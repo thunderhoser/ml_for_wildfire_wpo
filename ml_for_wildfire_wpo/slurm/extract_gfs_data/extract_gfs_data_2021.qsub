@@ -1,0 +1,38 @@
+#!/bin/tcsh
+
+#SBATCH --job-name="store_raw_satellite_data"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="batch"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=30:00:00
+#SBATCH --array=1-4
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=store_raw_satellite_data_%A_%a.out
+
+module load hpss
+module load gnu/9.2.0
+module load wgrib2/3.1.1_ncep
+
+set EXTRACTION_SCRIPT_FILE_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/prep_gfs_0p25deg_from_hpss.sh"
+
+# set FIRST_DATE_STRINGS=("2021/01/01" "2021/04/01" "2021/07/01" "2021/10/01")
+# set DAY_COUNTS=("90" "91" "92" "92")
+
+set FIRST_DATE_STRINGS=("2021/01/02" "2021/04/01" "2021/07/01" "2021/10/01")
+set DAY_COUNTS=("89" "91" "92" "92")
+
+set first_date_string=${FIRST_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}
+set num_days=${DAY_COUNTS[$SLURM_ARRAY_TASK_ID]}
+
+${EXTRACTION_SCRIPT_FILE_NAME} -d "${first_date_string}" -n ${num_days}
