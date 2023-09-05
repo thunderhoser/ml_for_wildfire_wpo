@@ -34,6 +34,26 @@ ALL_FIELD_NAMES = [
 ]
 
 
+def check_field_name(field_name):
+    """Ensures validity of field name.
+
+    :param field_name: Name of weather field.
+    :raises: ValueError: if `field_name not in ALL_FIELD_NAMES`.
+    """
+
+    error_checking.assert_is_string(field_name)
+    if field_name in ALL_FIELD_NAMES:
+        return
+
+    error_string = (
+        'Field "{0:s}" is not in the list of recognized fields (below):\n{1:s}'
+    ).format(
+        field_name, str(ALL_FIELD_NAMES)
+    )
+
+    raise ValueError(error_string)
+
+
 def desired_longitudes_to_columns(start_longitude_deg_e, end_longitude_deg_e):
     """Converts desired longitudes to desired grid columns.
 

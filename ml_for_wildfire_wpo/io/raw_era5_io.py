@@ -78,7 +78,7 @@ def _precip_hour_to_grib_search_string(precip_hour_start_time_unix_sec):
 
 def read_one_nonprecip_field(
         grib_file_name, field_name, valid_time_matrix_unix_sec,
-        desired_column_indices):
+        desired_column_indices, wgrib_exe_name, temporary_dir_name):
     """Extracts one field (anything except precip) from GRIB file.
 
     M = number of rows in grid
@@ -90,6 +90,9 @@ def read_one_nonprecip_field(
     :param valid_time_matrix_unix_sec: M-by-N numpy array of valid times.
     :param desired_column_indices: length-N numpy array with indices of desired
         grid columns from ERA5 data.
+    :param wgrib_exe_name: Path to wgrib executable.
+    :param temporary_dir_name: Path to temporary directory for text files
+        created by wgrib.
     :return: data_matrix: M-by-N numpy array of data values.
     """
 
@@ -142,7 +145,11 @@ def read_one_nonprecip_field(
             field_name_grib1=this_search_string,
             num_grid_rows=len(era5_utils.GRID_LATITUDES_DEG_N),
             num_grid_columns=
-            len(era5_utils.GRID_LONGITUDES_NEGATIVE_IN_WEST_DEG_E)
+            len(era5_utils.GRID_LONGITUDES_NEGATIVE_IN_WEST_DEG_E),
+            wgrib_exe_name=wgrib_exe_name,
+            temporary_dir_name=temporary_dir_name,
+            sentinel_value=None,
+            raise_error_if_fails=True
         )
         this_data_matrix = this_data_matrix[:, desired_column_indices]
         this_data_matrix = numpy.flip(this_data_matrix, axis=0)
@@ -155,7 +162,8 @@ def read_one_nonprecip_field(
 
 
 def read_24hour_precip_field(
-        grib_file_name, valid_time_matrix_unix_sec, desired_column_indices):
+        grib_file_name, valid_time_matrix_unix_sec, desired_column_indices,
+        wgrib_exe_name, temporary_dir_name):
     """Reads one field (24-hour accumulated precip) from GRIB file.
 
     M = number of rows in grid
@@ -164,6 +172,8 @@ def read_24hour_precip_field(
     :param grib_file_name: See doc for `read_one_nonprecip_field`.
     :param valid_time_matrix_unix_sec: Same.
     :param desired_column_indices: Same.
+    :param wgrib_exe_name: Same.
+    :param temporary_dir_name: Same.
     :return: precip_matrix_24hour_metres: M-by-N numpy array of precip
         accumulations.
     """
@@ -225,7 +235,11 @@ def read_24hour_precip_field(
             field_name_grib1=this_search_string,
             num_grid_rows=len(era5_utils.GRID_LATITUDES_DEG_N),
             num_grid_columns=
-            len(era5_utils.GRID_LONGITUDES_NEGATIVE_IN_WEST_DEG_E)
+            len(era5_utils.GRID_LONGITUDES_NEGATIVE_IN_WEST_DEG_E),
+            wgrib_exe_name=wgrib_exe_name,
+            temporary_dir_name=temporary_dir_name,
+            sentinel_value=None,
+            raise_error_if_fails=True
         )
         this_data_matrix = this_data_matrix[:, desired_column_indices]
         this_data_matrix = numpy.flip(this_data_matrix, axis=0)
