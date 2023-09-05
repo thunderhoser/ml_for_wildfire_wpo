@@ -1,4 +1,4 @@
-"""Time zones."""
+"""Input/output methods for time-zone data."""
 
 import os
 import xarray
@@ -23,4 +23,6 @@ def read_file(netcdf_file_name=None):
         netcdf_file_name = '{0:s}/time_zone_map.nc'.format(THIS_DIRECTORY_NAME)
 
     error_checking.assert_file_exists(netcdf_file_name)
+
+    print('Reading time-zone map from: "{0:s}"...'.format(netcdf_file_name))
     return xarray.open_dataset(netcdf_file_name)
