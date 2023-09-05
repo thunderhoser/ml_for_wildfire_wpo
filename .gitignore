@@ -1,0 +1,22 @@
+# Byte-compiled, optimized, and DLL files.
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution and packaging.
+build/
+dist/
+*.egg-info/
+
+# IntelliJ things.
+.idea/
+*.iml
+
+# Slurm scripts.
+slurm/
+
+# Code that I don't intend to commit.
+ml_for_wildfire_wpo/*.py
+ml_for_wildfire_wpo/dead_scratch_code/
+
+ml_for_wildfire_wpo/*.jpg
