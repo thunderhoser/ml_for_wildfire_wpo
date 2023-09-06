@@ -39,18 +39,18 @@ SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
 ALL_FIELD_NAMES = era5_utils.ALL_FIELD_NAMES
 
-ERA5_FILE_ARG_NAME = 'input_era5_grib_file_name'
+INPUT_DIR_ARG_NAME = 'input_grib_dir_name'
 START_DATE_ARG_NAME = 'start_date_string'
 END_DATE_ARG_NAME = 'end_date_string'
 START_LONGITUDE_ARG_NAME = 'start_longitude_deg_e'
 END_LONGITUDE_ARG_NAME = 'end_longitude_deg_e'
 WGRIB_EXE_ARG_NAME = 'wgrib_exe_file_name'
 TEMPORARY_DIR_ARG_NAME = 'temporary_dir_name'
-OUTPUT_DIR_ARG_NAME = 'output_dir_name'
+OUTPUT_DIR_ARG_NAME = 'output_netcdf_dir_name'
 
-ERA5_FILE_HELP_STRING = (
-    'Path to grib file with ERA5 data, described in the docstring at the top '
-    'of this script.'
+INPUT_DIR_HELP_STRING = (
+    'Name of input directory, containing one GRIB file per year.  Files '
+    'therein will be found by `raw_era5_io.find_file`.'
 )
 START_DATE_HELP_STRING = (
     'Start date (format "yyyymmdd").  This script will process all dates in '
@@ -79,8 +79,8 @@ OUTPUT_DIR_HELP_STRING = (
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
-    '--' + ERA5_FILE_ARG_NAME, type=str, required=True,
-    help=ERA5_FILE_HELP_STRING
+    '--' + INPUT_DIR_ARG_NAME, type=str, required=True,
+    help=INPUT_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + START_DATE_ARG_NAME, type=str, required=True,
@@ -112,14 +112,14 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
-def _run(era5_grib_file_name, start_date_string, end_date_string,
+def _run(input_dir_name, start_date_string, end_date_string,
          start_longitude_deg_e, end_longitude_deg_e, wgrib_exe_name,
          temporary_dir_name, output_dir_name):
     """Processes ERA5 data.
 
     This is effectively the main method.
 
-    :param era5_grib_file_name: See documentation at top of file.
+    :param input_dir_name: See documentation at top of file.
     :param start_date_string: Same.
     :param end_date_string: Same.
     :param start_longitude_deg_e: Same.
@@ -174,7 +174,7 @@ def _run(era5_grib_file_name, start_date_string, end_date_string,
 
             if ALL_FIELD_NAMES[k] == era5_utils.HOURLY_PRECIP_NAME:
                 data_matrix[..., k] = raw_era5_io.read_24hour_precip_field(
-                    grib_file_name=era5_grib_file_name,
+                    grib_directory_name=input_dir_name,
                     valid_time_matrix_unix_sec=valid_time_matrix_unix_sec,
                     desired_column_indices=desired_column_indices,
                     wgrib_exe_name=wgrib_exe_name,
@@ -182,7 +182,7 @@ def _run(era5_grib_file_name, start_date_string, end_date_string,
                 )
             else:
                 data_matrix[..., k] = raw_era5_io.read_one_nonprecip_field(
-                    grib_file_name=era5_grib_file_name,
+                    grib_directory_name=input_dir_name,
                     field_name=ALL_FIELD_NAMES[k],
                     valid_time_matrix_unix_sec=valid_time_matrix_unix_sec,
                     desired_column_indices=desired_column_indices,
@@ -240,7 +240,7 @@ if __name__ == '__main__':
     INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
 
     _run(
-        era5_grib_file_name=getattr(INPUT_ARG_OBJECT, ERA5_FILE_ARG_NAME),
+        input_dir_name=getattr(INPUT_ARG_OBJECT, INPUT_DIR_ARG_NAME),
         start_date_string=getattr(INPUT_ARG_OBJECT, START_DATE_ARG_NAME),
         end_date_string=getattr(INPUT_ARG_OBJECT, END_DATE_ARG_NAME),
         start_longitude_deg_e=getattr(
