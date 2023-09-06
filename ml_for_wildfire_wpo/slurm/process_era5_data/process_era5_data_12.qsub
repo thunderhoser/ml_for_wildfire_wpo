@@ -1,0 +1,46 @@
+#!/bin/tcsh
+
+#SBATCH --job-name="process_era5_data"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="batch"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=04:00:00
+#SBATCH --array=12
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=process_era5_data_%A_%a.out
+
+module load cuda/10.1
+source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
+conda activate base
+
+set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+set INPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_data/raw"
+set OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_data/processed"
+set WGRIB_EXE_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/wgrib/wgrib"
+
+set FIRST_DATE_STRINGS=("20180101" "20180201" "20180301" "20180401" "20180501" "20180601" "20180701" "20180801" "20180901" "20181001" "20181101" "20181201" "20190101" "20190201" "20190301" "20190401" "20190501" "20190601" "20190701" "20190801" "20190901" "20191001" "20191101" "20191201" "20200101" "20200201" "20200301" "20200401" "20200501" "20200601" "20200701" "20200801" "20200901" "20201001" "20201101" "20201201" "20210101" "20210201" "20210301" "20210401" "20210501" "20210601" "20210701" "20210801" "20210901" "20211001" "20211101" "20211201" "20220101" "20220201" "20220301" "20220401" "20220501" "20220601" "20220701" "20220801" "20220901" "20221001" "20221101" "20221201")
+set LAST_DATE_STRINGS=("20180131" "20180228" "20180331" "20180430" "20180531" "20180630" "20180731" "20180831" "20180930" "20181031" "20181130" "20181231" "20190131" "20190228" "20190331" "20190430" "20190531" "20190630" "20190731" "20190831" "20190930" "20191031" "20191130" "20191231" "20200131" "20200229" "20200331" "20200430" "20200531" "20200630" "20200731" "20200831" "20200930" "20201031" "20201130" "20201231" "20210131" "20210228" "20210331" "20210430" "20210531" "20210630" "20210731" "20210831" "20210930" "20211031" "20211130" "20211231" "20220131" "20220228" "20220331" "20220430" "20220531" "20220630" "20220731" "20220831" "20220930" "20221031" "20221130" "20221231")
+
+set first_date_string="${FIRST_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+set last_date_string="${LAST_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+
+python3 -u "${CODE_DIR_NAME}/process_era5_data.py" \
+--input_grib_dir_name="${INPUT_DIR_NAME}" \
+--start_date_string="${first_date_string}" \
+--end_date_string="${last_date_string}" \
+--start_longitude_deg_e=171 \
+--end_longitude_deg_e=-65 \
+--wgrib_exe_file_name="${WGRIB_EXE_NAME}" \
+--temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${first_date_string}-${last_date_string}" \
+--output_netcdf_dir_name="${OUTPUT_DIR_NAME}"

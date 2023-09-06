@@ -85,15 +85,15 @@ def _precip_hour_to_grib_search_string(precip_hour_start_time_unix_sec):
 
 
 def read_one_nonprecip_field(
-        grib_file_name, field_name, valid_time_matrix_unix_sec,
+        grib_directory_name, field_name, valid_time_matrix_unix_sec,
         desired_column_indices, wgrib_exe_name, temporary_dir_name):
     """Extracts one field (anything except precip) from GRIB file.
 
     M = number of rows in grid
     N = number of columns in grid
 
-    :param grib_file_name: Path to input file.  For more details on the
-        required format, see documentation at the top of this module.
+    :param grib_directory_name: Name of input directory.  Relevant files therein
+        will be found by `find_file`.
     :param field_name: Name of field (weather variable) to extract.
     :param valid_time_matrix_unix_sec: M-by-N numpy array of valid times.
     :param desired_column_indices: length-N numpy array with indices of desired
@@ -105,8 +105,6 @@ def read_one_nonprecip_field(
     """
 
     # Check input args.
-    error_checking.assert_file_exists(grib_file_name)
-
     error_checking.assert_is_numpy_array(
         valid_time_matrix_unix_sec, num_dimensions=2
     )
@@ -145,11 +143,20 @@ def read_one_nonprecip_field(
             this_time_string, grib_field_name
         )
 
+        this_time_string = time_conversion.unix_sec_to_string(
+            unique_valid_times_unix_sec[i], '%Y-%m-%d'
+        )
+        this_year = int(this_time_string[:4])
+        this_grib_file_name = find_file(
+            directory_name=grib_directory_name, year=this_year,
+            raise_error_if_missing=True
+        )
+
         print('Reading line "{0:s}" from GRIB file: "{1:s}"...'.format(
-            this_search_string, grib_file_name
+            this_search_string, this_grib_file_name
         ))
         this_data_matrix = grib_io.read_field_from_grib_file(
-            grib_file_name=grib_file_name,
+            grib_file_name=this_grib_file_name,
             field_name_grib1=this_search_string,
             num_grid_rows=len(era5_utils.GRID_LATITUDES_DEG_N),
             num_grid_columns=
@@ -170,14 +177,14 @@ def read_one_nonprecip_field(
 
 
 def read_24hour_precip_field(
-        grib_file_name, valid_time_matrix_unix_sec, desired_column_indices,
+        grib_directory_name, valid_time_matrix_unix_sec, desired_column_indices,
         wgrib_exe_name, temporary_dir_name):
     """Reads one field (24-hour accumulated precip) from GRIB file.
 
     M = number of rows in grid
     N = number of columns in grid
 
-    :param grib_file_name: See doc for `read_one_nonprecip_field`.
+    :param grib_directory_name: See doc for `read_one_nonprecip_field`.
     :param valid_time_matrix_unix_sec: Same.
     :param desired_column_indices: Same.
     :param wgrib_exe_name: Same.
@@ -187,8 +194,6 @@ def read_24hour_precip_field(
     """
 
     # Check input args.
-    error_checking.assert_file_exists(grib_file_name)
-
     error_checking.assert_is_numpy_array(
         valid_time_matrix_unix_sec, num_dimensions=2
     )
@@ -235,11 +240,20 @@ def read_24hour_precip_field(
             unique_precip_hour_start_times_unix_sec[k]
         )
 
+        this_start_time_string = time_conversion.unix_sec_to_string(
+            unique_precip_hour_start_times_unix_sec[k], '%Y-%m-%d'
+        )
+        this_year = int(this_start_time_string[:4])
+        this_grib_file_name = find_file(
+            directory_name=grib_directory_name, year=this_year,
+            raise_error_if_missing=True
+        )
+
         print('Reading line "{0:s}" from GRIB file: "{1:s}"...'.format(
-            this_search_string, grib_file_name
+            this_search_string, this_grib_file_name
         ))
         this_data_matrix = grib_io.read_field_from_grib_file(
-            grib_file_name=grib_file_name,
+            grib_file_name=this_grib_file_name,
             field_name_grib1=this_search_string,
             num_grid_rows=len(era5_utils.GRID_LATITUDES_DEG_N),
             num_grid_columns=
@@ -280,3 +294,46 @@ def read_24hour_precip_field(
     assert numpy.all(precip_matrix_24hour_metres >= 0.)
 
     return precip_matrix_24hour_metres
+
+
+def find_file(directory_name, year, raise_error_if_missing=True):
+    """Finds GRIB file with raw ERA5 data for one year.
+
+    :param directory_name: Path to input directory.
+    :param year: Year.
+    :param raise_error_if_missing: Boolean flag.  If file is missing and
+        `raise_error_if_missing == True`, will throw error.  If file is missing
+        and `raise_error_if_missing == False`, will return *expected* file path.
+    :return: era5_file_name: File path.
+    :raises: ValueError: if file is missing
+        and `raise_error_if_missing == True`.
+    """
+
+    error_checking.assert_is_string(directory_name)
+    error_checking.assert_is_integer(year)
+    error_checking.assert_is_greater(year, 0)
+    error_checking.assert_is_boolean(raise_error_if_missing)
+
+    era5_file_name = '{0:s}/raw_era5_{1:04d}.grb'.format(
+        directory_name, year
+    )
+
+    if raise_error_if_missing and not os.path.isfile(era5_file_name):
+        error_string = 'Cannot find file.  Expected at: "{0:s}"'.format(
+            era5_file_name
+        )
+        raise ValueError(error_string)
+
+    return era5_file_name
+
+
+def file_name_to_year(era5_file_name):
+    """Parses date from name of ERA5 file.
+
+    :param era5_file_name: File path.
+    :return: year: Year.
+    """
+
+    pathless_file_name = os.path.split(era5_file_name)[1]
+    extensionless_file_name = os.path.splitext(pathless_file_name)[0]
+    return int(extensionless_file_name.split('_')[2])
