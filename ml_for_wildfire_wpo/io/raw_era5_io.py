@@ -155,6 +155,7 @@ def read_one_nonprecip_field(
             num_grid_columns=
             len(era5_utils.GRID_LONGITUDES_NEGATIVE_IN_WEST_DEG_E),
             wgrib_exe_name=wgrib_exe_name,
+            wgrib2_exe_name=wgrib_exe_name,
             temporary_dir_name=temporary_dir_name,
             sentinel_value=None,
             raise_error_if_fails=True
@@ -252,6 +253,7 @@ def read_24hour_precip_field(
             num_grid_columns=
             len(era5_utils.GRID_LONGITUDES_NEGATIVE_IN_WEST_DEG_E),
             wgrib_exe_name=wgrib_exe_name,
+            wgrib2_exe_name=wgrib_exe_name,
             temporary_dir_name=temporary_dir_name,
             sentinel_value=None,
             raise_error_if_fails=True
