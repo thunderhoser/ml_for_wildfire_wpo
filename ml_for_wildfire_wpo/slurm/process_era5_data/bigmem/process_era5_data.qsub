@@ -1,8 +1,8 @@
 #!/bin/tcsh
 
 #SBATCH --job-name="process_era5_data"
-#SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
+#SBATCH --partition="bigmem"
+#SBATCH --account="gsd-hpcs"
 #SBATCH --qos="batch"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
