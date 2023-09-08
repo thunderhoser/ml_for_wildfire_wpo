@@ -242,7 +242,8 @@ def read_24hour_precip_field(
         )
 
         this_start_time_string = time_conversion.unix_sec_to_string(
-            unique_precip_hour_start_times_unix_sec[k], '%Y-%m-%d'
+            unique_precip_hour_start_times_unix_sec[k] + HOURS_TO_SECONDS,
+            '%Y-%m-%d'
         )
         this_year = int(this_start_time_string[:4])
         this_grib_file_name = find_file(
