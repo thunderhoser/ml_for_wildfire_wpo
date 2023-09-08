@@ -1,0 +1,44 @@
+#!/bin/tcsh
+
+#SBATCH --job-name="process_era5_data_patch"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="batch"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=08:00:00
+#SBATCH --array=1-75
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=process_era5_data_patch_%A_%a.out
+
+module load cuda/10.1
+source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
+conda activate base
+
+set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+set INPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_data/raw"
+set OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_data/processed"
+set WGRIB_EXE_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/wgrib/wgrib"
+
+set VALID_DATE_STRINGS=("20180101" "20180102" "20180103" "20180104" "20180105" "20180106" "20180107" "20180108" "20180109" "20180110" "20180111" "20180112" "20180113" "20180114" "20180115" "20181227" "20181228" "20181229" "20181230" "20181231" "20190101" "20190102" "20190103" "20190104" "20190105" "20190106" "20190107" "20190108" "20190109" "20190110" "20191222" "20191223" "20191224" "20191225" "20191226" "20191227" "20191228" "20191229" "20191230" "20191231" "20200101" "20200102" "20200103" "20200104" "20200105" "20201231" "20210101" "20210102" "20210103" "20210104" "20210105" "20210106" "20210107" "20210108" "20210109" "20210110" "20210111" "20210112" "20210113" "20210114" "20211226" "20211227" "20211228" "20211229" "20211230" "20211231" "20220101" "20220102" "20220103" "20220104" "20220105" "20220106" "20220107" "20220108" "20220109")
+
+set valid_date_string="${VALID_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+
+python3 -u "${CODE_DIR_NAME}/process_era5_data.py" \
+--input_grib_dir_name="${INPUT_DIR_NAME}" \
+--start_date_string="${valid_date_string}" \
+--end_date_string="${valid_date_string}" \
+--start_longitude_deg_e=171 \
+--end_longitude_deg_e=-65 \
+--wgrib_exe_file_name="${WGRIB_EXE_NAME}" \
+--temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${valid_date_string}-${valid_date_string}" \
+--output_netcdf_dir_name="${OUTPUT_DIR_NAME}"
