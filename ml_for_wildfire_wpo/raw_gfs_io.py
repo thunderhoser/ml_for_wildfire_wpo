@@ -252,17 +252,18 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
     # Do actual stuff.
     field_names_3d = gfs_utils.ALL_3D_FIELD_NAMES
     field_names_2d = gfs_utils.ALL_2D_FIELD_NAMES
+    forecast_hour = file_name_to_forecast_hour(grib2_file_name)
 
     num_grid_rows = len(desired_row_indices)
     num_grid_columns = len(desired_column_indices)
     num_3d_field_names = len(field_names_3d)
+    num_2d_field_names = len(field_names_2d)
     num_pressure_levels = len(PRESSURE_LEVELS_MB)
+
     these_dim = (
         num_grid_rows, num_grid_columns, num_pressure_levels, num_3d_field_names
     )
     data_matrix_3d = numpy.full(these_dim, numpy.nan)
-
-    num_2d_field_names = len(field_names_2d)
     data_matrix_2d = numpy.full(
         (num_grid_rows, num_grid_columns, num_2d_field_names), numpy.nan
     )
@@ -298,6 +299,14 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
             )
 
     for f in range(num_2d_field_names):
+        precip_field_names = [
+            gfs_utils.PRECIP_NAME, gfs_utils.CONVECTIVE_PRECIP_NAME
+        ]
+
+        if forecast_hour == 0 and field_names_2d[f] in precip_field_names:
+            data_matrix_2d[..., f] = 0.
+            continue
+
         print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
             FIELD_NAME_TO_GRIB_NAME[field_names_2d[f]],
             grib2_file_name
@@ -321,8 +330,6 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
         data_matrix_2d[..., f] = (
             this_data_matrix * FIELD_NAME_TO_CONV_FACTOR[field_names_2d[f]]
         )
-
-    forecast_hour = file_name_to_forecast_hour(grib2_file_name)
 
     coord_dict = {
         gfs_utils.FORECAST_HOUR_DIM: numpy.array([forecast_hour], dtype=int),
