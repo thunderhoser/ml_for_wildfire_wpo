@@ -299,11 +299,10 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
             )
 
     for f in range(num_2d_field_names):
-        precip_field_names = [
-            gfs_utils.PRECIP_NAME, gfs_utils.CONVECTIVE_PRECIP_NAME
-        ]
-
-        if forecast_hour == 0 and field_names_2d[f] in precip_field_names:
+        if (
+                forecast_hour == 0 and
+                field_names_2d[f] in gfs_utils.NO_0HOUR_ANALYSIS_FIELD_NAMES
+        ):
             data_matrix_2d[..., f] = 0.
             continue
 
