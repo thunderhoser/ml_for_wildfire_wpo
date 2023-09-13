@@ -149,8 +149,8 @@ def read_field_from_grib_file(
     error_checking.assert_is_greater(num_grid_rows, 0)
     error_checking.assert_is_integer(num_grid_columns)
     error_checking.assert_is_greater(num_grid_columns, 0)
-    error_checking.assert_file_exists(wgrib_exe_name)
-    error_checking.assert_file_exists(wgrib2_exe_name)
+    # error_checking.assert_file_exists(wgrib_exe_name)
+    # error_checking.assert_file_exists(wgrib2_exe_name)
     error_checking.assert_is_boolean(raise_error_if_fails)
     if sentinel_value is not None:
         error_checking.assert_is_not_nan(sentinel_value)
