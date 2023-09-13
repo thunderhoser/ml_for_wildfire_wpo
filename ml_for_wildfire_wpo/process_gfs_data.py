@@ -41,13 +41,13 @@ import gfs_utils
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
 # TODO(thunderhoser): Need to start processing precip at every hour in the run.
-# FORECAST_HOURS = numpy.array([
-#     0, 6, 12, 18, 24, 30, 36, 42, 48,
-#     60, 72, 84, 96, 108, 120,
-#     144, 168, 192, 216, 240, 264, 288, 312, 336
-# ], dtype=int)
+FORECAST_HOURS = numpy.array([
+    0, 6, 12, 18, 24, 30, 36, 42, 48,
+    60, 72, 84, 96, 108, 120,
+    144, 168, 192, 216, 240, 264, 288, 312, 336
+], dtype=int)
 
-FORECAST_HOURS = numpy.array([0, 6], dtype=int)
+# FORECAST_HOURS = numpy.array([0, 6], dtype=int)
 
 INPUT_DIR_ARG_NAME = 'input_grib2_dir_name'
 START_DATE_ARG_NAME = 'start_date_string'

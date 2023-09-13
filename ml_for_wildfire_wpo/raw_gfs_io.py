@@ -39,6 +39,7 @@ import gfs_utils
 
 TOLERANCE = 1e-6
 MM_TO_METRES = 0.001
+SENTINEL_VALUE = 9.999e20
 
 DATE_FORMAT = '%Y%m%d'
 JULIAN_DATE_FORMAT = '%y%j'
@@ -286,7 +287,7 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
                 wgrib_exe_name=wgrib2_exe_name,
                 wgrib2_exe_name=wgrib2_exe_name,
                 temporary_dir_name=temporary_dir_name,
-                sentinel_value=None,
+                sentinel_value=SENTINEL_VALUE,
                 raise_error_if_fails=True
             )
 
@@ -318,7 +319,7 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
             wgrib_exe_name=wgrib2_exe_name,
             wgrib2_exe_name=wgrib2_exe_name,
             temporary_dir_name=temporary_dir_name,
-            sentinel_value=None,
+            sentinel_value=SENTINEL_VALUE,
             raise_error_if_fails=True
         )
 
