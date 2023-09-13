@@ -19,7 +19,7 @@ Storage System (HPSS) with the following options:
   longwave radiative flux, upward longwave radiative flux, CAPE, soil
   temperature, volumetric soil-moisture fraction, vegetation type, soil type
 
-The output will contain the same data, in NetCDF format, with one file per model
+The output will contain the same data, in zarr format, with one file per model
 run (init time).
 """
 
@@ -48,7 +48,7 @@ START_LONGITUDE_ARG_NAME = 'start_longitude_deg_e'
 END_LONGITUDE_ARG_NAME = 'end_longitude_deg_e'
 WGRIB2_EXE_ARG_NAME = 'wgrib2_exe_file_name'
 TEMPORARY_DIR_ARG_NAME = 'temporary_dir_name'
-OUTPUT_DIR_ARG_NAME = 'output_netcdf_dir_name'
+OUTPUT_DIR_ARG_NAME = 'output_zarr_dir_name'
 
 INPUT_DIR_HELP_STRING = (
     'Name of input directory, containing one GRIB2 file per model run (init '
@@ -84,7 +84,7 @@ TEMPORARY_DIR_HELP_STRING = (
 )
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Processed files will be written here (one '
-    'NetCDF per model run) by `gfs_io.write_file`, to exact locations '
+    'zarr file per model run) by `gfs_io.write_file`, to exact locations '
     'determined by `gfs_io.find_file`.'
 )
 
