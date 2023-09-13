@@ -95,6 +95,11 @@ def file_name_to_type(grib_file_name):
     if grib_file_name.endswith(GRIB2_FILE_EXTENSION):
         return GRIB2_FILE_TYPE
 
+    # TODO(thunderhoser): Hack for GFS data on HPSS.
+    file_extension_string = os.path.splitext(grib_file_name)[1]
+    if file_extension_string == '':
+        return GRIB2_FILE_TYPE
+
     error_string = (
         'File type should be either "{0:s}" or "{1:s}".  Instead, got: "{2:s}"'
     ).format(GRIB1_FILE_TYPE, GRIB2_FILE_TYPE, grib_file_name)
