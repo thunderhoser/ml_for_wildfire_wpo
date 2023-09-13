@@ -61,6 +61,8 @@ def desired_longitudes_to_columns(start_longitude_deg_e, end_longitude_deg_e):
         be in either format (positive or negative values in western hemisphere).
     :param end_longitude_deg_e: Longitude at end of desired range.  This may
         be in either format.
+    :return: desired_column_indices: 1-D numpy array with indices of desired
+        columns.
     """
 
     start_longitude_deg_e = number_rounding.floor_to_nearest(

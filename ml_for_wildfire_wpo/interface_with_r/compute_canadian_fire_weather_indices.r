@@ -3,11 +3,11 @@
 library(cffdrs)
 require(raster)
 
-INPUT_DIR_NAME <- '/home/ralager/ml_for_wildfire_wpo_stuff/era5_data/processed/tif_format'
-OUTPUT_DIR_NAME <- '/home/ralager/ml_for_wildfire_wpo_stuff/era5_data/processed/tif_format/with_fire_weather_indices'
+INPUT_DIR_NAME <- '/home/ralager/ml_for_wildfire_wpo_stuff/processed_era5/tif_format'
+OUTPUT_DIR_NAME <- '/home/ralager/ml_for_wildfire_wpo_stuff/processed_era5/tif_format/with_fire_weather_indices'
 
-START_DATE_OBJECT <- as.Date('2018-12-01')
-END_DATE_OBJECT <- as.Date('2022-12-31')
+START_DATE_OBJECT <- as.Date('2018-01-02')
+END_DATE_OBJECT <- as.Date('2022-12-30')
 
 if (!file.exists(OUTPUT_DIR_NAME)) {
   dir.create(OUTPUT_DIR_NAME, recursive=TRUE)
