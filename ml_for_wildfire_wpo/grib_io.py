@@ -205,7 +205,19 @@ def read_field_from_grib_file(
 
     try:
         field_matrix = numpy.reshape(
-            field_vector, (num_grid_rows, num_grid_columns))
+            field_vector, (num_grid_rows, num_grid_columns)
+        )
+        return _sentinel_value_to_nan(
+            data_matrix=field_matrix, sentinel_value=sentinel_value
+        )
+    except:
+        pass
+
+    try:
+        field_matrix = numpy.reshape(
+            field_vector, (num_grid_rows, num_grid_columns, 2)
+        )
+        field_matrix = field_matrix[..., 0]
     except ValueError as this_exception:
         if raise_error_if_fails:
             raise
@@ -218,7 +230,8 @@ def read_field_from_grib_file(
         return None
 
     return _sentinel_value_to_nan(
-        data_matrix=field_matrix, sentinel_value=sentinel_value)
+        data_matrix=field_matrix, sentinel_value=sentinel_value
+    )
 
 
 def is_u_wind_field(field_name_grib1):
