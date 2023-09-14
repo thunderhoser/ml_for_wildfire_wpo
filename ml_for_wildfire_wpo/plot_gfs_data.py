@@ -24,6 +24,7 @@ import gfs_utils
 import plotting_utils
 import gfs_plotting
 
+TOLERANCE = 1e-6
 DATE_FORMAT = '%Y%m%d'
 
 SEQUENTIAL_COLOUR_MAP_OBJECT = pyplot.get_cmap('viridis')
@@ -135,6 +136,10 @@ def _plot_one_field(
         max_colour_value = numpy.nanpercentile(
             numpy.absolute(data_matrix), max_colour_percentile
         )
+        if numpy.isnan(max_colour_value):
+            max_colour_value = TOLERANCE
+
+        max_colour_value = max([max_colour_value, TOLERANCE])
         min_colour_value = -1 * max_colour_value
     else:
         colour_map_object = SEQUENTIAL_COLOUR_MAP_OBJECT
@@ -144,6 +149,12 @@ def _plot_one_field(
         max_colour_value = numpy.nanpercentile(
             data_matrix, max_colour_percentile
         )
+
+        if numpy.isnan(min_colour_value):
+            min_colour_value = 0.
+            max_colour_value = TOLERANCE
+
+        max_colour_value = max([max_colour_value, min_colour_value + TOLERANCE])
 
     colour_norm_object = pyplot.Normalize(
         vmin=min_colour_value, vmax=max_colour_value
