@@ -1,0 +1,51 @@
+#!/bin/tcsh
+
+#SBATCH --job-name="process_gfs_data_jan-mar"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="batch"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=24:00:00
+#SBATCH --array=6,21,22,28
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=process_gfs_data_jan-mar_%A_%a.out
+
+module load cuda/10.1
+module load gnu/9.2.0
+module load wgrib2/3.1.1_ncep
+
+source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
+conda activate base
+
+set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+set INPUT_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/gfs_data_for_fire_weather/grib2"
+set OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed"
+set WGRIB2_EXE_NAME="wgrib2"
+
+set FIRST_DATE_STRINGS=("20190101" "20190104" "20190107" "20190110" "20190113" "20190116" "20190119" "20190122" "20190125" "20190128" "20190131" "20190203" "20190206" "20190209" "20190212" "20190215" "20190218" "20190221" "20190224" "20190227" "20190302" "20190305" "20190308" "20190311" "20190314" "20190317" "20190320" "20190323" "20190326" "20190329")
+set LAST_DATE_STRINGS=("20190103" "20190106" "20190109" "20190112" "20190115" "20190118" "20190121" "20190124" "20190127" "20190130" "20190202" "20190205" "20190208" "20190211" "20190214" "20190217" "20190220" "20190223" "20190226" "20190301" "20190304" "20190307" "20190310" "20190313" "20190316" "20190319" "20190322" "20190325" "20190328" "20190331")
+
+set first_date_string="${FIRST_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+set last_date_string="${LAST_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+
+python3 -u "${CODE_DIR_NAME}/process_gfs_data.py" \
+--input_grib2_dir_name="${INPUT_DIR_NAME}" \
+--start_date_string="${first_date_string}" \
+--end_date_string="${last_date_string}" \
+--start_latitude_deg_n=10 \
+--end_latitude_deg_n=80 \
+--start_longitude_deg_e=160 \
+--end_longitude_deg_e=-55 \
+--wgrib2_exe_file_name="${WGRIB2_EXE_NAME}" \
+--temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${first_date_string}-${last_date_string}" \
+--output_zarr_dir_name="${OUTPUT_DIR_NAME}"
