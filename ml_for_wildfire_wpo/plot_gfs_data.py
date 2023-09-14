@@ -261,7 +261,7 @@ def _run(input_dir_name, field_names, pressure_levels_mb, init_date_strings,
             raise_error_if_missing=False
         )
 
-        if not os.path.isfile(gfs_file_name):
+        if not os.path.isdir(gfs_file_name):
             warning_string = (
                 'POTENTIAL ERROR.  Cannot find GFS file at expected location: '
                 '"{0:s}"'
