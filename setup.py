@@ -4,7 +4,8 @@ from setuptools import setup
 
 PACKAGE_NAMES = [
     'ml_for_wildfire_wpo', 'ml_for_wildfire_wpo.io',
-    'ml_for_wildfire_wpo.utils', 'ml_for_wildfire_wpo.scripts',
+    'ml_for_wildfire_wpo.utils', 'ml_for_wildfire_wpo.plotting',
+    'ml_for_wildfire_wpo.scripts',
 ]
 KEYWORDS = [
     'machine learning', 'deep learning', 'artificial intelligence',
