@@ -32,6 +32,7 @@ from ml_for_wildfire_wpo.utils import gfs_utils
 
 TOLERANCE = 1e-6
 MM_TO_METRES = 0.001
+SENTINEL_VALUE = 9.999e20
 
 DATE_FORMAT = '%Y%m%d'
 JULIAN_DATE_FORMAT = '%y%j'
@@ -279,13 +280,13 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
                 wgrib_exe_name=wgrib2_exe_name,
                 wgrib2_exe_name=wgrib2_exe_name,
                 temporary_dir_name=temporary_dir_name,
-                sentinel_value=None,
+                sentinel_value=SENTINEL_VALUE,
                 raise_error_if_fails=True
             )
 
             this_data_matrix = this_data_matrix[desired_row_indices, :]
             this_data_matrix = this_data_matrix[:, desired_column_indices]
-            assert not numpy.any(numpy.isnan(this_data_matrix))
+            # assert not numpy.any(numpy.isnan(this_data_matrix))
 
             data_matrix_3d[..., p, f] = (
                 this_data_matrix * FIELD_NAME_TO_CONV_FACTOR[field_names_3d[f]]
@@ -311,13 +312,13 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
             wgrib_exe_name=wgrib2_exe_name,
             wgrib2_exe_name=wgrib2_exe_name,
             temporary_dir_name=temporary_dir_name,
-            sentinel_value=None,
+            sentinel_value=SENTINEL_VALUE,
             raise_error_if_fails=True
         )
 
         this_data_matrix = this_data_matrix[desired_row_indices, :]
         this_data_matrix = this_data_matrix[:, desired_column_indices]
-        assert not numpy.any(numpy.isnan(this_data_matrix))
+        # assert not numpy.any(numpy.isnan(this_data_matrix))
 
         data_matrix_2d[..., f] = (
             this_data_matrix * FIELD_NAME_TO_CONV_FACTOR[field_names_2d[f]]

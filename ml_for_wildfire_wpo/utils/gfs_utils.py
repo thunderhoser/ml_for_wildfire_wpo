@@ -1,6 +1,7 @@
 """Helper methods for GFS model."""
 
 import xarray
+from gewittergefahr.gg_utils import error_checking
 
 FORECAST_HOUR_DIM = 'forecast_hour'
 LATITUDE_DIM = 'latitude_deg_n'
@@ -83,6 +84,27 @@ NO_0HOUR_ANALYSIS_FIELD_NAMES = [
     UPWARD_SURFACE_SHORTWAVE_FLUX_METRES, UPWARD_SURFACE_LONGWAVE_FLUX_METRES,
     UPWARD_TOA_SHORTWAVE_FLUX_METRES, UPWARD_TOA_LONGWAVE_FLUX_METRES
 ]
+
+
+def check_field_name(field_name):
+    """Ensures that field name is valid.
+
+    :param field_name: String (must be in list `ALL_FIELD_NAMES`).
+    :raises: ValueError: if `field_name not in ALL_FIELD_NAMES`.
+    """
+
+    error_checking.assert_is_string(field_name)
+    if field_name in ALL_FIELD_NAMES:
+        return
+
+    error_string = (
+        'Field name "{0:s}" is not in the list of accepted field names '
+        '(below):\n{1:s}'
+    ).format(
+        field_name, ALL_FIELD_NAMES
+    )
+
+    raise ValueError(error_string)
 
 
 def concat_over_forecast_hours(gfs_tables_xarray):
