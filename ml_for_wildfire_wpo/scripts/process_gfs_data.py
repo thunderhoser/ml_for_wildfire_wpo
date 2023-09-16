@@ -28,11 +28,11 @@ import numpy
 from gewittergefahr.gg_utils import time_conversion
 from ml_for_wildfire_wpo.io import gfs_io
 from ml_for_wildfire_wpo.io import raw_gfs_io
+from ml_for_wildfire_wpo.io import raw_ncar_gfs_io
 from ml_for_wildfire_wpo.utils import gfs_utils
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
-# TODO(thunderhoser): Need to start processing precip at every hour in the run.
 FORECAST_HOURS = numpy.array([
     0, 6, 12, 18, 24, 30, 36, 42, 48,
     60, 72, 84, 96, 108, 120,
@@ -48,6 +48,7 @@ START_LONGITUDE_ARG_NAME = 'start_longitude_deg_e'
 END_LONGITUDE_ARG_NAME = 'end_longitude_deg_e'
 WGRIB2_EXE_ARG_NAME = 'wgrib2_exe_file_name'
 TEMPORARY_DIR_ARG_NAME = 'temporary_dir_name'
+IS_NCAR_FORMAT_ARG_NAME = 'is_ncar_format'
 OUTPUT_DIR_ARG_NAME = 'output_zarr_dir_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -81,6 +82,10 @@ END_LONGITUDE_HELP_STRING = 'Same as {0:s} but end longitude.'.format(
 WGRIB2_EXE_HELP_STRING = 'Path to wgrib2 executable.'
 TEMPORARY_DIR_HELP_STRING = (
     'Path to temporary directory for text files created by wgrib2.'
+)
+IS_NCAR_FORMAT_HELP_STRING = (
+    'Boolean flag.  If 1, will except all raw data in NCAR format, in which '
+    'case this script will call raw_ncar_gfs_io.py instead of raw_gfs_io.py.'
 )
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Processed files will be written here (one '
@@ -126,6 +131,10 @@ INPUT_ARG_PARSER.add_argument(
     help=TEMPORARY_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + IS_NCAR_FORMAT_ARG_NAME, type=int, required=False, default=0,
+    help=IS_NCAR_FORMAT_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
@@ -134,7 +143,7 @@ INPUT_ARG_PARSER.add_argument(
 def _run(input_dir_name, start_date_string, end_date_string,
          start_latitude_deg_n, end_latitude_deg_n, start_longitude_deg_e,
          end_longitude_deg_e, wgrib2_exe_name, temporary_dir_name,
-         output_dir_name):
+         is_ncar_format, output_dir_name):
     """Processes GFS data.
 
     This is effectively the main method.
@@ -148,6 +157,7 @@ def _run(input_dir_name, start_date_string, end_date_string,
     :param end_longitude_deg_e: Same.
     :param wgrib2_exe_name: Same.
     :param temporary_dir_name: Same.
+    :param is_ncar_format: Same.
     :param output_dir_name: Same.
     """
 
@@ -169,19 +179,35 @@ def _run(input_dir_name, start_date_string, end_date_string,
         gfs_tables_xarray = [None] * num_forecast_hours
 
         for k in range(num_forecast_hours):
-            input_file_name = raw_gfs_io.find_file(
-                directory_name=input_dir_name,
-                init_date_string=this_date_string,
-                forecast_hour=FORECAST_HOURS[k],
-                raise_error_if_missing=True
-            )
-            gfs_tables_xarray[k] = raw_gfs_io.read_file(
-                grib2_file_name=input_file_name,
-                desired_row_indices=desired_row_indices,
-                desired_column_indices=desired_column_indices,
-                wgrib2_exe_name=wgrib2_exe_name,
-                temporary_dir_name=temporary_dir_name
-            )
+            if is_ncar_format:
+                input_file_name = raw_ncar_gfs_io.find_file(
+                    directory_name=input_dir_name,
+                    init_date_string=this_date_string,
+                    forecast_hour=FORECAST_HOURS[k],
+                    raise_error_if_missing=True
+                )
+                gfs_tables_xarray[k] = raw_ncar_gfs_io.read_file(
+                    grib2_file_name=input_file_name,
+                    desired_row_indices=desired_row_indices,
+                    desired_column_indices=desired_column_indices,
+                    wgrib2_exe_name=wgrib2_exe_name,
+                    temporary_dir_name=temporary_dir_name
+                )
+            else:
+                input_file_name = raw_gfs_io.find_file(
+                    directory_name=input_dir_name,
+                    init_date_string=this_date_string,
+                    forecast_hour=FORECAST_HOURS[k],
+                    raise_error_if_missing=True
+                )
+                gfs_tables_xarray[k] = raw_gfs_io.read_file(
+                    grib2_file_name=input_file_name,
+                    desired_row_indices=desired_row_indices,
+                    desired_column_indices=desired_column_indices,
+                    wgrib2_exe_name=wgrib2_exe_name,
+                    temporary_dir_name=temporary_dir_name
+                )
+
             print(SEPARATOR_STRING)
 
         gfs_table_xarray = gfs_utils.concat_over_forecast_hours(
@@ -215,5 +241,6 @@ if __name__ == '__main__':
         end_longitude_deg_e=getattr(INPUT_ARG_OBJECT, END_LONGITUDE_ARG_NAME),
         wgrib2_exe_name=getattr(INPUT_ARG_OBJECT, WGRIB2_EXE_ARG_NAME),
         temporary_dir_name=getattr(INPUT_ARG_OBJECT, TEMPORARY_DIR_ARG_NAME),
+        is_ncar_format=bool(getattr(INPUT_ARG_OBJECT, IS_NCAR_FORMAT_ARG_NAME)),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )

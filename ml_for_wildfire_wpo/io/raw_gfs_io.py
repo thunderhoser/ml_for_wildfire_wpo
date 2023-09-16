@@ -21,6 +21,7 @@ Storage System (HPSS) with the following options:
 """
 
 import os
+import warnings
 import numpy
 import xarray
 from gewittergefahr.gg_io import grib_io
@@ -31,8 +32,10 @@ from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.utils import gfs_utils
 
 TOLERANCE = 1e-6
-MM_TO_METRES = 0.001
 SENTINEL_VALUE = 9.999e20
+
+DAYS_TO_HOURS = 24
+MM_TO_METRES = 0.001
 
 DATE_FORMAT = '%Y%m%d'
 JULIAN_DATE_FORMAT = '%y%j'
@@ -80,12 +83,14 @@ FIELD_NAME_TO_GRIB_NAME = {
     gfs_utils.CAPE_FULL_COLUMN_NAME: 'CAPE:surface',
     gfs_utils.CAPE_BOTTOM_180MB_NAME: 'CAPE:180-0 mb above ground',
     gfs_utils.CAPE_BOTTOM_255MB_NAME: 'CAPE:255-0 mb above ground',
-    gfs_utils.DOWNWARD_SURFACE_SHORTWAVE_FLUX_METRES: 'DSWRF:surface',
-    gfs_utils.DOWNWARD_SURFACE_LONGWAVE_FLUX_METRES: 'DLWRF:surface',
-    gfs_utils.UPWARD_SURFACE_SHORTWAVE_FLUX_METRES: 'USWRF:surface',
-    gfs_utils.UPWARD_SURFACE_LONGWAVE_FLUX_METRES: 'ULWRF:surface',
-    gfs_utils.UPWARD_TOA_SHORTWAVE_FLUX_METRES: 'USWRF:top of atmosphere',
-    gfs_utils.UPWARD_TOA_LONGWAVE_FLUX_METRES: 'ULWRF:top of atmosphere'
+    gfs_utils.DOWNWARD_SURFACE_SHORTWAVE_FLUX_NAME: 'DSWRF:surface',
+    gfs_utils.DOWNWARD_SURFACE_LONGWAVE_FLUX_NAME: 'DLWRF:surface',
+    gfs_utils.UPWARD_SURFACE_SHORTWAVE_FLUX_NAME: 'USWRF:surface',
+    gfs_utils.UPWARD_SURFACE_LONGWAVE_FLUX_NAME: 'ULWRF:surface',
+    gfs_utils.UPWARD_TOA_SHORTWAVE_FLUX_NAME: 'USWRF:top of atmosphere',
+    gfs_utils.UPWARD_TOA_LONGWAVE_FLUX_NAME: 'ULWRF:top of atmosphere',
+    gfs_utils.VEGETATION_FRACTION_NAME: 'VEG:surface',
+    gfs_utils.SOIL_TYPE_NAME: 'SOTYP:surface'
 }
 
 FIELD_NAME_TO_CONV_FACTOR = {
@@ -116,12 +121,14 @@ FIELD_NAME_TO_CONV_FACTOR = {
     gfs_utils.CAPE_FULL_COLUMN_NAME: 1.,
     gfs_utils.CAPE_BOTTOM_180MB_NAME: 1.,
     gfs_utils.CAPE_BOTTOM_255MB_NAME: 1.,
-    gfs_utils.DOWNWARD_SURFACE_SHORTWAVE_FLUX_METRES: 1.,
-    gfs_utils.DOWNWARD_SURFACE_LONGWAVE_FLUX_METRES: 1.,
-    gfs_utils.UPWARD_SURFACE_SHORTWAVE_FLUX_METRES: 1.,
-    gfs_utils.UPWARD_SURFACE_LONGWAVE_FLUX_METRES: 1.,
-    gfs_utils.UPWARD_TOA_SHORTWAVE_FLUX_METRES: 1.,
-    gfs_utils.UPWARD_TOA_LONGWAVE_FLUX_METRES: 1.
+    gfs_utils.DOWNWARD_SURFACE_SHORTWAVE_FLUX_NAME: 1.,
+    gfs_utils.DOWNWARD_SURFACE_LONGWAVE_FLUX_NAME: 1.,
+    gfs_utils.UPWARD_SURFACE_SHORTWAVE_FLUX_NAME: 1.,
+    gfs_utils.UPWARD_SURFACE_LONGWAVE_FLUX_NAME: 1.,
+    gfs_utils.UPWARD_TOA_SHORTWAVE_FLUX_NAME: 1.,
+    gfs_utils.UPWARD_TOA_LONGWAVE_FLUX_NAME: 1.,
+    gfs_utils.VEGETATION_FRACTION_NAME: 0.01,
+    gfs_utils.SOIL_TYPE_NAME: 1.
 }
 
 
@@ -208,7 +215,9 @@ def file_name_to_forecast_hour(gfs_file_name):
 
 
 def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
-              wgrib2_exe_name, temporary_dir_name):
+              wgrib2_exe_name, temporary_dir_name,
+              field_names_3d=gfs_utils.ALL_3D_FIELD_NAMES,
+              field_names_2d=gfs_utils.ALL_2D_FIELD_NAMES):
     """Reads GFS data from GRIB2 file into xarray table.
 
     :param grib2_file_name: Path to input file.
@@ -219,6 +228,8 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
     :param wgrib2_exe_name: Path to wgrib2 executable.
     :param temporary_dir_name: Path to temporary directory for text files
         created by wgrib2.
+    :param field_names_3d: 1-D list with names of 3-D fields to read.
+    :param field_names_2d: 1-D list with names of 2-D fields to read.
     :return: gfs_table_xarray: xarray table with all data.  Metadata and
         variable names should make this table self-explanatory.
     """
@@ -243,9 +254,15 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
     )
     error_checking.assert_equals_numpy_array(numpy.diff(desired_row_indices), 1)
 
+    error_checking.assert_is_string_list(field_names_3d)
+    for this_field_name in field_names_3d:
+        gfs_utils.check_field_name(this_field_name)
+
+    error_checking.assert_is_string_list(field_names_2d)
+    for this_field_name in field_names_2d:
+        gfs_utils.check_field_name(this_field_name)
+
     # Do actual stuff.
-    field_names_3d = gfs_utils.ALL_3D_FIELD_NAMES
-    field_names_2d = gfs_utils.ALL_2D_FIELD_NAMES
     forecast_hour = file_name_to_forecast_hour(grib2_file_name)
 
     num_grid_rows = len(desired_row_indices)
@@ -297,24 +314,50 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
                 forecast_hour == 0 and
                 field_names_2d[f] in gfs_utils.NO_0HOUR_ANALYSIS_FIELD_NAMES
         ):
-            data_matrix_2d[..., f] = 0.
             continue
 
+        if field_names_2d[f] in [
+                gfs_utils.PRECIP_NAME, gfs_utils.CONVECTIVE_PRECIP_NAME
+        ]:
+            if numpy.mod(forecast_hour, DAYS_TO_HOURS) == 0:
+                grib_search_string = '{0:s}:0-{1:d} day acc'.format(
+                    FIELD_NAME_TO_GRIB_NAME[field_names_2d[f]],
+                    int(numpy.round(float(forecast_hour) / DAYS_TO_HOURS))
+                )
+            else:
+                grib_search_string = '{0:s}:0-{1:d} hour acc'.format(
+                    FIELD_NAME_TO_GRIB_NAME[field_names_2d[f]],
+                    forecast_hour
+                )
+        else:
+            grib_search_string = FIELD_NAME_TO_GRIB_NAME[field_names_2d[f]]
+
         print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
-            FIELD_NAME_TO_GRIB_NAME[field_names_2d[f]],
-            grib2_file_name
+            grib_search_string, grib2_file_name
         ))
         this_data_matrix = grib_io.read_field_from_grib_file(
             grib_file_name=grib2_file_name,
-            field_name_grib1=FIELD_NAME_TO_GRIB_NAME[field_names_2d[f]],
+            field_name_grib1=grib_search_string,
             num_grid_rows=len(GRID_LATITUDES_DEG_N),
             num_grid_columns=len(GRID_LONGITUDES_POSITIVE_IN_WEST_DEG_E),
             wgrib_exe_name=wgrib2_exe_name,
             wgrib2_exe_name=wgrib2_exe_name,
             temporary_dir_name=temporary_dir_name,
             sentinel_value=SENTINEL_VALUE,
-            raise_error_if_fails=True
+            raise_error_if_fails=
+            field_names_2d[f] not in gfs_utils.MAYBE_MISSING_FIELD_NAMES
         )
+
+        if this_data_matrix is None:
+            warning_string = (
+                'POTENTIAL ERROR: Cannot find line "{0:s}" in GRIB2 file: '
+                '"{1:s}"'
+            ).format(
+                grib_search_string, grib2_file_name
+            )
+
+            warnings.warn(warning_string)
+            continue
 
         this_data_matrix = this_data_matrix[desired_row_indices, :]
         this_data_matrix = this_data_matrix[:, desired_column_indices]
