@@ -34,12 +34,14 @@ FIELD_TO_CONV_FACTOR = {
     gfs_utils.CAPE_FULL_COLUMN_NAME: 1.,
     gfs_utils.CAPE_BOTTOM_180MB_NAME: 1.,
     gfs_utils.CAPE_BOTTOM_255MB_NAME: 1.,
-    gfs_utils.DOWNWARD_SURFACE_SHORTWAVE_FLUX_METRES: 1.,
-    gfs_utils.DOWNWARD_SURFACE_LONGWAVE_FLUX_METRES: 1.,
-    gfs_utils.UPWARD_SURFACE_SHORTWAVE_FLUX_METRES: 1.,
-    gfs_utils.UPWARD_SURFACE_LONGWAVE_FLUX_METRES: 1.,
-    gfs_utils.UPWARD_TOA_SHORTWAVE_FLUX_METRES: 1.,
-    gfs_utils.UPWARD_TOA_LONGWAVE_FLUX_METRES: 1.
+    gfs_utils.DOWNWARD_SURFACE_SHORTWAVE_FLUX_NAME: 1.,
+    gfs_utils.DOWNWARD_SURFACE_LONGWAVE_FLUX_NAME: 1.,
+    gfs_utils.UPWARD_SURFACE_SHORTWAVE_FLUX_NAME: 1.,
+    gfs_utils.UPWARD_SURFACE_LONGWAVE_FLUX_NAME: 1.,
+    gfs_utils.UPWARD_TOA_SHORTWAVE_FLUX_NAME: 1.,
+    gfs_utils.UPWARD_TOA_LONGWAVE_FLUX_NAME: 1.,
+    gfs_utils.VEGETATION_FRACTION_NAME: 1.,
+    gfs_utils.SOIL_TYPE_NAME: 1.
 }
 
 FIELD_TO_PLOTTING_UNIT_STRING = {
@@ -70,12 +72,14 @@ FIELD_TO_PLOTTING_UNIT_STRING = {
     gfs_utils.CAPE_FULL_COLUMN_NAME: r'J kg$^{-1}$',
     gfs_utils.CAPE_BOTTOM_180MB_NAME: r'J kg$^{-1}$',
     gfs_utils.CAPE_BOTTOM_255MB_NAME: r'J kg$^{-1}$',
-    gfs_utils.DOWNWARD_SURFACE_SHORTWAVE_FLUX_METRES: r'W m$^{-2}$',
-    gfs_utils.DOWNWARD_SURFACE_LONGWAVE_FLUX_METRES: r'W m$^{-2}$',
-    gfs_utils.UPWARD_SURFACE_SHORTWAVE_FLUX_METRES: r'W m$^{-2}$',
-    gfs_utils.UPWARD_SURFACE_LONGWAVE_FLUX_METRES: r'W m$^{-2}$',
-    gfs_utils.UPWARD_TOA_SHORTWAVE_FLUX_METRES: r'W m$^{-2}$',
-    gfs_utils.UPWARD_TOA_LONGWAVE_FLUX_METRES: r'W m$^{-2}$',
+    gfs_utils.DOWNWARD_SURFACE_SHORTWAVE_FLUX_NAME: r'W m$^{-2}$',
+    gfs_utils.DOWNWARD_SURFACE_LONGWAVE_FLUX_NAME: r'W m$^{-2}$',
+    gfs_utils.UPWARD_SURFACE_SHORTWAVE_FLUX_NAME: r'W m$^{-2}$',
+    gfs_utils.UPWARD_SURFACE_LONGWAVE_FLUX_NAME: r'W m$^{-2}$',
+    gfs_utils.UPWARD_TOA_SHORTWAVE_FLUX_NAME: r'W m$^{-2}$',
+    gfs_utils.UPWARD_TOA_LONGWAVE_FLUX_NAME: r'W m$^{-2}$',
+    gfs_utils.VEGETATION_FRACTION_NAME: 'unitless',
+    gfs_utils.SOIL_TYPE_NAME: 'unitless'
 }
 
 FIELD_NAME_TO_FANCY = {
@@ -106,12 +110,14 @@ FIELD_NAME_TO_FANCY = {
     gfs_utils.CAPE_FULL_COLUMN_NAME: 'column-total CAPE',
     gfs_utils.CAPE_BOTTOM_180MB_NAME: 'bottom-180-mb CAPE',
     gfs_utils.CAPE_BOTTOM_255MB_NAME: 'bottom-255-mb CAPE',
-    gfs_utils.DOWNWARD_SURFACE_SHORTWAVE_FLUX_METRES: 'downward sfc SW flux',
-    gfs_utils.DOWNWARD_SURFACE_LONGWAVE_FLUX_METRES: 'downward sfc LW flux',
-    gfs_utils.UPWARD_SURFACE_SHORTWAVE_FLUX_METRES: 'upward sfc SW flux',
-    gfs_utils.UPWARD_SURFACE_LONGWAVE_FLUX_METRES: 'upward sfc LW flux',
-    gfs_utils.UPWARD_TOA_SHORTWAVE_FLUX_METRES: 'upward TOA SW flux',
-    gfs_utils.UPWARD_TOA_LONGWAVE_FLUX_METRES: 'upward TOA LW flux'
+    gfs_utils.DOWNWARD_SURFACE_SHORTWAVE_FLUX_NAME: 'downward sfc SW flux',
+    gfs_utils.DOWNWARD_SURFACE_LONGWAVE_FLUX_NAME: 'downward sfc LW flux',
+    gfs_utils.UPWARD_SURFACE_SHORTWAVE_FLUX_NAME: 'upward sfc SW flux',
+    gfs_utils.UPWARD_SURFACE_LONGWAVE_FLUX_NAME: 'upward sfc LW flux',
+    gfs_utils.UPWARD_TOA_SHORTWAVE_FLUX_NAME: 'upward TOA SW flux',
+    gfs_utils.UPWARD_TOA_LONGWAVE_FLUX_NAME: 'upward TOA LW flux',
+    gfs_utils.VEGETATION_FRACTION_NAME: 'vegetation fraction',
+    gfs_utils.SOIL_TYPE_NAME: 'soil type'
 }
 
 
