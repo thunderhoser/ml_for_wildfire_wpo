@@ -230,7 +230,7 @@ def _run(main_gfs_dir_name, ncar_gfs_dir_name, start_date_string,
         )
         data_matrix_2d = main_gfs_table_xarray[gfs_utils.DATA_KEY_2D].values
         field_names_2d = (
-            main_gfs_table_xarray.coords[gfs_utils.FIELD_DIM_2D].values
+            main_gfs_table_xarray.coords[gfs_utils.FIELD_DIM_2D].values.tolist()
         )
 
         for k in range(num_fields_to_merge):
