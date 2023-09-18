@@ -95,9 +95,11 @@ def write_file(gfs_table_xarray, zarr_file_name):
     )
 
     encoding_dict = {
-        gfs_utils.DATA_KEY_2D: {'dtype': 'float32'},
-        gfs_utils.DATA_KEY_3D: {'dtype': 'float32'}
+        gfs_utils.DATA_KEY_2D: {'dtype': 'float32'}
     }
+    if gfs_utils.DATA_KEY_3D in gfs_table_xarray.data_vars:
+        encoding_dict[gfs_utils.DATA_KEY_3D] = {'dtype': 'float32'}
+
     gfs_table_xarray.to_zarr(
         store=zarr_file_name, mode='w', encoding=encoding_dict
     )
