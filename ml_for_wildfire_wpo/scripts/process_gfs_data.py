@@ -23,6 +23,9 @@ The output will contain the same data, in zarr format, with one file per model
 run (init time).
 """
 
+import os
+import copy
+import warnings
 import argparse
 import numpy
 from gewittergefahr.gg_utils import time_conversion
@@ -177,6 +180,7 @@ def _run(input_dir_name, start_date_string, end_date_string,
 
     for this_date_string in init_date_strings:
         gfs_tables_xarray = [None] * num_forecast_hours
+        found_0hour_file = False
 
         for k in range(num_forecast_hours):
             if is_ncar_format:
@@ -184,8 +188,15 @@ def _run(input_dir_name, start_date_string, end_date_string,
                     directory_name=input_dir_name,
                     init_date_string=this_date_string,
                     forecast_hour=FORECAST_HOURS[k],
-                    raise_error_if_missing=True
+                    raise_error_if_missing=FORECAST_HOURS[k] > 0
                 )
+
+                if FORECAST_HOURS[k] == 0:
+                    found_0hour_file = os.path.isfile(input_file_name)
+
+                if not os.path.isfile(input_file_name):
+                    continue
+
                 gfs_tables_xarray[k] = raw_ncar_gfs_io.read_file(
                     grib2_file_name=input_file_name,
                     desired_row_indices=desired_row_indices,
@@ -209,6 +220,41 @@ def _run(input_dir_name, start_date_string, end_date_string,
                 )
 
             print(SEPARATOR_STRING)
+
+        if not found_0hour_file:
+            missing_file_name = raw_ncar_gfs_io.find_file(
+                directory_name=input_dir_name,
+                init_date_string=this_date_string,
+                forecast_hour=0, raise_error_if_missing=False
+            )
+
+            warning_string = (
+                'POTENTIAL ERROR (but probably not): Could not find file at '
+                'forecast hour 0.  Expected at: "{0:s}".  All values at '
+                'forecast hour 0 will be NaN.'
+            ).format(missing_file_name)
+
+            warnings.warn(warning_string)
+
+            k = numpy.where(FORECAST_HOURS == 0)[0][0]
+            k_other = numpy.where(FORECAST_HOURS > 0)[0][0]
+            gfs_tables_xarray[k] = copy.deepcopy(gfs_tables_xarray[k_other])
+
+            gfs_tables_xarray[k] = gfs_tables_xarray[k].assign_coords({
+                gfs_utils.FORECAST_HOUR_DIM: numpy.array([0], dtype=int)
+            })
+
+            nan_matrix = numpy.full(
+                gfs_tables_xarray[k][gfs_utils.DATA_KEY_2D].values.shape,
+                numpy.nan
+            )
+
+            gfs_tables_xarray[k] = gfs_tables_xarray[k].assign({
+                gfs_utils.DATA_KEY_2D: (
+                    gfs_tables_xarray[k][gfs_utils.DATA_KEY_2D].dims,
+                    nan_matrix
+                )
+            })
 
         gfs_table_xarray = gfs_utils.concat_over_forecast_hours(
             gfs_tables_xarray
