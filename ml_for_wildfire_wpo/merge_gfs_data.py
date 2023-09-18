@@ -151,7 +151,7 @@ def _merge_data_1field_1init(
     orig_num_missing_values = numpy.sum(numpy.isnan(main_data_matrix))
 
     nan_flag_by_forecast_hour = numpy.all(
-        numpy.isnan(main_data_matrix), axis=(1, 2, 3)
+        numpy.isnan(main_data_matrix), axis=(1, 2)
     )
     nan_indices = numpy.where(nan_flag_by_forecast_hour)[0]
     if len(nan_indices) == 0:
