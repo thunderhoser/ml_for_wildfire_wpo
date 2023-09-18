@@ -94,6 +94,8 @@ def file_name_to_type(grib_file_name):
         return GRIB1_FILE_TYPE
     if grib_file_name.endswith(GRIB2_FILE_EXTENSION):
         return GRIB2_FILE_TYPE
+    if grib_file_name.endswith('.grib2'):
+        return GRIB2_FILE_TYPE
 
     # TODO(thunderhoser): Hack for GFS data on HPSS.
     file_extension_string = os.path.splitext(grib_file_name)[1]
