@@ -180,7 +180,7 @@ def _run(input_dir_name, start_date_string, end_date_string,
 
     for this_date_string in init_date_strings:
         gfs_tables_xarray = [None] * num_forecast_hours
-        found_0hour_file = False
+        found_0hour_file = True
 
         for k in range(num_forecast_hours):
             if is_ncar_format:
