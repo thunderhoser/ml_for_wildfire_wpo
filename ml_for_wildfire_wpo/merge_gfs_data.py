@@ -8,6 +8,7 @@ vegetation fraction, and soil type.
 
 import os
 import sys
+import warnings
 import argparse
 import numpy
 import xarray
@@ -29,6 +30,7 @@ MAIN_GFS_DIR_ARG_NAME = 'input_main_gfs_dir_name'
 NCAR_GFS_DIR_ARG_NAME = 'input_ncar_gfs_dir_name'
 START_DATE_ARG_NAME = 'start_date_string'
 END_DATE_ARG_NAME = 'end_date_string'
+ALLOW_MISSING_NCAR_ARG_NAME = 'allow_missing_ncar_files'
 MERGED_GFS_DIR_ARG_NAME = 'output_merged_gfs_dir_name'
 
 MAIN_GFS_DIR_HELP_STRING = (
@@ -47,6 +49,10 @@ START_DATE_HELP_STRING = (
 ).format(START_DATE_ARG_NAME, END_DATE_ARG_NAME)
 
 END_DATE_HELP_STRING = 'Same as {0:s} but end date.'.format(START_DATE_ARG_NAME)
+ALLOW_MISSING_NCAR_HELP_STRING = (
+    'Boolean flag.  If 1, when an NCAR file is missing, this script will just '
+    'copy the main GFS file into the "merged" directory.'
+)
 MERGED_GFS_DIR_HELP_STRING = (
     'Name of output directory.  Merged files will be written here (one '
     'zarr file per model run) by `gfs_io.write_file`, to exact locations '
@@ -69,6 +75,10 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + END_DATE_ARG_NAME, type=str, required=True,
     help=END_DATE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + ALLOW_MISSING_NCAR_ARG_NAME, type=int, required=False, default=0,
+    help=ALLOW_MISSING_NCAR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + MERGED_GFS_DIR_ARG_NAME, type=str, required=True,
@@ -133,7 +143,7 @@ def _merge_data_1field_1init(
 
 
 def _run(main_gfs_dir_name, ncar_gfs_dir_name, start_date_string,
-         end_date_string, merged_gfs_dir_name):
+         end_date_string, allow_missing_ncar_files, merged_gfs_dir_name):
     """Merges processed GFS files from two sources: NOAA HPSS and NCAR RDA.
 
     This is effectively the main method.
@@ -142,6 +152,7 @@ def _run(main_gfs_dir_name, ncar_gfs_dir_name, start_date_string,
     :param ncar_gfs_dir_name: Same.
     :param start_date_string: Same.
     :param end_date_string: Same.
+    :param allow_missing_ncar_files: Same.
     :param merged_gfs_dir_name: Same.
     """
 
@@ -159,42 +170,50 @@ def _run(main_gfs_dir_name, ncar_gfs_dir_name, start_date_string,
         ncar_gfs_file_name = gfs_io.find_file(
             directory_name=ncar_gfs_dir_name,
             init_date_string=this_date_string,
-            raise_error_if_missing=True
+            raise_error_if_missing=not allow_missing_ncar_files
         )
 
         print('Reading data from: "{0:s}"...'.format(main_gfs_file_name))
         main_gfs_table_xarray = gfs_io.read_file(main_gfs_file_name)
-
-        print('Reading data from: "{0:s}"...'.format(ncar_gfs_file_name))
-        ncar_gfs_table_xarray = gfs_io.read_file(ncar_gfs_file_name)
-
-        assert numpy.array_equal(
-            main_gfs_table_xarray.coords[gfs_utils.FORECAST_HOUR_DIM].values,
-            ncar_gfs_table_xarray.coords[gfs_utils.FORECAST_HOUR_DIM].values
-        )
-        assert numpy.allclose(
-            main_gfs_table_xarray.coords[gfs_utils.LATITUDE_DIM].values,
-            ncar_gfs_table_xarray.coords[gfs_utils.LATITUDE_DIM].values,
-            atol=TOLERANCE
-        )
-        assert numpy.allclose(
-            main_gfs_table_xarray.coords[gfs_utils.LONGITUDE_DIM].values,
-            ncar_gfs_table_xarray.coords[gfs_utils.LONGITUDE_DIM].values,
-            atol=TOLERANCE
-        )
 
         data_matrix_2d = main_gfs_table_xarray[gfs_utils.DATA_KEY_2D].values
         field_names_2d = (
             main_gfs_table_xarray.coords[gfs_utils.FIELD_DIM_2D].values
         )
 
-        for k in range(num_fields_to_merge):
-            this_merged_data_matrix, this_index = _merge_data_1field_1init(
-                main_gfs_table_xarray=main_gfs_table_xarray,
-                ncar_gfs_table_xarray=ncar_gfs_table_xarray,
-                field_name=FIELD_NAMES_TO_MERGE[k]
+        if os.path.isfile(ncar_gfs_file_name):
+            print('Reading data from: "{0:s}"...'.format(ncar_gfs_file_name))
+            ncar_gfs_table_xarray = gfs_io.read_file(ncar_gfs_file_name)
+
+            assert numpy.array_equal(
+                main_gfs_table_xarray.coords[gfs_utils.FORECAST_HOUR_DIM].values,
+                ncar_gfs_table_xarray.coords[gfs_utils.FORECAST_HOUR_DIM].values
             )
-            data_matrix_2d[..., this_index] = this_merged_data_matrix
+            assert numpy.allclose(
+                main_gfs_table_xarray.coords[gfs_utils.LATITUDE_DIM].values,
+                ncar_gfs_table_xarray.coords[gfs_utils.LATITUDE_DIM].values,
+                atol=TOLERANCE
+            )
+            assert numpy.allclose(
+                main_gfs_table_xarray.coords[gfs_utils.LONGITUDE_DIM].values,
+                ncar_gfs_table_xarray.coords[gfs_utils.LONGITUDE_DIM].values,
+                atol=TOLERANCE
+            )
+
+            for k in range(num_fields_to_merge):
+                this_merged_data_matrix, this_index = _merge_data_1field_1init(
+                    main_gfs_table_xarray=main_gfs_table_xarray,
+                    ncar_gfs_table_xarray=ncar_gfs_table_xarray,
+                    field_name=FIELD_NAMES_TO_MERGE[k]
+                )
+                data_matrix_2d[..., this_index] = this_merged_data_matrix
+        else:
+            warning_string = (
+                'POTENTIAL ERROR: Could not find NCAR GFS file.  Expected at: '
+                '"{0:s}"'
+            ).format(ncar_gfs_file_name)
+
+            warnings.warn(warning_string)
 
         data_dict = {}
         for var_name in main_gfs_table_xarray.data_vars:
@@ -242,5 +261,8 @@ if __name__ == '__main__':
         ncar_gfs_dir_name=getattr(INPUT_ARG_OBJECT, NCAR_GFS_DIR_ARG_NAME),
         start_date_string=getattr(INPUT_ARG_OBJECT, START_DATE_ARG_NAME),
         end_date_string=getattr(INPUT_ARG_OBJECT, END_DATE_ARG_NAME),
+        allow_missing_ncar_files=bool(
+            getattr(INPUT_ARG_OBJECT, ALLOW_MISSING_NCAR_ARG_NAME)
+        ),
         merged_gfs_dir_name=getattr(INPUT_ARG_OBJECT, MERGED_GFS_DIR_ARG_NAME)
     )
