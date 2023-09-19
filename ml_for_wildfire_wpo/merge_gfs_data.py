@@ -181,7 +181,7 @@ def _run(main_gfs_dir_name, ncar_gfs_dir_name, start_date_string,
             main_gfs_table_xarray.coords[gfs_utils.FIELD_DIM_2D].values
         )
 
-        if os.path.isfile(ncar_gfs_file_name):
+        if os.path.isdir(ncar_gfs_file_name):
             print('Reading data from: "{0:s}"...'.format(ncar_gfs_file_name))
             ncar_gfs_table_xarray = gfs_io.read_file(ncar_gfs_file_name)
 
