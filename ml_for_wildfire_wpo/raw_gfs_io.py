@@ -224,7 +224,8 @@ def file_name_to_forecast_hour(gfs_file_name):
 def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
               wgrib2_exe_name, temporary_dir_name,
               field_names_3d=gfs_utils.ALL_3D_FIELD_NAMES,
-              field_names_2d=gfs_utils.ALL_2D_FIELD_NAMES):
+              field_names_2d=gfs_utils.ALL_2D_FIELD_NAMES,
+              ignore_3d_fields=False):
     """Reads GFS data from GRIB2 file into xarray table.
 
     :param grib2_file_name: Path to input file.
@@ -288,6 +289,9 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
 
     for f in range(num_3d_field_names):
         for p in range(num_pressure_levels):
+            if ignore_3d_fields:
+                continue
+
             this_search_string = '{0:s}:{1:d} mb'.format(
                 FIELD_NAME_TO_GRIB_NAME[field_names_3d[f]],
                 PRESSURE_LEVELS_MB[p]
