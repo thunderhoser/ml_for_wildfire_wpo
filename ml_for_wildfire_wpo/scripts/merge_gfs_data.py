@@ -68,41 +68,6 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
-def _fix_0hour_fields_main_table(main_gfs_table_xarray):
-    """Fixes fields at forecast hour 0 in main GFS table.
-
-    For fields not available at forecast hour 0, I may have mistakenly filled
-    with zeros instead of NaN.  This method replaces all the zeros with NaN.
-
-    :param main_gfs_table_xarray: xarray table with main GFS data.
-    :return: main_gfs_table_xarray: Same but with NaN, instead of zeros, for
-        fields unavailable at forecast hour 0.
-    """
-
-    data_matrix_2d = main_gfs_table_xarray[gfs_utils.DATA_KEY_2D].values
-    j = numpy.where(
-        main_gfs_table_xarray.coords[gfs_utils.FORECAST_HOUR_DIM].values
-        == 0
-    )[0][0]
-
-    for this_field_name in gfs_utils.NO_0HOUR_ANALYSIS_FIELD_NAMES:
-        k = numpy.where(
-            main_gfs_table_xarray.coords[gfs_utils.FIELD_DIM_2D].values
-            == this_field_name
-        )[0][0]
-
-        data_matrix_2d[j, ..., k] = numpy.nan
-
-    main_gfs_table_xarray = main_gfs_table_xarray.assign({
-        gfs_utils.DATA_KEY_2D: (
-            main_gfs_table_xarray[gfs_utils.DATA_KEY_2D].dims,
-            data_matrix_2d
-        )
-    })
-
-    return main_gfs_table_xarray
-
-
 def _merge_data_1field_1init(
         main_gfs_table_xarray, ncar_gfs_table_xarray, field_name):
     """Merges data for one field and one init time (model run).
@@ -126,24 +91,17 @@ def _merge_data_1field_1init(
         ..., ncar_field_index
     ]
 
-    these_indices = numpy.where(
+    main_field_index = numpy.where(
         main_gfs_table_xarray.coords[gfs_utils.FIELD_DIM_2D].values ==
         field_name
-    )[0]
-    if len(these_indices) == 0:
-        print('Main GFS table does not contain {0:s} values.'.format(
-            field_name
-        ))
-        return ncar_data_matrix, None
-
-    main_field_index = these_indices[0]
+    )[0][0]
     main_data_matrix = main_gfs_table_xarray[gfs_utils.DATA_KEY_2D].values[
         ..., main_field_index
     ]
     orig_num_missing_values = numpy.sum(numpy.isnan(main_data_matrix))
 
     nan_flag_by_forecast_hour = numpy.all(
-        numpy.isnan(main_data_matrix), axis=(1, 2, 3)
+        numpy.isnan(main_data_matrix), axis=(1, 2)
     )
     nan_indices = numpy.where(nan_flag_by_forecast_hour)[0]
     if len(nan_indices) == 0:
@@ -217,9 +175,6 @@ def _run(main_gfs_dir_name, ncar_gfs_dir_name, start_date_string,
             atol=TOLERANCE
         )
 
-        main_gfs_table_xarray = _fix_0hour_fields_main_table(
-            main_gfs_table_xarray
-        )
         data_matrix_2d = main_gfs_table_xarray[gfs_utils.DATA_KEY_2D].values
         field_names_2d = (
             main_gfs_table_xarray.coords[gfs_utils.FIELD_DIM_2D].values
@@ -231,16 +186,7 @@ def _run(main_gfs_dir_name, ncar_gfs_dir_name, start_date_string,
                 ncar_gfs_table_xarray=ncar_gfs_table_xarray,
                 field_name=FIELD_NAMES_TO_MERGE[k]
             )
-
-            if this_index is None:
-                data_matrix_2d = numpy.concatenate((
-                    data_matrix_2d,
-                    numpy.expand_dims(this_merged_data_matrix, axis=-1)
-                ), axis=-1)
-
-                field_names_2d.append(FIELD_NAMES_TO_MERGE[k])
-            else:
-                data_matrix_2d[..., this_index] = this_merged_data_matrix
+            data_matrix_2d[..., this_index] = this_merged_data_matrix
 
         data_dict = {}
         for var_name in main_gfs_table_xarray.data_vars:
