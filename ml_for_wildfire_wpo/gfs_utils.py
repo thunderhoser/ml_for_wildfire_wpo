@@ -2,6 +2,7 @@
 
 import os
 import sys
+import numpy
 import xarray
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -34,7 +35,6 @@ U_WIND_10METRE_NAME = 'u_wind_10m_agl_m_s01'
 V_WIND_10METRE_NAME = 'v_wind_10m_agl_m_s01'
 SURFACE_PRESSURE_NAME = 'surface_pressure_pascals'
 
-# TODO(thunderhoser): Not sure what to do with these.
 PRECIP_NAME = 'accumulated_precip_metres'
 CONVECTIVE_PRECIP_NAME = 'accumulated_convective_precip_metres'
 
@@ -135,3 +135,91 @@ def concat_over_forecast_hours(gfs_tables_xarray):
         gfs_tables_xarray, dim=FORECAST_HOUR_DIM, data_vars='all',
         coords='minimal', compat='identical', join='exact'
     )
+
+
+def subset_by_row(gfs_table_xarray, desired_row_indices):
+    """Subsets GFS table by grid row.
+
+    :param gfs_table_xarray: xarray table with GFS forecasts.
+    :param desired_row_indices: 1-D numpy array with indices of desired rows.
+    :return: gfs_table_xarray: Same as input but maybe with fewer rows.
+    """
+
+    error_checking.assert_is_numpy_array(desired_row_indices, num_dimensions=1)
+    error_checking.assert_is_integer_numpy_array(desired_row_indices)
+    error_checking.assert_is_geq_numpy_array(desired_row_indices, 0)
+
+    return gfs_table_xarray.isel({LATITUDE_DIM: desired_row_indices})
+
+
+def subset_by_column(gfs_table_xarray, desired_column_indices):
+    """Subsets GFS table by grid column.
+
+    :param gfs_table_xarray: xarray table with GFS forecasts.
+    :param desired_column_indices: 1-D numpy array with indices of desired
+        columns.
+    :return: gfs_table_xarray: Same as input but maybe with fewer columns.
+    """
+
+    error_checking.assert_is_numpy_array(
+        desired_column_indices, num_dimensions=1
+    )
+    error_checking.assert_is_integer_numpy_array(desired_column_indices)
+    error_checking.assert_is_geq_numpy_array(desired_column_indices, 0)
+
+    return gfs_table_xarray.isel({LONGITUDE_DIM: desired_column_indices})
+
+
+def subset_by_forecast_hour(gfs_table_xarray, desired_forecast_hours):
+    """Subsets GFS table by forecast hour.
+
+    :param gfs_table_xarray: xarray table with GFS forecasts.
+    :param desired_forecast_hours: 1-D numpy array of desired forecast hours.
+    :return: gfs_table_xarray: Same as input but maybe with fewer forecast
+        hours.
+    """
+
+    error_checking.assert_is_numpy_array(
+        desired_forecast_hours, num_dimensions=1
+    )
+    error_checking.assert_is_integer_numpy_array(desired_forecast_hours)
+    error_checking.assert_is_geq_numpy_array(desired_forecast_hours, 0)
+
+    return gfs_table_xarray.sel({FORECAST_HOUR_DIM: desired_forecast_hours})
+
+
+def get_field(gfs_table_xarray, field_name, pressure_levels_mb=None):
+    """Extracts one field from GFS table.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    P = number of pressure levels
+
+    :param gfs_table_xarray: xarray table with GFS forecasts.
+    :param field_name: Field name.
+    :param pressure_levels_mb: length-P numpy array of pressure levels.  If the
+        field is 2-D rather than 3-D, leave this argument alone.
+    :return: data_matrix: M-by-N (if field is 2-D) or M-by-N-by-P (if field is
+        3-D) numpy array of data values.
+    """
+
+    check_field_name(field_name)
+
+    if field_name in ALL_2D_FIELD_NAMES:
+        k = numpy.where(
+            gfs_table_xarray.coords[FIELD_DIM_2D].values == field_name
+        )[0][0]
+        return gfs_table_xarray[DATA_KEY_2D].values[..., k]
+
+    k = numpy.where(
+        gfs_table_xarray.coords[FIELD_DIM_3D].values == field_name
+    )[0][0]
+
+    js = numpy.array([
+        numpy.where(
+            gfs_table_xarray.coords[PRESSURE_LEVEL_DIM].values == p
+        )[0][0]
+        for p in pressure_levels_mb
+    ], dtype=int)
+
+    return gfs_table_xarray[DATA_KEY_3D].values[..., k][..., js]
