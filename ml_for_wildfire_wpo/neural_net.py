@@ -195,7 +195,7 @@ def _check_generator_args(option_dict):
     error_checking.assert_directory_exists(option_dict[TARGET_DIRECTORY_KEY])
 
     error_checking.assert_is_integer(option_dict[BATCH_SIZE_KEY])
-    error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 8)
+    # error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 8)
 
     error_checking.assert_is_not_nan(option_dict[SENTINEL_VALUE_KEY])
 
