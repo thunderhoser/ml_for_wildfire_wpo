@@ -786,7 +786,7 @@ def data_generator(option_dict):
                 if predictor_matrix_3d is None:
                     these_dim = (
                         (num_examples_per_batch,) +
-                        this_predictor_matrix_3d.shape[1:]
+                        this_predictor_matrix_3d.shape
                     )
                     predictor_matrix_3d = numpy.full(these_dim, numpy.nan)
 
@@ -798,7 +798,7 @@ def data_generator(option_dict):
                 if gfs_predictor_matrix_2d is None:
                     these_dim = (
                         (num_examples_per_batch,) +
-                        this_gfs_predictor_matrix_2d.shape[1:]
+                        this_gfs_predictor_matrix_2d.shape
                     )
                     gfs_predictor_matrix_2d = numpy.full(these_dim, numpy.nan)
 
@@ -809,7 +809,7 @@ def data_generator(option_dict):
             if lagged_predictor_matrix_2d is None:
                 these_dim = (
                     (num_examples_per_batch,) +
-                    this_lagged_predictor_matrix_2d.shape[1:]
+                    this_lagged_predictor_matrix_2d.shape
                 )
                 lagged_predictor_matrix_2d = numpy.full(these_dim, numpy.nan)
 
@@ -819,7 +819,7 @@ def data_generator(option_dict):
 
             if target_matrix is None:
                 these_dim = (
-                    (num_examples_per_batch,) + this_target_matrix.shape[1:]
+                    (num_examples_per_batch,) + this_target_matrix.shape
                 )
                 target_matrix = numpy.full(these_dim, numpy.nan)
 
