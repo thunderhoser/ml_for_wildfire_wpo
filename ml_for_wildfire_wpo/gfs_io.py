@@ -86,7 +86,7 @@ def find_files_for_period(
             raise_error_if_missing=raise_error_if_any_missing
         )
 
-        if os.path.isfile(this_file_name):
+        if os.path.isdir(this_file_name):
             zarr_file_names.append(this_file_name)
 
     if raise_error_if_all_missing and len(zarr_file_names) == 0:
