@@ -187,7 +187,7 @@ def _check_generator_args(option_dict):
     error_checking.assert_directory_exists(option_dict[TARGET_DIRECTORY_KEY])
 
     error_checking.assert_is_integer(option_dict[BATCH_SIZE_KEY])
-    error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 8)
+    # error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 8)
 
     error_checking.assert_is_not_nan(option_dict[SENTINEL_VALUE_KEY])
 
@@ -402,9 +402,12 @@ def _get_target_field(
         fwi_table_xarray=fwi_table_xarray,
         desired_column_indices=desired_column_indices
     )
-    return canadian_fwi_utils.get_field(
+    data_matrix = canadian_fwi_utils.get_field(
         fwi_table_xarray=fwi_table_xarray, field_name=field_name
     )
+
+    assert not numpy.any(numpy.isnan(data_matrix))
+    return data_matrix
 
 
 def _read_mask_from_era5(
@@ -481,8 +484,10 @@ def data_generator(option_dict):
     L = number of GFS forecast hours (lead times)
     P = number of GFS pressure levels
     FFF = number of 3-D GFS predictor fields
-    FF = number of 2-D predictor fields (including GFS, ERA5-constant, and
-         lagged target fields)
+    FF = number of 2-D GFS predictor fields
+    F = number of ERA5-constant predictor fields
+    K = number of classes for classification
+    l = number of lag times for lagged-target predictor fields
 
     :param option_dict: Dictionary with the following keys.
     option_dict["inner_latitude_limits_deg_n"]: length-2 numpy array with
@@ -533,12 +538,26 @@ def data_generator(option_dict):
         usually just called "batch size".
     option_dict["sentinel_value"]: All NaN will be replaced with this value.
 
-    :return: predictor_matrices: List with the following items.  Either one may
+    :return: predictor_matrices: List with the following items.  Some items may
         be missing.
 
-    predictor_matrices[0]: E-by-M-by-N-by-P-by-L-by-FFF numpy array of 3-D
+    predictor_matrices[0]: E-by-M-by-N-by-P-by-L-by-FFF numpy array of 3-D GFS
         predictors.
-    predictor_matrices[1]: E-by-M-by-N-by-L-by-FF numpy array of 2-D predictors.
+    predictor_matrices[1]: E-by-M-by-N-by-L-by-FF numpy array of 2-D GFS
+        predictors.
+    predictor_matrices[2]: E-by-M-by-N-by-l-by-1 numpy array of lagged-target
+        predictors.
+    predictor_matrices[3]: E-by-M-by-N-by-F numpy array of ERA5-constant
+        predictors.
+
+    :return: target_matrix: If doing regression, this is an E-by-M-by-N-by-2
+        numpy array, where target_matrix[..., 0] contains values of the target
+        field and target_matrix[..., 1] contains a binary mask.  Where the
+        binary mask is 0, predictions should not be evaluated.
+
+        If doing classification, this is an E-by-M-by-N-by-(K + 1) numpy array,
+        where target_matrix[..., -1] is the binary mask and the first K slices
+        on the last axis are a one-hot encoding of class membership.
     """
 
     # TODO(thunderhoser): Allow multiple lead times for target.
@@ -665,9 +684,9 @@ def data_generator(option_dict):
     desired_target_column_indices = numpy.array([], dtype=int)
 
     while True:
-        predictor_matrix_3d = None
+        gfs_predictor_matrix_3d = None
         gfs_predictor_matrix_2d = None
-        lagged_predictor_matrix_2d = None
+        lagged_target_predictor_matrix = None
         target_matrix = None
         num_examples_in_memory = 0
 
@@ -716,7 +735,7 @@ def data_generator(option_dict):
                 gfs_table_xarray=gfs_table_xarray,
                 field_names=gfs_2d_field_names
             )
-            this_predictor_matrix_3d = _get_3d_gfs_fields(
+            this_gfs_predictor_matrix_3d = _get_3d_gfs_fields(
                 gfs_table_xarray=gfs_table_xarray,
                 field_names=gfs_3d_field_names,
                 pressure_levels_mb=gfs_pressure_levels_mb
@@ -748,7 +767,7 @@ def data_generator(option_dict):
                     )
                 )
 
-            this_lagged_predictor_matrix_2d = numpy.stack([
+            this_lagged_target_predictor_matrix = numpy.stack([
                 _get_target_field(
                     target_file_name=f,
                     desired_row_indices=desired_target_row_indices,
@@ -757,6 +776,10 @@ def data_generator(option_dict):
                 )
                 for f in target_file_names
             ], axis=-1)
+
+            this_lagged_target_predictor_matrix = numpy.expand_dims(
+                this_lagged_target_predictor_matrix, axis=-1
+            )
 
             target_file_name = _find_target_files_needed_1example(
                 gfs_init_date_string=
@@ -772,25 +795,24 @@ def data_generator(option_dict):
                 desired_column_indices=desired_target_column_indices,
                 field_name=target_field_name
             )
-            assert not numpy.any(numpy.isnan(this_target_matrix))
 
-            if this_predictor_matrix_3d is not None:
-                if predictor_matrix_3d is None:
+            if this_gfs_predictor_matrix_3d is not None:
+                if gfs_predictor_matrix_3d is None:
                     these_dim = (
                         (num_examples_per_batch,) +
-                        this_predictor_matrix_3d.shape[1:]
+                        this_gfs_predictor_matrix_3d.shape
                     )
-                    predictor_matrix_3d = numpy.full(these_dim, numpy.nan)
+                    gfs_predictor_matrix_3d = numpy.full(these_dim, numpy.nan)
 
-                predictor_matrix_3d[num_examples_in_memory, ...] = (
-                    this_predictor_matrix_3d
+                gfs_predictor_matrix_3d[num_examples_in_memory, ...] = (
+                    this_gfs_predictor_matrix_3d
                 )
 
             if this_gfs_predictor_matrix_2d is not None:
                 if gfs_predictor_matrix_2d is None:
                     these_dim = (
                         (num_examples_per_batch,) +
-                        this_gfs_predictor_matrix_2d.shape[1:]
+                        this_gfs_predictor_matrix_2d.shape
                     )
                     gfs_predictor_matrix_2d = numpy.full(these_dim, numpy.nan)
 
@@ -798,54 +820,59 @@ def data_generator(option_dict):
                     this_gfs_predictor_matrix_2d
                 )
 
-            if lagged_predictor_matrix_2d is None:
+            if lagged_target_predictor_matrix is None:
                 these_dim = (
                     (num_examples_per_batch,) +
-                    this_lagged_predictor_matrix_2d.shape[1:]
+                    this_lagged_target_predictor_matrix.shape
                 )
-                lagged_predictor_matrix_2d = numpy.full(these_dim, numpy.nan)
+                lagged_target_predictor_matrix = numpy.full(these_dim, numpy.nan)
 
-            lagged_predictor_matrix_2d[num_examples_in_memory, ...] = (
-                this_lagged_predictor_matrix_2d
+            lagged_target_predictor_matrix[num_examples_in_memory, ...] = (
+                this_lagged_target_predictor_matrix
             )
 
             if target_matrix is None:
                 these_dim = (
-                    (num_examples_per_batch,) + this_target_matrix.shape[1:]
+                    (num_examples_per_batch,) + this_target_matrix.shape
                 )
                 target_matrix = numpy.full(these_dim, numpy.nan)
 
             target_matrix[num_examples_in_memory, ...] = this_target_matrix
-            num_examples_in_memory += 1
 
-        predictor_matrix_2d = _pad_inner_to_outer_domain(
-            data_matrix=lagged_predictor_matrix_2d,
+            num_examples_in_memory += 1
+            gfs_file_index += 1
+
+        if gfs_predictor_matrix_3d is not None:
+            gfs_predictor_matrix_3d[
+                numpy.isnan(gfs_predictor_matrix_3d)
+            ] = sentinel_value
+
+            print('Shape of 3-D GFS predictor matrix: {0:s}'.format(
+                str(gfs_predictor_matrix_3d.shape)
+            ))
+
+        if gfs_predictor_matrix_2d is not None:
+            gfs_predictor_matrix_2d[
+                numpy.isnan(gfs_predictor_matrix_2d)
+            ] = sentinel_value
+
+            print('Shape of 2-D GFS predictor matrix: {0:s}'.format(
+                str(gfs_predictor_matrix_2d.shape)
+            ))
+
+        lagged_target_predictor_matrix = _pad_inner_to_outer_domain(
+            data_matrix=lagged_target_predictor_matrix,
             outer_latitude_buffer_deg=outer_latitude_buffer_deg,
             outer_longitude_buffer_deg=outer_longitude_buffer_deg,
             is_example_axis_present=True, fill_value=sentinel_value
         )
-
-        if era5_constant_matrix is not None:
-            predictor_matrix_2d = numpy.concatenate(
-                (predictor_matrix_2d, era5_constant_matrix), axis=-1
-            )
-        if gfs_predictor_matrix_2d is not None:
-            predictor_matrix_2d = numpy.concatenate(
-                (predictor_matrix_2d, gfs_predictor_matrix_2d), axis=-1
-            )
-
-        predictor_matrix_2d[numpy.isnan(predictor_matrix_2d)] = sentinel_value
-        print('Shape of 2-D predictor matrix: {0:s}'.format(
-            str(predictor_matrix_2d.shape)
+        print('Shape of lagged-target predictor matrix: {0:s}'.format(
+            str(lagged_target_predictor_matrix.shape)
         ))
 
-        if predictor_matrix_3d is not None:
-            predictor_matrix_3d[
-                numpy.isnan(predictor_matrix_3d)
-            ] = sentinel_value
-
-            print('Shape of 3-D predictor matrix: {0:s}'.format(
-                str(predictor_matrix_3d.shape)
+        if era5_constant_matrix is not None:
+            print('Shape of ERA5-constant predictor matrix: {0:s}'.format(
+                str(era5_constant_matrix.shape)
             ))
 
         target_matrix = _pad_inner_to_outer_domain(
@@ -867,7 +894,10 @@ def data_generator(option_dict):
             (target_matrix, mask_matrix), axis=-1
         )
         predictor_matrices = [
-            m for m in [predictor_matrix_3d, predictor_matrix_2d]
+            m for m in [
+                gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
+                lagged_target_predictor_matrix, era5_constant_matrix
+            ]
             if m is not None
         ]
 
