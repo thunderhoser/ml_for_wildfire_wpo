@@ -711,6 +711,7 @@ def create_model(option_dict, loss_function, metric_list):
                     )(skip_layer_by_level[i])
                 )
 
+        if i == 0:
             break
 
         this_name = 'upsampling_level{0:d}'.format(i - 1)
