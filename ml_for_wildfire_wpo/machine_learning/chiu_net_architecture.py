@@ -145,9 +145,7 @@ def _check_args(option_dict):
                 input_dimensions_gfs_2d[3]
             ], dtype=int)
 
-            error_checking.assert_equals_numpy_array(
-                input_dimensions_gfs_2d, these_dim
-            )
+            assert numpy.array_equal(input_dimensions_gfs_2d, these_dim)
 
     if input_dimensions_era5_constants is not None:
         error_checking.assert_is_numpy_array(
@@ -165,9 +163,7 @@ def _check_args(option_dict):
             num_grid_rows, num_grid_columns, input_dimensions_era5_constants[2]
         ], dtype=int)
 
-        error_checking.assert_equals_numpy_array(
-            input_dimensions_era5_constants, these_dim
-        )
+        assert numpy.array_equal(input_dimensions_era5_constants, these_dim)
 
     error_checking.assert_is_numpy_array(
         input_dimensions_lagged_target,
@@ -182,9 +178,7 @@ def _check_args(option_dict):
         num_grid_rows, num_grid_columns, input_dimensions_lagged_target[2], 1
     ], dtype=int)
 
-    error_checking.assert_equals_numpy_array(
-        input_dimensions_lagged_target, these_dim
-    )
+    assert numpy.array_equal(input_dimensions_lagged_target, these_dim)
 
     num_conv_layers_in_fc_module = option_dict[NUM_FC_CONV_LAYERS_KEY]
     error_checking.assert_is_integer(num_conv_layers_in_fc_module)
