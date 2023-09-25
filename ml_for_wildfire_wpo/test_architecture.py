@@ -34,6 +34,7 @@ def _run():
         chiu_net_architecture.ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
         chiu_net_architecture.DECODER_DROPOUT_RATES_KEY: numpy.full(6, 0.),
         chiu_net_architecture.SKIP_DROPOUT_RATES_KEY: numpy.full(6, 0.),
+        chiu_net_architecture.INCLUDE_PENULTIMATE_KEY: False,
         chiu_net_architecture.INNER_ACTIV_FUNCTION_KEY:
             architecture_utils.RELU_FUNCTION_STRING,
         chiu_net_architecture.INNER_ACTIV_FUNCTION_ALPHA_KEY: 0.2,

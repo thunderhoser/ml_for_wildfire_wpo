@@ -29,6 +29,8 @@ CHANNEL_COUNTS_KEY = 'num_channels_by_level'
 ENCODER_DROPOUT_RATES_KEY = 'encoder_dropout_rate_by_level'
 DECODER_DROPOUT_RATES_KEY = 'decoder_dropout_rate_by_level'
 SKIP_DROPOUT_RATES_KEY = 'skip_dropout_rate_by_level'
+INCLUDE_PENULTIMATE_KEY = 'include_penultimate_conv'
+PENULTIMATE_DROPOUT_RATE_KEY = 'penultimate_conv_dropout_rate'
 INNER_ACTIV_FUNCTION_KEY = 'inner_activ_function_name'
 INNER_ACTIV_FUNCTION_ALPHA_KEY = 'inner_activ_function_alpha'
 OUTPUT_ACTIV_FUNCTION_KEY = 'output_activ_function_name'
@@ -47,6 +49,8 @@ DEFAULT_ARCHITECTURE_OPTION_DICT = {
     ENCODER_DROPOUT_RATES_KEY: numpy.full(5, 0.),
     DECODER_DROPOUT_RATES_KEY: numpy.full(4, 0.),
     SKIP_DROPOUT_RATES_KEY: numpy.full(4, 0.),
+    INCLUDE_PENULTIMATE_KEY: True,
+    PENULTIMATE_DROPOUT_RATE_KEY: 0.,
     INNER_ACTIV_FUNCTION_KEY: architecture_utils.RELU_FUNCTION_STRING,
     INNER_ACTIV_FUNCTION_ALPHA_KEY: 0.2,
     OUTPUT_ACTIV_FUNCTION_KEY: architecture_utils.SIGMOID_FUNCTION_STRING,
@@ -63,48 +67,52 @@ def _check_args(option_dict):
     L = number of levels in encoder = number of levels in decoder
 
     :param option_dict: Dictionary with the following keys.
-    option_dict['input_dimensions_gfs_3d']: numpy array with input dimensions
+    option_dict["input_dimensions_gfs_3d"]: numpy array with input dimensions
         for 3-D GFS data.  Array elements should be [num_rows, num_columns,
         num_pressure_levels, num_lead_times, num_fields].  If predictors do not
         include 3-D GFS data, make this None.
-    option_dict['input_dimensions_gfs_2d']: numpy array with input dimensions
+    option_dict["input_dimensions_gfs_2d"]: numpy array with input dimensions
         for 2-D GFS data.  Array elements should be [num_rows, num_columns,
         num_lead_times, num_fields].  If predictors do not include 2-D GFS data,
         make this None.
-    option_dict['input_dimensions_era5_constants']: numpy array with input
+    option_dict["input_dimensions_era5_constants"]: numpy array with input
         dimensions for ERA5 constants.  Array elements should be [num_rows,
         num_columns, num_fields].  If predictors do not include ERA5 constants,
         make this None.
-    option_dict['input_dimensions_lagged_targets']: numpy array with input
+    option_dict["input_dimensions_lagged_targets"]: numpy array with input
         dimensions for lagged targets.  Array elements should be [num_rows,
         num_columns, num_lag_times, 1].
-    option_dict['num_conv_layers_in_fc_module']: Number of conv layers in
+    option_dict["num_conv_layers_in_fc_module"]: Number of conv layers in
         forecasting module.
-    option_dict['fc_module_dropout_rates']: length-N numpy array of dropout
-        rates in forecasting module, where N = 'num_conv_layers_in_fc_module'.
-    option_dict['num_levels']: L in the above discussion.
-    option_dict['num_conv_layers_by_level']: length-(L + 1) numpy array with
+    option_dict["fc_module_dropout_rates"]: length-N numpy array of dropout
+        rates in forecasting module, where N = "num_conv_layers_in_fc_module".
+    option_dict["num_levels"]: L in the above discussion.
+    option_dict["num_conv_layers_by_level"]: length-(L + 1) numpy array with
         number of conv layers at each level.
-    option_dict['num_channels_by_level']: length-(L + 1) numpy array with number
+    option_dict["num_channels_by_level"]: length-(L + 1) numpy array with number
         of channels at each level.
-    option_dict['encoder_dropout_rate_by_level']: length-(L + 1) numpy array
+    option_dict["encoder_dropout_rate_by_level"]: length-(L + 1) numpy array
         with dropout rate for conv layers in encoder at each level.
-    option_dict['decoder_dropout_rate_by_level']: length-L numpy array
+    option_dict["decoder_dropout_rate_by_level"]: length-L numpy array
         with dropout rate for conv layers in decoder at each level.
-    option_dict['skip_dropout_rate_by_level']: length-L numpy array with dropout
+    option_dict["skip_dropout_rate_by_level"]: length-L numpy array with dropout
         rate for conv layer after skip connection at each level.
-    option_dict['inner_activ_function_name']: Name of activation function for
+    option_dict["include_penultimate_conv"]: Boolean flag.  If True, will put in
+        extra conv layer (with 3 x 3 filter) before final pixelwise conv.
+    option_dict["penultimate_conv_dropout_rate"]: Dropout rate for penultimate
+        conv layer.
+    option_dict["inner_activ_function_name"]: Name of activation function for
         all inner (non-output) layers.  Must be accepted by
         `architecture_utils.check_activation_function`.
-    option_dict['inner_activ_function_alpha']: Alpha (slope parameter) for
+    option_dict["inner_activ_function_alpha"]: Alpha (slope parameter) for
         activation function for all inner layers.  Applies only to ReLU and eLU.
-    option_dict['output_activ_function_name']: Same as
+    option_dict["output_activ_function_name"]: Same as
         `inner_activ_function_name` but for output layer.
-    option_dict['output_activ_function_alpha']: Same as
+    option_dict["output_activ_function_alpha"]: Same as
         `inner_activ_function_alpha` but for output layer.
-    option_dict['l1_weight']: Weight for L_1 regularization.
-    option_dict['l2_weight']: Weight for L_2 regularization.
-    option_dict['use_batch_normalization']: Boolean flag.  If True, will use
+    option_dict["l1_weight"]: Weight for L_1 regularization.
+    option_dict["l2_weight"]: Weight for L_2 regularization.
+    option_dict["use_batch_normalization"]: Boolean flag.  If True, will use
         batch normalization after each inner (non-output) conv layer.
 
     :return: option_dict: Same as input, except defaults may have been added.
@@ -250,6 +258,11 @@ def _check_args(option_dict):
         skip_dropout_rate_by_level, 1., allow_nan=True
     )
 
+    error_checking.assert_is_boolean(option_dict[INCLUDE_PENULTIMATE_KEY])
+    error_checking.assert_is_leq(
+        option_dict[PENULTIMATE_DROPOUT_RATE_KEY], 1., allow_nan=True
+    )
+
     error_checking.assert_is_geq(option_dict[L1_WEIGHT_KEY], 0.)
     error_checking.assert_is_geq(option_dict[L2_WEIGHT_KEY], 0.)
     error_checking.assert_is_boolean(option_dict[USE_BATCH_NORM_KEY])
@@ -276,7 +289,46 @@ def _get_time_slicing_function(time_index):
     return time_slicing_function
 
 
-def create_model(option_dict, loss_function):
+def _create_skip_connection(
+        encoder_conv_layer_object, decoder_upconv_layer_object,
+        num_gfs_lead_times, current_level_num):
+    """Creates skip connection.
+
+    :param encoder_conv_layer_object: Conv layer on the encoder side.
+    :param decoder_upconv_layer_object: Upconv layer on the decoder side.
+    :param num_gfs_lead_times: Number of GFS lead times in the predictors.
+    :param current_level_num: Integer index for current level.
+    :return: merged_layer_object: Instance of `keras.layers.Concatenate`.
+    """
+
+    num_upconv_rows = decoder_upconv_layer_object.get_shape()[1]
+    num_desired_rows = encoder_conv_layer_object.get_shape()[2]
+    num_padding_rows = num_desired_rows - num_upconv_rows
+
+    num_upconv_columns = decoder_upconv_layer_object.get_shape()[2]
+    num_desired_columns = encoder_conv_layer_object.get_shape()[3]
+    num_padding_columns = num_desired_columns - num_upconv_columns
+
+    if num_padding_rows + num_padding_columns > 0:
+        padding_arg = ((0, num_padding_rows), (0, num_padding_columns))
+        this_name = 'padding_level{0:d}'.format(current_level_num)
+
+        decoder_upconv_layer_object = keras.layers.ZeroPadding2D(
+            padding=padding_arg, name=this_name
+        )(decoder_upconv_layer_object)
+
+    this_function = _get_time_slicing_function(num_gfs_lead_times - 1)
+    this_layer_object = keras.layers.Lambda(
+        this_function
+    )(encoder_conv_layer_object)
+
+    this_name = 'skip_level{0:d}'.format(current_level_num)
+    return keras.layers.Concatenate(
+        axis=-1, name=this_name
+    )([this_layer_object, decoder_upconv_layer_object])
+
+
+def create_model(option_dict, loss_function, metric_list):
     """Creates Chiu net.
 
     This method sets up the architecture, loss function, and optimizer -- and
@@ -289,11 +341,15 @@ def create_model(option_dict, loss_function):
 
     :param option_dict: See doc for `_check_args`.
     :param loss_function: Loss function.
+    :param metric_list: 1-D list of metrics.
     :return: model_object: Instance of `keras.models.Model`, with the
         aforementioned architecture.
     """
 
+    # TODO(thunderhoser): Add info from non-GFS predictors to the network.
+
     option_dict = _check_args(option_dict)
+    error_checking.assert_is_list(metric_list)
 
     input_dimensions_gfs_3d = option_dict[GFS_3D_DIMENSIONS_KEY]
     input_dimensions_gfs_2d = option_dict[GFS_2D_DIMENSIONS_KEY]
@@ -308,6 +364,8 @@ def create_model(option_dict, loss_function):
     encoder_dropout_rate_by_level = option_dict[ENCODER_DROPOUT_RATES_KEY]
     decoder_dropout_rate_by_level = option_dict[DECODER_DROPOUT_RATES_KEY]
     skip_dropout_rate_by_level = option_dict[SKIP_DROPOUT_RATES_KEY]
+    include_penultimate_conv = option_dict[INCLUDE_PENULTIMATE_KEY]
+    penultimate_conv_dropout_rate = option_dict[PENULTIMATE_DROPOUT_RATE_KEY]
     inner_activ_function_name = option_dict[INNER_ACTIV_FUNCTION_KEY]
     inner_activ_function_alpha = option_dict[INNER_ACTIV_FUNCTION_ALPHA_KEY]
     output_activ_function_name = option_dict[OUTPUT_ACTIV_FUNCTION_KEY]
@@ -321,10 +379,12 @@ def create_model(option_dict, loss_function):
         layer_object_gfs_3d = None
     else:
         input_layer_object_gfs_3d = keras.layers.Input(
-            shape=tuple(input_dimensions_gfs_3d.tolist())
+            shape=tuple(input_dimensions_gfs_3d.tolist()),
+            name='gfs_3d_inputs'
         )
         layer_object_gfs_3d = keras.layers.Permute(
-            dims=(4, 1, 2, 3, 5)
+            dims=(4, 1, 2, 3, 5),
+            name='gfs_3d_put-time-first'
         )(input_layer_object_gfs_3d)
 
         new_dims = (
@@ -334,7 +394,8 @@ def create_model(option_dict, loss_function):
             input_dimensions_gfs_3d[2] * input_dimensions_gfs_3d[4]
         )
         layer_object_gfs_3d = keras.layers.Reshape(
-            target_shape=new_dims
+            target_shape=new_dims,
+            name='gfs_3d_flatten-pressure-levels'
         )(layer_object_gfs_3d)
 
         num_gfs_lead_times = input_dimensions_gfs_3d[-2]
@@ -344,10 +405,12 @@ def create_model(option_dict, loss_function):
         layer_object_gfs_2d = None
     else:
         input_layer_object_gfs_2d = keras.layers.Input(
-            shape=tuple(input_dimensions_gfs_2d.tolist())
+            shape=tuple(input_dimensions_gfs_2d.tolist()),
+            name='gfs_2d_inputs'
         )
         layer_object_gfs_2d = keras.layers.Permute(
-            dims=(3, 1, 2, 4)
+            dims=(3, 1, 2, 4),
+            name='gfs_2d_put-time-first'
         )(input_layer_object_gfs_2d)
 
         num_gfs_lead_times = input_dimensions_gfs_2d[-2]
@@ -357,7 +420,9 @@ def create_model(option_dict, loss_function):
     elif input_dimensions_gfs_2d is None:
         layer_object_gfs = layer_object_gfs_3d
     else:
-        layer_object_gfs = keras.layers.Concatenate(axis=-1)(
+        layer_object_gfs = keras.layers.Concatenate(
+            axis=-1, name='gfs_concat-2d-and-3d'
+        )(
             [layer_object_gfs_3d, layer_object_gfs_2d]
         )
 
@@ -365,14 +430,16 @@ def create_model(option_dict, loss_function):
         input_layer_object_era5 = None
     else:
         input_layer_object_era5 = keras.layers.Input(
-            shape=tuple(input_dimensions_era5.tolist())
+            shape=tuple(input_dimensions_era5.tolist()),
+            name='era5_constant_inputs'
         )
 
     input_layer_object_lagged_target = keras.layers.Input(
-        shape=tuple(input_dimensions_lagged_target.tolist())
+        shape=tuple(input_dimensions_lagged_target.tolist()),
+        name='lagged_target_inputs'
     )
     layer_object_lagged_target = keras.layers.Permute(
-        dims=(3, 1, 2, 4)
+        dims=(3, 1, 2, 4), name='lagged_targets_put-time-first'
     )(input_layer_object_lagged_target)
 
     regularizer_object = architecture_utils.get_weight_regularizer(
@@ -394,6 +461,7 @@ def create_model(option_dict, loss_function):
             else:
                 this_input_layer_object = encoder_conv_layer_objects[i]
 
+            this_name = 'level{0:d}_conv{1:d}'.format(i, j)
             this_conv_layer_object = architecture_utils.get_2d_conv_layer(
                 num_kernel_rows=3, num_kernel_columns=3,
                 num_rows_per_stride=1, num_columns_per_stride=1,
@@ -402,45 +470,52 @@ def create_model(option_dict, loss_function):
                 weight_regularizer=regularizer_object
             )
             encoder_conv_layer_objects[i] = keras.layers.TimeDistributed(
-                this_conv_layer_object
+                this_conv_layer_object, name=this_name
             )(this_input_layer_object)
 
+            this_name = 'level{0:d}_conv{1:d}_activation'.format(i, j)
             encoder_conv_layer_objects[i] = (
                 architecture_utils.get_activation_layer(
                     activation_function_string=inner_activ_function_name,
                     alpha_for_relu=inner_activ_function_alpha,
-                    alpha_for_elu=inner_activ_function_alpha
+                    alpha_for_elu=inner_activ_function_alpha,
+                    layer_name=this_name
                 )(encoder_conv_layer_objects[i])
             )
 
             if encoder_dropout_rate_by_level[i] > 0:
+                this_name = 'level{0:d}_conv{1:d}_dropout'.format(i, j)
                 encoder_conv_layer_objects[i] = (
                     architecture_utils.get_dropout_layer(
-                        dropout_fraction=encoder_dropout_rate_by_level[i]
+                        dropout_fraction=encoder_dropout_rate_by_level[i],
+                        layer_name=this_name
                     )(encoder_conv_layer_objects[i])
                 )
 
             if use_batch_normalization:
+                this_name = 'level{0:d}_conv{1:d}_bn'.format(i, j)
                 encoder_conv_layer_objects[i] = (
-                    architecture_utils.get_batch_norm_layer()(
-                        encoder_conv_layer_objects[i]
-                    )
+                    architecture_utils.get_batch_norm_layer(
+                        layer_name=this_name
+                    )(encoder_conv_layer_objects[i])
                 )
 
         if i == num_levels:
             break
 
+        this_name = 'level{0:d}_pooling'.format(i)
         this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
             num_rows_in_window=2, num_columns_in_window=2,
             num_rows_per_stride=2, num_columns_per_stride=2,
-            pooling_type_string=architecture_utils.MAX_POOLING_STRING
+            pooling_type_string=architecture_utils.MAX_POOLING_STRING,
+            layer_name=this_name
         )
         encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
             this_pooling_layer_object
         )(encoder_conv_layer_objects[i])
 
     fc_module_layer_object = keras.layers.Permute(
-        dims=(2, 3, 1, 4)
+        dims=(2, 3, 1, 4), name='fc_module_put-time-last'
     )(encoder_conv_layer_objects[-1])
 
     if not use_3d_conv_in_fc_module:
@@ -495,7 +570,6 @@ def create_model(option_dict, loss_function):
             )(fc_module_layer_object)
 
         this_name = 'fc_module_conv{0:d}_activation'.format(j)
-
         fc_module_layer_object = architecture_utils.get_activation_layer(
             activation_function_string=inner_activ_function_name,
             alpha_for_relu=inner_activ_function_alpha,
@@ -505,7 +579,6 @@ def create_model(option_dict, loss_function):
 
         if fc_module_dropout_rates[j] > 0:
             this_name = 'fc_module_conv{0:d}_dropout'.format(j)
-
             fc_module_layer_object = architecture_utils.get_dropout_layer(
                 dropout_fraction=fc_module_dropout_rates[j],
                 layer_name=this_name
@@ -513,7 +586,6 @@ def create_model(option_dict, loss_function):
 
         if use_batch_normalization:
             this_name = 'fc_module_conv{0:d}_bn'.format(j)
-
             fc_module_layer_object = architecture_utils.get_batch_norm_layer(
                 layer_name=this_name
             )(fc_module_layer_object)
@@ -546,7 +618,6 @@ def create_model(option_dict, loss_function):
     )(this_layer_object)
 
     this_name = 'upsampling_level{0:d}_activation'.format(num_levels - 1)
-
     upconv_layer_by_level[i] = architecture_utils.get_activation_layer(
         activation_function_string=inner_activ_function_name,
         alpha_for_relu=inner_activ_function_alpha,
@@ -556,37 +627,16 @@ def create_model(option_dict, loss_function):
 
     if decoder_dropout_rate_by_level[i] > 0:
         this_name = 'upsampling_level{0:d}_dropout'.format(i)
-
         upconv_layer_by_level[i] = architecture_utils.get_dropout_layer(
             dropout_fraction=decoder_dropout_rate_by_level[i],
             layer_name=this_name
         )(upconv_layer_by_level[i])
 
-    num_upconv_rows = upconv_layer_by_level[i].get_shape()[1]
-    num_desired_rows = encoder_conv_layer_objects[i].get_shape()[2]
-    num_padding_rows = num_desired_rows - num_upconv_rows
-
-    num_upconv_columns = upconv_layer_by_level[i].get_shape()[2]
-    num_desired_columns = encoder_conv_layer_objects[i].get_shape()[3]
-    num_padding_columns = num_desired_columns - num_upconv_columns
-
-    if num_padding_rows + num_padding_columns > 0:
-        padding_arg = ((0, num_padding_rows), (0, num_padding_columns))
-        this_name = 'padding_level{0:d}'.format(i)
-
-        upconv_layer_by_level[i] = keras.layers.ZeroPadding2D(
-            padding=padding_arg, name=this_name
-        )(upconv_layer_by_level[i])
-
-    this_function = _get_time_slicing_function(num_gfs_lead_times - 1)
-    this_layer_object = keras.layers.Lambda(
-        this_function
-    )(encoder_conv_layer_objects[i])
-
-    this_name = 'skip_level{0:d}'.format(i)
-    merged_layer_by_level[i] = keras.layers.Concatenate(
-        axis=-1, name=this_name
-    )([this_layer_object, upconv_layer_by_level[i]])
+    merged_layer_by_level[i] = _create_skip_connection(
+        encoder_conv_layer_object=encoder_conv_layer_objects[i],
+        decoder_upconv_layer_object=upconv_layer_by_level[i],
+        num_gfs_lead_times=num_gfs_lead_times, current_level_num=i
+    )
 
     level_indices = numpy.linspace(
         0, num_levels - 1, num=num_levels, dtype=int
@@ -632,8 +682,7 @@ def create_model(option_dict, loss_function):
                     )(skip_layer_by_level[i])
                 )
 
-        # TODO(thunderhoser): Allow penultimate conv to be skipped.
-        if i == 0:
+        if i == 0 and include_penultimate_conv:
             skip_layer_by_level[i] = architecture_utils.get_2d_conv_layer(
                 num_kernel_rows=3, num_kernel_columns=3,
                 num_rows_per_stride=1, num_columns_per_stride=1, num_filters=2,
@@ -648,6 +697,12 @@ def create_model(option_dict, loss_function):
                 alpha_for_elu=inner_activ_function_alpha,
                 layer_name='penultimate_conv_activation'
             )(skip_layer_by_level[i])
+
+            if penultimate_conv_dropout_rate > 0:
+                skip_layer_by_level[i] = architecture_utils.get_dropout_layer(
+                    dropout_fraction=penultimate_conv_dropout_rate,
+                    layer_name='penultimate_conv_dropout'
+                )(skip_layer_by_level[i])
 
             if use_batch_normalization:
                 skip_layer_by_level[i] = (
@@ -693,32 +748,11 @@ def create_model(option_dict, loss_function):
                 layer_name=this_name
             )(upconv_layer_by_level[i - 1])
 
-        # TODO(thunderhoser): Modularize this fuckery.
-        num_upconv_rows = upconv_layer_by_level[i - 1].get_shape()[1]
-        num_desired_rows = encoder_conv_layer_objects[i - 1].get_shape()[2]
-        num_padding_rows = num_desired_rows - num_upconv_rows
-
-        num_upconv_columns = upconv_layer_by_level[i - 1].get_shape()[2]
-        num_desired_columns = encoder_conv_layer_objects[i - 1].get_shape()[3]
-        num_padding_columns = num_desired_columns - num_upconv_columns
-
-        if num_padding_rows + num_padding_columns > 0:
-            padding_arg = ((0, num_padding_rows), (0, num_padding_columns))
-            this_name = 'padding_level{0:d}'.format(i - 1)
-
-            upconv_layer_by_level[i - 1] = keras.layers.ZeroPadding2D(
-                padding=padding_arg, name=this_name
-            )(upconv_layer_by_level[i - 1])
-
-        this_function = _get_time_slicing_function(num_gfs_lead_times - 1)
-        this_layer_object = keras.layers.Lambda(
-            this_function
-        )(encoder_conv_layer_objects[i - 1])
-
-        this_name = 'skip_level{0:d}'.format(i - 1)
-        merged_layer_by_level[i - 1] = keras.layers.Concatenate(
-            axis=-1, name=this_name
-        )([this_layer_object, upconv_layer_by_level[i - 1]])
+        merged_layer_by_level[i - 1] = _create_skip_connection(
+            encoder_conv_layer_object=encoder_conv_layer_objects[i - 1],
+            decoder_upconv_layer_object=upconv_layer_by_level[i - 1],
+            num_gfs_lead_times=num_gfs_lead_times, current_level_num=i - 1
+        )
 
     skip_layer_by_level[0] = architecture_utils.get_2d_conv_layer(
         num_kernel_rows=1, num_kernel_columns=1,
@@ -745,9 +779,9 @@ def create_model(option_dict, loss_function):
         inputs=input_layer_objects, outputs=skip_layer_by_level[0]
     )
 
-    # TODO(thunderhoser): Will probably want metrics.
     model_object.compile(
-        loss=loss_function, optimizer=keras.optimizers.Adam(), metrics=[]
+        loss=loss_function, optimizer=keras.optimizers.Adam(),
+        metrics=metric_list
     )
 
     model_object.summary()
