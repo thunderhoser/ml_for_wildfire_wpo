@@ -48,7 +48,8 @@ def _run():
 
     chiu_net_architecture.create_model(
         option_dict=option_dict,
-        loss_function=custom_losses.mean_squared_error()
+        loss_function=custom_losses.mean_squared_error(),
+        metric_list=[]
     )
 
 
