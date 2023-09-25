@@ -570,6 +570,8 @@ def create_model(option_dict, loss_function):
     num_desired_columns = encoder_conv_layer_objects[i].get_shape()[2]
     num_padding_columns = num_desired_columns - num_upconv_columns
 
+    print(upconv_layer_by_level[i].shape)
+
     if num_padding_rows + num_padding_columns > 0:
         padding_arg = ((0, num_padding_rows), (0, num_padding_columns))
         this_name = 'padding_level{0:d}'.format(i)
@@ -578,10 +580,15 @@ def create_model(option_dict, loss_function):
             padding=padding_arg, name=this_name
         )(upconv_layer_by_level[i])
 
+    print(upconv_layer_by_level[i].shape)
+
     this_function = _get_time_slicing_function(num_gfs_lead_times - 1)
     this_layer_object = keras.layers.Lambda(
         this_function
     )(encoder_conv_layer_objects[i])
+
+    print(encoder_conv_layer_objects[i].shape)
+    print(this_layer_object.shape)
 
     this_name = 'skip_level{0:d}'.format(i)
     merged_layer_by_level[i] = keras.layers.Concatenate(
