@@ -1,5 +1,5 @@
 """Helper methods for training a neural network to predict fire weather."""
-
+import copy
 import random
 import numpy
 from gewittergefahr.gg_utils import time_conversion
@@ -15,6 +15,7 @@ from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 
 DATE_FORMAT = '%Y%m%d'
 GRID_SPACING_DEG = 0.25
+DEGREES_TO_RADIANS = numpy.pi / 180.
 
 INNER_LATITUDE_LIMITS_KEY = 'inner_latitude_limits_deg_n'
 INNER_LONGITUDE_LIMITS_KEY = 'inner_longitude_limits_deg_e'
@@ -57,8 +58,6 @@ def _check_generator_args(option_dict):
     option_dict = DEFAULT_GENERATOR_OPTION_DICT.copy()
     option_dict.update(orig_option_dict)
 
-    # TODO(thunderhoser): If the model uses image chips from different regions,
-    # the lat/long input args will be gone.
     error_checking.assert_is_numpy_array(
         option_dict[INNER_LATITUDE_LIMITS_KEY],
         exact_dimensions=numpy.array([2], dtype=int)
@@ -410,21 +409,24 @@ def _get_target_field(
     return data_matrix
 
 
-def _read_mask_from_era5(
+def _create_weight_matrix(
         era5_constant_file_name, inner_latitude_limits_deg_n,
         inner_longitude_limits_deg_e, outer_latitude_buffer_deg,
         outer_longitude_buffer_deg):
-    """Reads mask from ERA5 file.
+    """Creates weight matrix for loss function.
 
-    This mask is a combination of the land/sea mask and also the buffer between
-    the inner and outer domains.  The mask is binary, with 1 for land areas in
-    the inner domain and 0 everywhere else.
+    M = number of grid rows in outer domain
+    N = number of grid columns in outer domain
+
+    At each pixel, this weight is the product of the land mask (1 for land, 0
+    for sea) and cos(latitude).
 
     :param era5_constant_file_name: See documentation for `data_generator`.
     :param inner_latitude_limits_deg_n: Same.
     :param inner_longitude_limits_deg_e: Same.
     :param outer_latitude_buffer_deg: Same.
     :param outer_longitude_buffer_deg: Same.
+    :return: weight_matrix: M-by-N numpy array of weights in range 0...1.
     """
 
     era5_constant_table_xarray = era5_constant_io.read_file(
@@ -444,6 +446,16 @@ def _read_mask_from_era5(
         start_longitude_deg_e=inner_longitude_limits_deg_e[0],
         end_longitude_deg_e=inner_longitude_limits_deg_e[1]
     )
+
+    grid_latitudes_deg_n = (
+        ect.coords[era5_constant_utils.LATITUDE_DIM].values[desired_row_indices]
+    )
+    latitude_cosines = numpy.cos(DEGREES_TO_RADIANS * grid_latitudes_deg_n)
+    latitude_cosine_matrix = numpy.repeat(
+        numpy.expand_dims(latitude_cosines, axis=1),
+        axis=1, repeats=len(desired_column_indices)
+    )
+
     ect = era5_constant_utils.subset_by_row(
         era5_constant_table_xarray=ect,
         desired_row_indices=desired_row_indices
@@ -453,20 +465,18 @@ def _read_mask_from_era5(
         desired_column_indices=desired_column_indices
     )
 
-    mask_matrix = era5_constant_utils.get_field(
+    land_mask_matrix = era5_constant_utils.get_field(
         era5_constant_table_xarray=ect,
         field_name=era5_constant_utils.LAND_SEA_MASK_NAME
     )
-    mask_matrix = (mask_matrix > 0.05).astype(int)
+    weight_matrix = latitude_cosine_matrix * (land_mask_matrix > 0.05)
 
-    mask_matrix = _pad_inner_to_outer_domain(
-        data_matrix=mask_matrix,
+    return _pad_inner_to_outer_domain(
+        data_matrix=weight_matrix,
         outer_latitude_buffer_deg=outer_latitude_buffer_deg,
         outer_longitude_buffer_deg=outer_longitude_buffer_deg,
-        is_example_axis_present=False, fill_value=0
+        is_example_axis_present=False, fill_value=0.
     )
-
-    return numpy.round(mask_matrix).astype(int)
 
 
 def data_generator(option_dict):
@@ -664,18 +674,18 @@ def data_generator(option_dict):
             axis=0, repeats=num_examples_per_batch
         )
 
-    mask_matrix = _read_mask_from_era5(
+    weight_matrix = _create_weight_matrix(
         era5_constant_file_name=era5_constant_file_name,
         inner_latitude_limits_deg_n=inner_latitude_limits_deg_n,
         inner_longitude_limits_deg_e=inner_longitude_limits_deg_e,
         outer_latitude_buffer_deg=outer_latitude_buffer_deg,
         outer_longitude_buffer_deg=outer_longitude_buffer_deg
     )
-    mask_matrix = numpy.repeat(
-        numpy.expand_dims(mask_matrix, axis=0),
+    weight_matrix = numpy.repeat(
+        numpy.expand_dims(weight_matrix, axis=0),
         axis=0, repeats=num_examples_per_batch
     )
-    mask_matrix = numpy.expand_dims(mask_matrix, axis=-1)
+    weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
 
     gfs_file_index = len(gfs_file_names)
     desired_gfs_row_indices = numpy.array([], dtype=int)
@@ -890,8 +900,8 @@ def data_generator(option_dict):
                 cutoff_values=target_cutoffs_for_classifn
             )
 
-        target_matrix_with_mask = numpy.concatenate(
-            (target_matrix, mask_matrix), axis=-1
+        target_matrix_with_weights = numpy.concatenate(
+            (target_matrix, weight_matrix), axis=-1
         )
         predictor_matrices = [
             m for m in [
@@ -905,8 +915,64 @@ def data_generator(option_dict):
             'Shape of target matrix (including land mask as last channel): '
             '{0:s}'
         ).format(
-            str(target_matrix_with_mask.shape)
+            str(target_matrix_with_weights.shape)
         ))
 
         # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
-        yield predictor_matrices, target_matrix_with_mask
+        yield predictor_matrices, target_matrix_with_weights
+
+
+def data_generator_many_regions(
+        option_dict, num_regions_per_init_time_in_batch):
+    """Generates both training and validation for neural network.
+
+    This particular generator should be used for neural networks that use
+    several geographic domains, with each domain having the same dimensions.
+    The bounding box for each domain should be specified in the first few input
+    args of the dictionary.
+    
+    R = number of regions
+
+    :param option_dict: Same as dictionary for `data_generator`, with the
+        following exceptions.
+    option_dict["inner_latitude_limits_deg_n"]: length-R list, where the [i]th
+        element is a length-2 numpy array with meridional limits (deg north) of
+        the bounding box for the [i]th inner domain.
+    option_dict["inner_longitude_limits_deg_e"]: Same but for longitude (deg
+        east).
+    
+    :param num_regions_per_init_time_in_batch: Number of regions from one init
+        time (i.e., one GFS run) in a batch.  If you make this value lower
+        (higher), more (fewer) GFS runs will be included in a batch.
+
+    :return: predictor_matrices: See documentation for `data_generator`.
+    :return: target_matrix: Same.
+    """
+    
+    # TODO(thunderhoser): This bit is HACKY.
+    inner_latitude_limits_by_region_deg_n = copy.deepcopy(
+        option_dict[INNER_LATITUDE_LIMITS_KEY]
+    )
+    inner_longitude_limits_by_region_deg_e = copy.deepcopy(
+        option_dict[INNER_LONGITUDE_LIMITS_KEY]
+    )
+
+    error_checking.assert_is_list(inner_latitude_limits_by_region_deg_n)
+    error_checking.assert_is_list(inner_longitude_limits_by_region_deg_e)
+    error_checking.assert_equals(
+        len(inner_latitude_limits_by_region_deg_n),
+        len(inner_longitude_limits_by_region_deg_e)
+    )
+    
+    num_regions = len(inner_latitude_limits_by_region_deg_n)
+    for i in range(num_regions):
+        option_dict[INNER_LATITUDE_LIMITS_KEY] = (
+            inner_latitude_limits_by_region_deg_n[i]
+        )
+        option_dict[INNER_LONGITUDE_LIMITS_KEY] = (
+            inner_longitude_limits_by_region_deg_e[i]
+        )
+        option_dict = _check_generator_args(option_dict)
+    
+    error_checking.assert_is_integer(num_regions_per_init_time_in_batch)
+    error_checking.assert_is_greater(num_regions_per_init_time_in_batch, 0)
