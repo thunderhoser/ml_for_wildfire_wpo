@@ -290,21 +290,21 @@ def get_z_score_params_for_targets(target_file_names):
     return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
 
 
-def normalize_gfs_data_to_z_scores(fwi_table_xarray,
+def normalize_gfs_data_to_z_scores(gfs_table_xarray,
                                    z_score_param_table_xarray):
     """Normalizes GFS data from physical units to z-scores.
 
-    :param fwi_table_xarray: xarray table with GFS data in physical units.
+    :param gfs_table_xarray: xarray table with GFS data in physical units.
     :param z_score_param_table_xarray: xarray table with normalization
         parameters (means and standard deviations), created by
         `get_z_score_params_for_gfs`.
-    :return: fwi_table_xarray: Same as input but in z-score units.
+    :return: gfs_table_xarray: Same as input but in z-score units.
     """
 
     # TODO(thunderhoser): Still need denormalization method.
     # TODO(thunderhoser): Still need unit test.
 
-    gfst = fwi_table_xarray
+    gfst = gfs_table_xarray
     zspt = z_score_param_table_xarray
 
     field_names_3d = gfst.coords[gfs_utils.FIELD_DIM_3D].values.tolist()
@@ -350,13 +350,13 @@ def normalize_gfs_data_to_z_scores(fwi_table_xarray,
             (data_matrix_2d[..., j] - this_mean) / this_stdev
         )
 
-    return fwi_table_xarray.assign({
+    return gfs_table_xarray.assign({
         gfs_utils.DATA_KEY_3D: (
-            fwi_table_xarray[gfs_utils.DATA_KEY_3D].dims,
+            gfs_table_xarray[gfs_utils.DATA_KEY_3D].dims,
             data_matrix_3d
         ),
         gfs_utils.DATA_KEY_2D: (
-            fwi_table_xarray[gfs_utils.DATA_KEY_2D].dims,
+            gfs_table_xarray[gfs_utils.DATA_KEY_2D].dims,
             data_matrix_2d
         )
     })
