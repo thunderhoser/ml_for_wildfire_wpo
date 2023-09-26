@@ -507,11 +507,10 @@ def create_model(option_dict, loss_function, metric_list):
         this_pooling_layer_object = architecture_utils.get_2d_pooling_layer(
             num_rows_in_window=2, num_columns_in_window=2,
             num_rows_per_stride=2, num_columns_per_stride=2,
-            pooling_type_string=architecture_utils.MAX_POOLING_STRING,
-            layer_name=this_name
+            pooling_type_string=architecture_utils.MAX_POOLING_STRING
         )
         encoder_pooling_layer_objects[i] = keras.layers.TimeDistributed(
-            this_pooling_layer_object
+            this_pooling_layer_object, name=this_name
         )(encoder_conv_layer_objects[i])
 
     fc_module_layer_object = keras.layers.Permute(

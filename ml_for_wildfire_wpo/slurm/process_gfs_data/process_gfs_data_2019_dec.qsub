@@ -1,6 +1,6 @@
 #!/bin/tcsh
 
-#SBATCH --job-name="process_ncar_gfs_data_2021_patch"
+#SBATCH --job-name="process_gfs_data_2019_dec"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="batch"
@@ -12,13 +12,13 @@
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
 #SBATCH --time=24:00:00
-#SBATCH --array=1-2
+#SBATCH --array=1-31
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=process_ncar_gfs_data_2021_patch_%A_%a.out
+#SBATCH --output=process_gfs_data_2019_dec_%A_%a.out
 
 module load cuda/10.1
 module load gnu/9.2.0
@@ -28,12 +28,12 @@ source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
 conda activate base
 
 set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
-set INPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/raw_from_ncar/2021"
-set OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/from_ncar"
+set INPUT_DIR_NAME="/scratch1/BMC/gsd-hpcs/Ryan.Lagerquist/gfs_data_for_fire_weather/grib2"
+set OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed"
 set WGRIB2_EXE_NAME="wgrib2"
 
-set FIRST_DATE_STRINGS=("20210123" "20210124")
-set LAST_DATE_STRINGS=("20210123" "20210124")
+set FIRST_DATE_STRINGS=("20191201" "20191202" "20191203" "20191204" "20191205" "20191206" "20191207" "20191208" "20191209" "20191210" "20191211" "20191212" "20191213" "20191214" "20191215" "20191216" "20191217" "20191218" "20191219" "20191220" "20191221" "20191222" "20191223" "20191224" "20191225" "20191226" "20191227" "20191228" "20191229" "20191230" "20191231")
+set LAST_DATE_STRINGS=("20191201" "20191202" "20191203" "20191204" "20191205" "20191206" "20191207" "20191208" "20191209" "20191210" "20191211" "20191212" "20191213" "20191214" "20191215" "20191216" "20191217" "20191218" "20191219" "20191220" "20191221" "20191222" "20191223" "20191224" "20191225" "20191226" "20191227" "20191228" "20191229" "20191230" "20191231")
 
 set first_date_string="${FIRST_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}"
 set last_date_string="${LAST_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}"
@@ -48,5 +48,4 @@ python3 -u "${CODE_DIR_NAME}/process_gfs_data.py" \
 --end_longitude_deg_e=-55 \
 --wgrib2_exe_file_name="${WGRIB2_EXE_NAME}" \
 --temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${first_date_string}-${last_date_string}" \
---is_ncar_format=1 \
 --output_zarr_dir_name="${OUTPUT_DIR_NAME}"

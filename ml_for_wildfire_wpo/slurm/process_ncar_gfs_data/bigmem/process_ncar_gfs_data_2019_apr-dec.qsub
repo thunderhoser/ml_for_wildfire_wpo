@@ -1,0 +1,52 @@
+#!/bin/tcsh
+
+#SBATCH --job-name="process_ncar_gfs_data_2019_apr-dec"
+#SBATCH --partition="bigmem"
+#SBATCH --account="gsd-hpcs"
+#SBATCH --qos="batch"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=24:00:00
+#SBATCH --array=1-92%50
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=process_ncar_gfs_data_2019_apr-dec_%A_%a.out
+
+module load cuda/10.1
+module load gnu/9.2.0
+module load wgrib2/3.1.1_ncep
+
+source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
+conda activate base
+
+set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+set INPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/raw_from_ncar/2019"
+set OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/from_ncar"
+set WGRIB2_EXE_NAME="wgrib2"
+
+set FIRST_DATE_STRINGS=("20190401" "20190404" "20190407" "20190410" "20190413" "20190416" "20190419" "20190422" "20190425" "20190428" "20190501" "20190504" "20190507" "20190510" "20190513" "20190516" "20190519" "20190522" "20190525" "20190528" "20190531" "20190603" "20190606" "20190609" "20190612" "20190615" "20190618" "20190621" "20190624" "20190627" "20190630" "20190703" "20190706" "20190709" "20190712" "20190715" "20190718" "20190721" "20190724" "20190727" "20190730" "20190802" "20190805" "20190808" "20190811" "20190814" "20190817" "20190820" "20190823" "20190826" "20190829" "20190901" "20190904" "20190907" "20190910" "20190913" "20190916" "20190919" "20190922" "20190925" "20190928" "20191001" "20191004" "20191007" "20191010" "20191013" "20191016" "20191019" "20191022" "20191025" "20191028" "20191031" "20191103" "20191106" "20191109" "20191112" "20191115" "20191118" "20191121" "20191124" "20191127" "20191130" "20191203" "20191206" "20191209" "20191212" "20191215" "20191218" "20191221" "20191224" "20191227" "20191230")
+set LAST_DATE_STRINGS=("20190403" "20190406" "20190409" "20190412" "20190415" "20190418" "20190421" "20190424" "20190427" "20190430" "20190503" "20190506" "20190509" "20190512" "20190515" "20190518" "20190521" "20190524" "20190527" "20190530" "20190602" "20190605" "20190608" "20190611" "20190614" "20190617" "20190620" "20190623" "20190626" "20190629" "20190702" "20190705" "20190708" "20190711" "20190714" "20190717" "20190720" "20190723" "20190726" "20190729" "20190801" "20190804" "20190807" "20190810" "20190813" "20190816" "20190819" "20190822" "20190825" "20190828" "20190831" "20190903" "20190906" "20190909" "20190912" "20190915" "20190918" "20190921" "20190924" "20190927" "20190930" "20191003" "20191006" "20191009" "20191012" "20191015" "20191018" "20191021" "20191024" "20191027" "20191030" "20191102" "20191105" "20191108" "20191111" "20191114" "20191117" "20191120" "20191123" "20191126" "20191129" "20191202" "20191205" "20191208" "20191211" "20191214" "20191217" "20191220" "20191223" "20191226" "20191229" "20191231")
+
+set first_date_string="${FIRST_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+set last_date_string="${LAST_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}"
+
+python3 -u "${CODE_DIR_NAME}/process_gfs_data.py" \
+--input_grib2_dir_name="${INPUT_DIR_NAME}" \
+--start_date_string="${first_date_string}" \
+--end_date_string="${last_date_string}" \
+--start_latitude_deg_n=10 \
+--end_latitude_deg_n=80 \
+--start_longitude_deg_e=160 \
+--end_longitude_deg_e=-55 \
+--wgrib2_exe_file_name="${WGRIB2_EXE_NAME}" \
+--temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${first_date_string}-${last_date_string}" \
+--is_ncar_format=1 \
+--output_zarr_dir_name="${OUTPUT_DIR_NAME}"
