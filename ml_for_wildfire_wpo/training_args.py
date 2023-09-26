@@ -21,6 +21,7 @@ TARGET_NORM_FILE_ARG_NAME = 'target_normalization_file_name'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
 
+# TODO(thunderhoser): Need to support set of continuous training periods (so overall discontinuous).
 GFS_TRAINING_DIR_ARG_NAME = 'gfs_dir_name_for_training'
 TARGET_TRAINING_DIR_ARG_NAME = 'target_dir_name_for_training'
 TRAINING_DATE_LIMITS_ARG_NAME = 'gfs_init_date_limit_strings_for_training'

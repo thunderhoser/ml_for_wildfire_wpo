@@ -27,6 +27,7 @@ import gfs_utils
 import era5_constant_utils
 import canadian_fwi_utils
 import normalization
+import custom_losses
 
 DATE_FORMAT = '%Y%m%d'
 GRID_SPACING_DEG = 0.25
@@ -992,10 +993,19 @@ def data_generator(option_dict):
         target_matrix_with_weights = numpy.concatenate(
             (target_matrix, weight_matrix), axis=-1
         )
+        # predictor_matrices = [
+        #     m for m in [
+        #         gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
+        #         era5_constant_matrix, lagged_target_predictor_matrix
+        #     ]
+        #     if m is not None
+        # ]
+
+        # TODO(thunderhoser): HACK because my architecture cannot yet handle
+        # ERA5 or lagged targets.
         predictor_matrices = [
             m for m in [
-                gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
-                lagged_target_predictor_matrix, era5_constant_matrix
+                gfs_predictor_matrix_3d, gfs_predictor_matrix_2d
             ]
             if m is not None
         ]
