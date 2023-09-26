@@ -22,6 +22,11 @@ FIELD_DIM_3D = 'field_name_3d'
 DATA_KEY_2D = 'data_matrix_2d'
 DATA_KEY_3D = 'data_matrix_3d'
 
+MEAN_VALUE_KEY_3D = 'mean_value_3d'
+STDEV_KEY_3D = 'standard_deviation_3d'
+MEAN_VALUE_KEY_2D = 'mean_value_2d'
+STDEV_KEY_2D = 'standard_deviation_2d'
+
 TEMPERATURE_NAME = 'temperature_kelvins'
 SPECIFIC_HUMIDITY_NAME = 'specific_humidity_kg_kg01'
 GEOPOTENTIAL_HEIGHT_NAME = 'geopotential_height_m_asl'

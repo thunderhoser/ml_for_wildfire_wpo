@@ -16,6 +16,9 @@ LONGITUDE_DIM = 'longitude_deg_e'
 FIELD_DIM = 'field_name'
 DATA_KEY = 'data'
 
+MEAN_VALUE_KEY = 'mean_value'
+STDEV_KEY = 'standard_deviation'
+
 FFMC_NAME = 'fine_fuel_moisture_code'
 DMC_NAME = 'duff_moisture_code'
 DC_NAME = 'drought_code'
