@@ -1,9 +1,16 @@
 """Helper methods for training a neural network to predict fire weather."""
+
+import os
 import copy
+import time
 import random
+import pickle
 import numpy
+import keras
+import tensorflow.keras as tf_keras
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import number_rounding
+from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.io import gfs_io
 from ml_for_wildfire_wpo.io import era5_constant_io
@@ -12,6 +19,7 @@ from ml_for_wildfire_wpo.utils import misc_utils
 from ml_for_wildfire_wpo.utils import gfs_utils
 from ml_for_wildfire_wpo.utils import era5_constant_utils
 from ml_for_wildfire_wpo.utils import canadian_fwi_utils
+from ml_for_wildfire_wpo.utils import normalization
 
 DATE_FORMAT = '%Y%m%d'
 GRID_SPACING_DEG = 0.25
@@ -26,13 +34,16 @@ GFS_PREDICTOR_FIELDS_KEY = 'gfs_predictor_field_names'
 GFS_PRESSURE_LEVELS_KEY = 'gfs_pressure_levels_mb'
 GFS_PREDICTOR_LEADS_KEY = 'gfs_predictor_lead_times_hours'
 GFS_DIRECTORY_KEY = 'gfs_directory_name'
+GFS_NORM_FILE_KEY = 'gfs_normalization_file_name'
 ERA5_CONSTANT_PREDICTOR_FIELDS_KEY = 'era5_constant_predictor_field_names'
 ERA5_CONSTANT_FILE_KEY = 'era5_constant_file_name'
+# ERA5_NORM_FILE_KEY = 'era5_normalization_file_name' # TODO
 TARGET_FIELD_KEY = 'target_field_name'
 TARGET_LEAD_TIME_KEY = 'target_lead_time_days'
 TARGET_LAG_TIMES_KEY = 'target_lag_times_days'
 TARGET_CUTOFFS_KEY = 'target_cutoffs_for_classifn'
 TARGET_DIRECTORY_KEY = 'target_dir_name'
+TARGET_NORM_FILE_KEY = 'target_normalization_file_name'
 BATCH_SIZE_KEY = 'num_examples_per_batch'
 SENTINEL_VALUE_KEY = 'sentinel_value'
 
@@ -45,6 +56,22 @@ DEFAULT_GENERATOR_OPTION_DICT = {
     TARGET_CUTOFFS_KEY: None,
     # SENTINEL_VALUE_KEY: -10.
 }
+
+NUM_EPOCHS_KEY = 'num_epochs'
+NUM_TRAINING_BATCHES_KEY = 'num_training_batches_per_epoch'
+TRAINING_OPTIONS_KEY = 'training_option_dict'
+NUM_VALIDATION_BATCHES_KEY = 'num_validation_batches_per_epoch'
+VALIDATION_OPTIONS_KEY = 'validation_option_dict'
+LOSS_FUNCTION_KEY = 'loss_function_string'
+PLATEAU_PATIENCE_KEY = 'plateau_patience_epochs'
+PLATEAU_LR_MUTIPLIER_KEY = 'plateau_learning_rate_multiplier'
+EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
+
+METADATA_KEYS = [
+    NUM_EPOCHS_KEY, NUM_TRAINING_BATCHES_KEY, TRAINING_OPTIONS_KEY,
+    NUM_VALIDATION_BATCHES_KEY, VALIDATION_OPTIONS_KEY, LOSS_FUNCTION_KEY,
+    PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY, EARLY_STOPPING_PATIENCE_KEY
+]
 
 
 def _check_generator_args(option_dict):
@@ -146,6 +173,8 @@ def _check_generator_args(option_dict):
     )
 
     error_checking.assert_directory_exists(option_dict[GFS_DIRECTORY_KEY])
+    if option_dict[GFS_NORM_FILE_KEY] is not None:
+        error_checking.assert_directory_exists(option_dict[GFS_NORM_FILE_KEY])
 
     if option_dict[ERA5_CONSTANT_PREDICTOR_FIELDS_KEY] is not None:
         error_checking.assert_is_string_list(
@@ -184,6 +213,10 @@ def _check_generator_args(option_dict):
         )
 
     error_checking.assert_directory_exists(option_dict[TARGET_DIRECTORY_KEY])
+    if option_dict[TARGET_NORM_FILE_KEY] is not None:
+        error_checking.assert_directory_exists(
+            option_dict[TARGET_NORM_FILE_KEY]
+        )
 
     error_checking.assert_is_integer(option_dict[BATCH_SIZE_KEY])
     # error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 8)
@@ -377,7 +410,7 @@ def _pad_inner_to_outer_domain(
 
 def _get_target_field(
         target_file_name, desired_row_indices, desired_column_indices,
-        field_name):
+        field_name, norm_param_table_xarray):
     """Reads target field from one file.
 
     M = number of rows in grid
@@ -387,6 +420,8 @@ def _get_target_field(
     :param desired_row_indices: length-M numpy array of indices.
     :param desired_column_indices: length-N numpy array of indices.
     :param field_name: Field name.
+    :param norm_param_table_xarray: xarray table with normalization parameters.
+        If you do not want normalization, make this None.
     :return: data_matrix: M-by-N numpy array of data values.
     """
 
@@ -401,6 +436,12 @@ def _get_target_field(
         fwi_table_xarray=fwi_table_xarray,
         desired_column_indices=desired_column_indices
     )
+    if norm_param_table_xarray is not None:
+        fwi_table_xarray = normalization.normalize_targets_to_z_scores(
+            fwi_table_xarray=fwi_table_xarray,
+            z_score_param_table_xarray=norm_param_table_xarray
+        )
+
     data_matrix = canadian_fwi_utils.get_field(
         fwi_table_xarray=fwi_table_xarray, field_name=field_name
     )
@@ -524,6 +565,8 @@ def data_generator(option_dict):
     option_dict["gfs_directory_name"]: Name of directory with GFS data.  Files
         therein will be found by `gfs_io.find_file` and read by
         `gfs_io.read_file`.
+    option_dict["gfs_normalization_file_name"]: Path to file with normalization
+        params for GFS data.  Will be read by `gfs_io.read_normalization_file`.
     option_dict["era5_constant_predictor_field_names"]: 1-D list with names of
         ERA5 constant fields to be used as predictors.  If you do not want such
         predictors, make this None.
@@ -544,6 +587,9 @@ def data_generator(option_dict):
     option_dict["target_dir_name"]: Name of directory with target variable.
         Files therein will be found by `canadian_fwo_io.find_file` and read by
         `canadian_fwo_io.read_file`.
+    option_dict["target_normalization_file_name"]: Path to file with
+        normalization params for target fields.  Will be read by
+        `canadian_fwi_io.read_normalization_file`.
     option_dict["num_examples_per_batch"]: Number of data examples per batch,
         usually just called "batch size".
     option_dict["sentinel_value"]: All NaN will be replaced with this value.
@@ -572,8 +618,7 @@ def data_generator(option_dict):
 
     # TODO(thunderhoser): Allow multiple lead times for target.
 
-    # TODO(thunderhoser): Deal with normalization.  On-the-fly normalization
-    # would be easy but slow.  Pre-fab normalization (in the input files) would
+    # TODO(thunderhoser): Pre-fab normalization (in the input files) would
     # be tricky, because the target variable y should be normalized when lagged
     # versions of y are used in the predictors but not when y itself is used as
     # the target.
@@ -594,6 +639,7 @@ def data_generator(option_dict):
     gfs_pressure_levels_mb = option_dict[GFS_PRESSURE_LEVELS_KEY]
     gfs_predictor_lead_times_hours = option_dict[GFS_PREDICTOR_LEADS_KEY]
     gfs_directory_name = option_dict[GFS_DIRECTORY_KEY]
+    gfs_normalization_file_name = option_dict[GFS_NORM_FILE_KEY]
     era5_constant_predictor_field_names = option_dict[
         ERA5_CONSTANT_PREDICTOR_FIELDS_KEY
     ]
@@ -603,8 +649,31 @@ def data_generator(option_dict):
     target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
     target_cutoffs_for_classifn = option_dict[TARGET_CUTOFFS_KEY]
     target_dir_name = option_dict[TARGET_DIRECTORY_KEY]
+    target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
+
+    if gfs_normalization_file_name is None:
+        gfs_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            gfs_normalization_file_name
+        ))
+        gfs_norm_param_table_xarray = gfs_io.read_normalization_file(
+            gfs_normalization_file_name
+        )
+
+    if target_normalization_file_name is None:
+        target_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            target_normalization_file_name
+        ))
+        target_norm_param_table_xarray = (
+            canadian_fwi_io.read_normalization_file(
+                target_normalization_file_name
+            )
+        )
 
     # TODO(thunderhoser): The longitude command below might fail.
     outer_latitude_limits_deg_n = inner_latitude_limits_deg_n + numpy.array([
@@ -741,6 +810,17 @@ def data_generator(option_dict):
                 desired_column_indices=desired_gfs_column_indices
             )
 
+            if gfs_norm_param_table_xarray is not None:
+                exec_start_time_unix_sec = time.time()
+                gfs_table_xarray = normalization.normalize_gfs_data_to_z_scores(
+                    gfs_table_xarray=gfs_table_xarray,
+                    z_score_param_table_xarray=gfs_norm_param_table_xarray
+                )
+
+                print('Normalizing GFS data took {0:.4f} seconds.'.format(
+                    time.time() - exec_start_time_unix_sec
+                ))
+
             this_gfs_predictor_matrix_2d = _get_2d_gfs_fields(
                 gfs_table_xarray=gfs_table_xarray,
                 field_names=gfs_2d_field_names
@@ -782,7 +862,8 @@ def data_generator(option_dict):
                     target_file_name=f,
                     desired_row_indices=desired_target_row_indices,
                     desired_column_indices=desired_target_column_indices,
-                    field_name=target_field_name
+                    field_name=target_field_name,
+                    norm_param_table_xarray=target_norm_param_table_xarray
                 )
                 for f in target_file_names
             ], axis=-1)
@@ -803,7 +884,8 @@ def data_generator(option_dict):
                 target_file_name=target_file_name,
                 desired_row_indices=desired_target_row_indices,
                 desired_column_indices=desired_target_column_indices,
-                field_name=target_field_name
+                field_name=target_field_name,
+                norm_param_table_xarray=None
             )
 
             if this_gfs_predictor_matrix_3d is not None:
@@ -976,3 +1058,251 @@ def data_generator_many_regions(
     
     error_checking.assert_is_integer(num_regions_per_init_time_in_batch)
     error_checking.assert_is_greater(num_regions_per_init_time_in_batch, 0)
+
+
+def find_metafile(model_file_name, raise_error_if_missing=True):
+    """Finds metafile for neural net.
+
+    :param model_file_name: Path to model file.
+    :param raise_error_if_missing: Boolean flag.  If file is missing and
+        `raise_error_if_missing == True`, will throw error.  If file is missing
+        and `raise_error_if_missing == False`, will return *expected* file path.
+    :return: metafile_name: Path to metafile.
+    """
+
+    error_checking.assert_is_string(model_file_name)
+    metafile_name = '{0:s}/model_metadata.p'.format(
+        os.path.split(model_file_name)[0]
+    )
+
+    if raise_error_if_missing and not os.path.isfile(metafile_name):
+        error_string = 'Cannot find file.  Expected at: "{0:s}"'.format(
+            metafile_name
+        )
+        raise ValueError(error_string)
+
+    return metafile_name
+
+
+def write_metafile(
+        pickle_file_name, num_epochs, num_training_batches_per_epoch,
+        training_option_dict, num_validation_batches_per_epoch,
+        validation_option_dict, loss_function_string,
+        plateau_patience_epochs, plateau_learning_rate_multiplier,
+        early_stopping_patience_epochs):
+    """Writes metadata to Pickle file.
+
+    :param pickle_file_name: Path to output file.
+    :param num_epochs: See doc for `train_model`.
+    :param num_training_batches_per_epoch: Same.
+    :param training_option_dict: Same.
+    :param num_validation_batches_per_epoch: Same.
+    :param validation_option_dict: Same.
+    :param loss_function_string: Same.
+    :param plateau_patience_epochs: Same.
+    :param plateau_learning_rate_multiplier: Same.
+    :param early_stopping_patience_epochs: Same.
+    """
+
+    metadata_dict = {
+        NUM_EPOCHS_KEY: num_epochs,
+        NUM_TRAINING_BATCHES_KEY: num_training_batches_per_epoch,
+        TRAINING_OPTIONS_KEY: training_option_dict,
+        NUM_VALIDATION_BATCHES_KEY: num_validation_batches_per_epoch,
+        VALIDATION_OPTIONS_KEY: validation_option_dict,
+        LOSS_FUNCTION_KEY: loss_function_string,
+        PLATEAU_PATIENCE_KEY: plateau_patience_epochs,
+        PLATEAU_LR_MUTIPLIER_KEY: plateau_learning_rate_multiplier,
+        EARLY_STOPPING_PATIENCE_KEY: early_stopping_patience_epochs
+    }
+
+    file_system_utils.mkdir_recursive_if_necessary(file_name=pickle_file_name)
+
+    pickle_file_handle = open(pickle_file_name, 'wb')
+    pickle.dump(metadata_dict, pickle_file_handle)
+    pickle_file_handle.close()
+
+
+def read_metafile(pickle_file_name):
+    """Reads metadata from Pickle file.
+
+    :param pickle_file_name: Path to input file.
+    :return: metadata_dict: Dictionary with the following keys.
+    metadata_dict["num_epochs"]: See doc for `train_model`.
+    metadata_dict["num_training_batches_per_epoch"]: Same.
+    metadata_dict["training_option_dict"]: Same.
+    metadata_dict["num_validation_batches_per_epoch"]: Same.
+    metadata_dict["validation_option_dict"]: Same.
+    metadata_dict["loss_function_string"]: Same.
+    metadata_dict["plateau_patience_epochs"]: Same.
+    metadata_dict["plateau_learning_rate_multiplier"]: Same.
+    metadata_dict["early_stopping_patience_epochs"]: Same.
+
+    :raises: ValueError: if any expected key is not found in dictionary.
+    """
+
+    error_checking.assert_file_exists(pickle_file_name)
+
+    pickle_file_handle = open(pickle_file_name, 'rb')
+    metadata_dict = pickle.load(pickle_file_handle)
+    pickle_file_handle.close()
+
+    missing_keys = list(set(METADATA_KEYS) - set(metadata_dict.keys()))
+    if len(missing_keys) == 0:
+        return metadata_dict
+
+    error_string = (
+        '\n{0:s}\nKeys listed above were expected, but not found, in file '
+        '"{1:s}".'
+    ).format(str(missing_keys), pickle_file_name)
+
+    raise ValueError(error_string)
+
+
+def read_model(hdf5_file_name):
+    """Reads model from HDF5 file.
+
+    :param hdf5_file_name: Path to input file.
+    :return: model_object: Instance of `keras.models.Model`.
+    """
+
+    error_checking.assert_file_exists(hdf5_file_name)
+
+    metafile_name = find_metafile(
+        model_file_name=hdf5_file_name, raise_error_if_missing=True
+    )
+    metadata_dict = read_metafile(metafile_name)
+
+    custom_object_dict = {
+        'loss': eval(metadata_dict[TRAINING_OPTIONS_KEY][LOSS_FUNCTION_KEY])
+    }
+    model_object = tf_keras.models.load_model(
+        hdf5_file_name, custom_objects=custom_object_dict, compile=False
+    )
+    model_object.compile(
+        loss=custom_object_dict['loss'], optimizer=keras.optimizers.Adam(),
+        metrics=[]
+    )
+
+    return model_object
+
+
+def train_model(
+        model_object, num_epochs,
+        num_training_batches_per_epoch, training_option_dict,
+        num_validation_batches_per_epoch, validation_option_dict,
+        loss_function_string, plateau_patience_epochs,
+        plateau_learning_rate_multiplier, early_stopping_patience_epochs,
+        output_dir_name):
+    """Trains neural net with generator.
+
+    :param model_object: Untrained neural net (instance of
+        `keras.models.Model`).
+    :param num_epochs: Number of training epochs.
+    :param num_training_batches_per_epoch: Number of training batches per epoch.
+    :param training_option_dict: See doc for `data_generator`.  This dictionary
+        will be used to generate training data.
+    :param num_validation_batches_per_epoch: Number of validation batches per
+        epoch.
+    :param validation_option_dict: See doc for `data_generator`.  For validation
+        only, the following values will replace corresponding values in
+        `training_option_dict`:
+    validation_option_dict["init_date_limit_strings"]
+    validation_option_dict["gfs_directory_name"]
+    validation_option_dict["target_dir_name"]
+
+    :param loss_function_string: Loss function.  This string should be formatted
+        such that `eval(loss_function_string)` returns the actual loss function.
+    :param plateau_patience_epochs: Training will be deemed to have reached
+        "plateau" if validation loss has not decreased in the last N epochs,
+        where N = plateau_patience_epochs.
+    :param plateau_learning_rate_multiplier: If training reaches "plateau,"
+        learning rate will be multiplied by this value in range (0, 1).
+    :param early_stopping_patience_epochs: Training will be stopped early if
+        validation loss has not decreased in the last N epochs, where N =
+        early_stopping_patience_epochs.
+    :param output_dir_name: Path to output directory (model and training history
+        will be saved here).
+    """
+
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=output_dir_name
+    )
+
+    error_checking.assert_is_integer(num_epochs)
+    error_checking.assert_is_geq(num_epochs, 2)
+    error_checking.assert_is_integer(num_training_batches_per_epoch)
+    error_checking.assert_is_geq(num_training_batches_per_epoch, 2)
+    error_checking.assert_is_integer(num_validation_batches_per_epoch)
+    error_checking.assert_is_geq(num_validation_batches_per_epoch, 2)
+    error_checking.assert_is_integer(plateau_patience_epochs)
+    error_checking.assert_is_geq(plateau_patience_epochs, 2)
+    error_checking.assert_is_greater(plateau_learning_rate_multiplier, 0.)
+    error_checking.assert_is_less_than(plateau_learning_rate_multiplier, 1.)
+    error_checking.assert_is_integer(early_stopping_patience_epochs)
+    error_checking.assert_is_geq(early_stopping_patience_epochs, 5)
+
+    validation_keys_to_keep = [
+        INIT_DATE_LIMITS_KEY, GFS_DIRECTORY_KEY, TARGET_DIRECTORY_KEY
+    ]
+    for this_key in list(training_option_dict.keys()):
+        if this_key in validation_keys_to_keep:
+            continue
+
+        validation_option_dict[this_key] = training_option_dict[this_key]
+
+    training_option_dict = _check_generator_args(training_option_dict)
+    validation_option_dict = _check_generator_args(validation_option_dict)
+
+    model_file_name = '{0:s}/model.h5'.format(output_dir_name)
+
+    history_object = keras.callbacks.CSVLogger(
+        filename='{0:s}/history.csv'.format(output_dir_name),
+        separator=',', append=False
+    )
+    checkpoint_object = keras.callbacks.ModelCheckpoint(
+        filepath=model_file_name, monitor='val_loss', verbose=1,
+        save_best_only=True, save_weights_only=False, mode='min', period=1
+    )
+    early_stopping_object = keras.callbacks.EarlyStopping(
+        monitor='val_loss', min_delta=0.,
+        patience=early_stopping_patience_epochs, verbose=1, mode='min'
+    )
+    plateau_object = keras.callbacks.ReduceLROnPlateau(
+        monitor='val_loss', factor=plateau_learning_rate_multiplier,
+        patience=plateau_patience_epochs, verbose=1, mode='min',
+        min_delta=0., cooldown=0
+    )
+
+    list_of_callback_objects = [
+        history_object, checkpoint_object, early_stopping_object, plateau_object
+    ]
+
+    training_generator = data_generator(training_option_dict)
+    validation_generator = data_generator(validation_option_dict)
+
+    metafile_name = find_metafile(
+        model_file_name=model_file_name, raise_error_if_missing=False
+    )
+    print('Writing metadata to: "{0:s}"...'.format(metafile_name))
+
+    write_metafile(
+        pickle_file_name=metafile_name,
+        num_epochs=num_epochs,
+        num_training_batches_per_epoch=num_training_batches_per_epoch,
+        training_option_dict=training_option_dict,
+        num_validation_batches_per_epoch=num_validation_batches_per_epoch,
+        validation_option_dict=validation_option_dict,
+        loss_function_string=loss_function_string,
+        plateau_patience_epochs=plateau_patience_epochs,
+        plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
+        early_stopping_patience_epochs=early_stopping_patience_epochs
+    )
+
+    model_object.fit_generator(
+        generator=training_generator,
+        steps_per_epoch=num_training_batches_per_epoch,
+        epochs=num_epochs, verbose=1, callbacks=list_of_callback_objects,
+        validation_data=validation_generator,
+        validation_steps=num_validation_batches_per_epoch
+    )
