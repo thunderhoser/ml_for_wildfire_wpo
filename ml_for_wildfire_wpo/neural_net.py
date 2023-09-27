@@ -1191,7 +1191,7 @@ def read_model(hdf5_file_name):
     metadata_dict = read_metafile(metafile_name)
 
     custom_object_dict = {
-        'loss': eval(metadata_dict[TRAINING_OPTIONS_KEY][LOSS_FUNCTION_KEY])
+        'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
     }
     model_object = tf_keras.models.load_model(
         hdf5_file_name, custom_objects=custom_object_dict, compile=False
