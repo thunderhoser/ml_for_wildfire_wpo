@@ -191,7 +191,8 @@ def _check_generator_args(option_dict):
         for this_field_name in option_dict[ERA5_CONSTANT_PREDICTOR_FIELDS_KEY]:
             era5_constant_utils.check_field_name(this_field_name)
 
-    error_checking.assert_file_exists(option_dict[ERA5_CONSTANT_FILE_KEY])
+    if option_dict[ERA5_CONSTANT_FILE_KEY] is not None:
+        error_checking.assert_file_exists(option_dict[ERA5_CONSTANT_FILE_KEY])
 
     canadian_fwi_utils.check_field_name(option_dict[TARGET_FIELD_KEY])
 
