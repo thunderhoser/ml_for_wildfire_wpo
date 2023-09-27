@@ -181,20 +181,22 @@ def _check_args(option_dict):
 
         assert numpy.array_equal(input_dimensions_era5_constants, these_dim)
 
-    error_checking.assert_is_numpy_array(
-        input_dimensions_lagged_target,
-        exact_dimensions=numpy.array([4], dtype=int)
-    )
-    error_checking.assert_is_integer_numpy_array(input_dimensions_lagged_target)
-    error_checking.assert_is_greater_numpy_array(
-        input_dimensions_lagged_target, 0
-    )
+    # TODO(thunderhoser): Take away the if-condition here.
+    if input_dimensions_lagged_target is not None:
+        error_checking.assert_is_numpy_array(
+            input_dimensions_lagged_target,
+            exact_dimensions=numpy.array([4], dtype=int)
+        )
+        error_checking.assert_is_integer_numpy_array(input_dimensions_lagged_target)
+        error_checking.assert_is_greater_numpy_array(
+            input_dimensions_lagged_target, 0
+        )
 
-    these_dim = numpy.array([
-        num_grid_rows, num_grid_columns, input_dimensions_lagged_target[2], 1
-    ], dtype=int)
+        these_dim = numpy.array([
+            num_grid_rows, num_grid_columns, input_dimensions_lagged_target[2], 1
+        ], dtype=int)
 
-    assert numpy.array_equal(input_dimensions_lagged_target, these_dim)
+        assert numpy.array_equal(input_dimensions_lagged_target, these_dim)
 
     num_conv_layers_in_fc_module = option_dict[NUM_FC_CONV_LAYERS_KEY]
     error_checking.assert_is_integer(num_conv_layers_in_fc_module)
@@ -434,13 +436,18 @@ def create_model(option_dict, loss_function, metric_list):
             name='era5_constant_inputs'
         )
 
-    input_layer_object_lagged_target = keras.layers.Input(
-        shape=tuple(input_dimensions_lagged_target.tolist()),
-        name='lagged_target_inputs'
-    )
-    layer_object_lagged_target = keras.layers.Permute(
-        dims=(3, 1, 2, 4), name='lagged_targets_put-time-first'
-    )(input_layer_object_lagged_target)
+    # TODO(thunderhoser): Take away the if-condition here.
+    if input_dimensions_lagged_target is None:
+        input_layer_object_lagged_target = None
+        layer_object_lagged_target = None
+    else:
+        input_layer_object_lagged_target = keras.layers.Input(
+            shape=tuple(input_dimensions_lagged_target.tolist()),
+            name='lagged_target_inputs'
+        )
+        layer_object_lagged_target = keras.layers.Permute(
+            dims=(3, 1, 2, 4), name='lagged_targets_put-time-first'
+        )(input_layer_object_lagged_target)
 
     regularizer_object = architecture_utils.get_weight_regularizer(
         l1_weight=l1_weight, l2_weight=l2_weight
