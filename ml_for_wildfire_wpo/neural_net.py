@@ -182,7 +182,7 @@ def _check_generator_args(option_dict):
 
     error_checking.assert_directory_exists(option_dict[GFS_DIRECTORY_KEY])
     if option_dict[GFS_NORM_FILE_KEY] is not None:
-        error_checking.assert_directory_exists(option_dict[GFS_NORM_FILE_KEY])
+        error_checking.assert_file_exists(option_dict[GFS_NORM_FILE_KEY])
 
     if option_dict[ERA5_CONSTANT_PREDICTOR_FIELDS_KEY] is not None:
         error_checking.assert_is_string_list(
@@ -222,7 +222,7 @@ def _check_generator_args(option_dict):
 
     error_checking.assert_directory_exists(option_dict[TARGET_DIRECTORY_KEY])
     if option_dict[TARGET_NORM_FILE_KEY] is not None:
-        error_checking.assert_directory_exists(
+        error_checking.assert_file_exists(
             option_dict[TARGET_NORM_FILE_KEY]
         )
 
