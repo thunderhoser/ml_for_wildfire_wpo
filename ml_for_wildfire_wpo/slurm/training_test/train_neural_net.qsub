@@ -41,6 +41,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --gfs_pressure_levels_mb 500 700 900 \
 --gfs_predictor_lead_times_hours 0 12 24 36 48 \
 --gfs_normalization_file_name="${GFS_NORM_FILE_NAME}" \
+--era5_constant_file_name="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_constants.nc" \
 --target_field_name="fine_fuel_moisture_code" \
 --target_lead_time_days=2 \
 --target_lag_times_days 1 2 3 \
