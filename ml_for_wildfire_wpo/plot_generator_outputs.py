@@ -335,7 +335,7 @@ def _run(template_file_name, output_dir_name,
                 )
             )
             fwi_plotting.plot_field(
-                data_matrix=target_matrix_with_weights[..., 0],
+                data_matrix=target_matrix_with_weights[i, ..., 0],
                 grid_latitudes_deg_n=OUTER_GRID_LATITUDES_DEG_N,
                 grid_longitudes_deg_e=OUTER_GRID_LONGITUDES_DEG_E,
                 colour_map_object=colour_map_object,
@@ -387,7 +387,7 @@ def _run(template_file_name, output_dir_name,
             )
 
             fwi_plotting.plot_field(
-                data_matrix=target_matrix_with_weights[..., 1],
+                data_matrix=target_matrix_with_weights[i, ..., 1],
                 grid_latitudes_deg_n=OUTER_GRID_LATITUDES_DEG_N,
                 grid_longitudes_deg_e=OUTER_GRID_LONGITUDES_DEG_E,
                 colour_map_object=pyplot.get_cmap('Greens'),
