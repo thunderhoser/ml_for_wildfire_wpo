@@ -50,7 +50,7 @@ def _run():
             architecture_utils.RELU_FUNCTION_STRING,
         chiu_net_architecture.INNER_ACTIV_FUNCTION_ALPHA_KEY: 0.2,
         chiu_net_architecture.OUTPUT_ACTIV_FUNCTION_KEY:
-            architecture_utils.SIGMOID_FUNCTION_STRING,
+            architecture_utils.RELU_FUNCTION_STRING,
         chiu_net_architecture.OUTPUT_ACTIV_FUNCTION_ALPHA_KEY: 0.,
         chiu_net_architecture.L1_WEIGHT_KEY: 0.,
         chiu_net_architecture.L2_WEIGHT_KEY: 1e-6,
