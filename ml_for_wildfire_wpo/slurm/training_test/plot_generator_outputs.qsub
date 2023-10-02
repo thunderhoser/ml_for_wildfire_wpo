@@ -1,6 +1,6 @@
 #!/bin/tcsh
 
-#SBATCH --job-name="train_neural_net"
+#SBATCH --job-name="plot_generator_outputs"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="batch"
@@ -15,7 +15,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=train_neural_nets_%A.out
+#SBATCH --output=plot_generator_outputs_%A.out
 
 module load cuda/10.1
 source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
@@ -40,7 +40,7 @@ python3 -u "${CODE_DIR_NAME}/plot_generator_outputs.py" \
 --gfs_predictor_field_names "temperature_kelvins" "specific_humidity_kg_kg01" "geopotential_height_m_asl" "u_wind_m_s01" "v_wind_m_s01" "temperature_2m_agl_kelvins" "specific_humidity_2m_agl_kg_kg01" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "accumulated_precip_metres" "volumetric_soil_moisture_fraction_0to10cm" "snow_depth_metres" \
 --gfs_pressure_levels_mb 500 700 900 \
 --gfs_predictor_lead_times_hours 0 12 24 36 48 \
---gfs_normalization_file_name="${GFS_NORM_FILE_NAME}" \
+# --gfs_normalization_file_name="${GFS_NORM_FILE_NAME}" \
 --era5_constant_file_name="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_constants.nc" \
 --target_field_name="fine_fuel_moisture_code" \
 --target_lead_time_days=2 \

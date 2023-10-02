@@ -13,9 +13,12 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import longitude_conversion as lng_conversion
 import file_system_utils
+import border_io
 import gfs_utils
 import neural_net
+import plotting_utils
 import gfs_plotting
 import training_args
 
@@ -150,6 +153,11 @@ def _run(template_file_name, output_dir_name,
     generator_object = neural_net.data_generator(training_option_dict)
     example_index = -1
 
+    border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
+    border_longitudes_deg_e = lng_conversion.convert_lng_positive_in_west(
+        border_longitudes_deg_e
+    )
+
     for _ in range(3):
         predictor_matrices, target_matrix_with_weights = next(generator_object)
         target_matrix = target_matrix_with_weights[..., 0]
@@ -189,10 +197,33 @@ def _run(template_file_name, output_dir_name,
                             plot_colour_bar=True
                         )
 
+                        plotting_utils.plot_borders(
+                            border_latitudes_deg_n=border_latitudes_deg_n,
+                            border_longitudes_deg_e=border_longitudes_deg_e,
+                            axes_object=axes_object,
+                            line_colour=numpy.full(3, 0.)
+                        )
+                        plotting_utils.plot_grid_lines(
+                            plot_latitudes_deg_n=OUTER_GRID_LATITUDES_DEG_N,
+                            plot_longitudes_deg_e=OUTER_GRID_LONGITUDES_DEG_E,
+                            axes_object=axes_object,
+                            meridian_spacing_deg=20.,
+                            parallel_spacing_deg=10.
+                        )
+
+                        axes_object.set_xlim(
+                            numpy.min(OUTER_GRID_LONGITUDES_DEG_E),
+                            numpy.max(OUTER_GRID_LONGITUDES_DEG_E)
+                        )
+                        axes_object.set_ylim(
+                            numpy.min(OUTER_GRID_LATITUDES_DEG_N),
+                            numpy.max(OUTER_GRID_LATITUDES_DEG_N)
+                        )
+
                         title_string = '{0:s} at {1:d} mb and {2:d}-h lead'.format(
                             gfs_3d_field_names[j],
                             gfs_pressure_levels_mb[k],
-                            gfs_predictor_lead_times_hours[k]
+                            gfs_predictor_lead_times_hours[l]
                         )
                         axes_object.set_title(title_string)
 
