@@ -155,7 +155,7 @@ def _run(template_file_name, output_dir_name,
         target_matrix = target_matrix_with_weights[..., 0]
         gfs_3d_predictor_matrix = predictor_matrices[0]
         gfs_2d_predictor_matrix = predictor_matrices[1]
-        lagged_target_predictor_matrix = predictor_matrices[2]
+        # lagged_target_predictor_matrix = predictor_matrices[2]
 
         this_num_examples = target_matrix.shape[0]
 
