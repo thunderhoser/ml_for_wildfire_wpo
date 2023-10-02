@@ -17,9 +17,11 @@ import longitude_conversion as lng_conversion
 import file_system_utils
 import border_io
 import gfs_utils
+import canadian_fwi_utils
 import neural_net
 import plotting_utils
 import gfs_plotting
+import fwi_plotting
 import training_args
 
 OUTER_GRID_LATITUDES_DEG_N = numpy.linspace(12, 78, num=265, dtype=float)
@@ -148,7 +150,9 @@ def _run(template_file_name, output_dir_name,
 
     num_pressure_levels = len(gfs_pressure_levels_mb)
     num_lead_times = len(gfs_predictor_lead_times_hours)
-    num_3d_fields = len(gfs_3d_field_names)
+    # num_3d_fields = len(gfs_3d_field_names)
+    num_3d_fields = 0
+    num_2d_fields = len(gfs_2d_field_names)
 
     generator_object = neural_net.data_generator(training_option_dict)
     example_index = -1
@@ -160,12 +164,11 @@ def _run(template_file_name, output_dir_name,
 
     for _ in range(3):
         predictor_matrices, target_matrix_with_weights = next(generator_object)
-        target_matrix = target_matrix_with_weights[..., 0]
         gfs_3d_predictor_matrix = predictor_matrices[0]
         gfs_2d_predictor_matrix = predictor_matrices[1]
         # lagged_target_predictor_matrix = predictor_matrices[2]
 
-        this_num_examples = target_matrix.shape[0]
+        this_num_examples = target_matrix_with_weights.shape[0]
 
         for i in range(this_num_examples):
             example_index += 1
@@ -184,9 +187,9 @@ def _run(template_file_name, output_dir_name,
                             1, 1,
                             figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
                         )
-
                         gfs_plotting.plot_field(
-                            data_matrix=gfs_3d_predictor_matrix[i, ..., k, l, j],
+                            data_matrix=
+                            gfs_3d_predictor_matrix[i, ..., k, l, j],
                             grid_latitudes_deg_n=OUTER_GRID_LATITUDES_DEG_N,
                             grid_longitudes_deg_e=OUTER_GRID_LONGITUDES_DEG_E,
                             colour_map_object=pyplot.get_cmap('viridis'),
@@ -220,14 +223,19 @@ def _run(template_file_name, output_dir_name,
                             numpy.max(OUTER_GRID_LATITUDES_DEG_N)
                         )
 
-                        title_string = '{0:s} at {1:d} mb and {2:d}-h lead'.format(
+                        title_string = (
+                            '{0:s} at {1:d} mb and {2:d}-h lead'
+                        ).format(
                             gfs_3d_field_names[j],
                             gfs_pressure_levels_mb[k],
                             gfs_predictor_lead_times_hours[l]
                         )
                         axes_object.set_title(title_string)
 
-                        output_file_name = '{0:s}/example{1:03d}_{2:s}_{3:04d}mb_{4:03d}hours.jpg'.format(
+                        output_file_name = (
+                            '{0:s}/example{1:03d}_{2:s}_{3:04d}mb_{4:03d}hours'
+                            '.jpg'
+                        ).format(
                             output_dir_name,
                             example_index,
                             gfs_3d_field_names[j].replace('_', '-'),
@@ -243,6 +251,186 @@ def _run(template_file_name, output_dir_name,
                             pad_inches=0, bbox_inches='tight'
                         )
                         pyplot.close(figure_object)
+
+            for j in range(num_2d_fields):
+                for l in range(num_lead_times):
+                    min_colour_value = numpy.percentile(
+                        gfs_2d_predictor_matrix[i, ..., l, j], 1.
+                    )
+                    max_colour_value = numpy.percentile(
+                        gfs_2d_predictor_matrix[i, ..., l, j], 99.
+                    )
+
+                    figure_object, axes_object = pyplot.subplots(
+                        1, 1,
+                        figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+                    )
+                    gfs_plotting.plot_field(
+                        data_matrix=gfs_2d_predictor_matrix[i, ..., l, j],
+                        grid_latitudes_deg_n=OUTER_GRID_LATITUDES_DEG_N,
+                        grid_longitudes_deg_e=OUTER_GRID_LONGITUDES_DEG_E,
+                        colour_map_object=pyplot.get_cmap('viridis'),
+                        colour_norm_object=pyplot.Normalize(
+                            vmin=min_colour_value, vmax=max_colour_value
+                        ),
+                        axes_object=axes_object,
+                        plot_colour_bar=True
+                    )
+
+                    plotting_utils.plot_borders(
+                        border_latitudes_deg_n=border_latitudes_deg_n,
+                        border_longitudes_deg_e=border_longitudes_deg_e,
+                        axes_object=axes_object,
+                        line_colour=numpy.full(3, 0.)
+                    )
+                    plotting_utils.plot_grid_lines(
+                        plot_latitudes_deg_n=OUTER_GRID_LATITUDES_DEG_N,
+                        plot_longitudes_deg_e=OUTER_GRID_LONGITUDES_DEG_E,
+                        axes_object=axes_object,
+                        meridian_spacing_deg=20.,
+                        parallel_spacing_deg=10.
+                    )
+
+                    axes_object.set_xlim(
+                        numpy.min(OUTER_GRID_LONGITUDES_DEG_E),
+                        numpy.max(OUTER_GRID_LONGITUDES_DEG_E)
+                    )
+                    axes_object.set_ylim(
+                        numpy.min(OUTER_GRID_LATITUDES_DEG_N),
+                        numpy.max(OUTER_GRID_LATITUDES_DEG_N)
+                    )
+
+                    title_string = '{0:s} at {1:d}-h lead'.format(
+                        gfs_2d_field_names[j],
+                        gfs_predictor_lead_times_hours[l]
+                    )
+                    axes_object.set_title(title_string)
+
+                    output_file_name = (
+                        '{0:s}/example{1:03d}_{2:s}_{3:03d}hours.jpg'
+                    ).format(
+                        output_dir_name,
+                        example_index,
+                        gfs_2d_field_names[j].replace('_', '-'),
+                        gfs_predictor_lead_times_hours[l]
+                    )
+
+                    print('Saving figure to: "{0:s}"...'.format(
+                        output_file_name
+                    ))
+                    figure_object.savefig(
+                        output_file_name, dpi=FIGURE_RESOLUTION_DPI,
+                        pad_inches=0, bbox_inches='tight'
+                    )
+                    pyplot.close(figure_object)
+
+            figure_object, axes_object = pyplot.subplots(
+                1, 1,
+                figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+            )
+
+            colour_map_object, colour_norm_object = (
+                fwi_plotting.field_to_colour_scheme(
+                    canadian_fwi_utils.FFMC_NAME
+                )
+            )
+            fwi_plotting.plot_field(
+                data_matrix=target_matrix_with_weights[..., 0],
+                grid_latitudes_deg_n=OUTER_GRID_LATITUDES_DEG_N,
+                grid_longitudes_deg_e=OUTER_GRID_LONGITUDES_DEG_E,
+                colour_map_object=colour_map_object,
+                colour_norm_object=colour_norm_object,
+                axes_object=axes_object,
+                plot_colour_bar=True
+            )
+
+            plotting_utils.plot_borders(
+                border_latitudes_deg_n=border_latitudes_deg_n,
+                border_longitudes_deg_e=border_longitudes_deg_e,
+                axes_object=axes_object,
+                line_colour=numpy.full(3, 0.)
+            )
+            plotting_utils.plot_grid_lines(
+                plot_latitudes_deg_n=OUTER_GRID_LATITUDES_DEG_N,
+                plot_longitudes_deg_e=OUTER_GRID_LONGITUDES_DEG_E,
+                axes_object=axes_object,
+                meridian_spacing_deg=20.,
+                parallel_spacing_deg=10.
+            )
+
+            axes_object.set_xlim(
+                numpy.min(OUTER_GRID_LONGITUDES_DEG_E),
+                numpy.max(OUTER_GRID_LONGITUDES_DEG_E)
+            )
+            axes_object.set_ylim(
+                numpy.min(OUTER_GRID_LATITUDES_DEG_N),
+                numpy.max(OUTER_GRID_LATITUDES_DEG_N)
+            )
+
+            axes_object.set_title('Target field (FFMC)')
+
+            output_file_name = '{0:s}/example{1:03d}_targets.jpg'.format(
+                output_dir_name, example_index
+            )
+            print('Saving figure to: "{0:s}"...'.format(
+                output_file_name
+            ))
+            figure_object.savefig(
+                output_file_name, dpi=FIGURE_RESOLUTION_DPI,
+                pad_inches=0, bbox_inches='tight'
+            )
+            pyplot.close(figure_object)
+
+            figure_object, axes_object = pyplot.subplots(
+                1, 1,
+                figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+            )
+
+            fwi_plotting.plot_field(
+                data_matrix=target_matrix_with_weights[..., 1],
+                grid_latitudes_deg_n=OUTER_GRID_LATITUDES_DEG_N,
+                grid_longitudes_deg_e=OUTER_GRID_LONGITUDES_DEG_E,
+                colour_map_object=pyplot.get_cmap('Greens'),
+                colour_norm_object=pyplot.Normalize(vmin=0., vmax=1.),
+                axes_object=axes_object,
+                plot_colour_bar=True
+            )
+
+            plotting_utils.plot_borders(
+                border_latitudes_deg_n=border_latitudes_deg_n,
+                border_longitudes_deg_e=border_longitudes_deg_e,
+                axes_object=axes_object,
+                line_colour=numpy.full(3, 0.)
+            )
+            plotting_utils.plot_grid_lines(
+                plot_latitudes_deg_n=OUTER_GRID_LATITUDES_DEG_N,
+                plot_longitudes_deg_e=OUTER_GRID_LONGITUDES_DEG_E,
+                axes_object=axes_object,
+                meridian_spacing_deg=20.,
+                parallel_spacing_deg=10.
+            )
+
+            axes_object.set_xlim(
+                numpy.min(OUTER_GRID_LONGITUDES_DEG_E),
+                numpy.max(OUTER_GRID_LONGITUDES_DEG_E)
+            )
+            axes_object.set_ylim(
+                numpy.min(OUTER_GRID_LATITUDES_DEG_N),
+                numpy.max(OUTER_GRID_LATITUDES_DEG_N)
+            )
+
+            axes_object.set_title('Weights')
+
+            output_file_name = '{0:s}/example{1:03d}_weights.jpg'.format(
+                output_dir_name, example_index
+            )
+            print('Saving figure to: "{0:s}"...'.format(
+                output_file_name
+            ))
+            figure_object.savefig(
+                output_file_name, dpi=FIGURE_RESOLUTION_DPI,
+                pad_inches=0, bbox_inches='tight'
+            )
 
 
 if __name__ == '__main__':
