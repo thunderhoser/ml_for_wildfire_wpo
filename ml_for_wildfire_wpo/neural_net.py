@@ -32,6 +32,7 @@ import custom_losses
 DATE_FORMAT = '%Y%m%d'
 GRID_SPACING_DEG = 0.25
 DEGREES_TO_RADIANS = numpy.pi / 180.
+DAYS_TO_SECONDS = 86400
 
 INNER_LATITUDE_LIMITS_KEY = 'inner_latitude_limits_deg_n'
 INNER_LONGITUDE_LIMITS_KEY = 'inner_longitude_limits_deg_e'
@@ -252,7 +253,8 @@ def _find_target_files_needed_1example(
         gfs_init_date_string, DATE_FORMAT
     )
     target_dates_unix_sec = numpy.sort(
-        gfs_init_date_unix_sec + target_lead_times_days
+        gfs_init_date_unix_sec +
+        target_lead_times_days * DAYS_TO_SECONDS
     )
     target_date_strings = [
         time_conversion.unix_sec_to_string(d, DATE_FORMAT)
