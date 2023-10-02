@@ -150,8 +150,7 @@ def _run(template_file_name, output_dir_name,
 
     num_pressure_levels = len(gfs_pressure_levels_mb)
     num_lead_times = len(gfs_predictor_lead_times_hours)
-    # num_3d_fields = len(gfs_3d_field_names)
-    num_3d_fields = 0
+    num_3d_fields = len(gfs_3d_field_names)
     num_2d_fields = len(gfs_2d_field_names)
 
     generator_object = neural_net.data_generator(training_option_dict)
