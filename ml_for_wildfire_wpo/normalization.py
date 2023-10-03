@@ -423,15 +423,22 @@ def normalize_gfs_data_to_z_scores(gfs_table_xarray,
                 zspt.coords[gfs_utils.FIELD_DIM_2D].values == field_names_2d[j]
             )[0][0]
 
-            k_new = numpy.where(
-                numpy.round(
-                    zspt.coords[gfs_utils.FORECAST_HOUR_DIM].values
-                ).astype(int)
-                == forecast_hours[k]
-            )[0][0]
+            # TODO(thunderhoser): HACK to allow for old normalization files.
+            try:
+                k_new = numpy.where(
+                    numpy.round(
+                        zspt.coords[gfs_utils.FORECAST_HOUR_DIM].values
+                    ).astype(int)
+                    == forecast_hours[k]
+                )[0][0]
 
-            this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_2D].values[k_new, j_new]
-            this_stdev = zspt[gfs_utils.STDEV_KEY_2D].values[k_new, j_new]
+                this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_2D].values[
+                    k_new, j_new
+                ]
+                this_stdev = zspt[gfs_utils.STDEV_KEY_2D].values[k_new, j_new]
+            except KeyError:
+                this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_2D].values[j_new]
+                this_stdev = zspt[gfs_utils.STDEV_KEY_2D].values[j_new]
 
             if numpy.isnan(this_stdev):
                 data_matrix_2d[..., j] = 0.
