@@ -11,6 +11,10 @@ NUM_VALUES_KEY = 'num_values'
 MEAN_VALUE_KEY = 'mean_value'
 MEAN_OF_SQUARES_KEY = 'mean_of_squares'
 
+ACCUM_PRECIP_FIELD_NAMES = [
+    gfs_utils.PRECIP_NAME, gfs_utils.CONVECTIVE_PRECIP_NAME
+]
+
 
 def _update_z_score_params(z_score_param_dict, new_data_matrix):
     """Updates z-score parameters.
@@ -92,16 +96,30 @@ def get_z_score_params_for_gfs(gfs_file_names):
     pressure_levels_mb = numpy.round(
         first_gfst.coords[gfs_utils.PRESSURE_LEVEL_DIM].values
     ).astype(int)
+    forecast_hours = numpy.round(
+        first_gfst.coords[gfs_utils.FORECAST_HOUR_DIM].values
+    ).astype(int)
 
     z_score_dict_dict_2d = {}
+
     for this_field_name in field_names_2d:
-        z_score_dict_dict_2d[this_field_name] = {
-            NUM_VALUES_KEY: 0,
-            MEAN_VALUE_KEY: 0.,
-            MEAN_OF_SQUARES_KEY: 0.
-        }
+        if this_field_name not in ACCUM_PRECIP_FIELD_NAMES:
+            z_score_dict_dict_2d[this_field_name] = {
+                NUM_VALUES_KEY: 0,
+                MEAN_VALUE_KEY: 0.,
+                MEAN_OF_SQUARES_KEY: 0.
+            }
+            continue
+
+        for this_forecast_hour in forecast_hours:
+            z_score_dict_dict_2d[this_field_name, this_forecast_hour] = {
+                NUM_VALUES_KEY: 0,
+                MEAN_VALUE_KEY: 0.,
+                MEAN_OF_SQUARES_KEY: 0.
+            }
 
     z_score_dict_dict_3d = {}
+
     for this_field_name in field_names_3d:
         for this_pressure_level_mb in pressure_levels_mb:
             z_score_dict_dict_3d[this_field_name, this_pressure_level_mb] = {
@@ -117,10 +135,27 @@ def get_z_score_params_for_gfs(gfs_file_names):
 
         for j in range(len(this_gfst.coords[gfs_utils.FIELD_DIM_2D].values)):
             f = this_gfst.coords[gfs_utils.FIELD_DIM_2D].values[j]
-            z_score_dict_dict_2d[f] = _update_z_score_params(
-                z_score_param_dict=z_score_dict_dict_2d[f],
-                new_data_matrix=this_gfst[gfs_utils.DATA_KEY_2D].values[..., j]
-            )
+
+            if f not in ACCUM_PRECIP_FIELD_NAMES:
+                z_score_dict_dict_2d[f] = _update_z_score_params(
+                    z_score_param_dict=z_score_dict_dict_2d[f],
+                    new_data_matrix=
+                    this_gfst[gfs_utils.DATA_KEY_2D].values[..., j]
+                )
+                continue
+
+            for k in range(
+                    len(this_gfst.coords[gfs_utils.FORECAST_HOUR_DIM].values)
+            ):
+                h = int(numpy.round(
+                    this_gfst.coords[gfs_utils.FORECAST_HOUR_DIM].values[k]
+                ))
+
+                z_score_dict_dict_2d[f, h] = _update_z_score_params(
+                    z_score_param_dict=z_score_dict_dict_2d[f, h],
+                    new_data_matrix=
+                    this_gfst[gfs_utils.DATA_KEY_2D].values[k, ..., j]
+                )
 
         for j in range(len(this_gfst.coords[gfs_utils.FIELD_DIM_3D].values)):
             for k in range(
@@ -140,6 +175,7 @@ def get_z_score_params_for_gfs(gfs_file_names):
     num_pressure_levels = len(pressure_levels_mb)
     num_3d_fields = len(field_names_3d)
     num_2d_fields = len(field_names_2d)
+    num_forecast_hours = len(forecast_hours)
 
     mean_value_matrix_3d = numpy.full(
         (num_pressure_levels, num_3d_fields), numpy.nan
@@ -147,8 +183,12 @@ def get_z_score_params_for_gfs(gfs_file_names):
     stdev_matrix_3d = numpy.full(
         (num_pressure_levels, num_3d_fields), numpy.nan
     )
-    mean_values_2d = numpy.full(num_2d_fields, numpy.nan)
-    stdev_values_2d = numpy.full(num_2d_fields, numpy.nan)
+    mean_value_matrix_2d = numpy.full(
+        (num_forecast_hours, num_2d_fields), numpy.nan
+    )
+    stdev_matrix_2d = numpy.full(
+        (num_forecast_hours, num_2d_fields), numpy.nan
+    )
 
     for j in range(num_3d_fields):
         for k in range(num_pressure_levels):
@@ -173,37 +213,64 @@ def get_z_score_params_for_gfs(gfs_file_names):
             ))
 
     for j in range(num_2d_fields):
-        f = field_names_2d[j]
+        for k in range(num_forecast_hours):
+            f = field_names_2d[j]
+            h = forecast_hours[k]
 
-        mean_values_2d[j] = z_score_dict_dict_2d[f][MEAN_VALUE_KEY]
-        stdev_values_2d[j] = _get_standard_deviation(z_score_dict_dict_2d[f])
+            if f in ACCUM_PRECIP_FIELD_NAMES:
+                mean_value_matrix_2d[k, j] = (
+                    z_score_dict_dict_2d[f, h][MEAN_VALUE_KEY]
+                )
+                stdev_matrix_2d[k, j] = _get_standard_deviation(
+                    z_score_dict_dict_2d[f, h]
+                )
 
-        print((
-            'Mean and standard deviation for {0:s} = {1:.4g}, {2:.4g}'
-        ).format(
-            field_names_2d[j], mean_values_2d[j], stdev_values_2d[j]
-        ))
+                print((
+                    'Mean and standard deviation for {0:s} at {1:d}-hour lead'
+                    ' = {2:.4g}, {3:.4g}'
+                ).format(
+                    field_names_2d[j],
+                    forecast_hours[k],
+                    mean_value_matrix_2d[k, j],
+                    stdev_matrix_2d[k, j]
+                ))
+            else:
+                mean_value_matrix_2d[k, j] = (
+                    z_score_dict_dict_2d[f][MEAN_VALUE_KEY]
+                )
+                stdev_matrix_2d[k, j] = _get_standard_deviation(
+                    z_score_dict_dict_2d[f]
+                )
+
+                print((
+                    'Mean and standard deviation for {0:s} = {1:.4g}, {2:.4g}'
+                ).format(
+                    field_names_2d[j],
+                    mean_value_matrix_2d[k, j],
+                    stdev_matrix_2d[k, j]
+                ))
 
     coord_dict = {
         gfs_utils.PRESSURE_LEVEL_DIM: pressure_levels_mb,
+        gfs_utils.FORECAST_HOUR_DIM: forecast_hours,
         gfs_utils.FIELD_DIM_2D: field_names_2d,
         gfs_utils.FIELD_DIM_3D: field_names_3d
     }
 
     these_dim_3d = (gfs_utils.PRESSURE_LEVEL_DIM, gfs_utils.FIELD_DIM_3D)
-    these_dim_2d = (gfs_utils.FIELD_DIM_2D,)
+    these_dim_2d = (gfs_utils.FORECAST_HOUR_DIM, gfs_utils.FIELD_DIM_2D)
     main_data_dict = {
         gfs_utils.MEAN_VALUE_KEY_3D: (
             these_dim_3d, mean_value_matrix_3d
         ),
-        gfs_utils.MEAN_VALUE_KEY_2D: (
-            these_dim_2d, mean_values_2d
-        ),
         gfs_utils.STDEV_KEY_3D: (
             these_dim_3d, stdev_matrix_3d
         ),
+        gfs_utils.MEAN_VALUE_KEY_2D: (
+            these_dim_2d, mean_value_matrix_2d
+        ),
         gfs_utils.STDEV_KEY_2D: (
-            these_dim_2d, stdev_values_2d
+            these_dim_2d, stdev_matrix_2d
         )
     }
 
@@ -304,8 +371,12 @@ def normalize_gfs_data_to_z_scores(gfs_table_xarray,
     pressure_levels_mb = numpy.round(
         gfst.coords[gfs_utils.PRESSURE_LEVEL_DIM].values
     ).astype(int)
+    forecast_hours = numpy.round(
+        gfst.coords[gfs_utils.FORECAST_HOUR_DIM].values
+    ).astype(int)
 
     num_pressure_levels = len(pressure_levels_mb)
+    num_forecast_hours = len(forecast_hours)
     num_3d_fields = len(field_names_3d)
     num_2d_fields = len(field_names_2d)
 
@@ -332,15 +403,23 @@ def normalize_gfs_data_to_z_scores(gfs_table_xarray,
             )
 
     for j in range(num_2d_fields):
-        j_new = numpy.where(
-            zspt.coords[gfs_utils.FIELD_DIM_2D].values == field_names_2d[j]
-        )[0][0]
+        for k in range(num_forecast_hours):
+            j_new = numpy.where(
+                zspt.coords[gfs_utils.FIELD_DIM_2D].values == field_names_2d[j]
+            )[0][0]
 
-        this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_2D].values[j_new]
-        this_stdev = zspt[gfs_utils.STDEV_KEY_2D].values[j_new]
-        data_matrix_2d[..., j] = (
-            (data_matrix_2d[..., j] - this_mean) / this_stdev
-        )
+            k_new = numpy.where(
+                numpy.round(
+                    zspt.coords[gfs_utils.FORECAST_HOUR_DIM].values
+                ).astype(int)
+                == forecast_hours[k]
+            )[0][0]
+
+            this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_2D].values[k_new, j_new]
+            this_stdev = zspt[gfs_utils.STDEV_KEY_2D].values[k_new, j_new]
+            data_matrix_2d[..., j] = (
+                (data_matrix_2d[..., j] - this_mean) / this_stdev
+            )
 
     return gfs_table_xarray.assign({
         gfs_utils.DATA_KEY_3D: (
