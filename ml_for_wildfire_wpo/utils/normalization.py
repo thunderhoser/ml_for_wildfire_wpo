@@ -104,7 +104,7 @@ def get_z_score_params_for_gfs(gfs_file_names):
     z_score_dict_dict_3d = {}
     for this_field_name in field_names_3d:
         for this_pressure_level_mb in pressure_levels_mb:
-            z_score_dict_dict_3d[[this_field_name, this_pressure_level_mb]] = {
+            z_score_dict_dict_3d[this_field_name, this_pressure_level_mb] = {
                 NUM_VALUES_KEY: 0,
                 MEAN_VALUE_KEY: 0.,
                 MEAN_OF_SQUARES_KEY: 0.
@@ -131,8 +131,8 @@ def get_z_score_params_for_gfs(gfs_file_names):
                     this_gfst.coords[gfs_utils.PRESSURE_LEVEL_DIM].values[k]
                 ))
 
-                z_score_dict_dict_3d[[f, p]] = _update_z_score_params(
-                    z_score_param_dict=z_score_dict_dict_3d[[f, p]],
+                z_score_dict_dict_3d[f, p] = _update_z_score_params(
+                    z_score_param_dict=z_score_dict_dict_3d[f, p],
                     new_data_matrix=
                     this_gfst[gfs_utils.DATA_KEY_3D].values[..., k, j]
                 )
@@ -156,10 +156,10 @@ def get_z_score_params_for_gfs(gfs_file_names):
             p = pressure_levels_mb[k]
 
             mean_value_matrix_3d[k, j] = (
-                z_score_dict_dict_3d[[f, p]][MEAN_VALUE_KEY]
+                z_score_dict_dict_3d[f, p][MEAN_VALUE_KEY]
             )
             stdev_matrix_3d[k, j] = _get_standard_deviation(
-                z_score_dict_dict_3d[[f, p]]
+                z_score_dict_dict_3d[f, p]
             )
 
             print((

@@ -36,11 +36,11 @@ INPUT_ARG_PARSER.add_argument(
     help=INPUT_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + FIRST_DATES_ARG_NAME, type=str, required=True,
+    '--' + FIRST_DATES_ARG_NAME, type=str, nargs='+', required=True,
     help=FIRST_DATES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + LAST_DATES_ARG_NAME, type=str, required=True,
+    '--' + LAST_DATES_ARG_NAME, type=str, nargs='+', required=True,
     help=LAST_DATES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(

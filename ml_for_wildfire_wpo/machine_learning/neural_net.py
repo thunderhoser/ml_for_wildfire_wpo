@@ -20,10 +20,12 @@ from ml_for_wildfire_wpo.utils import gfs_utils
 from ml_for_wildfire_wpo.utils import era5_constant_utils
 from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 from ml_for_wildfire_wpo.utils import normalization
+from ml_for_wildfire_wpo.machine_learning import custom_losses
 
 DATE_FORMAT = '%Y%m%d'
 GRID_SPACING_DEG = 0.25
 DEGREES_TO_RADIANS = numpy.pi / 180.
+DAYS_TO_SECONDS = 86400
 
 INNER_LATITUDE_LIMITS_KEY = 'inner_latitude_limits_deg_n'
 INNER_LONGITUDE_LIMITS_KEY = 'inner_longitude_limits_deg_e'
@@ -174,7 +176,7 @@ def _check_generator_args(option_dict):
 
     error_checking.assert_directory_exists(option_dict[GFS_DIRECTORY_KEY])
     if option_dict[GFS_NORM_FILE_KEY] is not None:
-        error_checking.assert_directory_exists(option_dict[GFS_NORM_FILE_KEY])
+        error_checking.assert_file_exists(option_dict[GFS_NORM_FILE_KEY])
 
     if option_dict[ERA5_CONSTANT_PREDICTOR_FIELDS_KEY] is not None:
         error_checking.assert_is_string_list(
@@ -183,7 +185,8 @@ def _check_generator_args(option_dict):
         for this_field_name in option_dict[ERA5_CONSTANT_PREDICTOR_FIELDS_KEY]:
             era5_constant_utils.check_field_name(this_field_name)
 
-    error_checking.assert_file_exists(option_dict[ERA5_CONSTANT_FILE_KEY])
+    if option_dict[ERA5_CONSTANT_FILE_KEY] is not None:
+        error_checking.assert_file_exists(option_dict[ERA5_CONSTANT_FILE_KEY])
 
     canadian_fwi_utils.check_field_name(option_dict[TARGET_FIELD_KEY])
 
@@ -214,7 +217,7 @@ def _check_generator_args(option_dict):
 
     error_checking.assert_directory_exists(option_dict[TARGET_DIRECTORY_KEY])
     if option_dict[TARGET_NORM_FILE_KEY] is not None:
-        error_checking.assert_directory_exists(
+        error_checking.assert_file_exists(
             option_dict[TARGET_NORM_FILE_KEY]
         )
 
@@ -243,7 +246,8 @@ def _find_target_files_needed_1example(
         gfs_init_date_string, DATE_FORMAT
     )
     target_dates_unix_sec = numpy.sort(
-        gfs_init_date_unix_sec + target_lead_times_days
+        gfs_init_date_unix_sec +
+        target_lead_times_days * DAYS_TO_SECONDS
     )
     target_date_strings = [
         time_conversion.unix_sec_to_string(d, DATE_FORMAT)
@@ -985,10 +989,19 @@ def data_generator(option_dict):
         target_matrix_with_weights = numpy.concatenate(
             (target_matrix, weight_matrix), axis=-1
         )
+        # predictor_matrices = [
+        #     m for m in [
+        #         gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
+        #         era5_constant_matrix, lagged_target_predictor_matrix
+        #     ]
+        #     if m is not None
+        # ]
+
+        # TODO(thunderhoser): HACK because my architecture cannot yet handle
+        # ERA5 or lagged targets.
         predictor_matrices = [
             m for m in [
-                gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
-                lagged_target_predictor_matrix, era5_constant_matrix
+                gfs_predictor_matrix_3d, gfs_predictor_matrix_2d
             ]
             if m is not None
         ]
@@ -1174,7 +1187,7 @@ def read_model(hdf5_file_name):
     metadata_dict = read_metafile(metafile_name)
 
     custom_object_dict = {
-        'loss': eval(metadata_dict[TRAINING_OPTIONS_KEY][LOSS_FUNCTION_KEY])
+        'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
     }
     model_object = tf_keras.models.load_model(
         hdf5_file_name, custom_objects=custom_object_dict, compile=False
