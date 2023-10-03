@@ -1029,6 +1029,7 @@ def data_generator(option_dict):
             str(target_matrix_with_weights.shape)
         ))
 
+        predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
         yield predictor_matrices, target_matrix_with_weights
 
