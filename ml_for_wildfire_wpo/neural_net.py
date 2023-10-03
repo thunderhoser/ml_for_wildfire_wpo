@@ -1265,6 +1265,7 @@ def create_data(option_dict, init_date_string):
         outer_longitude_buffer_deg=outer_longitude_buffer_deg
     )
     weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
+    weight_matrix = numpy.expand_dims(weight_matrix, axis=0)
 
     gfs_file_name = gfs_io.find_file(
         directory_name=gfs_directory_name,
@@ -1341,6 +1342,7 @@ def create_data(option_dict, init_date_string):
         field_name=target_field_name,
         norm_param_table_xarray=None
     )
+    target_matrix = numpy.expand_dims(target_matrix, axis=0)
 
     if gfs_predictor_matrix_3d is not None:
         print((
@@ -1410,9 +1412,6 @@ def create_data(option_dict, init_date_string):
 
     target_matrix_with_weights = numpy.concatenate(
         (target_matrix, weight_matrix), axis=-1
-    )
-    target_matrix_with_weights = numpy.expand_dims(
-        target_matrix_with_weights, axis=0
     )
 
     predictor_matrices = [
