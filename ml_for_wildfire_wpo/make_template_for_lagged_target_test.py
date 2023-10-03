@@ -58,7 +58,7 @@ def _run():
         chiu_net_architecture.DECODER_NUM_CONV_LAYERS_KEY:
             numpy.full(6, 2, dtype=int),
         chiu_net_architecture.DECODER_NUM_CHANNELS_KEY:
-            numpy.array([20, 26, 32, 38, 44, 50, 56], dtype=int),
+            numpy.array([20, 26, 32, 38, 44, 50], dtype=int),
         chiu_net_architecture.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(6, 0.),
         chiu_net_architecture.SKIP_DROPOUT_RATES_KEY: numpy.full(6, 0.),
         chiu_net_architecture.INCLUDE_PENULTIMATE_KEY: False,
