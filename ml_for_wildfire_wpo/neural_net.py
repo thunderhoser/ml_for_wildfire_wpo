@@ -946,22 +946,38 @@ def data_generator(option_dict):
             gfs_file_index += 1
 
         if gfs_predictor_matrix_3d is not None:
+            print((
+                'Shape of 3-D GFS predictor matrix and NaN fraction: '
+                '{0:s}, {1:.04f}'
+            ).format(
+                str(gfs_predictor_matrix_3d.shape),
+                numpy.mean(numpy.isnan(gfs_predictor_matrix_3d))
+            ))
+
             gfs_predictor_matrix_3d[
                 numpy.isnan(gfs_predictor_matrix_3d)
             ] = sentinel_value
 
-            print('Shape of 3-D GFS predictor matrix: {0:s}'.format(
-                str(gfs_predictor_matrix_3d.shape)
+        if gfs_predictor_matrix_2d is not None:
+            print((
+                'Shape of 2-D GFS predictor matrix and NaN fraction: '
+                '{0:s}, {1:.04f}'
+            ).format(
+                str(gfs_predictor_matrix_2d.shape),
+                numpy.mean(numpy.isnan(gfs_predictor_matrix_2d))
             ))
 
-        if gfs_predictor_matrix_2d is not None:
             gfs_predictor_matrix_2d[
                 numpy.isnan(gfs_predictor_matrix_2d)
             ] = sentinel_value
 
-            print('Shape of 2-D GFS predictor matrix: {0:s}'.format(
-                str(gfs_predictor_matrix_2d.shape)
-            ))
+        print((
+            'Shape of lagged-target predictor matrix and NaN fraction: '
+            '{0:s}, {1:.4f}'
+        ).format(
+            str(lagged_target_predictor_matrix.shape),
+            numpy.mean(numpy.isnan(lagged_target_predictor_matrix))
+        ))
 
         lagged_target_predictor_matrix = _pad_inner_to_outer_domain(
             data_matrix=lagged_target_predictor_matrix,
@@ -969,7 +985,9 @@ def data_generator(option_dict):
             outer_longitude_buffer_deg=outer_longitude_buffer_deg,
             is_example_axis_present=True, fill_value=sentinel_value
         )
-        print('Shape of lagged-target predictor matrix: {0:s}'.format(
+        print((
+            'Shape of lagged-target predictor matrix after padding: {0:s}'
+        ).format(
             str(lagged_target_predictor_matrix.shape)
         ))
 
@@ -996,19 +1014,10 @@ def data_generator(option_dict):
         target_matrix_with_weights = numpy.concatenate(
             (target_matrix, weight_matrix), axis=-1
         )
-        # predictor_matrices = [
-        #     m for m in [
-        #         gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
-        #         era5_constant_matrix, lagged_target_predictor_matrix
-        #     ]
-        #     if m is not None
-        # ]
-
-        # TODO(thunderhoser): HACK because my architecture cannot yet handle
-        # ERA5 or lagged targets.
         predictor_matrices = [
             m for m in [
-                gfs_predictor_matrix_3d, gfs_predictor_matrix_2d
+                gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
+                era5_constant_matrix, lagged_target_predictor_matrix
             ]
             if m is not None
         ]
@@ -1032,7 +1041,7 @@ def data_generator_many_regions(
     several geographic domains, with each domain having the same dimensions.
     The bounding box for each domain should be specified in the first few input
     args of the dictionary.
-    
+
     R = number of regions
 
     :param option_dict: Same as dictionary for `data_generator`, with the
@@ -1042,7 +1051,7 @@ def data_generator_many_regions(
         the bounding box for the [i]th inner domain.
     option_dict["inner_longitude_limits_deg_e"]: Same but for longitude (deg
         east).
-    
+
     :param num_regions_per_init_time_in_batch: Number of regions from one init
         time (i.e., one GFS run) in a batch.  If you make this value lower
         (higher), more (fewer) GFS runs will be included in a batch.
@@ -1050,7 +1059,7 @@ def data_generator_many_regions(
     :return: predictor_matrices: See documentation for `data_generator`.
     :return: target_matrix: Same.
     """
-    
+
     # TODO(thunderhoser): This bit is HACKY.
     inner_latitude_limits_by_region_deg_n = copy.deepcopy(
         option_dict[INNER_LATITUDE_LIMITS_KEY]
@@ -1065,7 +1074,7 @@ def data_generator_many_regions(
         len(inner_latitude_limits_by_region_deg_n),
         len(inner_longitude_limits_by_region_deg_e)
     )
-    
+
     num_regions = len(inner_latitude_limits_by_region_deg_n)
     for i in range(num_regions):
         option_dict[INNER_LATITUDE_LIMITS_KEY] = (
@@ -1075,7 +1084,7 @@ def data_generator_many_regions(
             inner_longitude_limits_by_region_deg_e[i]
         )
         option_dict = _check_generator_args(option_dict)
-    
+
     error_checking.assert_is_integer(num_regions_per_init_time_in_batch)
     error_checking.assert_is_greater(num_regions_per_init_time_in_batch, 0)
 
