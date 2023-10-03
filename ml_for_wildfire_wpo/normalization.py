@@ -74,6 +74,9 @@ def _get_standard_deviation(z_score_param_dict):
     :return: standard_deviation: Standard deviation.
     """
 
+    if z_score_param_dict[NUM_VALUES_KEY] == 0:
+        return numpy.nan
+
     multiplier = float(
         z_score_param_dict[NUM_VALUES_KEY]
     ) / (z_score_param_dict[NUM_VALUES_KEY] - 1)
@@ -406,9 +409,13 @@ def normalize_gfs_data_to_z_scores(gfs_table_xarray,
 
             this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_3D].values[k_new, j_new]
             this_stdev = zspt[gfs_utils.STDEV_KEY_3D].values[k_new, j_new]
-            data_matrix_3d[..., k, j] = (
-                (data_matrix_3d[..., k, j] - this_mean) / this_stdev
-            )
+
+            if numpy.isnan(this_stdev):
+                data_matrix_3d[..., k, j] = 0.
+            else:
+                data_matrix_3d[..., k, j] = (
+                    (data_matrix_3d[..., k, j] - this_mean) / this_stdev
+                )
 
     for j in range(num_2d_fields):
         for k in range(num_forecast_hours):
@@ -425,9 +432,13 @@ def normalize_gfs_data_to_z_scores(gfs_table_xarray,
 
             this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_2D].values[k_new, j_new]
             this_stdev = zspt[gfs_utils.STDEV_KEY_2D].values[k_new, j_new]
-            data_matrix_2d[..., j] = (
-                (data_matrix_2d[..., j] - this_mean) / this_stdev
-            )
+
+            if numpy.isnan(this_stdev):
+                data_matrix_2d[..., j] = 0.
+            else:
+                data_matrix_2d[..., j] = (
+                    (data_matrix_2d[..., j] - this_mean) / this_stdev
+                )
 
     return gfs_table_xarray.assign({
         gfs_utils.DATA_KEY_3D: (
@@ -469,7 +480,11 @@ def normalize_targets_to_z_scores(fwi_table_xarray, z_score_param_table_xarray):
 
         this_mean = zspt[canadian_fwi_utils.MEAN_VALUE_KEY].values[j_new]
         this_stdev = zspt[canadian_fwi_utils.STDEV_KEY].values[j_new]
-        data_matrix[..., j] = (data_matrix[..., j] - this_mean) / this_stdev
+
+        if numpy.isnan(this_stdev):
+            data_matrix[..., j] = 0.
+        else:
+            data_matrix[..., j] = (data_matrix[..., j] - this_mean) / this_stdev
 
     return fwi_table_xarray.assign({
         canadian_fwi_utils.DATA_KEY: (
