@@ -1813,6 +1813,12 @@ def apply_model(
                 (1. - prediction_matrix, prediction_matrix), axis=-1
             )
     else:
+        if (
+                len(prediction_matrix.shape) == 4 and
+                prediction_matrix.shape[-1] == 1
+        ):
+            prediction_matrix = prediction_matrix[..., 0]
+
         error_checking.assert_equals(len(prediction_matrix.shape), 3)
 
     return prediction_matrix
