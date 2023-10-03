@@ -764,7 +764,8 @@ def _read_lagged_targets_1example(
         for f in target_file_names
     ], axis=-1)
 
-    return numpy.expand_dims(target_field_matrix, axis=-1)
+    target_field_matrix = numpy.expand_dims(target_field_matrix, axis=-1)
+    return target_field_matrix, desired_row_indices, desired_column_indices
 
 
 def data_generator(option_dict):
