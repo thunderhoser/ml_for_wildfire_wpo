@@ -75,6 +75,11 @@ METADATA_KEYS = [
     PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY, EARLY_STOPPING_PATIENCE_KEY
 ]
 
+PREDICTOR_MATRICES_KEY = 'predictor_matrices'
+TARGETS_AND_WEIGHTS_KEY = 'target_matrix_with_weights'
+GRID_LATITUDES_KEY = 'grid_latitudes_deg_n'
+GRID_LONGITUDES_KEY = 'grid_longitudes_deg_e'
+
 
 def _check_generator_args(option_dict):
     """Checks input arguments for generator.
@@ -524,6 +529,237 @@ def _create_weight_matrix(
     )
 
 
+def _get_era5_constants(
+        era5_constant_file_name, latitude_limits_deg_n, longitude_limits_deg_e,
+        field_names):
+    """Reads ERA5 constants.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    F = number of fields
+
+    :param era5_constant_file_name: See documentation for `data_generator`.
+    :param latitude_limits_deg_n: Same.
+    :param longitude_limits_deg_e: Same.
+    :param field_names: Same.
+    :return: predictor_matrix: M-by-N-by-F numpy array with ERA5 constants to
+        use as predictors.
+    """
+
+    print('Reading data from: "{0:s}"...'.format(era5_constant_file_name))
+    era5_constant_table_xarray = era5_constant_io.read_file(
+        era5_constant_file_name
+    )
+    ect = era5_constant_table_xarray
+
+    desired_row_indices = misc_utils.desired_latitudes_to_rows(
+        grid_latitudes_deg_n=
+        ect.coords[era5_constant_utils.LATITUDE_DIM].values,
+        start_latitude_deg_n=latitude_limits_deg_n[0],
+        end_latitude_deg_n=latitude_limits_deg_n[1]
+    )
+    desired_column_indices = misc_utils.desired_longitudes_to_columns(
+        grid_longitudes_deg_e=
+        ect.coords[era5_constant_utils.LONGITUDE_DIM].values,
+        start_longitude_deg_e=longitude_limits_deg_e[0],
+        end_longitude_deg_e=longitude_limits_deg_e[1]
+    )
+    ect = era5_constant_utils.subset_by_row(
+        era5_constant_table_xarray=ect,
+        desired_row_indices=desired_row_indices
+    )
+    ect = era5_constant_utils.subset_by_column(
+        era5_constant_table_xarray=ect,
+        desired_column_indices=desired_column_indices
+    )
+
+    return numpy.stack([
+        era5_constant_utils.get_field(
+            era5_constant_table_xarray=ect, field_name=f
+        )
+        for f in field_names
+    ], axis=-1)
+
+
+def _read_gfs_data_1example(
+        gfs_file_name, desired_row_indices, desired_column_indices,
+        latitude_limits_deg_n, longitude_limits_deg_e, lead_times_hours,
+        field_names, pressure_levels_mb, norm_param_table_xarray):
+    """Reads GFS data for one example.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    P = number of pressure levels in grid
+    L = number of lead times
+    FFF = number of 3-D fields
+    FF = number of 2-D fields
+
+    :param gfs_file_name: Path to input file (will be read by
+        `gfs_io.read_file`).
+    :param desired_row_indices: length-M numpy array with indices of desired
+        rows.  If this is None, it will be computed on the fly from
+        `latitude_limits_deg_n`.
+    :param desired_column_indices: length-N numpy array with indices of desired
+        columns.  If this is None, it will be computed on the fly from
+        `longitude_limits_deg_e`.
+    :param latitude_limits_deg_n: See documentation for `data_generator`.  If
+        `desired_row_indices is not None`, this argument is not used.
+    :param longitude_limits_deg_e: See documentation for `data_generator`.  If
+        `desired_column_indices is not None`, this argument is not used.
+    :param lead_times_hours: See documentation for `data_generator`.
+    :param field_names: See documentation for `data_generator`.
+    :param pressure_levels_mb: See documentation for `data_generator`.
+    :param norm_param_table_xarray: xarray table with normalization
+        parameters, in format returned by `gfs_io.read_normalization_file`.  If
+        you do not want normalization, make this None.
+    :return: predictor_matrix_3d: None or an M-by-N-by-L-by-P-by-FFF numpy
+        array.
+    :return: predictor_matrix_2d: None or an M-by-N-by-L-by-FF numpy array.
+    :return: desired_row_indices: See input documentation.
+    :return: desired_column_indices: See input documentation.
+    """
+
+    field_names_2d = [
+        f for f in field_names
+        if f in gfs_utils.ALL_2D_FIELD_NAMES
+    ]
+    field_names_3d = [
+        f for f in field_names
+        if f in gfs_utils.ALL_3D_FIELD_NAMES
+    ]
+
+    print('Reading data from: "{0:s}"...'.format(gfs_file_name))
+    gfs_table_xarray = gfs_io.read_file(gfs_file_name)
+
+    if desired_row_indices is None or len(desired_row_indices) == 0:
+        desired_row_indices = misc_utils.desired_latitudes_to_rows(
+            grid_latitudes_deg_n=
+            gfs_table_xarray.coords[gfs_utils.LATITUDE_DIM].values,
+            start_latitude_deg_n=latitude_limits_deg_n[0],
+            end_latitude_deg_n=latitude_limits_deg_n[1]
+        )
+        desired_column_indices = (
+            misc_utils.desired_longitudes_to_columns(
+                grid_longitudes_deg_e=
+                gfs_table_xarray.coords[gfs_utils.LONGITUDE_DIM].values,
+                start_longitude_deg_e=longitude_limits_deg_e[0],
+                end_longitude_deg_e=longitude_limits_deg_e[1]
+            )
+        )
+
+    # TODO(thunderhoser): I don't know if subsetting the whole table
+    # first -- before extracting desired fields -- is more efficient.
+    gfs_table_xarray = gfs_utils.subset_by_forecast_hour(
+        gfs_table_xarray=gfs_table_xarray,
+        desired_forecast_hours=lead_times_hours
+    )
+    gfs_table_xarray = gfs_utils.subset_by_row(
+        gfs_table_xarray=gfs_table_xarray,
+        desired_row_indices=desired_row_indices
+    )
+    gfs_table_xarray = gfs_utils.subset_by_column(
+        gfs_table_xarray=gfs_table_xarray,
+        desired_column_indices=desired_column_indices
+    )
+
+    if norm_param_table_xarray is not None:
+        exec_start_time_unix_sec = time.time()
+        gfs_table_xarray = normalization.normalize_gfs_data_to_z_scores(
+            gfs_table_xarray=gfs_table_xarray,
+            z_score_param_table_xarray=norm_param_table_xarray
+        )
+
+        print('Normalizing GFS data took {0:.4f} seconds.'.format(
+            time.time() - exec_start_time_unix_sec
+        ))
+
+    predictor_matrix_3d = _get_3d_gfs_fields(
+        gfs_table_xarray=gfs_table_xarray,
+        field_names=field_names_3d,
+        pressure_levels_mb=pressure_levels_mb
+    )
+    predictor_matrix_2d = _get_2d_gfs_fields(
+        gfs_table_xarray=gfs_table_xarray,
+        field_names=field_names_2d
+    )
+
+    return (
+        predictor_matrix_3d, predictor_matrix_2d,
+        desired_row_indices, desired_column_indices
+    )
+
+
+def _read_lagged_targets_1example(
+        gfs_init_date_string, target_dir_name, target_lag_times_days,
+        desired_row_indices, desired_column_indices,
+        latitude_limits_deg_n, longitude_limits_deg_e,
+        target_field_name, norm_param_table_xarray):
+    """Reads lagged-target fields for one example.
+
+    m = number of rows in grid
+    n = number of columns in grid
+    l = number of lead times
+
+    :param gfs_init_date_string: GFS initialization date (format "yyyymmdd") for
+        the given data example.
+    :param target_dir_name: See documentation for `data_generator`.
+    :param target_lag_times_days: Same.
+    :param desired_row_indices: length-m numpy array with indices of desired
+        rows.  If this is None, it will be computed on the fly from
+        `latitude_limits_deg_n`.
+    :param desired_column_indices: length-n numpy array with indices of desired
+        columns.  If this is None, it will be computed on the fly from
+        `longitude_limits_deg_e`.
+    :param latitude_limits_deg_n: See documentation for `data_generator`.  If
+        `desired_row_indices is not None`, this argument is not used.
+    :param longitude_limits_deg_e: See documentation for `data_generator`.  If
+        `desired_column_indices is not None`, this argument is not used.
+    :param target_field_name: See documentation for `data_generator`.
+    :param norm_param_table_xarray: xarray table with normalization
+        parameters, in format returned by
+        `canadian_fwi_io.read_normalization_file`.  If you do not want
+        normalization, make this None.
+    :return: target_field_matrix: M-by-N-by-l-by-1 numpy array.
+    :return: desired_row_indices: See input documentation.
+    :return: desired_column_indices: See input documentation.
+    """
+
+    target_file_names = _find_target_files_needed_1example(
+        gfs_init_date_string=gfs_init_date_string,
+        target_dir_name=target_dir_name,
+        target_lead_times_days=-1 * target_lag_times_days
+    )
+
+    if desired_row_indices is None or len(desired_row_indices) == 0:
+        fwit = canadian_fwi_io.read_file(target_file_names[0])
+
+        desired_row_indices = misc_utils.desired_latitudes_to_rows(
+            grid_latitudes_deg_n=
+            fwit.coords[canadian_fwi_utils.LATITUDE_DIM].values,
+            start_latitude_deg_n=latitude_limits_deg_n[0],
+            end_latitude_deg_n=latitude_limits_deg_n[1]
+        )
+        desired_column_indices = misc_utils.desired_longitudes_to_columns(
+            grid_longitudes_deg_e=
+            fwit.coords[canadian_fwi_utils.LONGITUDE_DIM].values,
+            start_longitude_deg_e=longitude_limits_deg_e[0],
+            end_longitude_deg_e=longitude_limits_deg_e[1]
+        )
+
+    target_field_matrix = numpy.stack([
+        _get_target_field(
+            target_file_name=f,
+            desired_row_indices=desired_row_indices,
+            desired_column_indices=desired_column_indices,
+            field_name=target_field_name,
+            norm_param_table_xarray=norm_param_table_xarray
+        )
+        for f in target_file_names
+    ], axis=-1)
+
+    return numpy.expand_dims(target_field_matrix, axis=-1)
+
+
 def data_generator(option_dict):
     """Generates both training and validation for neural network.
 
@@ -687,15 +923,6 @@ def data_generator(option_dict):
         -1 * outer_longitude_buffer_deg, outer_longitude_buffer_deg
     ])
 
-    gfs_2d_field_names = [
-        f for f in gfs_predictor_field_names
-        if f in gfs_utils.ALL_2D_FIELD_NAMES
-    ]
-    gfs_3d_field_names = [
-        f for f in gfs_predictor_field_names
-        if f in gfs_utils.ALL_3D_FIELD_NAMES
-    ]
-
     gfs_file_names = gfs_io.find_files_for_period(
         directory_name=gfs_directory_name,
         first_init_date_string=init_date_limit_strings[0],
@@ -705,43 +932,15 @@ def data_generator(option_dict):
     )
     random.shuffle(gfs_file_names)
 
-    print('Reading data from: "{0:s}"...'.format(era5_constant_file_name))
-    era5_constant_table_xarray = era5_constant_io.read_file(
-        era5_constant_file_name
-    )
-    ect = era5_constant_table_xarray
-
-    desired_era5c_row_indices = misc_utils.desired_latitudes_to_rows(
-        grid_latitudes_deg_n=
-        ect.coords[era5_constant_utils.LATITUDE_DIM].values,
-        start_latitude_deg_n=outer_latitude_limits_deg_n[0],
-        end_latitude_deg_n=outer_latitude_limits_deg_n[1]
-    )
-    desired_era5c_column_indices = misc_utils.desired_longitudes_to_columns(
-        grid_longitudes_deg_e=
-        ect.coords[era5_constant_utils.LONGITUDE_DIM].values,
-        start_longitude_deg_e=outer_longitude_limits_deg_e[0],
-        end_longitude_deg_e=outer_longitude_limits_deg_e[1]
-    )
-    ect = era5_constant_utils.subset_by_row(
-        era5_constant_table_xarray=ect,
-        desired_row_indices=desired_era5c_row_indices
-    )
-    ect = era5_constant_utils.subset_by_column(
-        era5_constant_table_xarray=ect,
-        desired_column_indices=desired_era5c_column_indices
-    )
-
     if era5_constant_predictor_field_names is None:
         era5_constant_matrix = None
     else:
-        era5_constant_matrix = numpy.stack([
-            era5_constant_utils.get_field(
-                era5_constant_table_xarray=ect, field_name=f
-            )
-            for f in era5_constant_predictor_field_names
-        ], axis=-1)
-
+        era5_constant_matrix = _get_era5_constants(
+            era5_constant_file_name=era5_constant_file_name,
+            latitude_limits_deg_n=outer_latitude_limits_deg_n,
+            longitude_limits_deg_e=outer_longitude_limits_deg_e,
+            field_names=era5_constant_predictor_field_names
+        )
         era5_constant_matrix = numpy.repeat(
             numpy.expand_dims(era5_constant_matrix, axis=0),
             axis=0, repeats=num_examples_per_batch
@@ -778,102 +977,37 @@ def data_generator(option_dict):
                 random.shuffle(gfs_file_names)
                 gfs_file_index = 0
 
-            print('Reading data from: "{0:s}"...'.format(
-                gfs_file_names[gfs_file_index]
-            ))
-            gfs_table_xarray = gfs_io.read_file(gfs_file_names[gfs_file_index])
-
-            if len(desired_gfs_row_indices) == 0:
-                desired_gfs_row_indices = misc_utils.desired_latitudes_to_rows(
-                    grid_latitudes_deg_n=
-                    gfs_table_xarray.coords[gfs_utils.LATITUDE_DIM].values,
-                    start_latitude_deg_n=outer_latitude_limits_deg_n[0],
-                    end_latitude_deg_n=outer_latitude_limits_deg_n[1]
-                )
-                desired_gfs_column_indices = (
-                    misc_utils.desired_longitudes_to_columns(
-                        grid_longitudes_deg_e=
-                        gfs_table_xarray.coords[gfs_utils.LONGITUDE_DIM].values,
-                        start_longitude_deg_e=outer_longitude_limits_deg_e[0],
-                        end_longitude_deg_e=outer_longitude_limits_deg_e[1]
-                    )
-                )
-
-            # TODO(thunderhoser): I don't know if subsetting the whole table
-            # first -- before extracting desired fields -- is more efficient.
-            gfs_table_xarray = gfs_utils.subset_by_forecast_hour(
-                gfs_table_xarray=gfs_table_xarray,
-                desired_forecast_hours=gfs_predictor_lead_times_hours
-            )
-            gfs_table_xarray = gfs_utils.subset_by_row(
-                gfs_table_xarray=gfs_table_xarray,
-                desired_row_indices=desired_gfs_row_indices
-            )
-            gfs_table_xarray = gfs_utils.subset_by_column(
-                gfs_table_xarray=gfs_table_xarray,
-                desired_column_indices=desired_gfs_column_indices
+            (
+                this_gfs_predictor_matrix_3d, this_gfs_predictor_matrix_2d,
+                desired_gfs_row_indices, desired_gfs_column_indices
+            ) = _read_gfs_data_1example(
+                gfs_file_name=gfs_file_names[gfs_file_index],
+                desired_row_indices=desired_gfs_row_indices,
+                desired_column_indices=desired_gfs_column_indices,
+                latitude_limits_deg_n=outer_latitude_limits_deg_n,
+                longitude_limits_deg_e=outer_longitude_limits_deg_e,
+                lead_times_hours=gfs_predictor_lead_times_hours,
+                field_names=gfs_predictor_field_names,
+                pressure_levels_mb=gfs_pressure_levels_mb,
+                norm_param_table_xarray=gfs_norm_param_table_xarray
             )
 
-            if gfs_norm_param_table_xarray is not None:
-                exec_start_time_unix_sec = time.time()
-                gfs_table_xarray = normalization.normalize_gfs_data_to_z_scores(
-                    gfs_table_xarray=gfs_table_xarray,
-                    z_score_param_table_xarray=gfs_norm_param_table_xarray
-                )
-
-                print('Normalizing GFS data took {0:.4f} seconds.'.format(
-                    time.time() - exec_start_time_unix_sec
-                ))
-
-            this_gfs_predictor_matrix_2d = _get_2d_gfs_fields(
-                gfs_table_xarray=gfs_table_xarray,
-                field_names=gfs_2d_field_names
-            )
-            this_gfs_predictor_matrix_3d = _get_3d_gfs_fields(
-                gfs_table_xarray=gfs_table_xarray,
-                field_names=gfs_3d_field_names,
-                pressure_levels_mb=gfs_pressure_levels_mb
-            )
-
-            target_file_names = _find_target_files_needed_1example(
-                gfs_init_date_string=
-                gfs_io.file_name_to_date(gfs_file_names[gfs_file_index]),
+            (
+                this_lagged_target_predictor_matrix,
+                desired_target_row_indices,
+                desired_target_column_indices
+            ) = _read_lagged_targets_1example(
+                gfs_init_date_string=gfs_io.file_name_to_date(
+                    gfs_file_names[gfs_file_index]
+                ),
                 target_dir_name=target_dir_name,
-                target_lead_times_days=-1 * target_lag_times_days
-            )
-
-            if len(desired_target_row_indices) == 0:
-                fwit = canadian_fwi_io.read_file(target_file_names[0])
-                desired_target_row_indices = (
-                    misc_utils.desired_latitudes_to_rows(
-                        grid_latitudes_deg_n=
-                        fwit.coords[canadian_fwi_utils.LATITUDE_DIM].values,
-                        start_latitude_deg_n=inner_latitude_limits_deg_n[0],
-                        end_latitude_deg_n=inner_latitude_limits_deg_n[1]
-                    )
-                )
-                desired_target_column_indices = (
-                    misc_utils.desired_longitudes_to_columns(
-                        grid_longitudes_deg_e=
-                        fwit.coords[canadian_fwi_utils.LONGITUDE_DIM].values,
-                        start_longitude_deg_e=inner_longitude_limits_deg_e[0],
-                        end_longitude_deg_e=inner_longitude_limits_deg_e[1]
-                    )
-                )
-
-            this_lagged_target_predictor_matrix = numpy.stack([
-                _get_target_field(
-                    target_file_name=f,
-                    desired_row_indices=desired_target_row_indices,
-                    desired_column_indices=desired_target_column_indices,
-                    field_name=target_field_name,
-                    norm_param_table_xarray=target_norm_param_table_xarray
-                )
-                for f in target_file_names
-            ], axis=-1)
-
-            this_lagged_target_predictor_matrix = numpy.expand_dims(
-                this_lagged_target_predictor_matrix, axis=-1
+                target_lag_times_days=target_lag_times_days,
+                desired_row_indices=desired_target_row_indices,
+                desired_column_indices=desired_target_column_indices,
+                latitude_limits_deg_n=inner_latitude_limits_deg_n,
+                longitude_limits_deg_e=inner_longitude_limits_deg_e,
+                target_field_name=target_field_name,
+                norm_param_table_xarray=target_norm_param_table_xarray
             )
 
             target_file_name = _find_target_files_needed_1example(
@@ -1025,6 +1159,277 @@ def data_generator(option_dict):
         predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
         yield predictor_matrices, target_matrix_with_weights
+
+
+def create_data(option_dict, init_date_string):
+    """Creates, rather than generates, neural-net inputs.
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param option_dict: See doc for `data_generator`.
+    :param init_date_string: GFS initialization date (format "yyyymmdd").  Will
+        always use the 00Z model run.
+
+    :return: data_dict: Dictionary with the following keys.
+    data_dict["predictor_matrices"]: Same as output from `data_generator`.
+    data_dict["target_matrix_with_weights"]: Same as output from
+        `data_generator`.
+    data_dict["grid_latitudes_deg_n"]: length-M numpy array of latitudes (deg
+        north).
+    data_dict["grid_longitudes_deg_e"]: length-N numpy array of longitudes (deg
+        east).
+    """
+
+    _ = time_conversion.string_to_unix_sec(init_date_string, DATE_FORMAT)
+
+    option_dict[INIT_DATE_LIMITS_KEY] = [init_date_string] * 2
+    option_dict[BATCH_SIZE_KEY] = 32
+
+    option_dict = _check_generator_args(option_dict)
+
+    inner_latitude_limits_deg_n = option_dict[INNER_LATITUDE_LIMITS_KEY]
+    inner_longitude_limits_deg_e = option_dict[INNER_LONGITUDE_LIMITS_KEY]
+    outer_latitude_buffer_deg = option_dict[OUTER_LATITUDE_BUFFER_KEY]
+    outer_longitude_buffer_deg = option_dict[OUTER_LONGITUDE_BUFFER_KEY]
+    gfs_predictor_field_names = option_dict[GFS_PREDICTOR_FIELDS_KEY]
+    gfs_pressure_levels_mb = option_dict[GFS_PRESSURE_LEVELS_KEY]
+    gfs_predictor_lead_times_hours = option_dict[GFS_PREDICTOR_LEADS_KEY]
+    gfs_directory_name = option_dict[GFS_DIRECTORY_KEY]
+    gfs_normalization_file_name = option_dict[GFS_NORM_FILE_KEY]
+    era5_constant_predictor_field_names = option_dict[
+        ERA5_CONSTANT_PREDICTOR_FIELDS_KEY
+    ]
+    era5_constant_file_name = option_dict[ERA5_CONSTANT_FILE_KEY]
+    target_field_name = option_dict[TARGET_FIELD_KEY]
+    target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
+    target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
+    target_cutoffs_for_classifn = option_dict[TARGET_CUTOFFS_KEY]
+    target_dir_name = option_dict[TARGET_DIRECTORY_KEY]
+    target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
+    sentinel_value = option_dict[SENTINEL_VALUE_KEY]
+
+    if gfs_normalization_file_name is None:
+        gfs_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            gfs_normalization_file_name
+        ))
+        gfs_norm_param_table_xarray = gfs_io.read_normalization_file(
+            gfs_normalization_file_name
+        )
+
+    if target_normalization_file_name is None:
+        target_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            target_normalization_file_name
+        ))
+        target_norm_param_table_xarray = (
+            canadian_fwi_io.read_normalization_file(
+                target_normalization_file_name
+            )
+        )
+
+    outer_latitude_limits_deg_n = inner_latitude_limits_deg_n + numpy.array([
+        -1 * outer_latitude_buffer_deg, outer_latitude_buffer_deg
+    ])
+    outer_longitude_limits_deg_e = inner_longitude_limits_deg_e + numpy.array([
+        -1 * outer_longitude_buffer_deg, outer_longitude_buffer_deg
+    ])
+
+    if era5_constant_predictor_field_names is None:
+        era5_constant_matrix = None
+    else:
+        era5_constant_matrix = _get_era5_constants(
+            era5_constant_file_name=era5_constant_file_name,
+            latitude_limits_deg_n=outer_latitude_limits_deg_n,
+            longitude_limits_deg_e=outer_longitude_limits_deg_e,
+            field_names=era5_constant_predictor_field_names
+        )
+        era5_constant_matrix = numpy.expand_dims(era5_constant_matrix, axis=0)
+
+    weight_matrix = _create_weight_matrix(
+        era5_constant_file_name=era5_constant_file_name,
+        inner_latitude_limits_deg_n=inner_latitude_limits_deg_n,
+        inner_longitude_limits_deg_e=inner_longitude_limits_deg_e,
+        outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+        outer_longitude_buffer_deg=outer_longitude_buffer_deg
+    )
+    weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
+
+    gfs_file_name = gfs_io.find_file(
+        directory_name=gfs_directory_name,
+        init_date_string=init_date_string,
+        raise_error_if_missing=True
+    )
+
+    (
+        gfs_predictor_matrix_3d,
+        gfs_predictor_matrix_2d,
+        desired_gfs_row_indices,
+        desired_gfs_column_indices
+    ) = _read_gfs_data_1example(
+        gfs_file_name=gfs_file_name,
+        desired_row_indices=None,
+        desired_column_indices=None,
+        latitude_limits_deg_n=outer_latitude_limits_deg_n,
+        longitude_limits_deg_e=outer_longitude_limits_deg_e,
+        lead_times_hours=gfs_predictor_lead_times_hours,
+        field_names=gfs_predictor_field_names,
+        pressure_levels_mb=gfs_pressure_levels_mb,
+        norm_param_table_xarray=gfs_norm_param_table_xarray
+    )
+
+    gfs_table_xarray = gfs_io.read_file(gfs_file_name)
+    grid_latitudes_deg_n = gfs_table_xarray.coords[
+        gfs_utils.LATITUDE_DIM
+    ].values[desired_gfs_row_indices]
+    grid_longitudes_deg_e = gfs_table_xarray.coords[
+        gfs_utils.LONGITUDE_DIM
+    ].values[desired_gfs_column_indices]
+
+    if gfs_predictor_matrix_3d is not None:
+        gfs_predictor_matrix_3d = numpy.expand_dims(
+            gfs_predictor_matrix_3d, axis=0
+        )
+
+    if gfs_predictor_matrix_2d is not None:
+        gfs_predictor_matrix_2d = numpy.expand_dims(
+            gfs_predictor_matrix_2d, axis=0
+        )
+
+    (
+        lagged_target_predictor_matrix,
+        desired_target_row_indices,
+        desired_target_column_indices
+    ) = _read_lagged_targets_1example(
+        gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_name),
+        target_dir_name=target_dir_name,
+        target_lag_times_days=target_lag_times_days,
+        desired_row_indices=None,
+        desired_column_indices=None,
+        latitude_limits_deg_n=inner_latitude_limits_deg_n,
+        longitude_limits_deg_e=inner_longitude_limits_deg_e,
+        target_field_name=target_field_name,
+        norm_param_table_xarray=target_norm_param_table_xarray
+    )
+
+    lagged_target_predictor_matrix = numpy.expand_dims(
+        lagged_target_predictor_matrix, axis=0
+    )
+
+    target_file_name = _find_target_files_needed_1example(
+        gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_name),
+        target_dir_name=target_dir_name,
+        target_lead_times_days=
+        numpy.array([target_lead_time_days], dtype=int)
+    )[0]
+
+    target_matrix = _get_target_field(
+        target_file_name=target_file_name,
+        desired_row_indices=desired_target_row_indices,
+        desired_column_indices=desired_target_column_indices,
+        field_name=target_field_name,
+        norm_param_table_xarray=None
+    )
+
+    if gfs_predictor_matrix_3d is not None:
+        print((
+            'Shape of 3-D GFS predictor matrix and NaN fraction: '
+            '{0:s}, {1:.04f}'
+        ).format(
+            str(gfs_predictor_matrix_3d.shape),
+            numpy.mean(numpy.isnan(gfs_predictor_matrix_3d))
+        ))
+
+        gfs_predictor_matrix_3d[
+            numpy.isnan(gfs_predictor_matrix_3d)
+        ] = sentinel_value
+
+    if gfs_predictor_matrix_2d is not None:
+        print((
+            'Shape of 2-D GFS predictor matrix and NaN fraction: '
+            '{0:s}, {1:.04f}'
+        ).format(
+            str(gfs_predictor_matrix_2d.shape),
+            numpy.mean(numpy.isnan(gfs_predictor_matrix_2d))
+        ))
+
+        gfs_predictor_matrix_2d[
+            numpy.isnan(gfs_predictor_matrix_2d)
+        ] = sentinel_value
+
+    print((
+        'Shape of lagged-target predictor matrix and NaN fraction: '
+        '{0:s}, {1:.4f}'
+    ).format(
+        str(lagged_target_predictor_matrix.shape),
+        numpy.mean(numpy.isnan(lagged_target_predictor_matrix))
+    ))
+
+    lagged_target_predictor_matrix = _pad_inner_to_outer_domain(
+        data_matrix=lagged_target_predictor_matrix,
+        outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+        outer_longitude_buffer_deg=outer_longitude_buffer_deg,
+        is_example_axis_present=True, fill_value=sentinel_value
+    )
+    print((
+        'Shape of lagged-target predictor matrix after padding: {0:s}'
+    ).format(
+        str(lagged_target_predictor_matrix.shape)
+    ))
+
+    if era5_constant_matrix is not None:
+        print('Shape of ERA5-constant predictor matrix: {0:s}'.format(
+            str(era5_constant_matrix.shape)
+        ))
+
+    target_matrix = _pad_inner_to_outer_domain(
+        data_matrix=target_matrix,
+        outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+        outer_longitude_buffer_deg=outer_longitude_buffer_deg,
+        is_example_axis_present=True, fill_value=0.
+    )
+
+    if target_cutoffs_for_classifn is None:
+        target_matrix = numpy.expand_dims(target_matrix, axis=-1)
+    else:
+        target_matrix = _discretize_targets(
+            target_matrix=target_matrix,
+            cutoff_values=target_cutoffs_for_classifn
+        )
+
+    target_matrix_with_weights = numpy.concatenate(
+        (target_matrix, weight_matrix), axis=-1
+    )
+    target_matrix_with_weights = numpy.expand_dims(
+        target_matrix_with_weights, axis=0
+    )
+
+    predictor_matrices = [
+        m for m in [
+            gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
+            era5_constant_matrix, lagged_target_predictor_matrix
+        ]
+        if m is not None
+    ]
+
+    print((
+        'Shape of target matrix (including land mask as last channel): '
+        '{0:s}'
+    ).format(
+        str(target_matrix_with_weights.shape)
+    ))
+
+    predictor_matrices = [p.astype('float32') for p in predictor_matrices]
+
+    return {
+        PREDICTOR_MATRICES_KEY: predictor_matrices,
+        TARGETS_AND_WEIGHTS_KEY: target_matrix_with_weights,
+        GRID_LATITUDES_KEY: grid_latitudes_deg_n,
+        GRID_LONGITUDES_KEY: grid_longitudes_deg_e
+    }
 
 
 def data_generator_many_regions(
@@ -1329,3 +1734,78 @@ def train_model(
         validation_data=validation_generator,
         validation_steps=num_validation_batches_per_epoch
     )
+
+
+def apply_model(
+        model_object, predictor_matrices, num_examples_per_batch,
+        for_classification, verbose=True):
+    """Applies trained neural net -- inference time!
+
+    E = number of examples
+    M = number of rows in grid
+    N = number of columns in grid
+    K = number of classes
+
+    :param model_object: Trained neural net (instance of `keras.models.Model`).
+    :param predictor_matrices: See output doc for `data_generator`.
+    :param num_examples_per_batch: Batch size.
+    :param for_classification: Boolean flag.  If True (False), the model is
+        assumed to do classification (regression).
+    :param verbose: Boolean flag.  If True, will print progress messages.
+    :return: prediction_matrix: If the model does classification, this is an
+        E-by-M-by-N-by-K numpy array of probabilities.  If the model does
+        regression, this is an E-by-M-by-N numpy array of predicted values.
+    """
+
+    # Check input args.
+    for this_matrix in predictor_matrices:
+        error_checking.assert_is_numpy_array_without_nan(this_matrix)
+
+    error_checking.assert_is_integer(num_examples_per_batch)
+    error_checking.assert_is_geq(num_examples_per_batch, 1)
+    num_examples = predictor_matrices[0].shape[0]
+    num_examples_per_batch = min([num_examples_per_batch, num_examples])
+
+    error_checking.assert_is_boolean(for_classification)
+    error_checking.assert_is_boolean(verbose)
+
+    # Do actual stuff.
+    prediction_matrix = None
+
+    for i in range(0, num_examples, num_examples_per_batch):
+        first_index = i
+        last_index = min([i + num_examples_per_batch, num_examples])
+
+        if verbose:
+            print('Applying model to examples {0:d}-{1:d} of {2:d}...'.format(
+                first_index + 1, last_index, num_examples
+            ))
+
+        this_prediction_matrix = model_object.predict_on_batch(
+            [a[first_index:last_index, ...] for a in predictor_matrices]
+        )
+
+        if prediction_matrix is None:
+            dimensions = (num_examples,) + this_prediction_matrix.shape[1:]
+            prediction_matrix = numpy.full(dimensions, numpy.nan)
+
+        prediction_matrix[first_index:last_index, ...] = this_prediction_matrix
+
+    if verbose:
+        print('Have applied model to all {0:d} examples!'.format(num_examples))
+
+    if for_classification:
+        error_checking.assert_is_geq(len(prediction_matrix.shape), 3)
+        error_checking.assert_is_leq(len(prediction_matrix.shape), 4)
+
+        if len(prediction_matrix.shape) == 3:
+            prediction_matrix = numpy.expand_dims(prediction_matrix, axis=-1)
+
+        if prediction_matrix.shape[3] == 1:
+            prediction_matrix = numpy.concatenate(
+                (1. - prediction_matrix, prediction_matrix), axis=-1
+            )
+    else:
+        error_checking.assert_equals(len(prediction_matrix.shape), 3)
+
+    return prediction_matrix
