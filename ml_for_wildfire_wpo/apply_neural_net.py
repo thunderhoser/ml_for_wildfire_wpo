@@ -105,11 +105,18 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     print(SEPARATOR_STRING)
 
     for this_init_date_string in init_date_strings:
-        predictor_matrices, target_matrix_with_weights = neural_net.create_data(
+        data_dict = neural_net.create_data(
             option_dict=validation_option_dict,
             init_date_string=this_init_date_string
         )
         print(SEPARATOR_STRING)
+
+        predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
+        target_matrix_with_weights = data_dict[
+            neural_net.TARGETS_AND_WEIGHTS_KEY
+        ]
+        grid_latitudes_deg_n = data_dict[neural_net.GRID_LATITUDES_KEY]
+        grid_longitudes_deg_e = data_dict[neural_net.GRID_LONGITUDES_KEY]
 
         prediction_matrix = neural_net.apply_model(
             model_object=model_object,
@@ -130,6 +137,8 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             netcdf_file_name=output_file_name,
             target_matrix_with_weights=target_matrix_with_weights[0, ...],
             prediction_matrix=prediction_matrix[0, ...],
+            grid_latitudes_deg_n=grid_latitudes_deg_n,
+            grid_longitudes_deg_e=grid_longitudes_deg_e,
             init_date_string=this_init_date_string,
             model_file_name=model_file_name
         )

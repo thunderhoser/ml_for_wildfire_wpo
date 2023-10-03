@@ -12,6 +12,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import time_conversion
+import longitude_conversion as lng_conversion
 import file_system_utils
 import error_checking
 
@@ -28,6 +29,8 @@ INIT_DATE_KEY = 'init_date_string'
 TARGET_KEY = 'target'
 PREDICTION_KEY = 'prediction'
 WEIGHT_KEY = 'evaluation_weight'
+LATITUDE_KEY = 'latitude_deg_n'
+LONGITUDE_KEY = 'longitude_deg_e'
 
 
 def find_file(directory_name, init_date_string, raise_error_if_missing=True):
@@ -89,6 +92,7 @@ def read_file(netcdf_file_name):
 
 def write_file(
         netcdf_file_name, target_matrix_with_weights, prediction_matrix,
+        grid_latitudes_deg_n, grid_longitudes_deg_e,
         init_date_string, model_file_name):
     """Writes predictions to NetCDF file.
 
@@ -107,6 +111,8 @@ def write_file(
     :param prediction_matrix: If the model does classification, should be
         M-by-N-by-K numpy array of class probabilities.  If the model does
         regression, should be M-by-N numpy array of predicted target values.
+    :param grid_latitudes_deg_n: length-M numpy array of latitudes (deg north).
+    :param grid_longitudes_deg_e: length-N numpy array of longitudes (deg east).
     :param init_date_string: Initialization date (format "yyyymmdd").
     :param model_file_name: Path to file with trained model.
     """
@@ -170,6 +176,30 @@ def write_file(
         )
         error_checking.assert_is_numpy_array_without_nan(prediction_matrix)
 
+    error_checking.assert_is_numpy_array(
+        grid_latitudes_deg_n,
+        exact_dimensions=numpy.array([num_grid_rows], dtype=int)
+    )
+    error_checking.assert_is_valid_lat_numpy_array(
+        grid_latitudes_deg_n, allow_nan=False
+    )
+    error_checking.assert_is_greater_numpy_array(
+        numpy.diff(grid_latitudes_deg_n), 0.
+    )
+
+    error_checking.assert_is_numpy_array(
+        grid_longitudes_deg_e,
+        exact_dimensions=numpy.array([num_grid_columns], dtype=int)
+    )
+    grid_longitudes_deg_e = lng_conversion.convert_lng_positive_in_west(
+        grid_longitudes_deg_e, allow_nan=False
+    )
+
+    if not numpy.all(numpy.diff(grid_longitudes_deg_e) > 0):
+        grid_longitudes_deg_e = lng_conversion.convert_lng_negative_in_west(
+            grid_longitudes_deg_e
+        )
+
     # Do actual stuff.
     file_system_utils.mkdir_recursive_if_necessary(file_name=netcdf_file_name)
     dataset_object = netCDF4.Dataset(
@@ -206,5 +236,15 @@ def write_file(
         WEIGHT_KEY, datatype=numpy.float32, dimensions=these_dim
     )
     dataset_object.variables[WEIGHT_KEY][:] = weight_matrix
+
+    dataset_object.createVariable(
+        LATITUDE_KEY, datatype=numpy.float32, dimensions=ROW_DIM
+    )
+    dataset_object.variables[LATITUDE_KEY][:] = grid_latitudes_deg_n
+
+    dataset_object.createVariable(
+        LONGITUDE_KEY, datatype=numpy.float32, dimensions=COLUMN_DIM
+    )
+    dataset_object.variables[LONGITUDE_KEY][:] = grid_longitudes_deg_e
 
     dataset_object.close()
