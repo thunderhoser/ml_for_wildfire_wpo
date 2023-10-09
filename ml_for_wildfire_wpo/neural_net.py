@@ -1815,6 +1815,9 @@ def apply_model(
             [a[first_index:last_index, ...] for a in predictor_matrices]
         )
 
+        print(numpy.min(this_prediction_matrix))
+        print(numpy.max(this_prediction_matrix))
+
         if prediction_matrix is None:
             dimensions = (num_examples,) + this_prediction_matrix.shape[1:]
             prediction_matrix = numpy.full(dimensions, numpy.nan)
