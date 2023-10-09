@@ -78,9 +78,9 @@ def max_prediction_unmasked(function_name=None, test_mode=False):
         :return: metric: Max prediction.
         """
 
-        weight_tensor = target_tensor[..., [1]]
+        weight_tensor = target_tensor[..., 1]
         mask_tensor = (weight_tensor >= 0.05).astype(int)
-        return K.max(prediction_tensor * mask_tensor)
+        return K.max(prediction_tensor * K.expand_dims(mask_tensor, axis=-1))
 
     if function_name is not None:
         metric.__name__ = function_name
