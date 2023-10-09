@@ -82,12 +82,31 @@ GRID_LATITUDES_KEY = 'grid_latitudes_deg_n'
 GRID_LONGITUDES_KEY = 'grid_longitudes_deg_e'
 
 METRIC_FUNCTION_LIST = [
-    custom_metrics.max_prediction_anywhere(),
-    custom_metrics.max_prediction_unmasked()
+    custom_metrics.max_prediction_anywhere(
+        function_name='max_prediction_anywhere'
+    ),
+    custom_metrics.max_prediction_unmasked(
+        function_name='max_prediction_unmasked'
+    ),
+    custom_metrics.mean_squared_error_everywhere(
+        function_name='mean_squared_error_everywhere'
+    ),
+    custom_losses.mean_squared_error(function_name='mean_squared_error')
 ]
+
 METRIC_FUNCTION_DICT = {
-    'max_prediction_anywhere': custom_metrics.max_prediction_anywhere(),
-    'max_prediction_unmasked': custom_metrics.max_prediction_unmasked()
+    'max_prediction_anywhere': custom_metrics.max_prediction_anywhere(
+        function_name='max_prediction_anywhere'
+    ),
+    'max_prediction_unmasked': custom_metrics.max_prediction_unmasked(
+        function_name='max_prediction_unmasked'
+    ),
+    'mean_squared_error_everywhere': custom_metrics.mean_squared_error_everywhere(
+        function_name='mean_squared_error_everywhere'
+    ),
+    'mean_squared_error': custom_losses.mean_squared_error(
+        function_name='mean_squared_error'
+    )
 }
 
 
@@ -1165,6 +1184,10 @@ def data_generator(option_dict):
             '{0:s}'
         ).format(
             str(target_matrix_with_weights.shape)
+        ))
+
+        print('Min and max target values = {0:.4f}, {1:.4f}'.format(
+            numpy.min(target_matrix), numpy.max(target_matrix)
         ))
 
         predictor_matrices = [p.astype('float32') for p in predictor_matrices]
