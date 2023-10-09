@@ -89,12 +89,21 @@ GRID_LATITUDES_KEY = 'grid_latitudes_deg_n'
 GRID_LONGITUDES_KEY = 'grid_longitudes_deg_e'
 
 METRIC_FUNCTION_LIST = [
-    custom_metrics.max_prediction_anywhere(),
-    custom_metrics.max_prediction_unmasked()
+    custom_metrics.max_prediction_anywhere(
+        function_name='max_prediction_anywhere'
+    ),
+    custom_metrics.max_prediction_unmasked(
+        function_name='max_prediction_unmasked'
+    )
 ]
+
 METRIC_FUNCTION_DICT = {
-    'max_prediction_anywhere': custom_metrics.max_prediction_anywhere(),
-    'max_prediction_unmasked': custom_metrics.max_prediction_unmasked()
+    'max_prediction_anywhere': custom_metrics.max_prediction_anywhere(
+        function_name='max_prediction_anywhere'
+    ),
+    'max_prediction_unmasked': custom_metrics.max_prediction_unmasked(
+        function_name='max_prediction_unmasked'
+    )
 }
 
 
