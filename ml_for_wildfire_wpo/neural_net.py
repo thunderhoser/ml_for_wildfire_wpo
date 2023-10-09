@@ -28,6 +28,7 @@ import era5_constant_utils
 import canadian_fwi_utils
 import normalization
 import custom_losses
+import custom_metrics
 
 DATE_FORMAT = '%Y%m%d'
 GRID_SPACING_DEG = 0.25
@@ -86,6 +87,15 @@ PREDICTOR_MATRICES_KEY = 'predictor_matrices'
 TARGETS_AND_WEIGHTS_KEY = 'target_matrix_with_weights'
 GRID_LATITUDES_KEY = 'grid_latitudes_deg_n'
 GRID_LONGITUDES_KEY = 'grid_longitudes_deg_e'
+
+METRIC_FUNCTION_LIST = [
+    custom_metrics.max_prediction_anywhere(),
+    custom_metrics.max_prediction_unmasked()
+]
+METRIC_FUNCTION_DICT = {
+    'max_prediction_anywhere': custom_metrics.max_prediction_anywhere(),
+    'max_prediction_unmasked': custom_metrics.max_prediction_unmasked()
+}
 
 
 def _check_generator_args(option_dict):
@@ -1616,7 +1626,7 @@ def read_model(hdf5_file_name):
     )
     model_object.compile(
         loss=custom_object_dict['loss'], optimizer=keras.optimizers.Adam(),
-        metrics=[]
+        metrics=METRIC_FUNCTION_LIST
     )
 
     return model_object
