@@ -111,7 +111,7 @@ def write_file(
     """
 
     # Check input args.
-    _ = time_conversion.unix_sec_to_string(init_date_string, DATE_FORMAT)
+    _ = time_conversion.string_to_unix_sec(init_date_string, DATE_FORMAT)
     error_checking.assert_is_string(model_file_name)
 
     error_checking.assert_is_numpy_array(
