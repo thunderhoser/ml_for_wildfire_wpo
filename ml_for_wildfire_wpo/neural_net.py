@@ -94,7 +94,11 @@ METRIC_FUNCTION_LIST = [
     ),
     custom_metrics.max_prediction_unmasked(
         function_name='max_prediction_unmasked'
-    )
+    ),
+    custom_metrics.mean_squared_error_everywhere(
+        function_name='mean_squared_error_everywhere'
+    ),
+    custom_losses.mean_squared_error(function_name='mean_squared_error')
 ]
 
 METRIC_FUNCTION_DICT = {
@@ -103,6 +107,12 @@ METRIC_FUNCTION_DICT = {
     ),
     'max_prediction_unmasked': custom_metrics.max_prediction_unmasked(
         function_name='max_prediction_unmasked'
+    ),
+    'mean_squared_error_everywhere': custom_metrics.mean_squared_error_everywhere(
+        function_name='mean_squared_error_everywhere'
+    ),
+    'mean_squared_error': custom_losses.mean_squared_error(
+        function_name='mean_squared_error'
     )
 }
 
@@ -1814,9 +1824,6 @@ def apply_model(
         this_prediction_matrix = model_object.predict_on_batch(
             [a[first_index:last_index, ...] for a in predictor_matrices]
         )
-
-        print(numpy.min(this_prediction_matrix))
-        print(numpy.max(this_prediction_matrix))
 
         if prediction_matrix is None:
             dimensions = (num_examples,) + this_prediction_matrix.shape[1:]
