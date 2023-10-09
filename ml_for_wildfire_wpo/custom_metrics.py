@@ -79,7 +79,7 @@ def max_prediction_unmasked(function_name=None, test_mode=False):
         """
 
         weight_tensor = target_tensor[..., 1]
-        mask_tensor = K.cast(weight_tensor >= 0.05, prediction_tensor.type)
+        mask_tensor = K.cast(weight_tensor >= 0.05, 'float64')
         return K.max(prediction_tensor * K.expand_dims(mask_tensor, axis=-1))
 
     if function_name is not None:
