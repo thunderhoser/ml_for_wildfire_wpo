@@ -1,0 +1,41 @@
+#!/bin/tcsh
+
+#SBATCH --job-name="apply_neural_net_new_norm_extraextra"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="batch"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=02:00:00
+#SBATCH --array=1-46
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=apply_neural_net_new_norm_extraextra_%A_%a.out
+
+module load cuda/10.1
+source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
+conda activate base
+
+set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+set MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/training_test_with_lagged_targets/new_normalization/extraextra"
+
+set GFS_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/merged"
+set TARGET_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+
+set FIRST_DATE_STRINGS=("20210501" "20210505" "20210509" "20210513" "20210517" "20210521" "20210525" "20210529" "20210602" "20210606" "20210610" "20210614" "20210618" "20210622" "20210626" "20210630" "20210704" "20210708" "20210712" "20210716" "20210720" "20210724" "20210728" "20210801" "20210805" "20210809" "20210813" "20210817" "20210821" "20210825" "20210829" "20210902" "20210906" "20210910" "20210914" "20210918" "20210922" "20210926" "20210930" "20211004" "20211008" "20211012" "20211016" "20211020" "20211024" "20211028")
+set LAST_DATE_STRINGS=("20210504" "20210508" "20210512" "20210516" "20210520" "20210524" "20210528" "20210601" "20210605" "20210609" "20210613" "20210617" "20210621" "20210625" "20210629" "20210703" "20210707" "20210711" "20210715" "20210719" "20210723" "20210727" "20210731" "20210804" "20210808" "20210812" "20210816" "20210820" "20210824" "20210828" "20210901" "20210905" "20210909" "20210913" "20210917" "20210921" "20210925" "20210929" "20211003" "20211007" "20211011" "20211015" "20211019" "20211023" "20211027" "20211031")
+
+python3 -u "${CODE_DIR_NAME}/apply_neural_net.py" \
+--input_model_file_name="${MODEL_DIR_NAME}/model.h5" \
+--input_gfs_directory_name="${GFS_DIR_NAME}" \
+--input_target_dir_name="${TARGET_DIR_NAME}" \
+--init_date_limit_strings ${FIRST_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]} ${LAST_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]} \
+--output_dir_name="${MODEL_DIR_NAME}/validation"
