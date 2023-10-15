@@ -68,7 +68,7 @@ def _run(input_dir_name, first_date_strings, last_date_strings, output_file_name
             first_init_date_string=first_date_strings[i],
             last_init_date_string=last_date_strings[i],
             raise_error_if_any_missing=False,
-            raise_error_if_all_missing=True
+            raise_error_if_all_missing=False
         )
 
     z_score_param_table_xarray = normalization.get_z_score_params_for_gfs(
