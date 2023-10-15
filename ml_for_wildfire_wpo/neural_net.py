@@ -1652,7 +1652,8 @@ def read_model(hdf5_file_name):
         hdf5_file_name, custom_objects=custom_object_dict, compile=False
     )
     model_object.compile(
-        loss=custom_object_dict['loss'], optimizer=keras.optimizers.Adam(),
+        loss=custom_object_dict['loss'],
+        optimizer=keras.optimizers.Adam(clipnorm=1.),
         metrics=METRIC_FUNCTION_LIST
     )
 
