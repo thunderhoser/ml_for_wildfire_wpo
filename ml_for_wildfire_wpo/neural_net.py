@@ -1126,6 +1126,14 @@ def data_generator(option_dict):
                 numpy.isnan(gfs_predictor_matrix_3d)
             ] = sentinel_value
 
+            print((
+                'Min and max values in 3-D GFS predictor matrix: '
+                '{0:.4f}, {1:.4f}'
+            ).format(
+                numpy.min(gfs_predictor_matrix_3d),
+                numpy.max(gfs_predictor_matrix_3d)
+            ))
+
         if gfs_predictor_matrix_2d is not None:
             print((
                 'Shape of 2-D GFS predictor matrix and NaN fraction: '
@@ -1139,12 +1147,28 @@ def data_generator(option_dict):
                 numpy.isnan(gfs_predictor_matrix_2d)
             ] = sentinel_value
 
+            print((
+                'Min and max values in 2-D GFS predictor matrix: '
+                '{0:.4f}, {1:.4f}'
+            ).format(
+                numpy.min(gfs_predictor_matrix_2d),
+                numpy.max(gfs_predictor_matrix_2d)
+            ))
+
         print((
             'Shape of lagged-target predictor matrix and NaN fraction: '
             '{0:s}, {1:.4f}'
         ).format(
             str(lagged_target_predictor_matrix.shape),
             numpy.mean(numpy.isnan(lagged_target_predictor_matrix))
+        ))
+
+        print((
+            'Min and max values in lagged-target predictor matrix: '
+            '{0:.4f}, {1:.4f}'
+        ).format(
+            numpy.min(lagged_target_predictor_matrix),
+            numpy.max(lagged_target_predictor_matrix)
         ))
 
         lagged_target_predictor_matrix = _pad_inner_to_outer_domain(
@@ -1394,6 +1418,13 @@ def create_data(option_dict, init_date_string):
             numpy.isnan(gfs_predictor_matrix_3d)
         ] = sentinel_value
 
+        print((
+            'Min and max values in 3-D GFS predictor matrix: {0:.4f}, {1:.4f}'
+        ).format(
+            numpy.min(gfs_predictor_matrix_3d),
+            numpy.max(gfs_predictor_matrix_3d)
+        ))
+
     if gfs_predictor_matrix_2d is not None:
         print((
             'Shape of 2-D GFS predictor matrix and NaN fraction: '
@@ -1407,12 +1438,26 @@ def create_data(option_dict, init_date_string):
             numpy.isnan(gfs_predictor_matrix_2d)
         ] = sentinel_value
 
+        print((
+            'Min and max values in 2-D GFS predictor matrix: {0:.4f}, {1:.4f}'
+        ).format(
+            numpy.min(gfs_predictor_matrix_2d),
+            numpy.max(gfs_predictor_matrix_2d)
+        ))
+
     print((
         'Shape of lagged-target predictor matrix and NaN fraction: '
         '{0:s}, {1:.4f}'
     ).format(
         str(lagged_target_predictor_matrix.shape),
         numpy.mean(numpy.isnan(lagged_target_predictor_matrix))
+    ))
+
+    print((
+        'Min and max values in lagged-target predictor matrix: {0:.4f}, {1:.4f}'
+    ).format(
+        numpy.min(lagged_target_predictor_matrix),
+        numpy.max(lagged_target_predictor_matrix)
     ))
 
     lagged_target_predictor_matrix = _pad_inner_to_outer_domain(
