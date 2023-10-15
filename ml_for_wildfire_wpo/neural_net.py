@@ -98,7 +98,8 @@ METRIC_FUNCTION_LIST = [
     custom_metrics.mean_squared_error_everywhere(
         function_name='mean_squared_error_everywhere'
     ),
-    custom_losses.mean_squared_error(function_name='mean_squared_error')
+    custom_losses.mean_squared_error(function_name='mean_squared_error'),
+    custom_losses.dual_weighted_mse(function_name='dual_weighted_mse')
 ]
 
 METRIC_FUNCTION_DICT = {
@@ -113,6 +114,9 @@ METRIC_FUNCTION_DICT = {
     ),
     'mean_squared_error': custom_losses.mean_squared_error(
         function_name='mean_squared_error'
+    ),
+    'dual_weighted_mse': custom_losses.dual_weighted_mse(
+        function_name='dual_weighted_mse'
     )
 }
 
