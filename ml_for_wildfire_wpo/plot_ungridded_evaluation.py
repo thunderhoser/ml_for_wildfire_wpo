@@ -1,4 +1,4 @@
-"""Plots model evaluation."""
+"""Plots ungridded (averaged over the whole domain) model evaluation."""
 
 import os
 import sys
@@ -347,7 +347,7 @@ def _plot_attributes_diagram(
 def _run(evaluation_file_names, line_styles, line_colour_strings,
          set_descriptions_verbose, plot_full_error_distributions,
          confidence_level, report_metrics_in_titles, output_dir_name):
-    """Plots model evaluation.
+    """Plots ungridded (averaged over the whole domain) model evaluation.
 
     This is effectively the main method.
 
@@ -359,6 +359,8 @@ def _run(evaluation_file_names, line_styles, line_colour_strings,
     :param confidence_level: Same.
     :param report_metrics_in_titles: Same.
     :param output_dir_name: Same.
+    :raises: ValueError: if any input file contains gridded, rather than
+        ungridded, evaluation.
     """
 
     # Check input args.
@@ -419,6 +421,16 @@ def _run(evaluation_file_names, line_styles, line_colour_strings,
         evaluation_tables_xarray[i] = regression_eval.read_file(
             evaluation_file_names[i]
         )
+
+        if regression_eval.LATITUDE_DIM in evaluation_tables_xarray[i].coords:
+            error_string = (
+                'File "{0:s}" contains gridded evaluation.  This script '
+                'handles only ungridded evaluation.'
+            ).format(
+                evaluation_file_names[i]
+            )
+
+            raise ValueError(error_string)
 
         model_file_name = (
             evaluation_tables_xarray[i].attrs[regression_eval.MODEL_FILE_KEY]

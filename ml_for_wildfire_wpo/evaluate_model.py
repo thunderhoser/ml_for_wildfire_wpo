@@ -24,6 +24,7 @@ NUM_BOOTSTRAP_REPS_ARG_NAME = 'num_bootstrap_reps'
 NUM_RELIABILITY_BINS_ARG_NAME = 'num_reliability_bins'
 RELIA_BIN_LIMITS_ARG_NAME = 'reliability_bin_edge_limits'
 RELIA_BIN_LIMITS_PRCTILE_ARG_NAME = 'reliability_bin_edge_limits_percentile'
+PER_GRID_CELL_ARG_NAME = 'per_grid_cell'
 OUTPUT_FILE_ARG_NAME = 'output_file_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -47,6 +48,10 @@ RELIA_BIN_LIMITS_PRCTILE_HELP_STRING = (
     '0...100.'
 ).format(RELIA_BIN_LIMITS_ARG_NAME)
 
+PER_GRID_CELL_HELP_STRING = (
+    'Boolean flag.  If 1, will compute a separate set of scores at each grid '
+    'cell.  If 0, will compute one set of scores for the whole domain.'
+)
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Evaluation scores will be written here by '
     '`regression_evaluation.write_file`.'
@@ -79,6 +84,10 @@ INPUT_ARG_PARSER.add_argument(
     help=RELIA_BIN_LIMITS_PRCTILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + PER_GRID_CELL_ARG_NAME, type=int, required=True,
+    help=PER_GRID_CELL_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
     help=OUTPUT_FILE_HELP_STRING
 )
@@ -87,7 +96,7 @@ INPUT_ARG_PARSER.add_argument(
 def _run(prediction_dir_name, init_date_limit_strings,
          num_bootstrap_reps, num_reliability_bins,
          reliability_bin_edge_limits, reliability_bin_edge_limits_percentile,
-         output_file_name):
+         per_grid_cell, output_file_name):
     """Evaluates model.
 
     This is effectively the main method.
@@ -98,6 +107,7 @@ def _run(prediction_dir_name, init_date_limit_strings,
     :param num_reliability_bins: Same.
     :param reliability_bin_edge_limits: Same.
     :param reliability_bin_edge_limits_percentile: Same.
+    :param per_grid_cell: Same.
     :param output_file_name: Same.
     """
 
@@ -130,7 +140,8 @@ def _run(prediction_dir_name, init_date_limit_strings,
         min_reliability_bin_edge=min_bin_edge,
         max_reliability_bin_edge=max_bin_edge,
         min_reliability_bin_edge_percentile=min_bin_edge_percentile,
-        max_reliability_bin_edge_percentile=max_bin_edge_percentile
+        max_reliability_bin_edge_percentile=max_bin_edge_percentile,
+        per_grid_cell=per_grid_cell
     )
     print(SEPARATOR_STRING)
 
@@ -184,5 +195,6 @@ if __name__ == '__main__':
             getattr(INPUT_ARG_OBJECT, RELIA_BIN_LIMITS_PRCTILE_ARG_NAME),
             dtype=float
         ),
+        per_grid_cell=bool(getattr(INPUT_ARG_OBJECT, PER_GRID_CELL_ARG_NAME)),
         output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )
