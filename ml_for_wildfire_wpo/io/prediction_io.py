@@ -56,6 +56,55 @@ def find_file(directory_name, init_date_string, raise_error_if_missing=True):
     return prediction_file_name
 
 
+def find_files_for_period(
+        directory_name, first_init_date_string, last_init_date_string,
+        raise_error_if_any_missing=False, raise_error_if_all_missing=True):
+    """Finds files with predictions over a time period, one per daily model run.
+
+    :param directory_name: Path to input directory.
+    :param first_init_date_string: First date in period (format "yyyymmdd").
+    :param last_init_date_string: Last date in period (format "yyyymmdd").
+    :param raise_error_if_any_missing: Boolean flag.  If any file is missing and
+        `raise_error_if_any_missing == True`, will throw error.
+    :param raise_error_if_all_missing: Boolean flag.  If all files are missing
+        and `raise_error_if_all_missing == True`, will throw error.
+    :return: prediction_file_names: 1-D list of paths to NetCDF files with
+        predictions, one per daily model run.
+    :raises: ValueError: if all files are missing and
+        `raise_error_if_all_missing == True`.
+    """
+
+    error_checking.assert_is_boolean(raise_error_if_any_missing)
+    error_checking.assert_is_boolean(raise_error_if_all_missing)
+
+    init_date_strings = time_conversion.get_spc_dates_in_range(
+        first_init_date_string, last_init_date_string
+    )
+
+    prediction_file_names = []
+
+    for this_date_string in init_date_strings:
+        this_file_name = find_file(
+            directory_name=directory_name,
+            init_date_string=this_date_string,
+            raise_error_if_missing=raise_error_if_any_missing
+        )
+
+        if os.path.isfile(this_file_name):
+            prediction_file_names.append(this_file_name)
+
+    if raise_error_if_all_missing and len(prediction_file_names) == 0:
+        error_string = (
+            'Cannot find any file in directory "{0:s}" from dates {1:s} to '
+            '{2:s}.'
+        ).format(
+            directory_name, first_init_date_string, last_init_date_string
+        )
+        raise ValueError(error_string)
+
+    return prediction_file_names
+
+
 def file_name_to_date(prediction_file_name):
     """Parses date from name of prediction file.
 
