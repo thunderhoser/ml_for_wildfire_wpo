@@ -378,8 +378,8 @@ def _get_scores_one_replicate(
         t[RELIABILITY_Y_KEY].values[:, i],
         these_counts
     ) = _get_rel_curve_one_scalar(
-        target_values=target_matrix,
-        predicted_values=prediction_matrix,
+        target_values=numpy.ravel(target_matrix),
+        predicted_values=numpy.ravel(prediction_matrix),
         num_bins=len(t.coords[RELIABILITY_BIN_DIM].values),
         min_bin_edge=min_bin_edge, max_bin_edge=max_bin_edge, invert=False
     )
@@ -398,8 +398,8 @@ def _get_scores_one_replicate(
             t[RELIABILITY_BIN_CENTER_KEY].values[:], _,
             t[RELIABILITY_COUNT_KEY].values[:]
         ) = _get_rel_curve_one_scalar(
-            target_values=full_target_matrix,
-            predicted_values=full_prediction_matrix,
+            target_values=numpy.ravel(full_target_matrix),
+            predicted_values=numpy.ravel(full_prediction_matrix),
             num_bins=len(t.coords[RELIABILITY_BIN_DIM].values),
             min_bin_edge=min_bin_edge, max_bin_edge=max_bin_edge,
             invert=False
@@ -410,7 +410,8 @@ def _get_scores_one_replicate(
                 t[KS_STATISTIC_KEY].values[0],
                 t[KS_P_VALUE_KEY].values[0]
             ) = ks_2samp(
-                full_target_matrix, full_prediction_matrix,
+                numpy.ravel(full_target_matrix),
+                numpy.ravel(full_prediction_matrix),
                 alternative='two-sided', mode='auto'
             )
 
@@ -418,8 +419,8 @@ def _get_scores_one_replicate(
             t[INV_RELIABILITY_BIN_CENTER_KEY].values[:], _,
             t[INV_RELIABILITY_COUNT_KEY].values[:]
         ) = _get_rel_curve_one_scalar(
-            target_values=full_target_matrix,
-            predicted_values=full_prediction_matrix,
+            target_values=numpy.ravel(full_target_matrix),
+            predicted_values=numpy.ravel(full_prediction_matrix),
             num_bins=len(t.coords[RELIABILITY_BIN_DIM].values),
             min_bin_edge=min_bin_edge, max_bin_edge=max_bin_edge,
             invert=True
@@ -538,7 +539,7 @@ def get_scores_with_bootstrapping(
     error_checking.assert_is_greater(num_bootstrap_reps, 0)
     error_checking.assert_is_integer(num_reliability_bins)
     error_checking.assert_is_geq(num_reliability_bins, 10)
-    error_checking.assert_is_leq(num_reliability_bins, 100)
+    error_checking.assert_is_leq(num_reliability_bins, 1000)
 
     if min_reliability_bin_edge is None or max_reliability_bin_edge is None:
         error_checking.assert_is_leq(min_reliability_bin_edge_percentile, 10.)
@@ -720,7 +721,9 @@ def get_scores_with_bootstrapping(
         data_vars=main_data_dict, coords=metadata_dict
     )
     result_table_xarray.attrs[MODEL_FILE_KEY] = model_file_name
-    result_table_xarray.attrs[PREDICTION_FILES_KEY] = prediction_file_names
+    result_table_xarray.attrs[PREDICTION_FILES_KEY] = ' '.join([
+        '{0:s}'.format(f) for f in prediction_file_names
+    ])
 
     num_examples = target_matrix.shape[0]
     example_indices = numpy.linspace(
@@ -785,4 +788,9 @@ def read_file(netcdf_file_name):
         `get_scores_with_bootstrapping`.
     """
 
-    return xarray.open_dataset(netcdf_file_name)
+    result_table_xarray = xarray.open_dataset(netcdf_file_name)
+    result_table_xarray.attrs[PREDICTION_FILES_KEY] = (
+        result_table_xarray.attrs[PREDICTION_FILES_KEY].split(' ')
+    )
+
+    return result_table_xarray
