@@ -1093,7 +1093,7 @@ def create_model(option_dict, loss_function, metric_list):
     )
 
     model_object.compile(
-        loss=loss_function, optimizer=keras.optimizers.Adam(),
+        loss=loss_function, optimizer=keras.optimizers.Adam(clipnorm=1.),
         metrics=metric_list
     )
 

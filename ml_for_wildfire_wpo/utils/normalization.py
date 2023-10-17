@@ -410,33 +410,41 @@ def normalize_gfs_data_to_z_scores(gfs_table_xarray,
                 )
 
     for j in range(num_2d_fields):
-        for k in range(num_forecast_hours):
-            j_new = numpy.where(
-                zspt.coords[gfs_utils.FIELD_DIM_2D].values == field_names_2d[j]
-            )[0][0]
+        j_new = numpy.where(
+            zspt.coords[gfs_utils.FIELD_DIM_2D].values == field_names_2d[j]
+        )[0][0]
 
-            # TODO(thunderhoser): HACK to allow for old normalization files.
-            try:
-                k_new = numpy.where(
-                    numpy.round(
-                        zspt.coords[gfs_utils.FORECAST_HOUR_DIM].values
-                    ).astype(int)
-                    == forecast_hours[k]
-                )[0][0]
-
-                this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_2D].values[
-                    k_new, j_new
-                ]
-                this_stdev = zspt[gfs_utils.STDEV_KEY_2D].values[k_new, j_new]
-            except KeyError:
-                this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_2D].values[j_new]
-                this_stdev = zspt[gfs_utils.STDEV_KEY_2D].values[j_new]
+        if field_names_2d[j] not in ACCUM_PRECIP_FIELD_NAMES:
+            this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_2D].values[0, j_new]
+            this_stdev = zspt[gfs_utils.STDEV_KEY_2D].values[0, j_new]
 
             if numpy.isnan(this_stdev):
                 data_matrix_2d[..., j] = 0.
             else:
                 data_matrix_2d[..., j] = (
                     (data_matrix_2d[..., j] - this_mean) / this_stdev
+                )
+
+            continue
+
+        for k in range(num_forecast_hours):
+            k_new = numpy.where(
+                numpy.round(
+                    zspt.coords[gfs_utils.FORECAST_HOUR_DIM].values
+                ).astype(int)
+                == forecast_hours[k]
+            )[0][0]
+
+            this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_2D].values[
+                k_new, j_new
+            ]
+            this_stdev = zspt[gfs_utils.STDEV_KEY_2D].values[k_new, j_new]
+
+            if numpy.isnan(this_stdev):
+                data_matrix_2d[k, ..., j] = 0.
+            else:
+                data_matrix_2d[k, ..., j] = (
+                    (data_matrix_2d[k, ..., j] - this_mean) / this_stdev
                 )
 
     return gfs_table_xarray.assign({
