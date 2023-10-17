@@ -729,7 +729,9 @@ def get_scores_with_bootstrapping(
         data_vars=main_data_dict, coords=metadata_dict
     )
     result_table_xarray.attrs[MODEL_FILE_KEY] = model_file_name
-    result_table_xarray.attrs[PREDICTION_FILES_KEY] = prediction_file_names
+    result_table_xarray.attrs[PREDICTION_FILES_KEY] = ' '.join([
+        '{0:s}'.format(f) for f in prediction_file_names
+    ])
 
     num_examples = target_matrix.shape[0]
     example_indices = numpy.linspace(
@@ -794,4 +796,9 @@ def read_file(netcdf_file_name):
         `get_scores_with_bootstrapping`.
     """
 
-    return xarray.open_dataset(netcdf_file_name)
+    result_table_xarray = xarray.open_dataset(netcdf_file_name)
+    result_table_xarray.attrs[PREDICTION_FILES_KEY] = (
+        result_table_xarray.attrs[PREDICTION_FILES_KEY].split(' ')
+    )
+
+    return result_table_xarray
