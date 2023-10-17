@@ -26,6 +26,8 @@ MSE_KEY = 'mean_squared_error'
 MSE_BIAS_KEY = 'mse_bias'
 MSE_VARIANCE_KEY = 'mse_variance'
 MSE_SKILL_SCORE_KEY = 'mse_skill_score'
+DWMSE_KEY = 'dual_weighted_mean_squared_error'
+DWMSE_SKILL_SCORE_KEY = 'dwmse_skill_score'
 
 KS_STATISTIC_KEY = 'kolmogorov_smirnov_statistic'
 KS_P_VALUE_KEY = 'kolmogorov_smirnov_p_value'
@@ -85,6 +87,45 @@ def _get_mse_ss_one_scalar(target_values, predicted_values,
     )[0]
 
     return (mse_climo - mse_actual) / mse_climo
+
+
+def _get_dwmse_one_scalar(target_values, predicted_values):
+    """Computes dual-weighted MSE (DWMSE) for one scalar target variable.
+
+    E = number of examples
+
+    :param target_values: length-E numpy array of target (actual) values.
+    :param predicted_values: length-E numpy array of predicted values.
+    :return: dwmse: Self-explanatory.
+    """
+
+    weights = numpy.maximum(
+        numpy.absolute(target_values),
+        numpy.absolute(predicted_values)
+    )
+    return numpy.mean(weights * (target_values - predicted_values) ** 2)
+
+
+def _get_dwmse_ss_one_scalar(target_values, predicted_values,
+                             mean_training_target_value):
+    """Computes DWMSE skill score for one scalar target variable.
+
+    :param target_values: See doc for `_get_dwmse_one_scalar`.
+    :param predicted_values: Same.
+    :param mean_training_target_value: Mean target value over all training
+        examples.
+    :return: dwmse_skill_score: Self-explanatory.
+    """
+
+    dwmse_actual = _get_dwmse_one_scalar(
+        target_values=target_values, predicted_values=predicted_values
+    )
+    dwmse_climo = _get_dwmse_one_scalar(
+        target_values=target_values,
+        predicted_values=numpy.array([mean_training_target_value])
+    )
+
+    return (dwmse_climo - dwmse_actual) / dwmse_climo
 
 
 def _get_mae_one_scalar(target_values, predicted_values):
@@ -292,6 +333,15 @@ def _get_scores_one_replicate(
         predicted_values=numpy.ravel(prediction_matrix)
     )
     t[MSE_SKILL_SCORE_KEY].values[i] = _get_mse_ss_one_scalar(
+        target_values=numpy.ravel(target_matrix),
+        predicted_values=numpy.ravel(prediction_matrix),
+        mean_training_target_value=mean_training_target_value
+    )
+    t[DWMSE_KEY].values[i] = _get_dwmse_one_scalar(
+        target_values=numpy.ravel(target_matrix),
+        predicted_values=numpy.ravel(prediction_matrix)
+    )
+    t[DWMSE_SKILL_SCORE_KEY].values[i] = _get_dwmse_ss_one_scalar(
         target_values=numpy.ravel(target_matrix),
         predicted_values=numpy.ravel(prediction_matrix),
         mean_training_target_value=mean_training_target_value
@@ -591,6 +641,12 @@ def get_scores_with_bootstrapping(
             these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         ),
         MSE_SKILL_SCORE_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        DWMSE_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        DWMSE_SKILL_SCORE_KEY: (
             these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         ),
         BIAS_KEY: (

@@ -130,13 +130,16 @@ def _run(prediction_dir_name, init_date_limit_strings,
     print((
         'Stdev of target and predicted values = {0:f}, {1:f} ... '
         'MSE and skill score = {2:f}, {3:f} ... '
-        'MAE and skill score = {4:f}, {5:f} ... '
-        'bias = {6:f} ... correlation = {7:f} ... KGE = {8:f}'
+        'DWMSE and skill score = {4:f}, {5:f} ... '
+        'MAE and skill score = {6:f}, {7:f} ... '
+        'bias = {8:f} ... correlation = {9:f} ... KGE = {10:f}'
     ).format(
         numpy.nanmean(t[regression_eval.TARGET_STDEV_KEY].values),
         numpy.nanmean(t[regression_eval.PREDICTION_STDEV_KEY].values),
         numpy.nanmean(t[regression_eval.MSE_KEY].values),
         numpy.nanmean(t[regression_eval.MSE_SKILL_SCORE_KEY].values),
+        numpy.nanmean(t[regression_eval.DWMSE_KEY].values),
+        numpy.nanmean(t[regression_eval.DWMSE_SKILL_SCORE_KEY].values),
         numpy.nanmean(t[regression_eval.MAE_KEY].values),
         numpy.nanmean(t[regression_eval.MAE_SKILL_SCORE_KEY].values),
         numpy.nanmean(t[regression_eval.BIAS_KEY].values),
