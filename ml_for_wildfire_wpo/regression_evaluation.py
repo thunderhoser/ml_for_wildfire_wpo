@@ -546,7 +546,7 @@ def get_scores_with_bootstrapping(
     error_checking.assert_is_greater(num_bootstrap_reps, 0)
     error_checking.assert_is_integer(num_reliability_bins)
     error_checking.assert_is_geq(num_reliability_bins, 10)
-    error_checking.assert_is_leq(num_reliability_bins, 100)
+    error_checking.assert_is_leq(num_reliability_bins, 1000)
 
     if min_reliability_bin_edge is None or max_reliability_bin_edge is None:
         error_checking.assert_is_leq(min_reliability_bin_edge_percentile, 10.)
