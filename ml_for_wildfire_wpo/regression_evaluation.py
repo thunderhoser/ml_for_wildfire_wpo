@@ -386,8 +386,8 @@ def _get_scores_one_replicate(
         t[RELIABILITY_Y_KEY].values[:, i],
         these_counts
     ) = _get_rel_curve_one_scalar(
-        target_values=target_matrix,
-        predicted_values=prediction_matrix,
+        target_values=numpy.ravel(target_matrix),
+        predicted_values=numpy.ravel(prediction_matrix),
         num_bins=len(t.coords[RELIABILITY_BIN_DIM].values),
         min_bin_edge=min_bin_edge, max_bin_edge=max_bin_edge, invert=False
     )
@@ -406,8 +406,8 @@ def _get_scores_one_replicate(
             t[RELIABILITY_BIN_CENTER_KEY].values[:], _,
             t[RELIABILITY_COUNT_KEY].values[:]
         ) = _get_rel_curve_one_scalar(
-            target_values=full_target_matrix,
-            predicted_values=full_prediction_matrix,
+            target_values=numpy.ravel(full_target_matrix),
+            predicted_values=numpy.ravel(full_prediction_matrix),
             num_bins=len(t.coords[RELIABILITY_BIN_DIM].values),
             min_bin_edge=min_bin_edge, max_bin_edge=max_bin_edge,
             invert=False
@@ -418,7 +418,8 @@ def _get_scores_one_replicate(
                 t[KS_STATISTIC_KEY].values[0],
                 t[KS_P_VALUE_KEY].values[0]
             ) = ks_2samp(
-                full_target_matrix, full_prediction_matrix,
+                numpy.ravel(full_target_matrix),
+                numpy.ravel(full_prediction_matrix),
                 alternative='two-sided', mode='auto'
             )
 
@@ -426,8 +427,8 @@ def _get_scores_one_replicate(
             t[INV_RELIABILITY_BIN_CENTER_KEY].values[:], _,
             t[INV_RELIABILITY_COUNT_KEY].values[:]
         ) = _get_rel_curve_one_scalar(
-            target_values=full_target_matrix,
-            predicted_values=full_prediction_matrix,
+            target_values=numpy.ravel(full_target_matrix),
+            predicted_values=numpy.ravel(full_prediction_matrix),
             num_bins=len(t.coords[RELIABILITY_BIN_DIM].values),
             min_bin_edge=min_bin_edge, max_bin_edge=max_bin_edge,
             invert=True
