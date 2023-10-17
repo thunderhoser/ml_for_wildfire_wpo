@@ -42,7 +42,7 @@ set gfs_lead_time_string=${GFS_LEAD_TIME_STRINGS[$BEST_MODEL_INDEX]}
 set model_dir_name="${TOP_MODEL_DIR_NAME}/num-conv-layers-per-block=${num_layers_per_block}_num-first-layer-filters=${num_first_layer_filters}_gfs-lead-times-hours=${gfs_lead_time_string}"
 echo $model_dir_name
 
-python3 -u "${CODE_DIR_NAME}/apply_neural_net.py" \
+python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
 --input_prediction_dir_name="${model_dir_name}/validation" \
 --init_date_limit_strings "20210101" "20211210" \
 --num_bootstrap_reps=1 \
