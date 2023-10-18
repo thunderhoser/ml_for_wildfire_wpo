@@ -128,7 +128,7 @@ OUTPUT_DIR_HELP_STRING = (
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
-    '--' + INPUT_FILE_ARG_NAME, type=str, nargs='+', required=True,
+    '--' + INPUT_FILE_ARG_NAME, type=str, required=True,
     help=INPUT_FILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
