@@ -287,26 +287,61 @@ def _run(input_file_name, min_colour_percentile, max_colour_percentile,
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
     for this_metric_name in list(METRIC_NAME_TO_VERBOSE.keys()):
-        this_score_matrix = numpy.nanmean(etx[this_metric_name].values, axis=-1)
+        if this_metric_name == RMSE_KEY:
+            this_score_matrix = numpy.sqrt(
+                numpy.nanmean(etx[regression_eval.MSE_KEY].values, axis=-1)
+            )
+        else:
+            this_score_matrix = numpy.nanmean(
+                etx[this_metric_name].values, axis=-1
+            )
+
+        if this_metric_name in [
+            regression_eval.TARGET_MEAN_KEY,
+            regression_eval.PREDICTION_MEAN_KEY
+        ]:
+            score_matrix_for_cnorm = numpy.stack([
+                etx[regression_eval.TARGET_MEAN_KEY].values,
+                etx[regression_eval.PREDICTION_MEAN_KEY].values,
+            ], axis=-1)
+
+            score_matrix_for_cnorm = numpy.nanmean(
+                score_matrix_for_cnorm, axis=-2
+            )
+        elif this_metric_name in [
+            regression_eval.TARGET_STDEV_KEY,
+            regression_eval.PREDICTION_STDEV_KEY
+        ]:
+            score_matrix_for_cnorm = numpy.stack([
+                etx[regression_eval.TARGET_STDEV_KEY].values,
+                etx[regression_eval.PREDICTION_STDEV_KEY].values,
+            ], axis=-1)
+
+            score_matrix_for_cnorm = numpy.nanmean(
+                score_matrix_for_cnorm, axis=-2
+            )
+        else:
+            score_matrix_for_cnorm = this_score_matrix
+
         colour_norm_type_string = METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING[
             this_metric_name
         ]
 
         if colour_norm_type_string == 'sequential':
             min_colour_value = numpy.nanpercentile(
-                this_score_matrix, min_colour_percentile
+                score_matrix_for_cnorm, min_colour_percentile
             )
             max_colour_value = numpy.nanpercentile(
-                this_score_matrix, max_colour_percentile
+                score_matrix_for_cnorm, max_colour_percentile
             )
         elif colour_norm_type_string == 'diverging':
             max_colour_value = numpy.nanpercentile(
-                numpy.absolute(this_score_matrix), max_colour_percentile
+                numpy.absolute(score_matrix_for_cnorm), max_colour_percentile
             )
             min_colour_value = -1 * max_colour_value
         else:
             max_colour_value = numpy.nanpercentile(
-                this_score_matrix, max_colour_percentile
+                score_matrix_for_cnorm, max_colour_percentile
             )
             min_colour_value = -1 * max_colour_value
 
