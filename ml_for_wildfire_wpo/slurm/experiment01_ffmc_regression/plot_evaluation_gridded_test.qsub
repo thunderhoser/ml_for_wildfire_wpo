@@ -41,7 +41,7 @@ set gfs_lead_time_string=${GFS_LEAD_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}
 set model_dir_name="${TOP_MODEL_DIR_NAME}/num-conv-layers-per-block=${num_layers_per_block}_num-first-layer-filters=${num_first_layer_filters}_gfs-lead-times-hours=${gfs_lead_time_string}"
 echo $model_dir_name
 
-python3 -u "${CODE_DIR_NAME}/plot_evaluation.py" \
+python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
 --input_evaluation_file_name="${model_dir_name}/validation/gridded_evaluation.nc" \
 --min_colour_percentile=1 \
 --max_colour_percentile=99 \
