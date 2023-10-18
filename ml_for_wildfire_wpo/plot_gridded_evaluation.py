@@ -109,7 +109,7 @@ FIGURE_RESOLUTION_DPI = 300
 
 INPUT_FILE_ARG_NAME = 'input_evaluation_file_name'
 MIN_COLOUR_PERCENTILE_ARG_NAME = 'min_colour_percentile'
-MAX_COLOUR_PERCENTILE_ARG_NAME = 'min_colour_percentile'
+MAX_COLOUR_PERCENTILE_ARG_NAME = 'max_colour_percentile'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 INPUT_FILE_HELP_STRING = (
