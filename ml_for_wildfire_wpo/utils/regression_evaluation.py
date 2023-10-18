@@ -23,6 +23,8 @@ DUMMY_DIM = 'dummy'
 
 TARGET_STDEV_KEY = 'target_standard_deviation'
 PREDICTION_STDEV_KEY = 'prediction_standard_deviation'
+TARGET_MEAN_KEY = 'target_mean'
+PREDICTION_MEAN_KEY = 'prediction_mean'
 
 MSE_KEY = 'mean_squared_error'
 MSE_BIAS_KEY = 'mse_bias'
@@ -382,11 +384,19 @@ def _get_scores_one_replicate(
         t[PREDICTION_STDEV_KEY].values[..., rep_idx] = numpy.std(
             prediction_matrix, ddof=1, axis=0
         )
+        t[TARGET_MEAN_KEY].values[..., rep_idx] = numpy.mean(
+            target_matrix, axis=0
+        )
+        t[PREDICTION_MEAN_KEY].values[..., rep_idx] = numpy.mean(
+            prediction_matrix, axis=0
+        )
     else:
         t[TARGET_STDEV_KEY].values[rep_idx] = numpy.std(target_matrix, ddof=1)
         t[PREDICTION_STDEV_KEY].values[rep_idx] = numpy.std(
             prediction_matrix, ddof=1
         )
+        t[TARGET_MEAN_KEY].values[rep_idx] = numpy.mean(target_matrix)
+        t[PREDICTION_MEAN_KEY].values[rep_idx] = numpy.mean(prediction_matrix)
 
     t[MAE_KEY].values[..., rep_idx] = _get_mae_one_scalar(
         target_values=target_matrix,
@@ -798,6 +808,12 @@ def get_scores_with_bootstrapping(
             these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         ),
         PREDICTION_STDEV_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        TARGET_MEAN_KEY: (
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
+        ),
+        PREDICTION_MEAN_KEY: (
             these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         ),
         MAE_KEY: (
