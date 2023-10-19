@@ -2,15 +2,23 @@
 
 import os
 import sys
+import warnings
 import numpy
 import xarray
+from scipy.interpolate import interp1d
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import time_conversion
 import error_checking
+
+TOLERANCE = 1e-6
+
+DATE_FORMAT = '%Y%m%d'
+HOURS_TO_SECONDS = 3600
 
 FORECAST_HOUR_DIM = 'forecast_hour'
 LATITUDE_DIM = 'latitude_deg_n'
@@ -107,6 +115,11 @@ MAYBE_MISSING_FIELD_NAMES = [
     VEGETATION_FRACTION_NAME, SOIL_TYPE_NAME
 ]
 
+ALL_FORECAST_HOURS = numpy.concatenate([
+    numpy.linspace(0, 240, num=81, dtype=int),
+    numpy.linspace(252, 384, num=12, dtype=int)
+])
+
 
 def check_field_name(field_name):
     """Ensures that field name is valid.
@@ -196,6 +209,7 @@ def subset_by_forecast_hour(gfs_table_xarray, desired_forecast_hours):
 def get_field(gfs_table_xarray, field_name, pressure_levels_mb=None):
     """Extracts one field from GFS table.
 
+    H = number of forecast hours
     M = number of rows in grid
     N = number of columns in grid
     P = number of pressure levels
@@ -204,8 +218,8 @@ def get_field(gfs_table_xarray, field_name, pressure_levels_mb=None):
     :param field_name: Field name.
     :param pressure_levels_mb: length-P numpy array of pressure levels.  If the
         field is 2-D rather than 3-D, leave this argument alone.
-    :return: data_matrix: M-by-N (if field is 2-D) or M-by-N-by-P (if field is
-        3-D) numpy array of data values.
+    :return: data_matrix: H-by-M-by-N (if field is 2-D) or H-by-M-by-N-by-P (if
+        field is 3-D) numpy array of data values.
     """
 
     check_field_name(field_name)
@@ -228,3 +242,212 @@ def get_field(gfs_table_xarray, field_name, pressure_levels_mb=None):
     ], dtype=int)
 
     return gfs_table_xarray[DATA_KEY_3D].values[..., k][..., js]
+
+
+def read_nonprecip_field_different_times(
+        gfs_table_xarray, init_date_string, field_name,
+        valid_time_matrix_unix_sec, pressure_level_mb=None):
+    """Reads any field other than precip, with different valid time at each px.
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param gfs_table_xarray: xarray table with GFS data for one model run, in
+        format returned by `gfs_io.read_file`.
+    :param init_date_string: Initialization date (format "yyyymmdd") for model
+        run.  Will assume that the init time is 0000 UTC on this day.
+    :param field_name: Field name.
+    :param valid_time_matrix_unix_sec: M-by-N numpy array of valid times.  Will
+        interpolate between forecast hours where necessary.
+    :param pressure_level_mb: Pressure level.  If the field is 2-D rather than
+        3-D, leave this argument alone.
+    :return: data_matrix: M-by-N numpy array of data values.
+    """
+
+    # Check input args.
+    init_time_unix_sec = time_conversion.string_to_unix_sec(
+        init_date_string, DATE_FORMAT
+    )
+
+    num_grid_rows = len(gfs_table_xarray.coords[LATITUDE_DIM].values)
+    num_grid_columns = len(gfs_table_xarray.coords[LONGITUDE_DIM].values)
+    expected_dim = numpy.array([num_grid_rows, num_grid_columns], dtype=int)
+
+    error_checking.assert_is_integer_numpy_array(valid_time_matrix_unix_sec)
+    error_checking.assert_is_numpy_array(
+        valid_time_matrix_unix_sec, exact_dimensions=expected_dim
+    )
+    error_checking.assert_is_geq_numpy_array(
+        valid_time_matrix_unix_sec, init_time_unix_sec
+    )
+
+    # Do actual stuff.
+    data_matrix_orig_fcst_hours = get_field(
+        gfs_table_xarray=gfs_table_xarray,
+        field_name=field_name,
+        pressure_levels_mb=(
+            None if pressure_level_mb is None
+            else numpy.array([pressure_level_mb], dtype=int)
+        )
+    )
+
+    if pressure_level_mb is not None:
+        data_matrix_orig_fcst_hours = data_matrix_orig_fcst_hours[..., 0]
+
+    gfs_valid_times_unix_sec = (
+        init_time_unix_sec +
+        gfs_table_xarray.coords[FORECAST_HOUR_DIM].values * HOURS_TO_SECONDS
+    )
+
+    bad_hour_flags = numpy.any(
+        numpy.isnan(data_matrix_orig_fcst_hours), axis=(1, 2)
+    )
+    good_hour_indices = numpy.where(numpy.invert(bad_hour_flags))[0]
+    data_matrix_orig_fcst_hours = data_matrix_orig_fcst_hours[
+        good_hour_indices, ...
+    ]
+    gfs_valid_times_unix_sec = gfs_valid_times_unix_sec[good_hour_indices]
+
+    unique_desired_valid_times_unix_sec = numpy.unique(
+        valid_time_matrix_unix_sec
+    )
+
+    interp_object = interp1d(
+        x=gfs_valid_times_unix_sec,
+        y=data_matrix_orig_fcst_hours,
+        kind='linear', axis=0, assume_sorted=True, bounds_error=False,
+        fill_value=(
+            data_matrix_orig_fcst_hours[0, ...],
+            data_matrix_orig_fcst_hours[-1, ...]
+        )
+    )
+    interp_data_matrix_3d = interp_object(unique_desired_valid_times_unix_sec)
+
+    interp_data_matrix_2d = numpy.full(
+        (num_grid_rows, num_grid_columns), numpy.nan
+    )
+
+    for i in range(len(unique_desired_valid_times_unix_sec)):
+        rowcol_indices = numpy.where(
+            valid_time_matrix_unix_sec == unique_desired_valid_times_unix_sec[i]
+        )
+        interp_data_matrix_2d[rowcol_indices] = (
+            interp_data_matrix_3d[i, ...][rowcol_indices]
+        )
+
+    assert not numpy.any(numpy.isnan(interp_data_matrix_2d))
+    return interp_data_matrix_2d
+
+
+def read_24hour_precip_different_times(
+        gfs_table_xarray, init_date_string, valid_time_matrix_unix_sec):
+    """Reads 24-hour accumulated precip, with different valid time at each px.
+
+    :param gfs_table_xarray: See doc for `read_nonprecip_field_different_times`.
+    :param init_date_string: Same.
+    :param valid_time_matrix_unix_sec: Same.
+    :return: data_matrix: Same.
+    """
+
+    # Check input args.
+    init_time_unix_sec = time_conversion.string_to_unix_sec(
+        init_date_string, DATE_FORMAT
+    )
+
+    num_grid_rows = len(gfs_table_xarray.coords[LATITUDE_DIM].values)
+    num_grid_columns = len(gfs_table_xarray.coords[LONGITUDE_DIM].values)
+    expected_dim = numpy.array([num_grid_rows, num_grid_columns], dtype=int)
+
+    error_checking.assert_is_integer_numpy_array(valid_time_matrix_unix_sec)
+    error_checking.assert_is_numpy_array(
+        valid_time_matrix_unix_sec, exact_dimensions=expected_dim
+    )
+    error_checking.assert_is_geq_numpy_array(
+        valid_time_matrix_unix_sec, init_time_unix_sec + 24 * HOURS_TO_SECONDS
+    )
+
+    # Do actual stuff.
+    orig_full_run_precip_matrix_metres = get_field(
+        gfs_table_xarray=gfs_table_xarray,
+        field_name=PRECIP_NAME,
+        pressure_levels_mb=None
+    )
+    orig_full_run_precip_matrix_metres[0, ...] = 0.
+    assert not numpy.any(numpy.isnan(orig_full_run_precip_matrix_metres))
+
+    orig_forecast_hours = gfs_table_xarray.coords[FORECAST_HOUR_DIM].values
+
+    if not numpy.all(numpy.isin(ALL_FORECAST_HOURS, orig_forecast_hours)):
+        missing_hour_array_string = str(
+            ALL_FORECAST_HOURS[
+                numpy.isin(ALL_FORECAST_HOURS, orig_forecast_hours) == False
+            ]
+        )
+
+        warning_string = (
+            'POTENTIAL ERROR: Expected {0:d} forecast hours in GFS table.  '
+            'Instead, got {1:d} forecast hours, with the following hours '
+            'missing:\n{2:s}'
+        ).format(
+            len(ALL_FORECAST_HOURS),
+            len(orig_forecast_hours),
+            missing_hour_array_string
+        )
+
+        warnings.warn(warning_string)
+
+        interp_object = interp1d(
+            x=orig_forecast_hours,
+            y=orig_full_run_precip_matrix_metres,
+            kind='linear', axis=0, assume_sorted=True, bounds_error=False,
+            fill_value=(
+                orig_full_run_precip_matrix_metres[0, ...],
+                orig_full_run_precip_matrix_metres[-1, ...]
+            )
+        )
+        orig_full_run_precip_matrix_metres = interp_object(ALL_FORECAST_HOURS)
+        orig_forecast_hours = ALL_FORECAST_HOURS + 0
+
+    gfs_valid_times_unix_sec = (
+        init_time_unix_sec + orig_forecast_hours * HOURS_TO_SECONDS
+    )
+    unique_desired_valid_times_unix_sec = numpy.unique(
+        valid_time_matrix_unix_sec
+    )
+
+    interp_object = interp1d(
+        x=gfs_valid_times_unix_sec,
+        y=orig_full_run_precip_matrix_metres,
+        kind='linear', axis=0, assume_sorted=True, bounds_error=False,
+        fill_value=(
+            orig_full_run_precip_matrix_metres[0, ...],
+            orig_full_run_precip_matrix_metres[-1, ...]
+        )
+    )
+    interp_end_precip_matrix_metres_3d = interp_object(
+        unique_desired_valid_times_unix_sec
+    )
+    interp_start_precip_matrix_metres_3d = interp_object(
+        unique_desired_valid_times_unix_sec - 24 * HOURS_TO_SECONDS
+    )
+
+    interp_24hour_precip_matrix_metres = numpy.full(
+        (num_grid_rows, num_grid_columns), numpy.nan
+    )
+
+    for i in range(len(unique_desired_valid_times_unix_sec)):
+        rowcol_indices = numpy.where(
+            valid_time_matrix_unix_sec == unique_desired_valid_times_unix_sec[i]
+        )
+        interp_24hour_precip_matrix_metres[rowcol_indices] = (
+            interp_end_precip_matrix_metres_3d[i, ...][rowcol_indices] -
+            interp_start_precip_matrix_metres_3d[i, ...][rowcol_indices]
+        )
+
+    assert not numpy.any(numpy.isnan(interp_24hour_precip_matrix_metres))
+    assert numpy.all(interp_24hour_precip_matrix_metres >= -1 * TOLERANCE)
+    interp_24hour_precip_matrix_metres = numpy.maximum(
+        interp_24hour_precip_matrix_metres, 0.
+    )
+
+    return interp_24hour_precip_matrix_metres

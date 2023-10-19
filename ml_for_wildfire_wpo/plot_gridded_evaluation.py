@@ -90,16 +90,16 @@ METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING = {
     RMSE_KEY: 'sequential',
     regression_eval.MSE_BIAS_KEY: 'sequential',
     regression_eval.MSE_VARIANCE_KEY: 'sequential',
-    regression_eval.MSE_SKILL_SCORE_KEY: 'skill_score',
+    regression_eval.MSE_SKILL_SCORE_KEY: 'sequential',
     regression_eval.DWMSE_KEY: 'sequential',
-    regression_eval.DWMSE_SKILL_SCORE_KEY: 'skill_score',
+    regression_eval.DWMSE_SKILL_SCORE_KEY: 'sequential',
     regression_eval.KS_STATISTIC_KEY: 'sequential',
     regression_eval.KS_P_VALUE_KEY: 'sequential',
     regression_eval.MAE_KEY: 'sequential',
-    regression_eval.MAE_SKILL_SCORE_KEY: 'skill_score',
+    regression_eval.MAE_SKILL_SCORE_KEY: 'sequential',
     regression_eval.BIAS_KEY: 'diverging',
-    regression_eval.CORRELATION_KEY: 'diverging',
-    regression_eval.KGE_KEY: 'skill_score',
+    regression_eval.CORRELATION_KEY: 'sequential',
+    regression_eval.KGE_KEY: 'sequential',
     regression_eval.RELIABILITY_KEY: 'sequential'
 }
 
