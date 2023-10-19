@@ -36,11 +36,27 @@ from ml_for_wildfire_wpo.utils import gfs_utils
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
-FORECAST_HOURS = numpy.array([
+FORECAST_HOURS_DEFAULT = numpy.array([
     0, 6, 12, 18, 24, 30, 36, 42, 48,
     60, 72, 84, 96, 108, 120,
     144, 168, 192, 216, 240, 264, 288, 312, 336
 ], dtype=int)
+
+FORECAST_HOURS_FOR_FWI_CALC = gfs_utils.ALL_FORECAST_HOURS
+
+FIELD_NAMES_3D_DEFAULT = gfs_utils.ALL_3D_FIELD_NAMES
+FIELD_NAMES_2D_DEFAULT = gfs_utils.ALL_2D_FIELD_NAMES
+
+FIELD_NAMES_3D_FOR_FWI_CALC = []
+FIELD_NAMES_2D_FOR_FWI_CALC = [
+    gfs_utils.TEMPERATURE_2METRE_NAME,
+    gfs_utils.DEWPOINT_2METRE_NAME,
+    gfs_utils.SPECIFIC_HUMIDITY_2METRE_NAME,
+    gfs_utils.U_WIND_10METRE_NAME,
+    gfs_utils.V_WIND_10METRE_NAME,
+    gfs_utils.SURFACE_PRESSURE_NAME,
+    gfs_utils.PRECIP_NAME
+]
 
 INPUT_DIR_ARG_NAME = 'input_grib2_dir_name'
 START_DATE_ARG_NAME = 'start_date_string'
@@ -52,6 +68,7 @@ END_LONGITUDE_ARG_NAME = 'end_longitude_deg_e'
 WGRIB2_EXE_ARG_NAME = 'wgrib2_exe_file_name'
 TEMPORARY_DIR_ARG_NAME = 'temporary_dir_name'
 IS_NCAR_FORMAT_ARG_NAME = 'is_ncar_format'
+FOR_DIRECT_FWI_CALC_ARG_NAME = 'for_direct_fwi_calc'
 OUTPUT_DIR_ARG_NAME = 'output_zarr_dir_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -89,6 +106,11 @@ TEMPORARY_DIR_HELP_STRING = (
 IS_NCAR_FORMAT_HELP_STRING = (
     'Boolean flag.  If 1, will except all raw data in NCAR format, in which '
     'case this script will call raw_ncar_gfs_io.py instead of raw_gfs_io.py.'
+)
+FOR_DIRECT_FWI_CALC_HELP_STRING = (
+    'Boolean flag.  If True, will process only variables needed for direct FWI '
+    'calculation (i.e., to compute GFS forecasts of fire-weather indices).  If '
+    'False, will process all variables.'
 )
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Processed files will be written here (one '
@@ -138,6 +160,10 @@ INPUT_ARG_PARSER.add_argument(
     help=IS_NCAR_FORMAT_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + FOR_DIRECT_FWI_CALC_ARG_NAME, type=int, required=False, default=0,
+    help=FOR_DIRECT_FWI_CALC_ARG_NAME
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
@@ -146,7 +172,7 @@ INPUT_ARG_PARSER.add_argument(
 def _run(input_dir_name, start_date_string, end_date_string,
          start_latitude_deg_n, end_latitude_deg_n, start_longitude_deg_e,
          end_longitude_deg_e, wgrib2_exe_name, temporary_dir_name,
-         is_ncar_format, output_dir_name):
+         is_ncar_format, for_direct_fwi_calc, output_dir_name):
     """Processes GFS data.
 
     This is effectively the main method.
@@ -161,8 +187,14 @@ def _run(input_dir_name, start_date_string, end_date_string,
     :param wgrib2_exe_name: Same.
     :param temporary_dir_name: Same.
     :param is_ncar_format: Same.
+    :param for_direct_fwi_calc: Same.
     :param output_dir_name: Same.
     """
+
+    if is_ncar_format:
+        for_direct_fwi_calc = False
+    if for_direct_fwi_calc:
+        is_ncar_format = False
 
     init_date_strings = time_conversion.get_spc_dates_in_range(
         start_date_string, end_date_string
@@ -176,7 +208,16 @@ def _run(input_dir_name, start_date_string, end_date_string,
         end_longitude_deg_e=end_longitude_deg_e
     )
 
-    num_forecast_hours = len(FORECAST_HOURS)
+    if for_direct_fwi_calc:
+        forecast_hours = FORECAST_HOURS_FOR_FWI_CALC + 0
+        field_names_2d = FIELD_NAMES_2D_FOR_FWI_CALC
+        field_names_3d = FIELD_NAMES_3D_FOR_FWI_CALC
+    else:
+        forecast_hours = FORECAST_HOURS_DEFAULT + 0
+        field_names_2d = FIELD_NAMES_2D_DEFAULT
+        field_names_3d = FIELD_NAMES_3D_DEFAULT
+
+    num_forecast_hours = len(forecast_hours)
 
     for this_date_string in init_date_strings:
         gfs_tables_xarray = [None] * num_forecast_hours
@@ -187,11 +228,11 @@ def _run(input_dir_name, start_date_string, end_date_string,
                 input_file_name = raw_ncar_gfs_io.find_file(
                     directory_name=input_dir_name,
                     init_date_string=this_date_string,
-                    forecast_hour=FORECAST_HOURS[k],
-                    raise_error_if_missing=FORECAST_HOURS[k] > 0
+                    forecast_hour=forecast_hours[k],
+                    raise_error_if_missing=forecast_hours[k] > 0
                 )
 
-                if FORECAST_HOURS[k] == 0:
+                if forecast_hours[k] == 0:
                     found_0hour_file = os.path.isfile(input_file_name)
 
                 if not os.path.isfile(input_file_name):
@@ -208,7 +249,7 @@ def _run(input_dir_name, start_date_string, end_date_string,
                 input_file_name = raw_gfs_io.find_file(
                     directory_name=input_dir_name,
                     init_date_string=this_date_string,
-                    forecast_hour=FORECAST_HOURS[k],
+                    forecast_hour=forecast_hours[k],
                     raise_error_if_missing=True
                 )
                 gfs_tables_xarray[k] = raw_gfs_io.read_file(
@@ -216,7 +257,9 @@ def _run(input_dir_name, start_date_string, end_date_string,
                     desired_row_indices=desired_row_indices,
                     desired_column_indices=desired_column_indices,
                     wgrib2_exe_name=wgrib2_exe_name,
-                    temporary_dir_name=temporary_dir_name
+                    temporary_dir_name=temporary_dir_name,
+                    field_names_2d=field_names_2d,
+                    field_names_3d=field_names_3d
                 )
 
             print(SEPARATOR_STRING)
@@ -236,8 +279,8 @@ def _run(input_dir_name, start_date_string, end_date_string,
 
             warnings.warn(warning_string)
 
-            k = numpy.where(FORECAST_HOURS == 0)[0][0]
-            k_other = numpy.where(FORECAST_HOURS > 0)[0][0]
+            k = numpy.where(forecast_hours == 0)[0][0]
+            k_other = numpy.where(forecast_hours > 0)[0][0]
             gfs_tables_xarray[k] = copy.deepcopy(gfs_tables_xarray[k_other])
 
             gfs_tables_xarray[k] = gfs_tables_xarray[k].assign_coords({
@@ -288,5 +331,8 @@ if __name__ == '__main__':
         wgrib2_exe_name=getattr(INPUT_ARG_OBJECT, WGRIB2_EXE_ARG_NAME),
         temporary_dir_name=getattr(INPUT_ARG_OBJECT, TEMPORARY_DIR_ARG_NAME),
         is_ncar_format=bool(getattr(INPUT_ARG_OBJECT, IS_NCAR_FORMAT_ARG_NAME)),
+        for_direct_fwi_calc=bool(
+            getattr(INPUT_ARG_OBJECT, FOR_DIRECT_FWI_CALC_ARG_NAME)
+        ),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
