@@ -160,7 +160,7 @@ def plot_field(data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
             colour_map_object=colour_map_object,
             colour_norm_object=colour_norm_object,
             orientation_string='vertical',
-            extend_min=False, extend_max=True
+            extend_min=True, extend_max=True
         )
 
     return is_longitude_positive_in_west
