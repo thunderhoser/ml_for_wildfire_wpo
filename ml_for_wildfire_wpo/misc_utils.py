@@ -68,6 +68,9 @@ def desired_latitudes_to_rows(
         start_latitude_deg_n, end_latitude_deg_n, num=num_latitudes
     )
     print(desired_latitudes_deg_n)
+    print('\n')
+    print(grid_latitudes_deg_n)
+    print('\n\n\n')
     desired_row_indices = numpy.array([
         numpy.where(numpy.absolute(grid_latitudes_deg_n - d) <= TOLERANCE)[0][0]
         for d in desired_latitudes_deg_n
