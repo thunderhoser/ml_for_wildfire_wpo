@@ -128,7 +128,7 @@ def check_field_name(field_name):
         'Field name "{0:s}" is not in the list of accepted field names '
         '(below):\n{1:s}'
     ).format(
-        field_name, ALL_FIELD_NAMES
+        field_name, str(ALL_FIELD_NAMES)
     )
 
     raise ValueError(error_string)

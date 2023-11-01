@@ -128,7 +128,11 @@ def field_to_plotting_units(data_matrix_default_units, field_name):
     """
 
     error_checking.assert_is_numpy_array(data_matrix_default_units)
-    gfs_utils.check_field_name(field_name)
+
+    try:
+        gfs_utils.check_field_name(field_name)
+    except ValueError:
+        gfs_daily_utils.check_field_name(field_name)
 
     if field_name in FIELD_TO_CONV_FACTOR:
         data_matrix_plotting_units = (
@@ -150,7 +154,10 @@ def use_diverging_colour_scheme(field_name):
     :return: use_diverging_scheme: Boolean flag.
     """
 
-    gfs_utils.check_field_name(field_name)
+    try:
+        gfs_utils.check_field_name(field_name)
+    except ValueError:
+        gfs_daily_utils.check_field_name(field_name)
 
     return field_name in [
         gfs_utils.U_WIND_NAME, gfs_utils.V_WIND_NAME,
