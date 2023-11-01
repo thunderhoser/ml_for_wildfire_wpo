@@ -6,6 +6,7 @@ from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import moisture_conversions as moisture_conv
 from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from ml_for_wildfire_wpo.io import gfs_io
+from ml_for_wildfire_wpo.io import gfs_daily_io
 from ml_for_wildfire_wpo.io import time_zone_io
 from ml_for_wildfire_wpo.utils import gfs_utils
 from ml_for_wildfire_wpo.utils import misc_utils
