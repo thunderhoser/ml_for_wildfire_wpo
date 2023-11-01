@@ -231,6 +231,10 @@ def _run(input_dir_name, first_init_date_string, last_init_date_string,
     fgfst = first_gfs_table_xarray
     tzt = time_zone_table_xarray
 
+    print(fgfst.coords[gfs_utils.LATITUDE_DIM].values)
+    print(fgfst.coords[gfs_utils.LATITUDE_DIM].values[0])
+    print(fgfst.coords[gfs_utils.LATITUDE_DIM].values[-1])
+
     desired_row_indices = misc_utils.desired_latitudes_to_rows(
         grid_latitudes_deg_n=tzt.coords[time_zone_utils.LATITUDE_KEY].values,
         start_latitude_deg_n=fgfst.coords[gfs_utils.LATITUDE_DIM].values[0],
