@@ -240,17 +240,11 @@ def _run(input_dir_name, first_init_date_string, last_init_date_string,
         {time_zone_utils.LATITUDE_KEY: desired_row_indices}
     )
 
-    print(fgfst.coords[gfs_utils.LONGITUDE_DIM].values)
-    print(fgfst.coords[gfs_utils.LONGITUDE_DIM].values[0])
-    print(fgfst.coords[gfs_utils.LONGITUDE_DIM].values[-1])
-
     desired_column_indices = misc_utils.desired_longitudes_to_columns(
         grid_longitudes_deg_e=tzt.coords[time_zone_utils.LONGITUDE_KEY].values,
         start_longitude_deg_e=fgfst.coords[gfs_utils.LONGITUDE_DIM].values[0],
         end_longitude_deg_e=fgfst.coords[gfs_utils.LONGITUDE_DIM].values[-1]
     )
-    print(desired_column_indices)
-    print(len(desired_column_indices))
     tzt = tzt.isel(
         {time_zone_utils.LONGITUDE_KEY: desired_column_indices}
     )
@@ -271,9 +265,11 @@ def _run(input_dir_name, first_init_date_string, last_init_date_string,
     )
 
     for this_input_file_name in input_gfs_file_names:
+        print(tzt)
+
         _convert_one_gfs_run(
             input_gfs_file_name=this_input_file_name,
-            time_zone_table_xarray=time_zone_table_xarray,
+            time_zone_table_xarray=tzt,
             max_lead_time_days=max_lead_time_days,
             output_dir_name=output_dir_name
         )
