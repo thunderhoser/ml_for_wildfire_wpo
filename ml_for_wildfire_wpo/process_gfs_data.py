@@ -77,6 +77,7 @@ WGRIB2_EXE_ARG_NAME = 'wgrib2_exe_file_name'
 TEMPORARY_DIR_ARG_NAME = 'temporary_dir_name'
 FOR_DIRECT_FWI_CALC_ARG_NAME = 'for_direct_fwi_calc'
 ALLOW_N_MISSING_HOURS_ARG_NAME = 'allow_n_missing_forecast_hours'
+MAX_FORECAST_HOUR_ARG_NAME = 'max_forecast_hour'
 OUTPUT_DIR_ARG_NAME = 'output_zarr_dir_name'
 
 MAIN_INPUT_DIR_HELP_STRING = (
@@ -129,6 +130,10 @@ FOR_DIRECT_FWI_CALC_HELP_STRING = (
 ALLOW_N_MISSING_HOURS_HELP_STRING = (
     '[used only if {0:s} == 1] Will allow this number of missing forecast '
     'hours.'
+).format(FOR_DIRECT_FWI_CALC_ARG_NAME)
+
+MAX_FORECAST_HOUR_HELP_STRING = (
+    '[used only if {0:s} == 1] Max forecast hour to process.'
 ).format(FOR_DIRECT_FWI_CALC_ARG_NAME)
 
 OUTPUT_DIR_HELP_STRING = (
@@ -185,6 +190,10 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + ALLOW_N_MISSING_HOURS_ARG_NAME, type=int, required=False, default=0,
     help=ALLOW_N_MISSING_HOURS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + MAX_FORECAST_HOUR_ARG_NAME, type=int, required=True,
+    help=MAX_FORECAST_HOUR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
@@ -256,7 +265,8 @@ def _run(main_input_dir_name, input_precip_dir_name,
          start_date_string, end_date_string,
          start_latitude_deg_n, end_latitude_deg_n, start_longitude_deg_e,
          end_longitude_deg_e, wgrib2_exe_name, temporary_dir_name,
-         for_direct_fwi_calc, allow_n_missing_forecast_hours, output_dir_name):
+         for_direct_fwi_calc, allow_n_missing_forecast_hours,
+         max_forecast_hour, output_dir_name):
     """Processes GFS data.
 
     This is effectively the main method.
@@ -273,11 +283,14 @@ def _run(main_input_dir_name, input_precip_dir_name,
     :param temporary_dir_name: Same.
     :param for_direct_fwi_calc: Same.
     :param allow_n_missing_forecast_hours: Same.
+    :param max_forecast_hour: Same.
     :param output_dir_name: Same.
     """
 
     if not for_direct_fwi_calc:
         allow_n_missing_forecast_hours = 0
+        max_forecast_hour = 1000
+
     if input_precip_dir_name == '':
         input_precip_dir_name = None
 
@@ -301,6 +314,9 @@ def _run(main_input_dir_name, input_precip_dir_name,
         forecast_hours = FORECAST_HOURS_DEFAULT + 0
         field_names_2d = FIELD_NAMES_2D_DEFAULT
         field_names_3d = FIELD_NAMES_3D_DEFAULT
+
+    error_checking.assert_is_greater(max_forecast_hour, 0)
+    forecast_hours = forecast_hours[forecast_hours <= max_forecast_hour]
 
     num_forecast_hours = len(forecast_hours)
     error_checking.assert_is_geq(allow_n_missing_forecast_hours, 0)
@@ -485,5 +501,6 @@ if __name__ == '__main__':
         allow_n_missing_forecast_hours=getattr(
             INPUT_ARG_OBJECT, ALLOW_N_MISSING_HOURS_ARG_NAME
         ),
+        max_forecast_hour=getattr(INPUT_ARG_OBJECT, MAX_FORECAST_HOUR_ARG_NAME),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
