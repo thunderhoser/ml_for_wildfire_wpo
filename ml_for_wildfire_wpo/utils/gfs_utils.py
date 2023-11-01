@@ -443,3 +443,67 @@ def read_24hour_precip_different_times(
     )
 
     return interp_24hour_precip_matrix_metres
+
+
+def precip_from_incremental_to_full_run(gfs_table_xarray):
+    """Converts precip from incremental values to full-run values.
+
+    "Incremental value" = an accumulation between two forecast hours
+    "Full-run value" = accumulation over the entire model run, up to a forecast
+                       hour
+
+    This method works for both accumulated-precip variables: total and
+    convective precip.
+
+    :param gfs_table_xarray: xarray table with GFS forecasts.
+    :return: gfs_table_xarray: Same as input but with full-run precip.
+    """
+
+    forecast_hours = gfs_table_xarray.coords[FORECAST_HOUR_DIM].values
+    num_forecast_hours = len(forecast_hours)
+    assert numpy.array_equal(forecast_hours, ALL_FORECAST_HOURS)
+
+    data_matrix_2d = gfs_table_xarray[DATA_KEY_2D].values
+
+    for j in range(num_forecast_hours)[::-1]:
+        if forecast_hours[j] == 0:
+            continue
+
+        if forecast_hours[j] > 240:
+            later_flags = forecast_hours > 240
+            earlier_flags = numpy.logical_and(
+                forecast_hours <= 240,
+                numpy.mod(forecast_hours, 6) == 0
+            )
+            addend_flags = numpy.logical_or(earlier_flags, later_flags)
+        else:
+            addend_flags = numpy.mod(forecast_hours, 6) == 0
+
+            if numpy.mod(forecast_hours[j], 6) == 3:
+                addend_flags = numpy.logical_or(
+                    addend_flags, forecast_hours == forecast_hours[j]
+                )
+
+        these_flags = numpy.logical_and(
+            forecast_hours > 0,
+            forecast_hours <= forecast_hours[j]
+        )
+        addend_flags = numpy.logical_and(addend_flags, these_flags)
+        addend_indices = numpy.where(addend_flags)[0]
+
+        for this_field_name in [PRECIP_NAME, CONVECTIVE_PRECIP_NAME]:
+            k = numpy.where(
+                gfs_table_xarray.coords[FIELD_DIM_2D].values == this_field_name
+            )[0][0]
+
+            data_matrix_2d[j, ..., k] = numpy.sum(
+                data_matrix_2d[addend_indices, ..., k], axis=0
+            )
+
+    gfs_table_xarray = gfs_table_xarray.assign({
+        DATA_KEY_2D: (
+            gfs_table_xarray[DATA_KEY_2D].dims, data_matrix_2d
+        )
+    })
+
+    return gfs_table_xarray

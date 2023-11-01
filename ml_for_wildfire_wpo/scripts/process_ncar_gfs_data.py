@@ -1,23 +1,15 @@
-"""Processes GFS data.
+"""Processes GFS data from NCAR.
 
-Each raw file should be a GRIB2 file downloaded from the NOAA High-performance
-Storage System (HPSS) with the following options:
+Each raw file should be a GRIB2 file downloaded from the NCAR Research Data
+Archive (https://rda.ucar.edu/datasets/ds084.1/) with the following
+specifications:
 
-- One model run (init time)
+- One model run (init time) at 0000 UTC
 - One forecast hour (valid time)
 - Global domain
 - 0.25-deg resolution
-- 3-D variables (at 1000, 900, 800, 700, 600, 500, 400, 300, and 200 mb) =
-  Temperature, specific humidity, geopotential height, u-wind, v-wind
-- Variables at 2 m above ground level (AGL) = temperature, specific humidity,
-  dewpoint
-- Variables at 10 m AGL: u-wind, v-wind
-- Variables at 0 m AGL: pressure
-- Other variables: accumulated precip, accumulated convective precip,
-  precipitable water, snow depth, water-equivalent snow depth, downward
-  shortwave radiative flux, upward shortwave radiative flux, downward
-  longwave radiative flux, upward longwave radiative flux, CAPE, soil
-  temperature, volumetric soil-moisture fraction, vegetation type, soil type
+- Four variables: accumulated precip, accumulated convective precip,
+  vegetation type, soil type
 
 The output will contain the same data, in zarr format, with one file per model
 run (init time).
@@ -29,34 +21,21 @@ import warnings
 import argparse
 import numpy
 from gewittergefahr.gg_utils import time_conversion
-from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.io import gfs_io
 from ml_for_wildfire_wpo.io import raw_gfs_io
+from ml_for_wildfire_wpo.io import raw_ncar_gfs_io
 from ml_for_wildfire_wpo.utils import gfs_utils
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
-FORECAST_HOURS_DEFAULT = numpy.array([
+FORECAST_HOURS = numpy.array([
     0, 6, 12, 18, 24, 30, 36, 42, 48,
     60, 72, 84, 96, 108, 120,
     144, 168, 192, 216, 240, 264, 288, 312, 336
 ], dtype=int)
 
-FORECAST_HOURS_FOR_FWI_CALC = gfs_utils.ALL_FORECAST_HOURS
-
-FIELD_NAMES_3D_DEFAULT = gfs_utils.ALL_3D_FIELD_NAMES
-FIELD_NAMES_2D_DEFAULT = gfs_utils.ALL_2D_FIELD_NAMES
-
-FIELD_NAMES_3D_FOR_FWI_CALC = []
-FIELD_NAMES_2D_FOR_FWI_CALC = [
-    gfs_utils.TEMPERATURE_2METRE_NAME,
-    gfs_utils.DEWPOINT_2METRE_NAME,
-    gfs_utils.SPECIFIC_HUMIDITY_2METRE_NAME,
-    gfs_utils.U_WIND_10METRE_NAME,
-    gfs_utils.V_WIND_10METRE_NAME,
-    gfs_utils.SURFACE_PRESSURE_NAME,
-    gfs_utils.PRECIP_NAME
-]
+FIELD_NAMES_3D = gfs_utils.ALL_3D_FIELD_NAMES
+FIELD_NAMES_2D = gfs_utils.ALL_2D_FIELD_NAMES
 
 MAIN_INPUT_DIR_ARG_NAME = 'main_input_grib2_dir_name'
 INPUT_PRECIP_DIR_ARG_NAME = 'input_grib2_precip_dir_name'
@@ -68,24 +47,22 @@ START_LONGITUDE_ARG_NAME = 'start_longitude_deg_e'
 END_LONGITUDE_ARG_NAME = 'end_longitude_deg_e'
 WGRIB2_EXE_ARG_NAME = 'wgrib2_exe_file_name'
 TEMPORARY_DIR_ARG_NAME = 'temporary_dir_name'
-FOR_DIRECT_FWI_CALC_ARG_NAME = 'for_direct_fwi_calc'
-ALLOW_N_MISSING_HOURS_ARG_NAME = 'allow_n_missing_forecast_hours'
 OUTPUT_DIR_ARG_NAME = 'output_zarr_dir_name'
 
 MAIN_INPUT_DIR_HELP_STRING = (
     'Name of main input directory, containing one GRIB2 file per model run '
     '(init time) and forecast hour (lead time).  Files therein will be found '
-    'by `raw_gfs_io.find_file`.'
+    'by `raw_ncar_gfs_io.find_file`.'
 )
 INPUT_PRECIP_DIR_HELP_STRING = (
     'Name of input directory for precip only.  As for the main input '
     'directory, should contain one GRIB2 file per model run and forecast hour, '
-    'to be found by `raw_gfs_io.find_file`.  Unlike the main input directory, '
-    'this directory must contain data for every single available GFS forecast '
-    'hour, not just select ones.  If you do *not* want to try reading '
-    'incremental (per-time-step) precip from a separate directory in case '
-    'precip data are missing from the main directory, then just leave this '
-    'argument alone.'
+    'to be found by `raw_ncar_gfs_io.find_file`.  Unlike the main input '
+    'directory, this directory must contain data for every single available '
+    'GFS forecast hour, not just select ones.  If you do *not* want to try '
+    'reading incremental (per-time-step) precip from a separate directory in '
+    'case precip data are missing from the main directory, then just leave '
+    'this argument alone.'
 )
 START_DATE_HELP_STRING = (
     'Start date (format "yyyymmdd").  This script will process model runs '
@@ -114,16 +91,6 @@ WGRIB2_EXE_HELP_STRING = 'Path to wgrib2 executable.'
 TEMPORARY_DIR_HELP_STRING = (
     'Path to temporary directory for text files created by wgrib2.'
 )
-FOR_DIRECT_FWI_CALC_HELP_STRING = (
-    'Boolean flag.  If True, will process only variables needed for direct FWI '
-    'calculation (i.e., to compute GFS forecasts of fire-weather indices).  If '
-    'False, will process all variables.'
-)
-ALLOW_N_MISSING_HOURS_HELP_STRING = (
-    '[used only if {0:s} == 1] Will allow this number of missing forecast '
-    'hours.'
-).format(FOR_DIRECT_FWI_CALC_ARG_NAME)
-
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Processed files will be written here (one '
     'zarr file per model run) by `gfs_io.write_file`, to exact locations '
@@ -172,14 +139,6 @@ INPUT_ARG_PARSER.add_argument(
     help=TEMPORARY_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + FOR_DIRECT_FWI_CALC_ARG_NAME, type=int, required=False, default=0,
-    help=FOR_DIRECT_FWI_CALC_ARG_NAME
-)
-INPUT_ARG_PARSER.add_argument(
-    '--' + ALLOW_N_MISSING_HOURS_ARG_NAME, type=int, required=False, default=0,
-    help=ALLOW_N_MISSING_HOURS_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
@@ -210,7 +169,7 @@ def _read_incremental_precip_1init(
     forecast_hours = gfs_utils.ALL_FORECAST_HOURS
 
     input_file_names = [
-        raw_gfs_io.find_file(
+        raw_ncar_gfs_io.find_file(
             directory_name=input_dir_name,
             init_date_string=init_date_string,
             forecast_hour=h,
@@ -226,15 +185,12 @@ def _read_incremental_precip_1init(
     gfs_tables_xarray = [None] * num_forecast_hours
 
     for k in range(num_forecast_hours):
-        gfs_tables_xarray[k] = raw_gfs_io.read_file(
+        gfs_tables_xarray[k] = raw_ncar_gfs_io.read_file(
             grib2_file_name=input_file_names[k],
             desired_row_indices=desired_row_indices,
             desired_column_indices=desired_column_indices,
             wgrib2_exe_name=wgrib2_exe_name,
             temporary_dir_name=temporary_dir_name,
-            field_names_2d=
-            [gfs_utils.PRECIP_NAME, gfs_utils.CONVECTIVE_PRECIP_NAME],
-            field_names_3d=[],
             read_incremental_precip=True
         )
 
@@ -249,7 +205,7 @@ def _run(main_input_dir_name, input_precip_dir_name,
          start_date_string, end_date_string,
          start_latitude_deg_n, end_latitude_deg_n, start_longitude_deg_e,
          end_longitude_deg_e, wgrib2_exe_name, temporary_dir_name,
-         for_direct_fwi_calc, allow_n_missing_forecast_hours, output_dir_name):
+         output_dir_name):
     """Processes GFS data.
 
     This is effectively the main method.
@@ -264,13 +220,9 @@ def _run(main_input_dir_name, input_precip_dir_name,
     :param end_longitude_deg_e: Same.
     :param wgrib2_exe_name: Same.
     :param temporary_dir_name: Same.
-    :param for_direct_fwi_calc: Same.
-    :param allow_n_missing_forecast_hours: Same.
     :param output_dir_name: Same.
     """
 
-    if not for_direct_fwi_calc:
-        allow_n_missing_forecast_hours = 0
     if input_precip_dir_name == '':
         input_precip_dir_name = None
 
@@ -286,42 +238,9 @@ def _run(main_input_dir_name, input_precip_dir_name,
         end_longitude_deg_e=end_longitude_deg_e
     )
 
-    if for_direct_fwi_calc:
-        forecast_hours = FORECAST_HOURS_FOR_FWI_CALC + 0
-        field_names_2d = FIELD_NAMES_2D_FOR_FWI_CALC
-        field_names_3d = FIELD_NAMES_3D_FOR_FWI_CALC
-    else:
-        forecast_hours = FORECAST_HOURS_DEFAULT + 0
-        field_names_2d = FIELD_NAMES_2D_DEFAULT
-        field_names_3d = FIELD_NAMES_3D_DEFAULT
-
-    num_forecast_hours = len(forecast_hours)
-    error_checking.assert_is_geq(allow_n_missing_forecast_hours, 0)
-    error_checking.assert_is_less_than(
-        allow_n_missing_forecast_hours, num_forecast_hours
-    )
+    num_forecast_hours = len(FORECAST_HOURS)
 
     for this_date_string in init_date_strings:
-        input_file_names = [
-            raw_gfs_io.find_file(
-                directory_name=main_input_dir_name,
-                init_date_string=this_date_string,
-                forecast_hour=h,
-                raise_error_if_missing=False
-            )
-            for h in forecast_hours
-        ]
-
-        missing_hour_flags = numpy.array(
-            [not os.path.isfile(f) for f in input_file_names], dtype=bool
-        )
-
-        num_missing_forecast_hours = numpy.sum(missing_hour_flags)
-        assert num_missing_forecast_hours <= allow_n_missing_forecast_hours
-
-        missing_hour_indices = numpy.where(missing_hour_flags)[0]
-        found_hour_index = numpy.where(numpy.invert(missing_hour_flags))[0][0]
-
         if input_precip_dir_name is None:
             precip_table_xarray = None
         else:
@@ -335,56 +254,65 @@ def _run(main_input_dir_name, input_precip_dir_name,
             )
 
         gfs_tables_xarray = [None] * num_forecast_hours
+        found_0hour_file = True
 
         for k in range(num_forecast_hours):
-            if os.path.isfile(input_file_names[k]):
-                gfs_tables_xarray[k] = raw_gfs_io.read_file(
-                    grib2_file_name=input_file_names[k],
-                    desired_row_indices=desired_row_indices,
-                    desired_column_indices=desired_column_indices,
-                    wgrib2_exe_name=wgrib2_exe_name,
-                    temporary_dir_name=temporary_dir_name,
-                    field_names_2d=field_names_2d,
-                    field_names_3d=field_names_3d,
-                    read_incremental_precip=False
-                )
-            else:
-                warning_string = (
-                    'POTENTIAL ERROR: Cannot find file for forecast hour '
-                    '{0:d}.  Expected at: "{1:s}"'
-                ).format(
-                    forecast_hours[k], input_file_names[k]
-                )
+            input_file_name = raw_ncar_gfs_io.find_file(
+                directory_name=main_input_dir_name,
+                init_date_string=this_date_string,
+                forecast_hour=FORECAST_HOURS[k],
+                raise_error_if_missing=FORECAST_HOURS[k] > 0
+            )
 
-                warnings.warn(warning_string)
+            if FORECAST_HOURS[k] == 0:
+                found_0hour_file = os.path.isfile(input_file_name)
+
+            if not os.path.isfile(input_file_name):
+                continue
+
+            gfs_tables_xarray[k] = raw_ncar_gfs_io.read_file(
+                grib2_file_name=input_file_name,
+                desired_row_indices=desired_row_indices,
+                desired_column_indices=desired_column_indices,
+                wgrib2_exe_name=wgrib2_exe_name,
+                temporary_dir_name=temporary_dir_name,
+                read_incremental_precip=False
+            )
 
             print(SEPARATOR_STRING)
 
-        for k in missing_hour_indices:
-            k_other = found_hour_index
+        if not found_0hour_file:
+            missing_file_name = raw_ncar_gfs_io.find_file(
+                directory_name=main_input_dir_name,
+                init_date_string=this_date_string,
+                forecast_hour=0, raise_error_if_missing=False
+            )
+
+            warning_string = (
+                'POTENTIAL ERROR (but probably not): Could not find file at '
+                'forecast hour 0.  Expected at: "{0:s}".  All values at '
+                'forecast hour 0 will be NaN.'
+            ).format(missing_file_name)
+
+            warnings.warn(warning_string)
+
+            k = numpy.where(FORECAST_HOURS == 0)[0][0]
+            k_other = numpy.where(FORECAST_HOURS > 0)[0][0]
             gfs_tables_xarray[k] = copy.deepcopy(gfs_tables_xarray[k_other])
 
             gfs_tables_xarray[k] = gfs_tables_xarray[k].assign_coords({
-                gfs_utils.FORECAST_HOUR_DIM: forecast_hours[[k]]
+                gfs_utils.FORECAST_HOUR_DIM: numpy.array([0], dtype=int)
             })
 
-            nan_matrix_2d = numpy.full(
+            nan_matrix = numpy.full(
                 gfs_tables_xarray[k][gfs_utils.DATA_KEY_2D].values.shape,
-                numpy.nan
-            )
-            nan_matrix_3d = numpy.full(
-                gfs_tables_xarray[k][gfs_utils.DATA_KEY_3D].values.shape,
                 numpy.nan
             )
 
             gfs_tables_xarray[k] = gfs_tables_xarray[k].assign({
                 gfs_utils.DATA_KEY_2D: (
                     gfs_tables_xarray[k][gfs_utils.DATA_KEY_2D].dims,
-                    nan_matrix_2d
-                ),
-                gfs_utils.DATA_KEY_3D: (
-                    gfs_tables_xarray[k][gfs_utils.DATA_KEY_3D].dims,
-                    nan_matrix_3d
+                    nan_matrix
                 )
             })
 
@@ -398,7 +326,7 @@ def _run(main_input_dir_name, input_precip_dir_name,
             )
             precip_table_xarray = gfs_utils.subset_by_forecast_hour(
                 gfs_table_xarray=precip_table_xarray,
-                desired_forecast_hours=forecast_hours
+                desired_forecast_hours=FORECAST_HOURS
             )
 
             main_data_matrix_2d = gfs_table_xarray[gfs_utils.DATA_KEY_2D].values
@@ -472,11 +400,5 @@ if __name__ == '__main__':
         end_longitude_deg_e=getattr(INPUT_ARG_OBJECT, END_LONGITUDE_ARG_NAME),
         wgrib2_exe_name=getattr(INPUT_ARG_OBJECT, WGRIB2_EXE_ARG_NAME),
         temporary_dir_name=getattr(INPUT_ARG_OBJECT, TEMPORARY_DIR_ARG_NAME),
-        for_direct_fwi_calc=bool(
-            getattr(INPUT_ARG_OBJECT, FOR_DIRECT_FWI_CALC_ARG_NAME)
-        ),
-        allow_n_missing_forecast_hours=getattr(
-            INPUT_ARG_OBJECT, ALLOW_N_MISSING_HOURS_ARG_NAME
-        ),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
