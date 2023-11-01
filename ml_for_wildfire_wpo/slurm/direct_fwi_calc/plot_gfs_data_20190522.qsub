@@ -1,6 +1,6 @@
 #!/bin/tcsh
 
-#SBATCH --job-name="plot_gfs_data_20190522_60hours"
+#SBATCH --job-name="plot_gfs_data_20190522"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="batch"
@@ -18,7 +18,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_gfs_data_20190522_60hours_%A_%a.out
+#SBATCH --output=plot_gfs_data_20190522_%A_%a.out
 
 module load cuda/10.1
 module load gnu/9.2.0
@@ -41,7 +41,7 @@ while ($i <= `expr $SLURM_ARRAY_TASK_ID + 11` && $i <= $#INIT_DATE_STRINGS)
     --field_names "temperature_2m_agl_kelvins" "dewpoint_2m_agl_kelvins" "specific_humidity_2m_agl_kg_kg01" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "surface_pressure_pascals" "accumulated_precip_metres" \
     --pressure_levels_mb 500 \
     --init_date_strings ${init_date_string} \
-    --forecast_hours 0 6 12 15 24 36 60 \
+    --forecast_hours 0 6 12 15 24 36 60 120 180 240 288 384 \
     --min_colour_percentile=0 \
     --max_colour_percentile=100 \
     --output_dir_name="${INPUT_DIR_NAME}/plots/${init_date_string}"

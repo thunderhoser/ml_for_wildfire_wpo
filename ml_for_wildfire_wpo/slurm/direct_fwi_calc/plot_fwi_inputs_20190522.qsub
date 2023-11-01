@@ -1,6 +1,6 @@
 #!/bin/tcsh
 
-#SBATCH --job-name="convert_gfs_to_fwi_inputs_20190522_60hours"
+#SBATCH --job-name="plot_fwi_inputs_20190522"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="batch"
@@ -18,7 +18,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=convert_gfs_to_fwi_inputs_20190522_60hours_%A_%a.out
+#SBATCH --output=plot_fwi_inputs_20190522_%A_%a.out
 
 module load cuda/10.1
 module load gnu/9.2.0
@@ -28,8 +28,7 @@ source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
 conda activate base
 
 set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
-set INPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/direct_fwi_calc/processed"
-set OUTPUT_DIR_NAME="${INPUT_DIR_NAME}/daily"
+set INPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/direct_fwi_calc/processed/daily"
 
 set INIT_DATE_STRINGS=("20190522")
 set i=$SLURM_ARRAY_TASK_ID
@@ -37,12 +36,14 @@ set i=$SLURM_ARRAY_TASK_ID
 while ($i <= `expr $SLURM_ARRAY_TASK_ID + 11` && $i <= $#INIT_DATE_STRINGS)
     set init_date_string="${INIT_DATE_STRINGS[$i]}"
     
-    python3 -u "${CODE_DIR_NAME}/convert_gfs_to_daily_fwi_inputs.py" \
-    --input_gfs_dir_name="${INPUT_DIR_NAME}" \
-    --first_init_date_string="${init_date_string}" \
-    --last_init_date_string="${init_date_string}" \
-    --max_lead_time_days=2 \
-    --output_daily_gfs_dir_name="${OUTPUT_DIR_NAME}"
+    python3 -u "${CODE_DIR_NAME}/plot_daily_gfs_data.py" \
+    --input_dir_name="${INPUT_DIR_NAME}" \
+    --field_names "temperature_2m_agl_kelvins" "dewpoint_2m_agl_kelvins" "relative_humidity_2m_agl" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "surface_pressure_pascals" "accumulated_precip_metres" \
+    --init_date_string="${init_date_string}" \
+    --lead_times_days 1 3 5 7 10 14 \
+    --min_colour_percentile=0 \
+    --max_colour_percentile=100 \
+    --output_dir_name="${INPUT_DIR_NAME}/plots/${init_date_string}"
     
     @ i = $i + 1
 end
