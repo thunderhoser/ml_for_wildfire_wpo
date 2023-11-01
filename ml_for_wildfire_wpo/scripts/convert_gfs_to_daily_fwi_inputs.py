@@ -5,34 +5,24 @@ import numpy
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import moisture_conversions as moisture_conv
 from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
+from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.io import gfs_io
 from ml_for_wildfire_wpo.io import gfs_daily_io
 from ml_for_wildfire_wpo.io import time_zone_io
 from ml_for_wildfire_wpo.utils import gfs_utils
+from ml_for_wildfire_wpo.utils import gfs_daily_utils
 from ml_for_wildfire_wpo.utils import misc_utils
 from ml_for_wildfire_wpo.utils import time_zone_utils
 
 TOLERANCE = 1e-6
 DAYS_TO_SECONDS = 86400
 
-# TODO(thunderhoser): Putting this constant in a script is a HACK.
-RELATIVE_HUMIDITY_2METRE_NAME = 'relative_humidity_2m_agl'
-
-FIELD_NAMES = [
-    gfs_utils.TEMPERATURE_2METRE_NAME,
-    gfs_utils.DEWPOINT_2METRE_NAME,
-    RELATIVE_HUMIDITY_2METRE_NAME,
-    gfs_utils.U_WIND_10METRE_NAME,
-    gfs_utils.V_WIND_10METRE_NAME,
-    gfs_utils.SURFACE_PRESSURE_NAME,
-    gfs_utils.PRECIP_NAME
-]
-
-FORECAST_LEAD_TIMES_DAYS = numpy.linspace(1, 14, dtype=int)
+FIELD_NAMES = gfs_daily_utils.ALL_FIELD_NAMES
 
 INPUT_DIR_ARG_NAME = 'input_gfs_dir_name'
 FIRST_INIT_DATE_ARG_NAME = 'first_init_date_string'
 LAST_INIT_DATE_ARG_NAME = 'last_init_date_string'
+MAX_LEAD_TIME_ARG_NAME = 'max_lead_time_days'
 OUTPUT_DIR_ARG_NAME = 'output_daily_gfs_dir_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -47,9 +37,15 @@ FIRST_INIT_DATE_HELP_STRING = (
 ).format(
     FIRST_INIT_DATE_ARG_NAME, LAST_INIT_DATE_ARG_NAME
 )
+
 LAST_INIT_DATE_HELP_STRING = 'Same as {0:s} but end date.'.format(
     FIRST_INIT_DATE_ARG_NAME
 )
+MAX_LEAD_TIME_HELP_STRING = (
+    'Max lead time.  Will convert data for lead times of 1, 2, ..., K days, '
+    'where K = {0:s}.'
+).format(MAX_LEAD_TIME_ARG_NAME)
+
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Files with daily FWI inputs (weather variables '
     'at local noon) will be written here by `gfs_daily_io.write_file`, to '
@@ -70,21 +66,30 @@ INPUT_ARG_PARSER.add_argument(
     help=LAST_INIT_DATE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + MAX_LEAD_TIME_ARG_NAME, type=int, required=True,
+    help=MAX_LEAD_TIME_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
 
 
 def _convert_one_gfs_run(input_gfs_file_name, time_zone_table_xarray,
-                         output_dir_name):
+                         max_lead_time_days, output_dir_name):
     """Does the dirty work for one GFS run.
 
     :param input_gfs_file_name: Path to input file, with GFS data at the
         typical forecast hours.
     :param time_zone_table_xarray: xarray table in format returned by
         `time_zone_io.read_file`.
-    :param output_dir_name: See documentation at top of file.
+    :param max_lead_time_days: See documentation at top of file.
+    :param output_dir_name: Same.
     """
+
+    forecast_lead_times_days = numpy.linspace(
+        1, max_lead_time_days, num=max_lead_time_days, dtype=int
+    )
 
     print('Reading data from: "{0:s}"...'.format(input_gfs_file_name))
     gfs_table_xarray = gfs_io.read_file(input_gfs_file_name)
@@ -95,7 +100,7 @@ def _convert_one_gfs_run(input_gfs_file_name, time_zone_table_xarray,
     )
 
     valid_dates_unix_sec = (
-        init_date_unix_sec + FORECAST_LEAD_TIMES_DAYS * DAYS_TO_SECONDS
+        init_date_unix_sec + forecast_lead_times_days * DAYS_TO_SECONDS
     )
     valid_date_strings = [
         time_conversion.unix_sec_to_string(d, gfs_io.DATE_FORMAT)
@@ -106,7 +111,7 @@ def _convert_one_gfs_run(input_gfs_file_name, time_zone_table_xarray,
     num_grid_rows = len(tzt.coords[time_zone_utils.LATITUDE_KEY].values)
     num_grid_columns = len(tzt.coords[time_zone_utils.LONGITUDE_KEY].values)
     num_fields = len(FIELD_NAMES)
-    num_lead_times = len(FORECAST_LEAD_TIMES_DAYS)
+    num_lead_times = len(forecast_lead_times_days)
 
     data_matrix = numpy.full(
         (num_lead_times, num_grid_rows, num_grid_columns, num_fields),
@@ -122,7 +127,7 @@ def _convert_one_gfs_run(input_gfs_file_name, time_zone_table_xarray,
         )
 
         for k in range(num_fields):
-            if FIELD_NAMES[k] == RELATIVE_HUMIDITY_2METRE_NAME:
+            if FIELD_NAMES[k] == gfs_daily_utils.RELATIVE_HUMIDITY_2METRE_NAME:
                 continue
 
             if FIELD_NAMES[k] == gfs_utils.PRECIP_NAME:
@@ -143,7 +148,9 @@ def _convert_one_gfs_run(input_gfs_file_name, time_zone_table_xarray,
                     )
                 )
 
-        rh_index = FIELD_NAMES.index(RELATIVE_HUMIDITY_2METRE_NAME)
+        rh_index = FIELD_NAMES.index(
+            gfs_daily_utils.RELATIVE_HUMIDITY_2METRE_NAME
+        )
 
         data_matrix[
             i, ..., rh_index
@@ -183,12 +190,12 @@ def _convert_one_gfs_run(input_gfs_file_name, time_zone_table_xarray,
         longitudes_deg_e=
         time_zone_table_xarray[time_zone_utils.LONGITUDE_KEY].values,
         field_names=FIELD_NAMES,
-        lead_times_days=FORECAST_LEAD_TIMES_DAYS
+        lead_times_days=forecast_lead_times_days
     )
 
 
 def _run(input_dir_name, first_init_date_string, last_init_date_string,
-         output_dir_name):
+         max_lead_time_days, output_dir_name):
     """Converts GFS data to daily FWI (fire-weather index) inputs.
 
     This is effectively the main method.
@@ -196,8 +203,11 @@ def _run(input_dir_name, first_init_date_string, last_init_date_string,
     :param input_dir_name: See documentation at top of file.
     :param first_init_date_string: Same.
     :param last_init_date_string: Same.
+    :param max_lead_time_days: Same.
     :param output_dir_name: Same.
     """
+
+    error_checking.assert_is_geq(max_lead_time_days, 1)
 
     input_gfs_file_names = gfs_io.find_files_for_period(
         directory_name=input_dir_name,
@@ -250,6 +260,7 @@ def _run(input_dir_name, first_init_date_string, last_init_date_string,
         _convert_one_gfs_run(
             input_gfs_file_name=this_input_file_name,
             time_zone_table_xarray=time_zone_table_xarray,
+            max_lead_time_days=max_lead_time_days,
             output_dir_name=output_dir_name
         )
 
@@ -265,5 +276,6 @@ if __name__ == '__main__':
         last_init_date_string=getattr(
             INPUT_ARG_OBJECT, LAST_INIT_DATE_ARG_NAME
         ),
+        max_lead_time_days=getattr(INPUT_ARG_OBJECT, MAX_LEAD_TIME_ARG_NAME),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )

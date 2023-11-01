@@ -345,9 +345,6 @@ def _run(main_input_dir_name, input_precip_dir_name,
 
             raise ValueError(error_string)
 
-        # TODO(thunderhoser): Remove the "continue".
-        continue
-
         missing_hour_indices = numpy.where(missing_hour_flags)[0]
         found_hour_index = numpy.where(numpy.invert(missing_hour_flags))[0][0]
 
@@ -441,7 +438,15 @@ def _run(main_input_dir_name, input_precip_dir_name,
                 k_main = numpy.where(
                     gfs_table_xarray.coords[gfs_utils.FIELD_DIM_2D].values ==
                     this_field_name
-                )[0][0]
+                )[0]
+
+                if (
+                        this_field_name == gfs_utils.CONVECTIVE_PRECIP_NAME and
+                        len(k_main) == 0
+                ):
+                    continue
+
+                k_main = k_main[0]
                 k_aux = numpy.where(
                     precip_table_xarray.coords[gfs_utils.FIELD_DIM_2D].values ==
                     this_field_name
