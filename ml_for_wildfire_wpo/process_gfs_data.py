@@ -352,9 +352,6 @@ def _run(main_input_dir_name, input_precip_dir_name,
 
             raise ValueError(error_string)
 
-        # TODO(thunderhoser): Remove the "continue".
-        continue
-
         missing_hour_indices = numpy.where(missing_hour_flags)[0]
         found_hour_index = numpy.where(numpy.invert(missing_hour_flags))[0][0]
 
