@@ -71,7 +71,7 @@ INPUT_ARG_PARSER.add_argument(
     help=FIELDS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + INIT_DATE_ARG_NAME, type=str, nargs='+', required=True,
+    '--' + INIT_DATE_ARG_NAME, type=str, required=True,
     help=INIT_DATE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
