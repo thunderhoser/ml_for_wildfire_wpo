@@ -338,9 +338,22 @@ def _run(main_input_dir_name, input_precip_dir_name,
         missing_hour_flags = numpy.array(
             [not os.path.isfile(f) for f in input_file_names], dtype=bool
         )
-
         num_missing_forecast_hours = numpy.sum(missing_hour_flags)
-        assert num_missing_forecast_hours <= allow_n_missing_forecast_hours
+
+        if num_missing_forecast_hours > allow_n_missing_forecast_hours:
+            error_string = (
+                'Cannot find {0:d} forecast hours for init date {1:s}.  Files '
+                'expected at:\n{2:s}'
+            ).format(
+                num_missing_forecast_hours,
+                this_date_string,
+                str(numpy.array(input_file_names)[missing_hour_flags])
+            )
+
+            raise ValueError(error_string)
+
+        # TODO(thunderhoser): Remove the "continue".
+        continue
 
         missing_hour_indices = numpy.where(missing_hour_flags)[0]
         found_hour_index = numpy.where(numpy.invert(missing_hour_flags))[0][0]

@@ -40,6 +40,7 @@ while ($i <= `expr $SLURM_ARRAY_TASK_ID + 11` && $i <= $#INIT_DATE_STRINGS)
     
     python3 -u "${CODE_DIR_NAME}/process_gfs_data.py" \
     --main_input_grib2_dir_name="${INPUT_DIR_NAME}" \
+    --input_grib2_precip_dir_name="${INPUT_DIR_NAME}" \
     --start_date_string="${init_date_string}" \
     --end_date_string="${init_date_string}" \
     --start_latitude_deg_n=10 \
