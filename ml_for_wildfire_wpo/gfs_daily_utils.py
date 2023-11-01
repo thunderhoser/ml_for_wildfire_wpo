@@ -8,6 +8,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import error_checking
 import gfs_utils
 
 RELATIVE_HUMIDITY_2METRE_NAME = 'relative_humidity_2m_agl'
@@ -23,3 +24,24 @@ ALL_FIELD_NAMES = [
     DEWPOINT_2METRE_NAME, U_WIND_10METRE_NAME, V_WIND_10METRE_NAME,
     SURFACE_PRESSURE_NAME, PRECIP_NAME
 ]
+
+
+def check_field_name(field_name):
+    """Ensures that field name is valid.
+
+    :param field_name: String (must be in list `ALL_FIELD_NAMES`).
+    :raises: ValueError: if `field_name not in ALL_FIELD_NAMES`.
+    """
+
+    error_checking.assert_is_string(field_name)
+    if field_name in ALL_FIELD_NAMES:
+        return
+
+    error_string = (
+        'Field name "{0:s}" is not in the list of accepted field names '
+        '(below):\n{1:s}'
+    ).format(
+        field_name, ALL_FIELD_NAMES
+    )
+
+    raise ValueError(error_string)

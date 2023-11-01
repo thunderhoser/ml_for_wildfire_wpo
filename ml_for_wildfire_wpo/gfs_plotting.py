@@ -11,6 +11,7 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import temperature_conversions as temperature_conv
 import error_checking
 import gfs_utils
+import gfs_daily_utils
 import fwi_plotting
 
 FIELD_TO_CONV_FACTOR = {
@@ -41,7 +42,8 @@ FIELD_TO_CONV_FACTOR = {
     gfs_utils.UPWARD_TOA_SHORTWAVE_FLUX_NAME: 1.,
     gfs_utils.UPWARD_TOA_LONGWAVE_FLUX_NAME: 1.,
     gfs_utils.VEGETATION_FRACTION_NAME: 1.,
-    gfs_utils.SOIL_TYPE_NAME: 1.
+    gfs_utils.SOIL_TYPE_NAME: 1.,
+    gfs_daily_utils.RELATIVE_HUMIDITY_2METRE_NAME: 100.
 }
 
 FIELD_TO_PLOTTING_UNIT_STRING = {
@@ -79,7 +81,8 @@ FIELD_TO_PLOTTING_UNIT_STRING = {
     gfs_utils.UPWARD_TOA_SHORTWAVE_FLUX_NAME: r'W m$^{-2}$',
     gfs_utils.UPWARD_TOA_LONGWAVE_FLUX_NAME: r'W m$^{-2}$',
     gfs_utils.VEGETATION_FRACTION_NAME: 'unitless',
-    gfs_utils.SOIL_TYPE_NAME: 'unitless'
+    gfs_utils.SOIL_TYPE_NAME: 'unitless',
+    gfs_daily_utils.RELATIVE_HUMIDITY_2METRE_NAME: '%'
 }
 
 FIELD_NAME_TO_FANCY = {
@@ -117,7 +120,8 @@ FIELD_NAME_TO_FANCY = {
     gfs_utils.UPWARD_TOA_SHORTWAVE_FLUX_NAME: 'upward TOA SW flux',
     gfs_utils.UPWARD_TOA_LONGWAVE_FLUX_NAME: 'upward TOA LW flux',
     gfs_utils.VEGETATION_FRACTION_NAME: 'vegetation fraction',
-    gfs_utils.SOIL_TYPE_NAME: 'soil type'
+    gfs_utils.SOIL_TYPE_NAME: 'soil type',
+    gfs_daily_utils.RELATIVE_HUMIDITY_2METRE_NAME: '2-metre relative humidity'
 }
 
 

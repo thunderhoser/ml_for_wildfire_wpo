@@ -264,12 +264,12 @@ def _run(input_dir_name, first_init_date_string, last_init_date_string,
         atol=TOLERANCE
     )
 
-    for this_input_file_name in input_gfs_file_names:
-        print(tzt)
+    time_zone_table_xarray = tzt
 
+    for this_input_file_name in input_gfs_file_names:
         _convert_one_gfs_run(
             input_gfs_file_name=this_input_file_name,
-            time_zone_table_xarray=tzt,
+            time_zone_table_xarray=time_zone_table_xarray,
             max_lead_time_days=max_lead_time_days,
             output_dir_name=output_dir_name
         )
