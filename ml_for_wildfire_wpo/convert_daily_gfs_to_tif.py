@@ -264,7 +264,9 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name, init_date_string,
     }
 
     gfs_table_xarray_day0 = xarray.DataArray(
-        data=data_matrix_day0, coords=coord_dict
+        data=data_matrix_day0,
+        coords=coord_dict,
+        dims=['band', 'latitude_deg_n', 'longitude_deg_e']
     )
     gfs_table_xarray_day0.rio.set_spatial_dims(
         x_dim='longitude_deg_e', y_dim='latitude_deg_n'
@@ -301,7 +303,8 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name, init_date_string,
 
         gfs_table_xarray_day_k = xarray.DataArray(
             data=data_matrix_channels_first[:, k, ...],
-            coords=coord_dict
+            coords=coord_dict,
+            dims=['band', 'latitude_deg_n', 'longitude_deg_e']
         )
         gfs_table_xarray_day_k.rio.set_spatial_dims(
             x_dim='longitude_deg_e', y_dim='latitude_deg_n'
