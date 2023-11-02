@@ -82,7 +82,7 @@ def field_to_colour_scheme(field_name):
 
 def plot_field(data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
                colour_map_object, colour_norm_object, axes_object,
-               plot_colour_bar):
+               plot_colour_bar, plot_in_log2_scale):
     """Plots one field on a lat/long grid.
 
     M = number of rows in grid
@@ -99,6 +99,7 @@ def plot_field(data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
     :param axes_object: Will plot on this set of axes (instance of
         `matplotlib.axes._subplots.AxesSubplot` or similar).
     :param plot_colour_bar: Boolean flag.
+    :param plot_in_log2_scale: Boolean flag.
     :return: is_longitude_positive_in_west: Boolean flag.
     """
 
@@ -134,6 +135,9 @@ def plot_field(data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
         exact_dimensions=numpy.array([num_grid_columns], dtype=int)
     )
 
+    error_checking.assert_is_boolean(plot_colour_bar)
+    error_checking.assert_is_boolean(plot_in_log2_scale)
+
     # Do actual stuff.
     (
         grid_latitude_matrix_deg_n, grid_longitude_matrix_deg_e
@@ -142,8 +146,13 @@ def plot_field(data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
         unique_longitudes_deg=grid_longitudes_to_plot_deg_e
     )
 
+    if plot_in_log2_scale:
+        data_matrix_to_plot = numpy.log2(data_matrix + 1.)
+    else:
+        data_matrix_to_plot = data_matrix + 0.
+
     data_matrix_to_plot = numpy.ma.masked_where(
-        numpy.isnan(data_matrix), data_matrix
+        numpy.isnan(data_matrix_to_plot), data_matrix_to_plot
     )
 
     axes_object.pcolor(
@@ -154,7 +163,7 @@ def plot_field(data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
     )
 
     if plot_colour_bar:
-        gg_plotting_utils.plot_colour_bar(
+        colour_bar_object = gg_plotting_utils.plot_colour_bar(
             axes_object_or_matrix=axes_object,
             data_matrix=data_matrix,
             colour_map_object=colour_map_object,
@@ -162,5 +171,14 @@ def plot_field(data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
             orientation_string='vertical',
             extend_min=True, extend_max=True
         )
+
+        if plot_in_log2_scale:
+            tick_values = colour_bar_object.get_ticks()
+            tick_strings = [
+                '{0:.0f}'.format(numpy.power(2., v) - 1) for v in tick_values
+            ]
+
+            colour_bar_object.set_ticks(tick_values)
+            colour_bar_object.set_ticklabels(tick_strings)
 
     return is_longitude_positive_in_west

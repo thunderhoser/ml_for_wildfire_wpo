@@ -167,7 +167,7 @@ def use_diverging_colour_scheme(field_name):
 
 def plot_field(data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
                colour_map_object, colour_norm_object, axes_object,
-               plot_colour_bar):
+               plot_colour_bar, plot_in_log2_scale=False):
     """Plots one field on a lat/long grid.
 
     This is a light wrapper around `fwi_plotting.plot_field`.
@@ -179,6 +179,7 @@ def plot_field(data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
     :param colour_norm_object: Same.
     :param axes_object: Same.
     :param plot_colour_bar: Same.
+    :param plot_in_log2_scale: Same.
     :return: is_longitude_positive_in_west: Same.
     """
 
@@ -189,5 +190,6 @@ def plot_field(data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
         colour_map_object=colour_map_object,
         colour_norm_object=colour_norm_object,
         axes_object=axes_object,
-        plot_colour_bar=plot_colour_bar
+        plot_colour_bar=plot_colour_bar,
+        plot_in_log2_scale=plot_in_log2_scale
     )

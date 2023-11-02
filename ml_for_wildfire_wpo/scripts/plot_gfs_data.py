@@ -152,6 +152,9 @@ def _plot_one_field(
     colour_norm_object = pyplot.Normalize(
         vmin=min_colour_value, vmax=max_colour_value
     )
+    plot_in_log2_scale = field_name in [
+        gfs_utils.PRECIP_NAME, gfs_utils.CONVECTIVE_PRECIP_NAME
+    ]
 
     is_longitude_positive_in_west = gfs_plotting.plot_field(
         data_matrix=data_matrix,
@@ -159,7 +162,9 @@ def _plot_one_field(
         grid_longitudes_deg_e=grid_longitudes_deg_e,
         colour_map_object=colour_map_object,
         colour_norm_object=colour_norm_object,
-        axes_object=axes_object, plot_colour_bar=True
+        axes_object=axes_object,
+        plot_colour_bar=True,
+        plot_in_log2_scale=plot_in_log2_scale
     )
 
     if is_longitude_positive_in_west:
