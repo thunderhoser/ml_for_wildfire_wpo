@@ -164,7 +164,7 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name, init_date_string,
 
     desired_row_indices = misc_utils.desired_latitudes_to_rows(
         grid_latitudes_deg_n=
-        daily_gfs_table_xarray.coords[gfs_daily_io.LATITUDE_DIM].values,
+        daily_gfs_table_xarray.coords[gfs_daily_utils.LATITUDE_DIM].values,
         start_latitude_deg_n=
         fwi_table_xarray.coords[canadian_fwi_utils.LATITUDE_DIM].values[0],
         end_latitude_deg_n=
@@ -173,7 +173,7 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name, init_date_string,
 
     desired_column_indices = misc_utils.desired_longitudes_to_columns(
         grid_longitudes_deg_e=
-        daily_gfs_table_xarray.coords[gfs_daily_io.LONGITUDE_DIM].values,
+        daily_gfs_table_xarray.coords[gfs_daily_utils.LONGITUDE_DIM].values,
         start_longitude_deg_e=
         fwi_table_xarray.coords[canadian_fwi_utils.LONGITUDE_DIM].values[0],
         end_longitude_deg_e=
@@ -181,19 +181,19 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name, init_date_string,
     )
 
     daily_gfs_table_xarray = daily_gfs_table_xarray.isel({
-        gfs_daily_io.LATITUDE_DIM: desired_row_indices
+        gfs_daily_utils.LATITUDE_DIM: desired_row_indices
     })
     daily_gfs_table_xarray = daily_gfs_table_xarray.isel({
-        gfs_daily_io.LONGITUDE_DIM: desired_column_indices
+        gfs_daily_utils.LONGITUDE_DIM: desired_column_indices
     })
 
     # TODO(thunderhoser): I am assuming here that the domain crosses the
     # International Date Line.
     longitudes_deg_e = longitude_conv.convert_lng_positive_in_west(
-        daily_gfs_table_xarray.coords[gfs_daily_io.LONGITUDE_DIM].values
+        daily_gfs_table_xarray.coords[gfs_daily_utils.LONGITUDE_DIM].values
     )
     latitudes_deg_n = (
-        daily_gfs_table_xarray.coords[gfs_daily_io.LATITUDE_DIM].values
+        daily_gfs_table_xarray.coords[gfs_daily_utils.LATITUDE_DIM].values
     )
     latitude_matrix_deg_n = grids.latlng_vectors_to_matrices(
         unique_latitudes_deg=latitudes_deg_n,
@@ -202,10 +202,10 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name, init_date_string,
 
     # Dimensions are currently lead_time x latitude x longitude x field.
     data_matrix_channels_last = (
-        daily_gfs_table_xarray[gfs_daily_io.DATA_KEY_2D].values
+        daily_gfs_table_xarray[gfs_daily_utils.DATA_KEY_2D].values
     )
     field_names = (
-        daily_gfs_table_xarray.coords[gfs_daily_io.FIELD_DIM].values.tolist()
+        daily_gfs_table_xarray.coords[gfs_daily_utils.FIELD_DIM].values.tolist()
     )
 
     temp_index = field_names.index(gfs_daily_utils.TEMPERATURE_2METRE_NAME)
@@ -248,7 +248,7 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name, init_date_string,
     ], axis=0)
 
     day1_index = numpy.where(
-        daily_gfs_table_xarray.coords[gfs_daily_io.LEAD_TIME_DIM].values == 1
+        daily_gfs_table_xarray.coords[gfs_daily_utils.LEAD_TIME_DIM].values == 1
     )[0][0]
 
     data_matrix_day0 = numpy.concatenate((
@@ -297,7 +297,7 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name, init_date_string,
             continue
 
         k = numpy.where(
-            daily_gfs_table_xarray.coords[gfs_daily_io.LEAD_TIME_DIM].values
+            daily_gfs_table_xarray.coords[gfs_daily_utils.LEAD_TIME_DIM].values
             == this_lead_time_days
         )[0][0]
 

@@ -1,5 +1,6 @@
 """Helper methods for daily GFS data."""
 
+import numpy
 from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.utils import gfs_utils
 from ml_for_wildfire_wpo.utils import canadian_fwi_utils
@@ -31,6 +32,13 @@ ALL_FWI_FIELD_NAMES = [
 ]
 ALL_FIELD_NAMES = ALL_NON_FWI_FIELD_NAMES + ALL_FWI_FIELD_NAMES
 
+LATITUDE_DIM = gfs_utils.LATITUDE_DIM
+LONGITUDE_DIM = gfs_utils.LONGITUDE_DIM
+FIELD_DIM = gfs_utils.FIELD_DIM_2D
+LEAD_TIME_DIM = 'lead_time_days'
+
+DATA_KEY_2D = gfs_utils.DATA_KEY_2D
+
 
 def check_field_name(field_name):
     """Ensures that field name is valid.
@@ -51,3 +59,79 @@ def check_field_name(field_name):
     )
 
     raise ValueError(error_string)
+
+
+def get_field(daily_gfs_table_xarray, field_name):
+    """Extracts one field from xarray table.
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param daily_gfs_table_xarray: xarray table with daily GFS forecasts.
+    :param field_name: Field name.
+    :return: data_matrix: M-by-N-by-L numpy array of data values.
+    """
+
+    error_checking.assert_is_string(field_name)
+
+    k = numpy.where(
+        daily_gfs_table_xarray.coords[FIELD_DIM].values == field_name
+    )[0][0]
+
+    data_matrix = daily_gfs_table_xarray[DATA_KEY_2D].values[..., k]
+    data_matrix = numpy.swapaxes(data_matrix, 0, 1)
+    data_matrix = numpy.swapaxes(data_matrix, 1, 2)
+
+    return data_matrix
+
+
+def subset_by_row(daily_gfs_table_xarray, desired_row_indices):
+    """Subsets xarray table by grid row.
+
+    :param daily_gfs_table_xarray: xarray table with daily GFS forecasts.
+    :param desired_row_indices: 1-D numpy array with indices of desired rows.
+    :return: daily_gfs_table_xarray: Same as input but maybe with fewer rows.
+    """
+
+    error_checking.assert_is_numpy_array(desired_row_indices, num_dimensions=1)
+    error_checking.assert_is_integer_numpy_array(desired_row_indices)
+    error_checking.assert_is_geq_numpy_array(desired_row_indices, 0)
+
+    return daily_gfs_table_xarray.isel({LATITUDE_DIM: desired_row_indices})
+
+
+def subset_by_column(daily_gfs_table_xarray, desired_column_indices):
+    """Subsets xarray table by grid column.
+
+    :param daily_gfs_table_xarray: xarray table with daily GFS forecasts.
+    :param desired_column_indices: 1-D numpy array with indices of desired
+        columns.
+    :return: daily_gfs_table_xarray: Same as input but maybe with fewer
+        columns.
+    """
+
+    error_checking.assert_is_numpy_array(
+        desired_column_indices, num_dimensions=1
+    )
+    error_checking.assert_is_integer_numpy_array(desired_column_indices)
+    error_checking.assert_is_geq_numpy_array(desired_column_indices, 0)
+
+    return daily_gfs_table_xarray.isel(
+        {LONGITUDE_DIM: desired_column_indices}
+    )
+
+
+def subset_by_lead_time(daily_gfs_table_xarray, lead_times_days):
+    """Subsets xarray table by lead time.
+
+    :param daily_gfs_table_xarray: xarray table with daily GFS forecasts.
+    :param lead_times_days: 1-D numpy array of lead times.
+    :return: daily_gfs_table_xarray: Same as input but maybe with fewer lead
+        times.
+    """
+
+    error_checking.assert_is_numpy_array(lead_times_days, num_dimensions=1)
+    error_checking.assert_is_integer_numpy_array(lead_times_days)
+    error_checking.assert_is_greater_numpy_array(lead_times_days, 0)
+
+    return daily_gfs_table_xarray.sel({LEAD_TIME_DIM: lead_times_days})

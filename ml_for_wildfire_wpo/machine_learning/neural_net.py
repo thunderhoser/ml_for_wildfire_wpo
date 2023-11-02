@@ -46,8 +46,10 @@ ERA5_CONSTANT_FILE_KEY = 'era5_constant_file_name'
 TARGET_FIELD_KEY = 'target_field_name'
 TARGET_LEAD_TIME_KEY = 'target_lead_time_days'
 TARGET_LAG_TIMES_KEY = 'target_lag_times_days'
+GFS_FCST_TARGET_LEAD_TIMES_KEY = 'gfs_forecast_target_lead_times_days'
 TARGET_CUTOFFS_KEY = 'target_cutoffs_for_classifn'
 TARGET_DIRECTORY_KEY = 'target_dir_name'
+GFS_FORECAST_TARGET_DIR_KEY = 'gfs_forecast_target_dir_name'
 TARGET_NORM_FILE_KEY = 'target_normalization_file_name'
 BATCH_SIZE_KEY = 'num_examples_per_batch'
 SENTINEL_VALUE_KEY = 'sentinel_value'
@@ -242,6 +244,27 @@ def _check_generator_args(option_dict):
     error_checking.assert_is_greater_numpy_array(
         option_dict[TARGET_LAG_TIMES_KEY], 0
     )
+
+    if (
+            option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY] is None
+            or option_dict[GFS_FORECAST_TARGET_DIR_KEY] is None
+    ):
+        option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY] = None
+        option_dict[GFS_FORECAST_TARGET_DIR_KEY] = None
+
+    if option_dict[GFS_FORECAST_TARGET_DIR_KEY] is not None:
+        error_checking.assert_directory_exists(
+            option_dict[GFS_FORECAST_TARGET_DIR_KEY]
+        )
+        error_checking.assert_is_numpy_array(
+            option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY], num_dimensions=1
+        )
+        error_checking.assert_is_integer_numpy_array(
+            option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY]
+        )
+        error_checking.assert_is_greater_numpy_array(
+            option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY], 0
+        )
 
     if option_dict[TARGET_CUTOFFS_KEY] is not None:
         error_checking.assert_is_numpy_array(
@@ -1400,8 +1423,12 @@ def create_data(option_dict, init_date_string):
     target_field_name = option_dict[TARGET_FIELD_KEY]
     target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
     target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
+    gfs_forecast_target_lead_times_days = option_dict[
+        GFS_FCST_TARGET_LEAD_TIMES_KEY
+    ]
     target_cutoffs_for_classifn = option_dict[TARGET_CUTOFFS_KEY]
     target_dir_name = option_dict[TARGET_DIRECTORY_KEY]
+    gfs_forecast_target_dir_name = option_dict[GFS_FORECAST_TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
 
@@ -1511,6 +1538,24 @@ def create_data(option_dict, init_date_string):
         target_field_name=target_field_name,
         norm_param_table_xarray=target_norm_param_table_xarray
     )
+
+    if gfs_forecast_target_dir_name is not None:
+        new_matrix = _read_gfs_forecast_targets_1example(
+            daily_gfs_dir_name=gfs_forecast_target_dir_name,
+            init_date_string=gfs_io.file_name_to_date(gfs_file_name),
+            target_lead_times_days=gfs_forecast_target_lead_times_days,
+            desired_row_indices=None,
+            desired_column_indices=None,
+            latitude_limits_deg_n=inner_latitude_limits_deg_n,
+            longitude_limits_deg_e=inner_longitude_limits_deg_e,
+            target_field_name=target_field_name,
+            norm_param_table_xarray=target_norm_param_table_xarray
+        )[0]
+
+        laglead_target_predictor_matrix = numpy.concatenate(
+            (laglead_target_predictor_matrix, new_matrix),
+            axis=-2
+        )
 
     laglead_target_predictor_matrix = numpy.expand_dims(
         laglead_target_predictor_matrix, axis=0
@@ -1773,6 +1818,19 @@ def read_metafile(pickle_file_name):
     missing_keys = list(set(METADATA_KEYS) - set(metadata_dict.keys()))
     if len(missing_keys) == 0:
         return metadata_dict
+
+    training_option_dict = metadata_dict[TRAINING_OPTIONS_KEY]
+    validation_option_dict = metadata_dict[VALIDATION_OPTIONS_KEY]
+
+    if GFS_FORECAST_TARGET_DIR_KEY not in training_option_dict:
+        training_option_dict[GFS_FORECAST_TARGET_DIR_KEY] = None
+        training_option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY] = None
+
+        validation_option_dict[GFS_FORECAST_TARGET_DIR_KEY] = None
+        validation_option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY] = None
+
+    metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
+    metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict
 
     error_string = (
         '\n{0:s}\nKeys listed above were expected, but not found, in file '

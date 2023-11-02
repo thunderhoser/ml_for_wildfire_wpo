@@ -5,6 +5,7 @@ import xarray
 from ml_for_wildfire_wpo.io import gfs_io
 from ml_for_wildfire_wpo.io import canadian_fwi_io
 from ml_for_wildfire_wpo.utils import gfs_utils
+from ml_for_wildfire_wpo.utils import gfs_daily_utils
 from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 
 NUM_VALUES_KEY = 'num_values'
@@ -496,6 +497,50 @@ def normalize_targets_to_z_scores(fwi_table_xarray, z_score_param_table_xarray):
     return fwi_table_xarray.assign({
         canadian_fwi_utils.DATA_KEY: (
             fwi_table_xarray[canadian_fwi_utils.DATA_KEY].dims,
+            data_matrix
+        )
+    })
+
+
+def normalize_gfs_fwi_forecasts_to_z_scores(
+        daily_gfs_table_xarray, z_score_param_table_xarray):
+    """Normalizes GFS-based FWI forecasts from physical units to z-scores.
+
+    :param daily_gfs_table_xarray: xarray table with daily GFS-based FWI
+        forecasts in physical units.
+    :param z_score_param_table_xarray: xarray table with normalization
+        parameters (means and standard deviations), created by
+        `get_z_score_params_for_targets`.
+    :return: daily_gfs_table_xarray: Same as input but in z-score units.
+    """
+
+    # TODO(thunderhoser): Still need denormalization method.
+    # TODO(thunderhoser): Still need unit test.
+
+    dgfst = daily_gfs_table_xarray
+    zspt = z_score_param_table_xarray
+
+    field_names = dgfst.coords[gfs_daily_utils.FIELD_DIM].values.tolist()
+    num_fields = len(field_names)
+
+    data_matrix = dgfst[gfs_daily_utils.DATA_KEY_2D].values
+
+    for j in range(num_fields):
+        j_new = numpy.where(
+            zspt.coords[canadian_fwi_utils.FIELD_DIM].values == field_names[j]
+        )[0][0]
+
+        this_mean = zspt[canadian_fwi_utils.MEAN_VALUE_KEY].values[j_new]
+        this_stdev = zspt[canadian_fwi_utils.STDEV_KEY].values[j_new]
+
+        if numpy.isnan(this_stdev):
+            data_matrix[..., j] = 0.
+        else:
+            data_matrix[..., j] = (data_matrix[..., j] - this_mean) / this_stdev
+
+    return daily_gfs_table_xarray.assign({
+        gfs_daily_utils.DATA_KEY_2D: (
+            daily_gfs_table_xarray[gfs_daily_utils.DATA_KEY_2D].dims,
             data_matrix
         )
     })

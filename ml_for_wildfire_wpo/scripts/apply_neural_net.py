@@ -12,6 +12,7 @@ NUM_EXAMPLES_PER_BATCH = 16
 MODEL_FILE_ARG_NAME = 'input_model_file_name'
 GFS_DIRECTORY_ARG_NAME = 'input_gfs_directory_name'
 TARGET_DIR_ARG_NAME = 'input_target_dir_name'
+GFS_FCST_TARGET_DIR_ARG_NAME = 'input_gfs_fcst_target_dir_name'
 DATE_LIMITS_ARG_NAME = 'init_date_limit_strings'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
@@ -25,6 +26,11 @@ GFS_DIRECTORY_HELP_STRING = (
 TARGET_DIR_HELP_STRING = (
     'Name of directory with target fields.  Files therein will be found by '
     '`canadian_fwo_io.find_file` and read by `canadian_fwo_io.read_file`.'
+)
+GFS_FCST_TARGET_DIR_HELP_STRING = (
+    'Name of directory with raw-GFS-forecast target fields.  Files therein '
+    'will be found by `gfs_daily_io.find_file` and read by '
+    '`gfs_daily_io.read_file`.'
 )
 DATE_LIMITS_HELP_STRING = (
     'Length-2 list with first and last GFS model runs (init times in format '
@@ -50,6 +56,10 @@ INPUT_ARG_PARSER.add_argument(
     help=TARGET_DIR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + GFS_FCST_TARGET_DIR_ARG_NAME, type=str, required=True,
+    help=GFS_FCST_TARGET_DIR_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + DATE_LIMITS_ARG_NAME, type=str, nargs=2, required=True,
     help=DATE_LIMITS_HELP_STRING
 )
@@ -60,7 +70,8 @@ INPUT_ARG_PARSER.add_argument(
 
 
 def _run(model_file_name, gfs_directory_name, target_dir_name,
-         init_date_limit_strings, output_dir_name):
+         gfs_forecast_target_dir_name, init_date_limit_strings,
+         output_dir_name):
     """Applies trained neural net -- inference time!
 
     This is effectively the main method.
@@ -68,6 +79,7 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     :param model_file_name: See documentation at top of file.
     :param gfs_directory_name: Same.
     :param target_dir_name: Same.
+    :param gfs_forecast_target_dir_name: Same.
     :param init_date_limit_strings: Same.
     :param output_dir_name: Same.
     """
@@ -90,6 +102,9 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     )
     validation_option_dict[neural_net.GFS_DIRECTORY_KEY] = gfs_directory_name
     validation_option_dict[neural_net.TARGET_DIRECTORY_KEY] = target_dir_name
+    validation_option_dict[neural_net.GFS_FORECAST_TARGET_DIR_KEY] = (
+        gfs_forecast_target_dir_name
+    )
 
     for_classification = (
         validation_option_dict[neural_net.TARGET_CUTOFFS_KEY] is not None
@@ -148,6 +163,9 @@ if __name__ == '__main__':
         model_file_name=getattr(INPUT_ARG_OBJECT, MODEL_FILE_ARG_NAME),
         gfs_directory_name=getattr(INPUT_ARG_OBJECT, GFS_DIRECTORY_ARG_NAME),
         target_dir_name=getattr(INPUT_ARG_OBJECT, TARGET_DIR_ARG_NAME),
+        gfs_forecast_target_dir_name=getattr(
+            INPUT_ARG_OBJECT, GFS_FCST_TARGET_DIR_ARG_NAME
+        ),
         init_date_limit_strings=getattr(INPUT_ARG_OBJECT, DATE_LIMITS_ARG_NAME),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )

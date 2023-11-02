@@ -10,16 +10,9 @@ import xarray
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
-from ml_for_wildfire_wpo.utils import gfs_utils
+from ml_for_wildfire_wpo.utils import gfs_daily_utils
 
 DATE_FORMAT = '%Y%m%d'
-
-LATITUDE_DIM = gfs_utils.LATITUDE_DIM
-LONGITUDE_DIM = gfs_utils.LONGITUDE_DIM
-FIELD_DIM = gfs_utils.FIELD_DIM_2D
-LEAD_TIME_DIM = 'lead_time_days'
-
-DATA_KEY_2D = gfs_utils.DATA_KEY_2D
 
 
 def find_file(directory_name, init_date_string, raise_error_if_missing=True):
@@ -119,15 +112,18 @@ def write_file(
 
     # Do actual stuff.
     coord_dict = {
-        LEAD_TIME_DIM: lead_times_days,
-        LATITUDE_DIM: latitudes_deg_n,
-        LONGITUDE_DIM: longitudes_deg_e,
-        FIELD_DIM: field_names
+        gfs_daily_utils.LEAD_TIME_DIM: lead_times_days,
+        gfs_daily_utils.LATITUDE_DIM: latitudes_deg_n,
+        gfs_daily_utils.LONGITUDE_DIM: longitudes_deg_e,
+        gfs_daily_utils.FIELD_DIM: field_names
     }
 
-    these_dim = (LEAD_TIME_DIM, LATITUDE_DIM, LONGITUDE_DIM, FIELD_DIM)
+    these_dim = (
+        gfs_daily_utils.LEAD_TIME_DIM, gfs_daily_utils.LATITUDE_DIM,
+        gfs_daily_utils.LONGITUDE_DIM, gfs_daily_utils.FIELD_DIM
+    )
     main_data_dict = {
-        DATA_KEY_2D: (these_dim, data_matrix)
+        gfs_daily_utils.DATA_KEY_2D: (these_dim, data_matrix)
     }
 
     gfs_daily_table_xarray = xarray.Dataset(
@@ -135,7 +131,7 @@ def write_file(
     )
 
     encoding_dict = {
-        gfs_utils.DATA_KEY_2D: {'dtype': 'float32'}
+        gfs_daily_utils.DATA_KEY_2D: {'dtype': 'float32'}
     }
     gfs_daily_table_xarray.to_zarr(
         store=zarr_file_name, mode='w', encoding=encoding_dict
