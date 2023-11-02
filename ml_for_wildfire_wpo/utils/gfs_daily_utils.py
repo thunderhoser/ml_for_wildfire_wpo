@@ -2,6 +2,7 @@
 
 from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.utils import gfs_utils
+from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 
 RELATIVE_HUMIDITY_2METRE_NAME = 'relative_humidity_2m_agl'
 TEMPERATURE_2METRE_NAME = gfs_utils.TEMPERATURE_2METRE_NAME
@@ -11,11 +12,24 @@ V_WIND_10METRE_NAME = gfs_utils.V_WIND_10METRE_NAME
 SURFACE_PRESSURE_NAME = gfs_utils.SURFACE_PRESSURE_NAME
 PRECIP_NAME = gfs_utils.PRECIP_NAME
 
-ALL_FIELD_NAMES = [
+ALL_NON_FWI_FIELD_NAMES = [
     RELATIVE_HUMIDITY_2METRE_NAME, TEMPERATURE_2METRE_NAME,
     DEWPOINT_2METRE_NAME, U_WIND_10METRE_NAME, V_WIND_10METRE_NAME,
     SURFACE_PRESSURE_NAME, PRECIP_NAME
 ]
+
+FFMC_NAME = canadian_fwi_utils.FFMC_NAME
+DMC_NAME = canadian_fwi_utils.DMC_NAME
+DC_NAME = canadian_fwi_utils.DC_NAME
+ISI_NAME = canadian_fwi_utils.ISI_NAME
+BUI_NAME = canadian_fwi_utils.BUI_NAME
+FWI_NAME = canadian_fwi_utils.FWI_NAME
+DSR_NAME = canadian_fwi_utils.DSR_NAME
+
+ALL_FWI_FIELD_NAMES = [
+    FFMC_NAME, DMC_NAME, DC_NAME, ISI_NAME, BUI_NAME, FWI_NAME, DSR_NAME
+]
+ALL_FIELD_NAMES = ALL_NON_FWI_FIELD_NAMES + ALL_FWI_FIELD_NAMES
 
 
 def check_field_name(field_name):

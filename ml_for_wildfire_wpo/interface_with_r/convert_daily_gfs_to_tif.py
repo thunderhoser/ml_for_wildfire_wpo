@@ -8,6 +8,7 @@ import argparse
 import numpy
 import xarray
 from gewittergefahr.gg_utils import grids
+from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import longitude_conversion as longitude_conv
 from gewittergefahr.gg_utils import temperature_conversions as temperature_conv
 from gewittergefahr.gg_utils import file_system_utils
@@ -101,6 +102,12 @@ def _find_output_file(directory_name, init_date_string, lead_time_days,
     :raises: ValueError: if file is missing
         and `raise_error_if_missing == True`.
     """
+
+    error_checking.assert_is_string(directory_name)
+    _ = time_conversion.string_to_unix_sec(init_date_string, DATE_FORMAT)
+    error_checking.assert_is_integer(lead_time_days)
+    error_checking.assert_is_geq(lead_time_days, 0)
+    error_checking.assert_is_boolean(raise_error_if_missing)
 
     tif_file_name = (
         '{0:s}/init={1:s}/gfs_fwi_inputs_init={1:s}_lead={2:02d}days.tif'
@@ -257,7 +264,9 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name, init_date_string,
     }
 
     gfs_table_xarray_day0 = xarray.DataArray(
-        data=data_matrix_day0, coords=coord_dict
+        data=data_matrix_day0,
+        coords=coord_dict,
+        dims=['band', 'latitude_deg_n', 'longitude_deg_e']
     )
     gfs_table_xarray_day0.rio.set_spatial_dims(
         x_dim='longitude_deg_e', y_dim='latitude_deg_n'
@@ -294,7 +303,8 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name, init_date_string,
 
         gfs_table_xarray_day_k = xarray.DataArray(
             data=data_matrix_channels_first[:, k, ...],
-            coords=coord_dict
+            coords=coord_dict,
+            dims=['band', 'latitude_deg_n', 'longitude_deg_e']
         )
         gfs_table_xarray_day_k.rio.set_spatial_dims(
             x_dim='longitude_deg_e', y_dim='latitude_deg_n'
