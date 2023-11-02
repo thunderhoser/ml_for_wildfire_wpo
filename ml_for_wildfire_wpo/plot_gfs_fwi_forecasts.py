@@ -203,7 +203,7 @@ def _run(input_dir_name, field_names, init_date_string, lead_times_days,
 
     for this_forecast_day in lead_times_days:
         day_index = numpy.where(
-            dgfst.coords[gfs_daily_io.LEAD_TIME_DIM].values ==
+            dgfst.coords[gfs_daily_utils.LEAD_TIME_DIM].values ==
             this_forecast_day
         )[0][0]
 
@@ -212,10 +212,11 @@ def _run(input_dir_name, field_names, init_date_string, lead_times_days,
                 this_field_name
             ]
             field_index = numpy.where(
-                dgfst.coords[gfs_daily_io.FIELD_DIM].values == this_field_name
+                dgfst.coords[gfs_daily_utils.FIELD_DIM].values ==
+                this_field_name
             )[0][0]
 
-            data_matrix = dgfst[gfs_daily_io.DATA_KEY_2D].values[
+            data_matrix = dgfst[gfs_daily_utils.DATA_KEY_2D].values[
                 day_index, ..., field_index
             ]
 
@@ -245,9 +246,9 @@ def _run(input_dir_name, field_names, init_date_string, lead_times_days,
             _plot_one_field(
                 data_matrix=data_matrix,
                 grid_latitudes_deg_n=
-                dgfst.coords[gfs_daily_io.LATITUDE_DIM].values,
+                dgfst.coords[gfs_daily_utils.LATITUDE_DIM].values,
                 grid_longitudes_deg_e=
-                dgfst.coords[gfs_daily_io.LONGITUDE_DIM].values,
+                dgfst.coords[gfs_daily_utils.LONGITUDE_DIM].values,
                 border_latitudes_deg_n=border_latitudes_deg_n,
                 border_longitudes_deg_e=border_longitudes_deg_e,
                 field_name=this_field_name,

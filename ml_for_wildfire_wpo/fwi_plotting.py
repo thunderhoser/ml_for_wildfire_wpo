@@ -93,7 +93,7 @@ def field_to_colour_scheme(field_name):
 
 def plot_field(data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
                colour_map_object, colour_norm_object, axes_object,
-               plot_colour_bar, plot_in_log2_scale):
+               plot_colour_bar, plot_in_log2_scale=False):
     """Plots one field on a lat/long grid.
 
     M = number of rows in grid
