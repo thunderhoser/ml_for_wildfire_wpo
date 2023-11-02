@@ -220,7 +220,7 @@ def _run(input_dir_name, field_names, init_date_string, lead_times_days,
             ]
 
             title_string = (
-                '{0:s}{1:s}\nInit 0000 UTC {2:s}, valid local noon {3:s}'
+                '{0:s}{1:s}\nInit 00Z {2:s}, valid local noon {3:s}'
             ).format(
                 this_field_name_fancy[0].upper(),
                 this_field_name_fancy[1:],

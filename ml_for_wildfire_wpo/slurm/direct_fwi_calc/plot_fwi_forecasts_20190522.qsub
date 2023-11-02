@@ -1,6 +1,6 @@
 #!/bin/tcsh
 
-#SBATCH --job-name="convert_fwi_inputs_to_tif_20190522"
+#SBATCH --job-name="plot_fwi_inputs_20190522"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="batch"
@@ -18,7 +18,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=convert_fwi_inputs_to_tif_20190522_%A_%a.out
+#SBATCH --output=plot_fwi_inputs_20190522_%A_%a.out
 
 module load cuda/10.1
 module load gnu/9.2.0
@@ -28,9 +28,7 @@ source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
 conda activate base
 
 set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
-set DAILY_GFS_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/direct_fwi_calc/processed/daily"
-set CANADIAN_FWI_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
-set OUTPUT_DIR_NAME="${DAILY_GFS_DIR_NAME}/tif"
+set INPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/direct_fwi_calc/processed/daily_fwi"
 
 set INIT_DATE_STRINGS=("20190522")
 set i=$SLURM_ARRAY_TASK_ID
@@ -38,12 +36,12 @@ set i=$SLURM_ARRAY_TASK_ID
 while ($i <= `expr $SLURM_ARRAY_TASK_ID + 11` && $i <= $#INIT_DATE_STRINGS)
     set init_date_string="${INIT_DATE_STRINGS[$i]}"
     
-    python3 -u "${CODE_DIR_NAME}/convert_daily_gfs_to_tif.py" \
-    --input_daily_gfs_dir_name="${DAILY_GFS_DIR_NAME}" \
-    --input_canadian_fwi_dir_name="${CANADIAN_FWI_DIR_NAME}" \
+    python3 -u "${CODE_DIR_NAME}/plot_gfs_fwi_forecasts.py" \
+    --input_dir_name="${INPUT_DIR_NAME}" \
+    --field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" \
     --init_date_string="${init_date_string}" \
-    --max_lead_time_days=14 \
-    --output_tif_dir_name="${OUTPUT_DIR_NAME}"
+    --lead_times_days 1 2 3 4 5 6 7 8 9 10 11 12 13 14 \
+    --output_dir_name="${INPUT_DIR_NAME}/plots/${init_date_string}"
     
     @ i = $i + 1
 end

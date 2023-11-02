@@ -40,7 +40,7 @@ while ($i <= `expr $SLURM_ARRAY_TASK_ID + 11` && $i <= $#INIT_DATE_STRINGS)
     --input_dir_name="${INPUT_DIR_NAME}" \
     --field_names "temperature_2m_agl_kelvins" "dewpoint_2m_agl_kelvins" "relative_humidity_2m_agl" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "surface_pressure_pascals" "accumulated_precip_metres" \
     --init_date_string="${init_date_string}" \
-    --lead_times_days 1 3 5 7 10 14 \
+    --lead_times_days 1 2 3 4 5 6 7 8 9 10 11 12 13 14 \
     --min_colour_percentile=0 \
     --max_colour_percentile=100 \
     --output_dir_name="${INPUT_DIR_NAME}/plots/${init_date_string}"
