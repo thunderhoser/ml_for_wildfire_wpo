@@ -1,6 +1,9 @@
 """Methods for plotting fire-weather indices."""
 
 import numpy
+import matplotlib
+matplotlib.use('agg')
+from matplotlib import pyplot
 import matplotlib.colors
 from gewittergefahr.gg_utils import grids
 from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
@@ -148,6 +151,10 @@ def plot_field(data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
 
     if plot_in_log2_scale:
         data_matrix_to_plot = numpy.log2(data_matrix + 1.)
+        colour_norm_object = pyplot.Normalize(
+            vmin=numpy.log2(colour_norm_object.vmin + 1),
+            vmax=numpy.log2(colour_norm_object.vmax + 1)
+        )
     else:
         data_matrix_to_plot = data_matrix + 0.
 
