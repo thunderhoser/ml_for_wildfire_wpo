@@ -25,7 +25,7 @@ import time_zone_utils
 TOLERANCE = 1e-6
 DAYS_TO_SECONDS = 86400
 
-FIELD_NAMES = gfs_daily_utils.ALL_FIELD_NAMES
+FIELD_NAMES = gfs_daily_utils.ALL_NON_FWI_FIELD_NAMES
 
 INPUT_DIR_ARG_NAME = 'input_gfs_dir_name'
 FIRST_INIT_DATE_ARG_NAME = 'first_init_date_string'

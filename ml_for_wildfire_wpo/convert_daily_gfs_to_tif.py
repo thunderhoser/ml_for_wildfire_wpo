@@ -15,6 +15,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import grids
+import time_conversion
 import longitude_conversion as longitude_conv
 import temperature_conversions as temperature_conv
 import file_system_utils
@@ -108,6 +109,12 @@ def _find_output_file(directory_name, init_date_string, lead_time_days,
     :raises: ValueError: if file is missing
         and `raise_error_if_missing == True`.
     """
+
+    error_checking.assert_is_string(directory_name)
+    _ = time_conversion.string_to_unix_sec(init_date_string, DATE_FORMAT)
+    error_checking.assert_is_integer(lead_time_days)
+    error_checking.assert_is_geq(lead_time_days, 0)
+    error_checking.assert_is_boolean(raise_error_if_missing)
 
     tif_file_name = (
         '{0:s}/init={1:s}/gfs_fwi_inputs_init={1:s}_lead={2:02d}days.tif'
