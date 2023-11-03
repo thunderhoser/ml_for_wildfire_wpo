@@ -461,7 +461,17 @@ def precip_from_incremental_to_full_run(gfs_table_xarray):
 
     forecast_hours = gfs_table_xarray.coords[FORECAST_HOUR_DIM].values
     num_forecast_hours = len(forecast_hours)
-    assert numpy.array_equal(forecast_hours, ALL_FORECAST_HOURS)
+
+    required_forecast_hours = set(ALL_FORECAST_HOURS.tolist())
+    required_forecast_hours.remove(384)
+    required_forecast_hours = numpy.array(
+        list(required_forecast_hours), dtype=int
+    )
+
+    assert numpy.all(numpy.isin(
+        element=required_forecast_hours,
+        test_elements=forecast_hours
+    ))
 
     data_matrix_2d = gfs_table_xarray[DATA_KEY_2D].values
 
