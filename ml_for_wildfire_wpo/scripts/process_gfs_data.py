@@ -42,7 +42,11 @@ FORECAST_HOURS_DEFAULT = numpy.array([
     144, 168, 192, 216, 240, 264, 288, 312, 336
 ], dtype=int)
 
-FORECAST_HOURS_FOR_FWI_CALC = gfs_utils.ALL_FORECAST_HOURS
+FORECAST_HOURS_FOR_FWI_CALC = set(gfs_utils.ALL_FORECAST_HOURS.tolist())
+FORECAST_HOURS_FOR_FWI_CALC.remove(384)
+FORECAST_HOURS_FOR_FWI_CALC = numpy.array(
+    list(FORECAST_HOURS_FOR_FWI_CALC), dtype=int
+)
 
 FIELD_NAMES_3D_DEFAULT = gfs_utils.ALL_3D_FIELD_NAMES
 FIELD_NAMES_2D_DEFAULT = gfs_utils.ALL_2D_FIELD_NAMES
@@ -216,7 +220,7 @@ def _read_incremental_precip_1init(
         Metadata and variable names should make this table self-explanatory.
     """
 
-    forecast_hours = gfs_utils.ALL_FORECAST_HOURS
+    forecast_hours = FORECAST_HOURS_FOR_FWI_CALC
 
     input_file_names = [
         raw_gfs_io.find_file(

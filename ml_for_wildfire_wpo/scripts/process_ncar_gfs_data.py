@@ -166,7 +166,9 @@ def _read_incremental_precip_1init(
         Metadata and variable names should make this table self-explanatory.
     """
 
-    forecast_hours = gfs_utils.ALL_FORECAST_HOURS
+    forecast_hours = set(gfs_utils.ALL_FORECAST_HOURS.tolist())
+    forecast_hours.remove(384)
+    forecast_hours = numpy.array(list(forecast_hours), dtype=int)
 
     input_file_names = [
         raw_ncar_gfs_io.find_file(
