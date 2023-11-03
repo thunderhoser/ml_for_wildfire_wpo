@@ -20,3 +20,5 @@ ml_for_wildfire_wpo/*.py
 ml_for_wildfire_wpo/dead_scratch_code/
 
 ml_for_wildfire_wpo/*.jpg
+ml_for_wildfire_wpo/linear_colour_scheme/
+ml_for_wildfire_wpo/proper_colour_scheme/
