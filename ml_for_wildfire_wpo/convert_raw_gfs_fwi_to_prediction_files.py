@@ -27,6 +27,7 @@ import neural_net
 
 DATE_FORMAT = gfs_daily_io.DATE_FORMAT
 
+DAYS_TO_SECONDS = 86400
 DEGREES_TO_RADIANS = numpy.pi / 180.
 
 DAILY_GFS_DIR_ARG_NAME = 'input_daily_gfs_dir_name'
@@ -196,7 +197,7 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
     init_date_unix_sec = time_conversion.string_to_unix_sec(
         init_date_string, DATE_FORMAT
     )
-    valid_date_unix_sec = init_date_unix_sec + lead_time_days
+    valid_date_unix_sec = init_date_unix_sec + lead_time_days * DAYS_TO_SECONDS
     valid_date_string = time_conversion.unix_sec_to_string(
         valid_date_unix_sec, DATE_FORMAT
     )
