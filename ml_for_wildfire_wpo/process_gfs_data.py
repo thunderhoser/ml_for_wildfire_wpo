@@ -227,7 +227,7 @@ def _read_incremental_precip_1init(
         Metadata and variable names should make this table self-explanatory.
     """
 
-    forecast_hours = gfs_utils.ALL_FORECAST_HOURS
+    forecast_hours = FORECAST_HOURS_FOR_FWI_CALC
 
     input_file_names = [
         raw_gfs_io.find_file(
