@@ -216,10 +216,43 @@ def read_field_from_grib_file(
         pass
 
     try:
-        field_matrix = numpy.reshape(
-            field_vector, (num_grid_rows, num_grid_columns, 2)
+        num_values = len(field_vector)
+        half_num_values = int(numpy.round(0.5 * num_values))
+
+        if 2 * half_num_values != num_values:
+            error_string = (
+                'SOMETHING WENT VERY WRONG.  Expected {0:d} values '
+                '({1:d} rows x {2:d} columns) in temporary text file from '
+                'wgrib, but the file contains {3:d} values instead.'
+            ).format(
+                num_grid_rows * num_grid_columns,
+                num_grid_rows,
+                num_grid_columns,
+                num_values
+            )
+
+            raise ValueError(error_string)
+
+        first_field_matrix = numpy.reshape(
+            field_vector[:half_num_values], (num_grid_rows, num_grid_columns)
         )
-        field_matrix = field_matrix[..., 0]
+        second_field_matrix = numpy.reshape(
+            field_vector[half_num_values:], (num_grid_rows, num_grid_columns)
+        )
+        max_diff = numpy.nanmax(
+            numpy.absolute(first_field_matrix - second_field_matrix)
+        )
+
+        if max_diff > 1e-6:
+            error_string = (
+                'SOMETHING WENT VERY WRONG.  First and second data matrices in '
+                'temporary text file from wgrib should be equal, but found a '
+                'max absolute diff of {0:f}.'
+            ).format(max_diff)
+
+            raise ValueError(error_string)
+
+        field_matrix = first_field_matrix
     except ValueError as this_exception:
         if raise_error_if_fails:
             raise
