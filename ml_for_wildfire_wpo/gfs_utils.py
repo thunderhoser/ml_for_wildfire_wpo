@@ -525,3 +525,49 @@ def precip_from_incremental_to_full_run(gfs_table_xarray):
     })
 
     return gfs_table_xarray
+
+
+def remove_negative_precip(gfs_table_xarray):
+    """Removes negative precip accumulations.
+
+    This method works for both accumulated-precip variables: total and
+    convective precip.  This method requires an input table with full-run
+    values, not incremental values -- but it ensures that all incremental
+    values, and thus all full-run values, are positive.  For the definitions of
+    "full-run" and "incremental" precip, see documentation for
+    `precip_from_incremental_to_full_run`.
+
+    :param gfs_table_xarray: xarray table with GFS forecasts.
+    :return: gfs_table_xarray: Same as input but without negative precip
+        accumulations.
+    """
+
+    forecast_hours = gfs_table_xarray.coords[FORECAST_HOUR_DIM].values
+    num_forecast_hours = len(forecast_hours)
+
+    data_matrix_2d = gfs_table_xarray[DATA_KEY_2D].values
+
+    for j in range(num_forecast_hours):
+        if j == 0:
+            continue
+
+        for this_field_name in [PRECIP_NAME, CONVECTIVE_PRECIP_NAME]:
+            ks = numpy.where(
+                gfs_table_xarray.coords[FIELD_DIM_2D].values == this_field_name
+            )[0]
+
+            if len(ks) == 0:
+                continue
+
+            k = ks[0]
+            data_matrix_2d[j, ..., k] = numpy.nanmax(
+                data_matrix_2d[:(j + 1), ..., k], axis=0
+            )
+
+    gfs_table_xarray = gfs_table_xarray.assign({
+        DATA_KEY_2D: (
+            gfs_table_xarray[DATA_KEY_2D].dims, data_matrix_2d
+        )
+    })
+
+    return gfs_table_xarray

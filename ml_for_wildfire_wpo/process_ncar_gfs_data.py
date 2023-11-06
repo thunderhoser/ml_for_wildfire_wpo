@@ -378,6 +378,8 @@ def _run(main_input_dir_name, input_precip_dir_name,
                 )
             })
 
+        gfs_table_xarray = gfs_utils.remove_negative_precip(gfs_table_xarray)
+
         output_file_name = gfs_io.find_file(
             directory_name=output_dir_name,
             init_date_string=this_date_string,
