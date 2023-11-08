@@ -1,0 +1,55 @@
+#!/bin/tcsh
+
+#SBATCH --job-name="process_gfs_data"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpu"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=01:30:00
+#SBATCH --array=1-219
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=process_gfs_data_%A_%a.out
+
+module load cuda/10.1
+source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
+conda activate base
+
+set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+set INPUT_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/gfs_data_fwi_inputs_only/grib2"
+set OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/direct_fwi_calc/processed"
+set WGRIB2_EXE_NAME="wgrib2"
+
+set INIT_DATE_STRINGS=("20210712" "20210713" "20210714" "20210715" "20210716" "20210717" "20210718" "20210719" "20210720" "20210721" "20210722" "20210723" "20210724" "20210725" "20210726" "20210727" "20210728" "20210729" "20210730" "20210731" "20210801" "20210802" "20210803" "20210804" "20210805" "20210806" "20210807" "20210808" "20210809" "20210810" "20210811" "20210812" "20210813" "20210814" "20210815" "20210816" "20210817" "20210818" "20210819" "20210820" "20210821" "20210822" "20210823" "20210824" "20210825" "20210826" "20210827" "20210828" "20210829" "20210830" "20210831" "20210901" "20210902" "20210903" "20210904" "20210905" "20210906" "20210907" "20210908" "20210909" "20210910" "20210911" "20210912" "20210913" "20210914" "20210915" "20210916" "20210917" "20210918" "20210919" "20210920" "20210921" "20210922" "20210923" "20210924" "20210925" "20210926" "20210927" "20210928" "20210929" "20210930" "20211001" "20211002" "20211003" "20211004" "20211005" "20211006" "20211007" "20211008" "20211009" "20211010" "20211011" "20211012" "20211013" "20211014" "20211015" "20211016" "20211017" "20211018" "20211019" "20211020" "20211021" "20211022" "20211023" "20211024" "20211025" "20211026" "20211027" "20211028" "20211029" "20211030" "20211031" "20211101" "20211102" "20211103" "20211104" "20211105" "20211106" "20211107" "20211108" "20211109" "20211110" "20211111" "20211112" "20211113" "20211114" "20211115" "20211116" "20211117" "20211118" "20211119" "20211120" "20211121" "20211122" "20211123" "20211124" "20211125" "20211126" "20211127" "20211128" "20211129" "20211130" "20211201" "20211202" "20211203" "20211204" "20211205" "20211206" "20211207" "20211208" "20211209" "20211210" "20211211" "20211212" "20211213" "20211214" "20211215" "20211216" "20211217" "20211218" "20211219" "20211220" "20211221" "20211222" "20211223" "20211224" "20211225" "20211226" "20211227" "20211228" "20211229" "20211230" "20211231" "20221116" "20221117" "20221118" "20221119" "20221120" "20221121" "20221122" "20221123" "20221124" "20221125" "20221126" "20221127" "20221128" "20221129" "20221130" "20221201" "20221202" "20221203" "20221204" "20221205" "20221206" "20221207" "20221208" "20221209" "20221210" "20221211" "20221212" "20221213" "20221214" "20221215" "20221216" "20221217" "20221218" "20221219" "20221220" "20221221" "20221222" "20221223" "20221224" "20221225" "20221226" "20221227" "20221228" "20221229" "20221230" "20221231")
+set i=$SLURM_ARRAY_TASK_ID
+
+while ($i <= `expr $SLURM_ARRAY_TASK_ID + 0` && $i <= $#INIT_DATE_STRINGS)
+    set init_date_string="${INIT_DATE_STRINGS[$i]}"
+    
+    python3 -u "${CODE_DIR_NAME}/process_gfs_data.py" \
+    --main_input_grib2_dir_name="${INPUT_DIR_NAME}" \
+    --input_grib2_precip_dir_name="${INPUT_DIR_NAME}" \
+    --start_date_string="${init_date_string}" \
+    --end_date_string="${init_date_string}" \
+    --start_latitude_deg_n=10 \
+    --end_latitude_deg_n=80 \
+    --start_longitude_deg_e=160 \
+    --end_longitude_deg_e=-55 \
+    --wgrib2_exe_file_name="${WGRIB2_EXE_NAME}" \
+    --temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${init_date_string}" \
+    --for_direct_fwi_calc=1 \
+    --allow_n_missing_forecast_hours=0 \
+    --max_forecast_hour=372 \
+    --output_zarr_dir_name="${OUTPUT_DIR_NAME}"
+    
+    @ i = $i + 1
+end
