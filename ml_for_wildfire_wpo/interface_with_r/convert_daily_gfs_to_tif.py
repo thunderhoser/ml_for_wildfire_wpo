@@ -7,6 +7,7 @@ import os
 import argparse
 import numpy
 import xarray
+import rioxarray
 from gewittergefahr.gg_utils import grids
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import longitude_conversion as longitude_conv

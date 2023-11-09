@@ -5,19 +5,27 @@ require(raster)
 
 DAILY_GFS_DIR_NAME <- '/home/ralager/condo/swatwork/ralager/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/direct_fwi_calc/processed/daily/tif'
 TOP_OUTPUT_DIR_NAME <- '/home/ralager/condo/swatwork/ralager/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/direct_fwi_calc/processed/daily/tif_with_fwi'
-
-FIRST_INIT_DATE_OBJECT <- as.Date('2019-05-22')
-LAST_INIT_DATE_OBJECT <- as.Date('2019-05-22')
 ALL_LEAD_TIMES_DAYS <- c('01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14')
 
-init_date_object <- FIRST_INIT_DATE_OBJECT
+argument_list = commandArgs(trailingOnly=TRUE)
+first_init_date_string <- argument_list[1]
+last_init_date_string <- argument_list[2]
 
-while (init_date_object <= LAST_INIT_DATE_OBJECT) {
+first_init_date_object <- as.Date(first_init_date_string)
+last_init_date_object <- as.Date(last_init_date_string)
+init_date_object <- first_init_date_object
+
+while (init_date_object <= last_init_date_object) {
   init_date_string <- format(init_date_object, '%Y%m%d')
   input_file_name <- sprintf(
     '%s/init=%s/gfs_fwi_inputs_init=%s_lead=00days.tif',
     DAILY_GFS_DIR_NAME, init_date_string, init_date_string
   )
+  
+  if (!file.exists(input_file_name)) {
+    init_date_object <- init_date_object + 1
+    next
+  }
 
   log_message <- sprintf('Reading data from: "%s"...', input_file_name)
   print(log_message)
@@ -38,8 +46,13 @@ while (init_date_object <= LAST_INIT_DATE_OBJECT) {
     current_fcst_day_gfs_raster_stack <- stack(input_file_name)
     names(current_fcst_day_gfs_raster_stack) <- c('lat', 'temp', 'rh', 'ws', 'prec')
 
-    current_month_string <- substr(init_date_string, 5, 6)
+    valid_date_object <- init_date_object + strtoi(lead_time_days, base=10L)
+    valid_date_string <- format(valid_date_object, '%Y%m%d')
+    current_month_string <- substr(valid_date_string, 5, 6)
     current_month <- as.integer(current_month_string)
+    
+    log_message <- sprintf('Valid date = %s; month = %s', valid_date_string, current_month_string)
+    print(log_message)
 
     current_fcst_day_fwi_raster_stack <- fwiRaster(current_fcst_day_gfs_raster_stack, init=prev_fcst_day_fwi_raster_stack, mon=current_month, lat.adjust=TRUE, uppercase=FALSE)
 

@@ -1004,11 +1004,12 @@ def data_generator(option_dict):
     option_dict["target_field_name"]: Name of target field (a fire-weather
         index).
     option_dict["target_lead_time_days"]: Lead time for target field.
-    option_dict["target_lag_times_days"]: 1-D numpy array with lag times to be
-        used as predictors.  For example, if the target field is FFMC and the
-        lag times are {1, 2, 3} days, this means that FFMC fields from {1, 2, 3}
-        days ago will be in the predictors.  Just the 1-day lag time should be
-        enough, though.
+    option_dict["target_lag_times_days"]: 1-D numpy array with lag times for
+        lagged-target predictors.  A "lagged-target predictor" is the actual
+        target field at one lag time.
+    option_dict["gfs_forecast_target_lead_times_days"]: 1-D numpy array with
+        lead times for lead-target predictors.  A "lead-target predictor" is the
+        raw-GFS-forecast target field at one lead time.
     option_dict["target_cutoffs_for_classifn"]: 1-D numpy array of cutoffs for
         converting regression problem to classification problem.  For example,
         if this array is [20, 30], the three classes will be 0-20, 20-30, and
@@ -1016,6 +1017,9 @@ def data_generator(option_dict):
     option_dict["target_dir_name"]: Name of directory with target variable.
         Files therein will be found by `canadian_fwo_io.find_file` and read by
         `canadian_fwo_io.read_file`.
+    option_dict["gfs_forecast_target_dir_name"]: Name of directory with raw-GFS
+        forecasts of target variable.  Files therein will be found by
+        `gfs_daily_io.find_file` and read by `gfs_daily_io.read_file`.
     option_dict["target_normalization_file_name"]: Path to file with
         normalization params for target fields.  Will be read by
         `canadian_fwi_io.read_normalization_file`.
@@ -1892,6 +1896,7 @@ def train_model(
     validation_option_dict["init_date_limit_strings"]
     validation_option_dict["gfs_directory_name"]
     validation_option_dict["target_dir_name"]
+    validation_option_dict["gfs_forecast_target_dir_name"]
 
     :param loss_function_string: Loss function.  This string should be formatted
         such that `eval(loss_function_string)` returns the actual loss function.
@@ -1925,7 +1930,8 @@ def train_model(
     error_checking.assert_is_geq(early_stopping_patience_epochs, 5)
 
     validation_keys_to_keep = [
-        INIT_DATE_LIMITS_KEY, GFS_DIRECTORY_KEY, TARGET_DIRECTORY_KEY
+        INIT_DATE_LIMITS_KEY, GFS_DIRECTORY_KEY, TARGET_DIRECTORY_KEY,
+        GFS_FORECAST_TARGET_DIR_KEY
     ]
     for this_key in list(training_option_dict.keys()):
         if this_key in validation_keys_to_keep:
