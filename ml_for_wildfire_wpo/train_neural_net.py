@@ -24,11 +24,14 @@ def _run(template_file_name, output_dir_name,
          gfs_predictor_lead_times_hours, gfs_normalization_file_name,
          era5_constant_file_name, era5_constant_predictor_field_names,
          target_field_name, target_lead_time_days, target_lag_times_days,
+         gfs_forecast_target_lead_times_days,
          target_cutoffs_for_classifn, target_normalization_file_name,
          num_examples_per_batch, sentinel_value,
          gfs_dir_name_for_training, target_dir_name_for_training,
+         gfs_forecast_target_dir_name_for_training,
          init_date_limit_strings_for_training,
          gfs_dir_name_for_validation, target_dir_name_for_validation,
+         gfs_forecast_target_dir_name_for_validation,
          init_date_limit_strings_for_validation,
          num_epochs, num_training_batches_per_epoch,
          num_validation_batches_per_epoch,
@@ -53,15 +56,18 @@ def _run(template_file_name, output_dir_name,
     :param target_field_name: Same.
     :param target_lead_time_days: Same.
     :param target_lag_times_days: Same.
+    :param gfs_forecast_target_lead_times_days: Same.
     :param target_cutoffs_for_classifn: Same.
     :param target_normalization_file_name: Same.
     :param num_examples_per_batch: Same.
     :param sentinel_value: Same.
     :param gfs_dir_name_for_training: Same.
     :param target_dir_name_for_training: Same.
+    :param gfs_forecast_target_dir_name_for_training: Same.
     :param init_date_limit_strings_for_training: Same.
     :param gfs_dir_name_for_validation: Same.
     :param target_dir_name_for_validation: Same.
+    :param gfs_forecast_target_dir_name_for_validation: Same.
     :param init_date_limit_strings_for_validation: Same.
     :param num_epochs: Same.
     :param num_training_batches_per_epoch: Same.
@@ -93,6 +99,22 @@ def _run(template_file_name, output_dir_name,
     ):
         target_cutoffs_for_classifn = None
 
+    if (
+            len(gfs_forecast_target_lead_times_days) == 1 and
+            gfs_forecast_target_lead_times_days[0] <= 0
+    ):
+        gfs_forecast_target_lead_times_days = None
+        gfs_forecast_target_dir_name_for_training = None
+        gfs_forecast_target_dir_name_for_validation = None
+
+    if (
+            gfs_forecast_target_dir_name_for_training is None or
+            gfs_forecast_target_dir_name_for_validation is None
+    ):
+        gfs_forecast_target_lead_times_days = None
+        gfs_forecast_target_dir_name_for_training = None
+        gfs_forecast_target_dir_name_for_validation = None
+
     training_option_dict = {
         neural_net.INNER_LATITUDE_LIMITS_KEY: inner_latitude_limits_deg_n,
         neural_net.INNER_LONGITUDE_LIMITS_KEY: inner_longitude_limits_deg_e,
@@ -108,19 +130,25 @@ def _run(template_file_name, output_dir_name,
         neural_net.TARGET_FIELD_KEY: target_field_name,
         neural_net.TARGET_LEAD_TIME_KEY: target_lead_time_days,
         neural_net.TARGET_LAG_TIMES_KEY: target_lag_times_days,
+        neural_net.GFS_FCST_TARGET_LEAD_TIMES_KEY:
+            gfs_forecast_target_lead_times_days,
         neural_net.TARGET_CUTOFFS_KEY: target_cutoffs_for_classifn,
         neural_net.TARGET_NORM_FILE_KEY: target_normalization_file_name,
         neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
         neural_net.SENTINEL_VALUE_KEY: sentinel_value,
         neural_net.INIT_DATE_LIMITS_KEY: init_date_limit_strings_for_training,
         neural_net.GFS_DIRECTORY_KEY: gfs_dir_name_for_training,
-        neural_net.TARGET_DIRECTORY_KEY: target_dir_name_for_training
+        neural_net.TARGET_DIRECTORY_KEY: target_dir_name_for_training,
+        neural_net.GFS_FORECAST_TARGET_DIR_KEY:
+            gfs_forecast_target_dir_name_for_training
     }
 
     validation_option_dict = {
         neural_net.INIT_DATE_LIMITS_KEY: init_date_limit_strings_for_validation,
         neural_net.GFS_DIRECTORY_KEY: gfs_dir_name_for_validation,
-        neural_net.TARGET_DIRECTORY_KEY: target_dir_name_for_validation
+        neural_net.TARGET_DIRECTORY_KEY: target_dir_name_for_validation,
+        neural_net.GFS_FORECAST_TARGET_DIR_KEY:
+            gfs_forecast_target_dir_name_for_validation
     }
 
     print('Reading model template from: "{0:s}"...'.format(template_file_name))
@@ -209,6 +237,13 @@ if __name__ == '__main__':
             getattr(INPUT_ARG_OBJECT, training_args.TARGET_LAG_TIMES_ARG_NAME),
             dtype=int
         ),
+        gfs_forecast_target_lead_times_days=numpy.array(
+            getattr(
+                INPUT_ARG_OBJECT,
+                training_args.GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME
+            ),
+            dtype=int
+        ),
         target_cutoffs_for_classifn=numpy.array(
             getattr(INPUT_ARG_OBJECT, training_args.TARGET_CUTOFFS_ARG_NAME),
             dtype=float
@@ -228,6 +263,10 @@ if __name__ == '__main__':
         target_dir_name_for_training=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_TRAINING_DIR_ARG_NAME
         ),
+        gfs_forecast_target_dir_name_for_training=getattr(
+            INPUT_ARG_OBJECT,
+            training_args.GFS_FCST_TARGET_TRAINING_DIR_ARG_NAME
+        ),
         init_date_limit_strings_for_training=getattr(
             INPUT_ARG_OBJECT, training_args.TRAINING_DATE_LIMITS_ARG_NAME
         ),
@@ -236,6 +275,10 @@ if __name__ == '__main__':
         ),
         target_dir_name_for_validation=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_VALIDATION_DIR_ARG_NAME
+        ),
+        gfs_forecast_target_dir_name_for_validation=getattr(
+            INPUT_ARG_OBJECT,
+            training_args.GFS_FCST_TARGET_VALIDATION_DIR_ARG_NAME
         ),
         init_date_limit_strings_for_validation=getattr(
             INPUT_ARG_OBJECT, training_args.VALIDATION_DATE_LIMITS_ARG_NAME

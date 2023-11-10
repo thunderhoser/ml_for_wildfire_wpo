@@ -16,18 +16,24 @@ ERA5_CONSTANT_PREDICTORS_ARG_NAME = 'era5_constant_predictor_field_names'
 TARGET_FIELD_ARG_NAME = 'target_field_name'
 TARGET_LEAD_TIME_ARG_NAME = 'target_lead_time_days'
 TARGET_LAG_TIMES_ARG_NAME = 'target_lag_times_days'
+GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME = 'gfs_forecast_target_lead_times_days'
 TARGET_CUTOFFS_ARG_NAME = 'target_cutoffs_for_classifn'
 TARGET_NORM_FILE_ARG_NAME = 'target_normalization_file_name'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
 
-# TODO(thunderhoser): Need to support set of continuous training periods (so overall discontinuous).
 GFS_TRAINING_DIR_ARG_NAME = 'gfs_dir_name_for_training'
 TARGET_TRAINING_DIR_ARG_NAME = 'target_dir_name_for_training'
+GFS_FCST_TARGET_TRAINING_DIR_ARG_NAME = (
+    'gfs_forecast_target_dir_name_for_training'
+)
 TRAINING_DATE_LIMITS_ARG_NAME = 'gfs_init_date_limit_strings_for_training'
 
 GFS_VALIDATION_DIR_ARG_NAME = 'gfs_dir_name_for_validation'
 TARGET_VALIDATION_DIR_ARG_NAME = 'target_dir_name_for_validation'
+GFS_FCST_TARGET_VALIDATION_DIR_ARG_NAME = (
+    'gfs_forecast_target_dir_name_for_validation'
+)
 VALIDATION_DATE_LIMITS_ARG_NAME = 'gfs_init_date_limit_strings_for_validation'
 
 NUM_EPOCHS_ARG_NAME = 'num_epochs'
@@ -89,6 +95,11 @@ TARGET_LEAD_TIME_HELP_STRING = 'Lead time for target field.'
 TARGET_LAG_TIMES_HELP_STRING = (
     'List of lag times to be used for lagged-target predictors.'
 )
+GFS_FCST_TARGET_LEAD_TIMES_HELP_STRING = (
+    'List of lead times to be used for lead-target predictors.  A '
+    '"lead-target predictor" is the raw-GFS forecast of the target field (fire '
+    'weather index) at one lead time.'
+)
 TARGET_CUTOFFS_HELP_STRING = (
     'List of cutoffs for converting regression problem to classification '
     'problem.  For example, if this list is [20, 30], the three classes will '
@@ -113,6 +124,11 @@ TARGET_TRAINING_DIR_HELP_STRING = (
     'Name of directory with target fields.  Files therein will be found by '
     '`canadian_fwo_io.find_file` and read by `canadian_fwo_io.read_file`.'
 )
+GFS_FCST_TARGET_TRAINING_DIR_HELP_STRING = (
+    'Name of directory with raw-GFS-forecast target fields.  Files therein '
+    'will be found by `gfs_daily_io.find_file` and read by '
+    '`gfs_daily_io.read_file`.'
+)
 TRAINING_DATE_LIMITS_HELP_STRING = (
     'Length-2 list with first and last GFS model runs (init times in format '
     '"yyyymmdd") to be used for training.'
@@ -123,6 +139,11 @@ GFS_VALIDATION_DIR_HELP_STRING = 'Same as {0:s} but for validation.'.format(
 )
 TARGET_VALIDATION_DIR_HELP_STRING = 'Same as {0:s} but for validation.'.format(
     TARGET_TRAINING_DIR_ARG_NAME
+)
+GFS_FCST_TARGET_VALIDATION_DIR_HELP_STRING = (
+    'Same as {0:s} but for validation.'
+).format(
+    GFS_FCST_TARGET_TRAINING_DIR_ARG_NAME
 )
 VALIDATION_DATE_LIMITS_HELP_STRING = 'Same as {0:s} but for validation.'.format(
     TRAINING_DATE_LIMITS_ARG_NAME
@@ -217,6 +238,10 @@ def add_input_args(parser_object):
         required=True, help=TARGET_LAG_TIMES_HELP_STRING
     )
     parser_object.add_argument(
+        '--' + GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME, type=int, nargs='+',
+        required=True, help=GFS_FCST_TARGET_LEAD_TIMES_HELP_STRING
+    )
+    parser_object.add_argument(
         '--' + TARGET_CUTOFFS_ARG_NAME, type=float, nargs='+',
         required=False, default=[-1], help=TARGET_CUTOFFS_HELP_STRING
     )
@@ -242,6 +267,10 @@ def add_input_args(parser_object):
         required=True, help=TARGET_TRAINING_DIR_HELP_STRING
     )
     parser_object.add_argument(
+        '--' + GFS_FCST_TARGET_TRAINING_DIR_ARG_NAME, type=str,
+        required=True, help=GFS_FCST_TARGET_TRAINING_DIR_HELP_STRING
+    )
+    parser_object.add_argument(
         '--' + TRAINING_DATE_LIMITS_ARG_NAME, type=str, nargs=2,
         required=True, help=TRAINING_DATE_LIMITS_HELP_STRING
     )
@@ -253,6 +282,10 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + TARGET_VALIDATION_DIR_ARG_NAME, type=str,
         required=True, help=TARGET_VALIDATION_DIR_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + GFS_FCST_TARGET_VALIDATION_DIR_ARG_NAME, type=str,
+        required=True, help=GFS_FCST_TARGET_VALIDATION_DIR_HELP_STRING
     )
     parser_object.add_argument(
         '--' + VALIDATION_DATE_LIMITS_ARG_NAME, type=str, nargs=2,
