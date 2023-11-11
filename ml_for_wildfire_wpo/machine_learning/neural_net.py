@@ -302,11 +302,14 @@ def _find_gfs_forecast_target_file_1example(daily_gfs_dir_name,
     :return: daily_gfs_file_name: File path.
     """
 
-    return gfs_daily_io.find_file(
-        directory_name=daily_gfs_dir_name,
-        init_date_string=init_date_string,
-        raise_error_if_missing=True
-    )
+    try:
+        return gfs_daily_io.find_file(
+            directory_name=daily_gfs_dir_name,
+            init_date_string=init_date_string,
+            raise_error_if_missing=True
+        )
+    except:
+        return None
 
 
 def _find_target_files_needed_1example(
@@ -848,6 +851,9 @@ def _read_gfs_forecast_targets_1example(
         init_date_string=init_date_string
     )
 
+    if daily_gfs_file_name is None:
+        return None, None, None
+
     if desired_row_indices is None or len(desired_row_indices) == 0:
         dgfst = gfs_daily_io.read_file(daily_gfs_file_name)
 
@@ -1223,6 +1229,10 @@ def data_generator(option_dict):
                     target_field_name=target_field_name,
                     norm_param_table_xarray=target_norm_param_table_xarray
                 )
+
+                if new_matrix is None:
+                    gfs_file_index += 1
+                    continue
 
                 this_laglead_target_predictor_matrix = numpy.concatenate(
                     (this_laglead_target_predictor_matrix, new_matrix),
