@@ -1,6 +1,6 @@
 #!/bin/tcsh
 
-#SBATCH --job-name="evaluate_neural_nets_ungridded"
+#SBATCH --job-name="plot_evaluation_gridded"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="gpu"
@@ -11,14 +11,14 @@
 ##SBATCH --ntasks=1
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
-#SBATCH --time=00:30:00
-#SBATCH --array=1-90
+#SBATCH --time=00:10:00
+#SBATCH --array=66
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=evaluate_neural_nets_ungridded_%A_%a.out
+#SBATCH --output=plot_evaluation_gridded_%A_%a.out
 
 module load cuda/10.1
 source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
@@ -40,11 +40,8 @@ set gfs_lead_time_string=${GFS_LEAD_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}
 set model_dir_name="${TOP_MODEL_DIR_NAME}/num-conv-layers-per-block=${num_layers_per_block}_num-first-layer-filters=${num_first_layer_filters}_gfs-lead-times-hours=${gfs_lead_time_string}"
 echo $model_dir_name
 
-python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
---input_prediction_dir_name="${model_dir_name}/validation" \
---init_date_limit_strings "20210101" "20211210" \
---num_bootstrap_reps=1 \
---num_reliability_bins=102 \
---reliability_bin_edge_limits 0 102 \
---per_grid_cell=0 \
---output_file_name="${model_dir_name}/validation/ungridded_evaluation.nc"
+python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
+--input_evaluation_file_name="${model_dir_name}/validation/gridded_evaluation.nc" \
+--min_colour_percentile=0 \
+--max_colour_percentile=100 \
+--output_dir_name="${model_dir_name}/validation/gridded_evaluation"
