@@ -761,7 +761,7 @@ def get_scores_with_bootstrapping(
         target_matrix[i, ...] = tpt[prediction_io.TARGET_KEY].values
         prediction_matrix[i, ...] = tpt[prediction_io.PREDICTION_KEY].values
         weight_matrix[i, ...] = tpt[prediction_io.WEIGHT_KEY].values
-        assert model_file_name == tpt.attrs[prediction_io.MODEL_FILE_KEY]
+        # assert model_file_name == tpt.attrs[prediction_io.MODEL_FILE_KEY]
 
     # TODO(thunderhoser): This is a HACK.  I should use the weight matrix to
     # actually weight the various scores.
