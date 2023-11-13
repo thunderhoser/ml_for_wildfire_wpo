@@ -39,7 +39,7 @@ while ($j <= $#LEAD_TIMES_DAYS)
     python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
     --input_prediction_dir_name="${DAILY_GFS_DIR_NAME}/prediction_files/fine_fuel_moisture_code/${lead_time_days}day_lead" \
     --init_date_limit_strings "20210101" "20211210" \
-    --num_bootstrap_reps=100 \
+    --num_bootstrap_reps=1 \
     --num_reliability_bins=102 \
     --reliability_bin_edge_limits 0 102 \
     --per_grid_cell=0 \
