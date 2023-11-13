@@ -1,6 +1,6 @@
 #!/bin/tcsh
 
-#SBATCH --job-name="plot_evaluation_gridded_test"
+#SBATCH --job-name="apply_neural_nets_test"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="gpu"
@@ -11,38 +11,42 @@
 ##SBATCH --ntasks=1
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
-#SBATCH --time=02:00:00
-#SBATCH --array=1,8,15,22,29,36,43,50,57,64,78,85
+#SBATCH --time=04:00:00
+#SBATCH --array=1-90
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_evaluation_gridded_test_%A_%a.out
+#SBATCH --output=apply_neural_nets_test_%A_%a.out
 
 module load cuda/10.1
 source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
 conda activate base
 
 set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
-set TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment01_ffmc_regression"
+set TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment02_ffmc_regression/further_training"
 
 set GFS_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/merged/normalized_params_from_2019-2020"
 set TARGET_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+set GFS_FORECAST_TARGET_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/direct_fwi_calc/processed/daily/fwi"
 
 set LAYERS_PER_BLOCK_COUNTS=("1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2" "1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2" "1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2" "1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2" "1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2")
 set FIRST_LAYER_FILTER_COUNTS=("10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30")
+set GFS_LEAD_TIME_COUNTS=("02" "03" "04" "04" "05" "06" "07" "09" "11" "02" "03" "04" "04" "05" "06" "07" "09" "11" "02" "03" "04" "04" "05" "06" "07" "09" "11" "02" "03" "04" "04" "05" "06" "07" "09" "11" "02" "03" "04" "04" "05" "06" "07" "09" "11" "02" "03" "04" "04" "05" "06" "07" "09" "11" "02" "03" "04" "04" "05" "06" "07" "09" "11" "02" "03" "04" "04" "05" "06" "07" "09" "11" "02" "03" "04" "04" "05" "06" "07" "09" "11" "02" "03" "04" "04" "05" "06" "07" "09" "11")
 set GFS_LEAD_TIME_STRINGS=("0-48" "0-24-48" "0-24-48-72" "0-18-36-48" "0-12-24-36-48" "0-18-36-48-60-72" "0-12-24-36-48-60-72" "0-6-12-18-24-30-36-42-48" "0-6-12-18-24-30-36-42-48-60-72" "0-48" "0-24-48" "0-24-48-72" "0-18-36-48" "0-12-24-36-48" "0-18-36-48-60-72" "0-12-24-36-48-60-72" "0-6-12-18-24-30-36-42-48" "0-6-12-18-24-30-36-42-48-60-72" "0-48" "0-24-48" "0-24-48-72" "0-18-36-48" "0-12-24-36-48" "0-18-36-48-60-72" "0-12-24-36-48-60-72" "0-6-12-18-24-30-36-42-48" "0-6-12-18-24-30-36-42-48-60-72" "0-48" "0-24-48" "0-24-48-72" "0-18-36-48" "0-12-24-36-48" "0-18-36-48-60-72" "0-12-24-36-48-60-72" "0-6-12-18-24-30-36-42-48" "0-6-12-18-24-30-36-42-48-60-72" "0-48" "0-24-48" "0-24-48-72" "0-18-36-48" "0-12-24-36-48" "0-18-36-48-60-72" "0-12-24-36-48-60-72" "0-6-12-18-24-30-36-42-48" "0-6-12-18-24-30-36-42-48-60-72" "0-48" "0-24-48" "0-24-48-72" "0-18-36-48" "0-12-24-36-48" "0-18-36-48-60-72" "0-12-24-36-48-60-72" "0-6-12-18-24-30-36-42-48" "0-6-12-18-24-30-36-42-48-60-72" "0-48" "0-24-48" "0-24-48-72" "0-18-36-48" "0-12-24-36-48" "0-18-36-48-60-72" "0-12-24-36-48-60-72" "0-6-12-18-24-30-36-42-48" "0-6-12-18-24-30-36-42-48-60-72" "0-48" "0-24-48" "0-24-48-72" "0-18-36-48" "0-12-24-36-48" "0-18-36-48-60-72" "0-12-24-36-48-60-72" "0-6-12-18-24-30-36-42-48" "0-6-12-18-24-30-36-42-48-60-72" "0-48" "0-24-48" "0-24-48-72" "0-18-36-48" "0-12-24-36-48" "0-18-36-48-60-72" "0-12-24-36-48-60-72" "0-6-12-18-24-30-36-42-48" "0-6-12-18-24-30-36-42-48-60-72" "0-48" "0-24-48" "0-24-48-72" "0-18-36-48" "0-12-24-36-48" "0-18-36-48-60-72" "0-12-24-36-48-60-72" "0-6-12-18-24-30-36-42-48" "0-6-12-18-24-30-36-42-48-60-72")
 
 set num_layers_per_block=${LAYERS_PER_BLOCK_COUNTS[$SLURM_ARRAY_TASK_ID]}
 set num_first_layer_filters=${FIRST_LAYER_FILTER_COUNTS[$SLURM_ARRAY_TASK_ID]}
+set num_gfs_lead_times=${GFS_LEAD_TIME_COUNTS[$SLURM_ARRAY_TASK_ID]}
 set gfs_lead_time_string=${GFS_LEAD_TIME_STRINGS[$SLURM_ARRAY_TASK_ID]}
 
 set model_dir_name="${TOP_MODEL_DIR_NAME}/num-conv-layers-per-block=${num_layers_per_block}_num-first-layer-filters=${num_first_layer_filters}_gfs-lead-times-hours=${gfs_lead_time_string}"
 echo $model_dir_name
 
-python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
---input_evaluation_file_name="${model_dir_name}/validation/gridded_evaluation.nc" \
---min_colour_percentile=1 \
---max_colour_percentile=99 \
---output_dir_name="${model_dir_name}/validation/gridded_evaluation"
+python3 -u "${CODE_DIR_NAME}/apply_neural_net.py" \
+--input_model_file_name="${model_dir_name}/model.h5" \
+--input_gfs_directory_name="${GFS_DIR_NAME}" \
+--input_target_dir_name="${TARGET_DIR_NAME}" \
+--init_date_limit_strings "20210101" "20211210" \
+--output_dir_name="${model_dir_name}/validation"
