@@ -1,9 +1,9 @@
 #!/bin/tcsh
 
-#SBATCH --job-name="convert_fwi_forecasts_to_prediction_files_20190522"
+#SBATCH --job-name="evaluate_ffmc_forecasts"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
-#SBATCH --qos="batch"
+#SBATCH --qos="gpu"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=1
@@ -11,14 +11,14 @@
 ##SBATCH --ntasks=1
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
-#SBATCH --time=03:30:00
+#SBATCH --time=00:05:00
 #SBATCH --array=1
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=convert_fwi_forecasts_to_prediction_files_20190522_%A_%a.out
+#SBATCH --output=evaluate_ffmc_forecasts_%A_%a.out
 
 module load cuda/10.1
 source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
@@ -31,31 +31,19 @@ set TARGET_NORM_FILE_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wil
 set ERA5_CONSTANT_FILE_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_constants.nc"
 
 set LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "11" "12" "13" "14")
+set j=1
 
-set INIT_DATE_STRINGS=("20190522")
-set i=$SLURM_ARRAY_TASK_ID
-
-while ($i <= `expr $SLURM_ARRAY_TASK_ID + 11` && $i <= $#INIT_DATE_STRINGS)
-    set init_date_string="${INIT_DATE_STRINGS[$i]}"
-    set j=1
+while ($j <= $#LEAD_TIMES_DAYS)
+    set lead_time_days="${LEAD_TIMES_DAYS[$j]}"
     
-    while ($j <= $#LEAD_TIMES_DAYS)
-        set lead_time_days="${LEAD_TIMES_DAYS[$j]}"
+    python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
+    --input_prediction_dir_name="${DAILY_GFS_DIR_NAME}/prediction_files/fine_fuel_moisture_code/${lead_time_days}day_lead" \
+    --init_date_limit_strings "20210101" "20211210" \
+    --num_bootstrap_reps=100 \
+    --num_reliability_bins=102 \
+    --reliability_bin_edge_limits 0 102 \
+    --per_grid_cell=0 \
+    --output_file_name="${DAILY_GFS_DIR_NAME}/prediction_files/fine_fuel_moisture_code/${lead_time_days}day_lead/evaluation_20210101-20211210.nc"
     
-        python3 -u "${CODE_DIR_NAME}/convert_raw_gfs_fwi_to_prediction_files.py" \
-        --input_daily_gfs_dir_name="${DAILY_GFS_DIR_NAME}" \
-        --input_canadian_fwi_dir_name="${CANADIAN_FWI_DIR_NAME}" \
-        --input_era5_constant_file_name="${ERA5_CONSTANT_FILE_NAME}" \
-        --input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
-        --init_date_string="${init_date_string}" \
-        --lead_time_days=${lead_time_days} \
-        --target_field_name="fine_fuel_moisture_code" \
-        --latitude_limits_deg_n 17 73 \
-        --longitude_limits_deg_e 171 -65 \
-        --output_prediction_dir_name="${DAILY_GFS_DIR_NAME}/prediction_files/fine_fuel_moisture_code/${lead_time_days}day_lead"
-        
-        @ j = $j + 1
-    end
-    
-    @ i = $i + 1
+    @ j = $j + 1
 end
