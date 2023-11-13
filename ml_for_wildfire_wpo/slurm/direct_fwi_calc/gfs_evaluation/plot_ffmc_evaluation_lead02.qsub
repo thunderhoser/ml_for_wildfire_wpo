@@ -1,0 +1,50 @@
+#!/bin/tcsh
+
+#SBATCH --job-name="plot_ffmc_evaluation_lead02"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpu"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=00:05:00
+#SBATCH --array=1
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_ffmc_evaluation_lead02_%A_%a.out
+
+module load cuda/10.1
+source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
+conda activate base
+
+set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+set DAILY_GFS_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/direct_fwi_calc/processed/daily/fwi"
+set CANADIAN_FWI_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+set TARGET_NORM_FILE_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi/z_score_params_2019-2020.nc"
+set ERA5_CONSTANT_FILE_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_constants.nc"
+
+set LEAD_TIMES_DAYS=("02")
+set j=1
+
+while ($j <= $#LEAD_TIMES_DAYS)
+    set lead_time_days="${LEAD_TIMES_DAYS[$j]}"
+    
+    python3 -u "${CODE_DIR_NAME}/plot_ungridded_evaluation.py" \
+    --input_eval_file_names "${DAILY_GFS_DIR_NAME}/prediction_files/fine_fuel_moisture_code/${lead_time_days}day_lead/evaluation_20210101-20211210.nc" \
+    --line_styles "solid" \
+    --line_colours "217_95_2" \
+    --set_descriptions "model" \
+    --plot_full_error_distributions=1 \
+    --confidence_level=0.95 \
+    --report_metrics_in_titles=1 \
+    --output_dir_name="${DAILY_GFS_DIR_NAME}/prediction_files/fine_fuel_moisture_code/${lead_time_days}day_lead/evaluation_20210101-20211210"
+    
+    @ j = $j + 1
+end
