@@ -1511,6 +1511,9 @@ def create_data(option_dict, init_date_string):
             norm_param_table_xarray=target_norm_param_table_xarray
         )[0]
 
+        print(laglead_target_predictor_matrix.shape)
+        print(new_matrix.shape)
+
         laglead_target_predictor_matrix = numpy.concatenate(
             (laglead_target_predictor_matrix, new_matrix),
             axis=-2
