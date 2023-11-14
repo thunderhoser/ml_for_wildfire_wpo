@@ -155,33 +155,40 @@ def _plot_attributes_diagram(
     :param force_plot_legend: Boolean flag.
     """
 
+    target_indices = numpy.array([
+        numpy.where(
+            etx.coords[regression_eval.FIELD_DIM].values == target_field_name
+        )[0][0]
+        for etx in evaluation_tables_xarray
+    ], dtype=int)
+
     mean_predictions_by_set = [
-        t[regression_eval.RELIABILITY_X_KEY].values
-        for t in evaluation_tables_xarray
+        etx[regression_eval.RELIABILITY_X_KEY].values[k, ...]
+        for etx, k in zip(evaluation_tables_xarray, target_indices)
     ]
     mean_observations_by_set = [
-        t[regression_eval.RELIABILITY_Y_KEY].values
-        for t in evaluation_tables_xarray
+        etx[regression_eval.RELIABILITY_Y_KEY].values[k, ...]
+        for etx, k in zip(evaluation_tables_xarray, target_indices)
     ]
     bin_centers_by_set = [
-        t[regression_eval.RELIABILITY_BIN_CENTER_KEY].values
-        for t in evaluation_tables_xarray
+        etx[regression_eval.RELIABILITY_BIN_CENTER_KEY].values[k, :]
+        for etx, k in zip(evaluation_tables_xarray, target_indices)
     ]
     example_counts_by_set = [
-        t[regression_eval.RELIABILITY_COUNT_KEY].values
-        for t in evaluation_tables_xarray
+        etx[regression_eval.RELIABILITY_COUNT_KEY].values[k, :]
+        for etx, k in zip(evaluation_tables_xarray, target_indices)
     ]
     inverted_example_counts_by_set = [
-        t[regression_eval.INV_RELIABILITY_COUNT_KEY].values
-        for t in evaluation_tables_xarray
+        etx[regression_eval.INV_RELIABILITY_COUNT_KEY].values[k, :]
+        for etx, k in zip(evaluation_tables_xarray, target_indices)
     ]
     reliabilities_by_set = [
-        t[regression_eval.RELIABILITY_KEY].values
-        for t in evaluation_tables_xarray
+        etx[regression_eval.RELIABILITY_KEY].values[k, :]
+        for etx, k in zip(evaluation_tables_xarray, target_indices)
     ]
     mse_skill_scores_by_set = [
-        t[regression_eval.MSE_SKILL_SCORE_KEY].values
-        for t in evaluation_tables_xarray
+        etx[regression_eval.MSE_SKILL_SCORE_KEY].values[k, :]
+        for etx, k in zip(evaluation_tables_xarray, target_indices)
     ]
 
     concat_values = numpy.concatenate([
@@ -413,7 +420,7 @@ def _run(evaluation_file_names, line_styles, line_colour_strings,
 
     # Do actual stuff.
     evaluation_tables_xarray = [xarray.Dataset()] * num_evaluation_sets
-    target_field_name = None
+    target_field_names = None
     target_norm_file_name = None
 
     for i in range(num_evaluation_sets):
@@ -447,10 +454,10 @@ def _run(evaluation_file_names, line_styles, line_colour_strings,
         goptd = generator_option_dict
 
         if i == 0:
-            target_field_name = goptd[neural_net.TARGET_FIELD_KEY]
+            target_field_names = goptd[neural_net.TARGET_FIELDS_KEY]
             target_norm_file_name = goptd[neural_net.TARGET_NORM_FILE_KEY]
 
-        assert target_field_name == goptd[neural_net.TARGET_FIELD_KEY]
+        assert target_field_names == goptd[neural_net.TARGET_FIELDS_KEY]
         assert target_norm_file_name == goptd[neural_net.TARGET_NORM_FILE_KEY]
 
     print('Reading normalization params from: "{0:s}"...'.format(
@@ -461,70 +468,82 @@ def _run(evaluation_file_names, line_styles, line_colour_strings,
     )
     tnpt = target_norm_param_table_xarray
 
-    k = numpy.where(
-        tnpt.coords[canadian_fwi_utils.FIELD_DIM].values == target_field_name
-    )[0][0]
-    climo_mean_target_value = tnpt[canadian_fwi_utils.MEAN_VALUE_KEY].values[k]
+    these_indices = numpy.array([
+        numpy.where(tnpt.coords[canadian_fwi_utils.FIELD_DIM].values == f)[0][0]
+        for f in target_field_names
+    ], dtype=int)
 
-    _plot_attributes_diagram(
-        evaluation_tables_xarray=evaluation_tables_xarray,
-        line_styles=line_styles,
-        line_colours=line_colours,
-        set_descriptions_abbrev=set_descriptions_abbrev,
-        set_descriptions_verbose=set_descriptions_verbose,
-        confidence_level=confidence_level,
-        climo_mean_target_value=climo_mean_target_value,
-        target_field_name=target_field_name,
-        report_reliability_in_title=report_metrics_in_titles,
-        output_dir_name=output_dir_name
+    climo_mean_target_values = (
+        tnpt[canadian_fwi_utils.MEAN_VALUE_KEY].values[these_indices]
     )
+    num_target_fields = len(target_field_names)
 
-    for i in range(num_evaluation_sets):
-        figure_object, axes_object = pyplot.subplots(
-            1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
-        )
-        etx = evaluation_tables_xarray[i]
-
-        eval_plotting.plot_taylor_diagram(
-            target_stdev=numpy.nanmean(
-                etx[regression_eval.TARGET_STDEV_KEY].values
-            ),
-            prediction_stdev=numpy.nanmean(
-                etx[regression_eval.PREDICTION_STDEV_KEY].values
-            ),
-            correlation=numpy.nanmean(
-                etx[regression_eval.CORRELATION_KEY].values
-            ),
-            marker_colour=line_colours[i],
-            figure_object=figure_object
+    for k in range(num_target_fields):
+        _plot_attributes_diagram(
+            evaluation_tables_xarray=evaluation_tables_xarray,
+            line_styles=line_styles,
+            line_colours=line_colours,
+            set_descriptions_abbrev=set_descriptions_abbrev,
+            set_descriptions_verbose=set_descriptions_verbose,
+            confidence_level=confidence_level,
+            climo_mean_target_value=climo_mean_target_values[k],
+            target_field_name=target_field_names[k],
+            report_reliability_in_title=report_metrics_in_titles,
+            output_dir_name=output_dir_name
         )
 
-        title_string = 'Taylor diagram for {0:s}'.format(
-            TARGET_FIELD_NAME_TO_VERBOSE[target_field_name]
-        )
-        if report_metrics_in_titles:
-            title_string += (
-                '\nActual/pred stdevs = {0:.2f}, {1:.2f}; corr = {2:.2f}'
-            ).format(
-                numpy.nanmean(etx[regression_eval.TARGET_STDEV_KEY].values),
-                numpy.nanmean(etx[regression_eval.PREDICTION_STDEV_KEY].values),
-                numpy.nanmean(etx[regression_eval.CORRELATION_KEY].values)
+        for i in range(num_evaluation_sets):
+            figure_object, axes_object = pyplot.subplots(
+                1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+            )
+            etx = evaluation_tables_xarray[i]
+
+            eval_plotting.plot_taylor_diagram(
+                target_stdev=numpy.nanmean(
+                    etx[regression_eval.TARGET_STDEV_KEY].values[k, :]
+                ),
+                prediction_stdev=numpy.nanmean(
+                    etx[regression_eval.PREDICTION_STDEV_KEY].values[k, :]
+                ),
+                correlation=numpy.nanmean(
+                    etx[regression_eval.CORRELATION_KEY].values[k, :]
+                ),
+                marker_colour=line_colours[i],
+                figure_object=figure_object
             )
 
-        axes_object.set_title(title_string)
+            title_string = 'Taylor diagram for {0:s}'.format(
+                TARGET_FIELD_NAME_TO_VERBOSE[target_field_names[k]]
+            )
+            if report_metrics_in_titles:
+                title_string += (
+                    '\nActual/pred stdevs = {0:.2f}, {1:.2f}; corr = {2:.2f}'
+                ).format(
+                    numpy.nanmean(
+                        etx[regression_eval.TARGET_STDEV_KEY].values[k, :]
+                    ),
+                    numpy.nanmean(
+                        etx[regression_eval.PREDICTION_STDEV_KEY].values[k, :]
+                    ),
+                    numpy.nanmean(
+                        etx[regression_eval.CORRELATION_KEY].values[k, :]
+                    )
+                )
 
-        figure_file_name = '{0:s}/{1:s}_taylor_{2:s}.jpg'.format(
-            output_dir_name,
-            target_field_name.replace('_', '-'),
-            set_descriptions_abbrev[i]
-        )
+            axes_object.set_title(title_string)
 
-        print('Saving figure to: "{0:s}"...'.format(figure_file_name))
-        figure_object.savefig(
-            figure_file_name, dpi=FIGURE_RESOLUTION_DPI,
-            pad_inches=0, bbox_inches='tight'
-        )
-        pyplot.close(figure_object)
+            figure_file_name = '{0:s}/{1:s}_taylor_{2:s}.jpg'.format(
+                output_dir_name,
+                target_field_names[k].replace('_', '-'),
+                set_descriptions_abbrev[i]
+            )
+
+            print('Saving figure to: "{0:s}"...'.format(figure_file_name))
+            figure_object.savefig(
+                figure_file_name, dpi=FIGURE_RESOLUTION_DPI,
+                pad_inches=0, bbox_inches='tight'
+            )
+            pyplot.close(figure_object)
 
     if not plot_full_error_distributions:
         return
@@ -551,44 +570,53 @@ def _run(evaluation_file_names, line_styles, line_colour_strings,
                 )
                 error_matrix = numpy.full(these_dim, numpy.nan)
 
+            these_indices = numpy.array([
+                numpy.where(tpt[prediction_io.FIELD_NAME_KEY].values == f)[0][0]
+                for f in target_field_names
+            ], dtype=int)
+
             error_matrix[j, ...] = (
-                tpt[prediction_io.PREDICTION_KEY].values -
-                tpt[prediction_io.TARGET_KEY].values
+                tpt[prediction_io.PREDICTION_KEY].values[..., these_indices] -
+                tpt[prediction_io.TARGET_KEY].values[..., these_indices]
             )
             error_matrix[j, ...][
-                tpt[prediction_io.WEIGHT_KEY].values < 0.05
+                numpy.expand_dims(tpt[prediction_io.WEIGHT_KEY].values, axis=-1)
+                < 0.05
             ] = numpy.nan
 
-        error_values = numpy.ravel(error_matrix)
-        error_values = error_values[numpy.invert(numpy.isnan(error_values))]
+        for k in range(num_target_fields):
+            error_values = numpy.ravel(error_matrix[..., k])
+            error_values = error_values[numpy.invert(numpy.isnan(error_values))]
 
-        figure_object, axes_object = pyplot.subplots(
-            1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
-        )
-        eval_plotting.plot_error_distribution(
-            error_values=error_values,
-            min_error_to_plot=numpy.percentile(error_values, 0.),
-            max_error_to_plot=numpy.percentile(error_values, 100.),
-            axes_object=axes_object
-        )
+            figure_object, axes_object = pyplot.subplots(
+                1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+            )
+            eval_plotting.plot_error_distribution(
+                error_values=error_values,
+                min_error_to_plot=numpy.percentile(error_values, 0.),
+                max_error_to_plot=numpy.percentile(error_values, 100.),
+                axes_object=axes_object
+            )
 
-        title_string = 'Error distribution for {0:s}'.format(
-            TARGET_FIELD_NAME_TO_VERBOSE[target_field_name]
-        )
-        axes_object.set_title(title_string)
+            title_string = 'Error distribution for {0:s}'.format(
+                TARGET_FIELD_NAME_TO_VERBOSE[target_field_names[k]]
+            )
+            axes_object.set_title(title_string)
 
-        figure_file_name = '{0:s}/{1:s}_error-distribution_{2:s}.jpg'.format(
-            output_dir_name,
-            target_field_name.replace('_', '-'),
-            set_descriptions_abbrev[i]
-        )
+            figure_file_name = (
+                '{0:s}/{1:s}_error-distribution_{2:s}.jpg'
+            ).format(
+                output_dir_name,
+                target_field_names[k].replace('_', '-'),
+                set_descriptions_abbrev[i]
+            )
 
-        print('Saving figure to: "{0:s}"...'.format(figure_file_name))
-        figure_object.savefig(
-            figure_file_name, dpi=FIGURE_RESOLUTION_DPI,
-            pad_inches=0, bbox_inches='tight'
-        )
-        pyplot.close(figure_object)
+            print('Saving figure to: "{0:s}"...'.format(figure_file_name))
+            figure_object.savefig(
+                figure_file_name, dpi=FIGURE_RESOLUTION_DPI,
+                pad_inches=0, bbox_inches='tight'
+            )
+            pyplot.close(figure_object)
 
 
 if __name__ == '__main__':

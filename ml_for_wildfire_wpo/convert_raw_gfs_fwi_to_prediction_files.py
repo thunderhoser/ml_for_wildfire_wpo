@@ -30,13 +30,14 @@ DATE_FORMAT = gfs_daily_io.DATE_FORMAT
 DAYS_TO_SECONDS = 86400
 DEGREES_TO_RADIANS = numpy.pi / 180.
 
+TARGET_FIELD_NAMES = canadian_fwi_utils.ALL_FIELD_NAMES
+
 DAILY_GFS_DIR_ARG_NAME = 'input_daily_gfs_dir_name'
 CANADIAN_FWI_DIR_ARG_NAME = 'input_canadian_fwi_dir_name'
 ERA5_CONSTANT_FILE_ARG_NAME = 'input_era5_constant_file_name'
 TARGET_NORM_FILE_ARG_NAME = 'input_target_norm_file_name'
 INIT_DATE_ARG_NAME = 'init_date_string'
 LEAD_TIME_ARG_NAME = 'lead_time_days'
-TARGET_FIELD_ARG_NAME = 'target_field_name'
 LATITUDE_LIMITS_ARG_NAME = 'latitude_limits_deg_n'
 LONGITUDE_LIMITS_ARG_NAME = 'longitude_limits_deg_e'
 OUTPUT_DIR_ARG_NAME = 'output_prediction_dir_name'
@@ -59,7 +60,7 @@ ERA5_CONSTANT_FILE_HELP_STRING = (
 TARGET_NORM_FILE_HELP_STRING = (
     'Path to file with normalization parameters for all target fields (FWIs).  '
     'This file will be read by `canadian_fwi_io.read_normalization_file` and '
-    'used to determine the climatological target value, which is used to '
+    'used to determine the climatological target values, which are used to '
     'compute skill scores.'
 )
 INIT_DATE_HELP_STRING = (
@@ -70,11 +71,6 @@ LEAD_TIME_HELP_STRING = (
     'Lead time for FWI forecast.  Predictions for only this lead will be '
     'written to the output files.'
 )
-TARGET_FIELD_HELP_STRING = (
-    'Name of target field (i.e., the particular fire-weather index).  '
-    'Predictions for only this field will be written to the output files.'
-)
-
 LATITUDE_LIMITS_HELP_STRING = (
     'Length-2 list with meridional limits (deg north) of bounding box for '
     'prediction domain.'
@@ -115,10 +111,6 @@ INPUT_ARG_PARSER.add_argument(
     help=LEAD_TIME_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + TARGET_FIELD_ARG_NAME, type=str, required=True,
-    help=TARGET_FIELD_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
     '--' + LATITUDE_LIMITS_ARG_NAME, type=float, nargs=2,
     required=True, help=LATITUDE_LIMITS_HELP_STRING
 )
@@ -134,8 +126,8 @@ INPUT_ARG_PARSER.add_argument(
 
 def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
          era5_constant_file_name, target_norm_file_name,
-         init_date_string, lead_time_days, target_field_name,
-         latitude_limits_deg_n, longitude_limits_deg_e, output_dir_name):
+         init_date_string, lead_time_days, latitude_limits_deg_n,
+         longitude_limits_deg_e, output_dir_name):
     """Converts raw-GFS FWI forecasts to prediction files.
 
     This is effectively the main method.
@@ -146,7 +138,6 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
     :param target_norm_file_name: Same.
     :param init_date_string: Same.
     :param lead_time_days: Same.
-    :param target_field_name: Same.
     :param latitude_limits_deg_n: Same.
     :param longitude_limits_deg_e: Same.
     :param output_dir_name: Same.
@@ -188,10 +179,11 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
     )
 
     daily_gfs_table_xarray = dgfst
-    prediction_matrix = gfs_daily_utils.get_field(
-        daily_gfs_table_xarray=daily_gfs_table_xarray,
-        field_name=target_field_name
-    )[..., 0]
+    prediction_matrix = numpy.stack([
+        gfs_daily_utils.get_field(
+            daily_gfs_table_xarray=daily_gfs_table_xarray, field_name=f
+        ) for f in TARGET_FIELD_NAMES
+    ], axis=-1)
 
     # Create target matrix.
     init_date_unix_sec = time_conversion.string_to_unix_sec(
@@ -236,10 +228,11 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
     )
 
     canadian_fwi_table_xarray = cfwit
-    target_matrix = canadian_fwi_utils.get_field(
-        fwi_table_xarray=canadian_fwi_table_xarray,
-        field_name=target_field_name
-    )
+    target_matrix = numpy.stack([
+        canadian_fwi_utils.get_field(
+            fwi_table_xarray=canadian_fwi_table_xarray, field_name=f
+        ) for f in TARGET_FIELD_NAMES
+    ], axis=-1)
 
     # Create weight matrix.
     print('Reading data from: "{0:s}"...'.format(era5_constant_file_name))
@@ -290,7 +283,7 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
 
     # Create fake neural-net metafile.
     generator_option_dict = {
-        neural_net.TARGET_FIELD_KEY: target_field_name,
+        neural_net.TARGET_FIELDS_KEY: TARGET_FIELD_NAMES,
         neural_net.TARGET_NORM_FILE_KEY: target_norm_file_name
     }
 
@@ -328,14 +321,16 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
     print('Writing prediction file: "{0:s}"...'.format(prediction_file_name))
     prediction_io.write_file(
         netcdf_file_name=prediction_file_name,
-        target_matrix_with_weights=numpy.stack(
-            (target_matrix, weight_matrix), axis=-1
+        target_matrix_with_weights=numpy.concatenate(
+            (target_matrix, numpy.expand_dims(weight_matrix, axis=-1)),
+            axis=-1
         ),
         prediction_matrix=prediction_matrix,
         grid_latitudes_deg_n=
         era5ct.coords[era5_constant_utils.LATITUDE_DIM].values,
         grid_longitudes_deg_e=
         era5ct.coords[era5_constant_utils.LONGITUDE_DIM].values,
+        field_names=TARGET_FIELD_NAMES,
         init_date_string=init_date_string,
         model_file_name=fake_model_file_name
     )
@@ -357,7 +352,6 @@ if __name__ == '__main__':
         ),
         init_date_string=getattr(INPUT_ARG_OBJECT, INIT_DATE_ARG_NAME),
         lead_time_days=getattr(INPUT_ARG_OBJECT, LEAD_TIME_ARG_NAME),
-        target_field_name=getattr(INPUT_ARG_OBJECT, TARGET_FIELD_ARG_NAME),
         latitude_limits_deg_n=numpy.array(
             getattr(INPUT_ARG_OBJECT, LATITUDE_LIMITS_ARG_NAME), dtype=float
         ),

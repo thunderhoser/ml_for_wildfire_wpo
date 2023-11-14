@@ -13,11 +13,10 @@ GFS_PREDICTOR_LEADS_ARG_NAME = 'gfs_predictor_lead_times_hours'
 GFS_NORM_FILE_ARG_NAME = 'gfs_normalization_file_name'
 ERA5_CONSTANT_FILE_ARG_NAME = 'era5_constant_file_name'
 ERA5_CONSTANT_PREDICTORS_ARG_NAME = 'era5_constant_predictor_field_names'
-TARGET_FIELD_ARG_NAME = 'target_field_name'
+TARGET_FIELDS_ARG_NAME = 'target_field_names'
 TARGET_LEAD_TIME_ARG_NAME = 'target_lead_time_days'
 TARGET_LAG_TIMES_ARG_NAME = 'target_lag_times_days'
 GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME = 'gfs_forecast_target_lead_times_days'
-TARGET_CUTOFFS_ARG_NAME = 'target_cutoffs_for_classifn'
 TARGET_NORM_FILE_ARG_NAME = 'target_normalization_file_name'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
@@ -90,7 +89,7 @@ ERA5_CONSTANT_FILE_HELP_STRING = (
     '`era5_constant_io.read_file`).  If you do not want to use ERA5, leave '
     'this argument alone.'
 )
-TARGET_FIELD_HELP_STRING = 'Name of target field (a fire-weather index).'
+TARGET_FIELDS_HELP_STRING = 'List of target fields (fire-weather indices).'
 TARGET_LEAD_TIME_HELP_STRING = 'Lead time for target field.'
 TARGET_LAG_TIMES_HELP_STRING = (
     'List of lag times to be used for lagged-target predictors.'
@@ -99,12 +98,6 @@ GFS_FCST_TARGET_LEAD_TIMES_HELP_STRING = (
     'List of lead times to be used for lead-target predictors.  A '
     '"lead-target predictor" is the raw-GFS forecast of the target field (fire '
     'weather index) at one lead time.'
-)
-TARGET_CUTOFFS_HELP_STRING = (
-    'List of cutoffs for converting regression problem to classification '
-    'problem.  For example, if this list is [20, 30], the three classes will '
-    'be 0-20, 20-30, and 30-infinity.  If you want to do regression, leave '
-    'this argument alone.'
 )
 TARGET_NORM_FILE_HELP_STRING = (
     'Path to file with normalization params for lagged-target predictors (will '
@@ -226,8 +219,8 @@ def add_input_args(parser_object):
         required=False, default=[''], help=ERA5_CONSTANT_PREDICTORS_HELP_STRING
     )
     parser_object.add_argument(
-        '--' + TARGET_FIELD_ARG_NAME, type=str,
-        required=True, help=TARGET_FIELD_HELP_STRING
+        '--' + TARGET_FIELDS_ARG_NAME, type=str, nargs='+',
+        required=True, help=TARGET_FIELDS_HELP_STRING
     )
     parser_object.add_argument(
         '--' + TARGET_LEAD_TIME_ARG_NAME, type=int,
@@ -240,10 +233,6 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME, type=int, nargs='+',
         required=True, help=GFS_FCST_TARGET_LEAD_TIMES_HELP_STRING
-    )
-    parser_object.add_argument(
-        '--' + TARGET_CUTOFFS_ARG_NAME, type=float, nargs='+',
-        required=False, default=[-1], help=TARGET_CUTOFFS_HELP_STRING
     )
     parser_object.add_argument(
         '--' + TARGET_NORM_FILE_ARG_NAME, type=str,

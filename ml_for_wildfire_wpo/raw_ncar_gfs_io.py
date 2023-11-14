@@ -128,7 +128,8 @@ def file_name_to_forecast_hour(gfs_file_name):
 
 
 def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
-              read_incremental_precip, wgrib2_exe_name, temporary_dir_name):
+              read_incremental_precip, wgrib2_exe_name, temporary_dir_name,
+              field_names=FIELD_NAMES_TO_READ):
     """Reads GFS data from GRIB2 file into xarray table.
 
     :param grib2_file_name: Path to input file.
@@ -143,6 +144,7 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
     :param wgrib2_exe_name: Path to wgrib2 executable.
     :param temporary_dir_name: Path to temporary directory for text files
         created by wgrib2.
+    :param field_names: 1-D list of fields to read.
     :return: gfs_table_xarray: xarray table with all data.  Metadata and
         variable names should make this table self-explanatory.
     """
@@ -168,26 +170,26 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
     error_checking.assert_equals_numpy_array(numpy.diff(desired_row_indices), 1)
 
     error_checking.assert_is_boolean(read_incremental_precip)
+    error_checking.assert_is_string_list(field_names)
 
     # Do actual stuff.
     forecast_hour = file_name_to_forecast_hour(grib2_file_name)
-    field_names_2d = FIELD_NAMES_TO_READ
 
     num_grid_rows = len(desired_row_indices)
     num_grid_columns = len(desired_column_indices)
-    num_2d_field_names = len(field_names_2d)
+    num_fields = len(field_names)
     data_matrix_2d = numpy.full(
-        (num_grid_rows, num_grid_columns, num_2d_field_names), numpy.nan
+        (num_grid_rows, num_grid_columns, num_fields), numpy.nan
     )
 
-    for f in range(num_2d_field_names):
+    for f in range(num_fields):
         if (
                 forecast_hour == 0 and
-                field_names_2d[f] in gfs_utils.NO_0HOUR_ANALYSIS_FIELD_NAMES
+                field_names[f] in gfs_utils.NO_0HOUR_ANALYSIS_FIELD_NAMES
         ):
             continue
 
-        if field_names_2d[f] in [
+        if field_names[f] in [
                 gfs_utils.PRECIP_NAME, gfs_utils.CONVECTIVE_PRECIP_NAME
         ]:
             if read_incremental_precip:
@@ -195,7 +197,7 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
                     grib_search_string = (
                         '{0:s}:{1:d}-{2:d} hour acc'
                     ).format(
-                        FIELD_NAME_TO_GRIB_NAME[field_names_2d[f]],
+                        FIELD_NAME_TO_GRIB_NAME[field_names[f]],
                         forecast_hour - 12,
                         forecast_hour
                     )
@@ -204,7 +206,7 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
                         grib_search_string = (
                             '{0:s}:{1:d}-{2:d} hour acc'
                         ).format(
-                            FIELD_NAME_TO_GRIB_NAME[field_names_2d[f]],
+                            FIELD_NAME_TO_GRIB_NAME[field_names[f]],
                             forecast_hour - 6,
                             forecast_hour
                         )
@@ -212,23 +214,23 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
                         grib_search_string = (
                             '{0:s}:{1:d}-{2:d} hour acc'
                         ).format(
-                            FIELD_NAME_TO_GRIB_NAME[field_names_2d[f]],
+                            FIELD_NAME_TO_GRIB_NAME[field_names[f]],
                             forecast_hour - 3,
                             forecast_hour
                         )
             else:
                 if numpy.mod(forecast_hour, DAYS_TO_HOURS) == 0:
                     grib_search_string = '{0:s}:0-{1:d} day acc'.format(
-                        FIELD_NAME_TO_GRIB_NAME[field_names_2d[f]],
+                        FIELD_NAME_TO_GRIB_NAME[field_names[f]],
                         int(numpy.round(float(forecast_hour) / DAYS_TO_HOURS))
                     )
                 else:
                     grib_search_string = '{0:s}:0-{1:d} hour acc'.format(
-                        FIELD_NAME_TO_GRIB_NAME[field_names_2d[f]],
+                        FIELD_NAME_TO_GRIB_NAME[field_names[f]],
                         forecast_hour
                     )
         else:
-            grib_search_string = FIELD_NAME_TO_GRIB_NAME[field_names_2d[f]]
+            grib_search_string = FIELD_NAME_TO_GRIB_NAME[field_names[f]]
 
         print('Reading line "{0:s}" from GRIB2 file: "{1:s}"...'.format(
             grib_search_string, grib2_file_name
@@ -243,7 +245,7 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
             temporary_dir_name=temporary_dir_name,
             sentinel_value=SENTINEL_VALUE,
             raise_error_if_fails=
-            field_names_2d[f] not in gfs_utils.MAYBE_MISSING_FIELD_NAMES
+            field_names[f] not in gfs_utils.MAYBE_MISSING_FIELD_NAMES
         )
 
         if this_data_matrix is None:
@@ -262,7 +264,7 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
         # assert not numpy.any(numpy.isnan(this_data_matrix))
 
         data_matrix_2d[..., f] = (
-            this_data_matrix * FIELD_NAME_TO_CONV_FACTOR[field_names_2d[f]]
+            this_data_matrix * FIELD_NAME_TO_CONV_FACTOR[field_names[f]]
         )
 
     coord_dict = {
@@ -270,7 +272,7 @@ def read_file(grib2_file_name, desired_row_indices, desired_column_indices,
         gfs_utils.LATITUDE_DIM: GRID_LATITUDES_DEG_N[desired_row_indices],
         gfs_utils.LONGITUDE_DIM:
             GRID_LONGITUDES_POSITIVE_IN_WEST_DEG_E[desired_column_indices],
-        gfs_utils.FIELD_DIM_2D: field_names_2d
+        gfs_utils.FIELD_DIM_2D: field_names
     }
 
     these_dim = (

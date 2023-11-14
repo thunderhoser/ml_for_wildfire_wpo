@@ -23,9 +23,8 @@ def _run(template_file_name, output_dir_name,
          gfs_predictor_field_names, gfs_pressure_levels_mb,
          gfs_predictor_lead_times_hours, gfs_normalization_file_name,
          era5_constant_file_name, era5_constant_predictor_field_names,
-         target_field_name, target_lead_time_days, target_lag_times_days,
-         gfs_forecast_target_lead_times_days,
-         target_cutoffs_for_classifn, target_normalization_file_name,
+         target_field_names, target_lead_time_days, target_lag_times_days,
+         gfs_forecast_target_lead_times_days, target_normalization_file_name,
          num_examples_per_batch, sentinel_value,
          gfs_dir_name_for_training, target_dir_name_for_training,
          gfs_forecast_target_dir_name_for_training,
@@ -53,11 +52,10 @@ def _run(template_file_name, output_dir_name,
     :param gfs_normalization_file_name: Same.
     :param era5_constant_file_name: Same.
     :param era5_constant_predictor_field_names: Same.
-    :param target_field_name: Same.
+    :param target_field_names: Same.
     :param target_lead_time_days: Same.
     :param target_lag_times_days: Same.
     :param gfs_forecast_target_lead_times_days: Same.
-    :param target_cutoffs_for_classifn: Same.
     :param target_normalization_file_name: Same.
     :param num_examples_per_batch: Same.
     :param sentinel_value: Same.
@@ -94,12 +92,6 @@ def _run(template_file_name, output_dir_name,
         era5_constant_predictor_field_names = None
 
     if (
-            len(target_cutoffs_for_classifn) == 1 and
-            target_cutoffs_for_classifn[0] <= 0
-    ):
-        target_cutoffs_for_classifn = None
-
-    if (
             len(gfs_forecast_target_lead_times_days) == 1 and
             gfs_forecast_target_lead_times_days[0] <= 0
     ):
@@ -127,12 +119,11 @@ def _run(template_file_name, output_dir_name,
         neural_net.ERA5_CONSTANT_PREDICTOR_FIELDS_KEY:
             era5_constant_predictor_field_names,
         neural_net.ERA5_CONSTANT_FILE_KEY: era5_constant_file_name,
-        neural_net.TARGET_FIELD_KEY: target_field_name,
+        neural_net.TARGET_FIELDS_KEY: target_field_names,
         neural_net.TARGET_LEAD_TIME_KEY: target_lead_time_days,
         neural_net.TARGET_LAG_TIMES_KEY: target_lag_times_days,
         neural_net.GFS_FCST_TARGET_LEAD_TIMES_KEY:
             gfs_forecast_target_lead_times_days,
-        neural_net.TARGET_CUTOFFS_KEY: target_cutoffs_for_classifn,
         neural_net.TARGET_NORM_FILE_KEY: target_normalization_file_name,
         neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
         neural_net.SENTINEL_VALUE_KEY: sentinel_value,
@@ -227,8 +218,8 @@ if __name__ == '__main__':
         era5_constant_predictor_field_names=getattr(
             INPUT_ARG_OBJECT, training_args.ERA5_CONSTANT_PREDICTORS_ARG_NAME
         ),
-        target_field_name=getattr(
-            INPUT_ARG_OBJECT, training_args.TARGET_FIELD_ARG_NAME
+        target_field_names=getattr(
+            INPUT_ARG_OBJECT, training_args.TARGET_FIELDS_ARG_NAME
         ),
         target_lead_time_days=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_LEAD_TIME_ARG_NAME
@@ -243,10 +234,6 @@ if __name__ == '__main__':
                 training_args.GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME
             ),
             dtype=int
-        ),
-        target_cutoffs_for_classifn=numpy.array(
-            getattr(INPUT_ARG_OBJECT, training_args.TARGET_CUTOFFS_ARG_NAME),
-            dtype=float
         ),
         target_normalization_file_name=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_NORM_FILE_ARG_NAME

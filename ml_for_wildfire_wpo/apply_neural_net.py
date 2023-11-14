@@ -113,10 +113,6 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     validation_option_dict[neural_net.GFS_FORECAST_TARGET_DIR_KEY] = (
         gfs_forecast_target_dir_name
     )
-
-    for_classification = (
-        validation_option_dict[neural_net.TARGET_CUTOFFS_KEY] is not None
-    )
     print(SEPARATOR_STRING)
 
     for this_init_date_string in init_date_strings:
@@ -141,7 +137,6 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             model_object=model_object,
             predictor_matrices=predictor_matrices,
             num_examples_per_batch=NUM_EXAMPLES_PER_BATCH,
-            for_classification=for_classification,
             verbose=True
         )
 
@@ -158,6 +153,7 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             prediction_matrix=prediction_matrix[0, ...],
             grid_latitudes_deg_n=grid_latitudes_deg_n,
             grid_longitudes_deg_e=grid_longitudes_deg_e,
+            field_names=validation_option_dict[neural_net.TARGET_FIELDS_KEY],
             init_date_string=this_init_date_string,
             model_file_name=model_file_name
         )

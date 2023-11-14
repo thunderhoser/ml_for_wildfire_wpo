@@ -20,14 +20,13 @@ import canadian_fwi_io
 import canadian_fwi_utils
 import neural_net
 
-# TODO(thunderhoser): Allow multiple target fields.
 # TODO(thunderhoser): Allow multiple lead times.
 
 RELIABILITY_BIN_DIM = 'reliability_bin'
 BOOTSTRAP_REP_DIM = 'bootstrap_replicate'
 LATITUDE_DIM = 'grid_row'
 LONGITUDE_DIM = 'grid_column'
-DUMMY_DIM = 'dummy'
+FIELD_DIM = 'field'
 
 TARGET_STDEV_KEY = 'target_standard_deviation'
 PREDICTION_STDEV_KEY = 'prediction_standard_deviation'
@@ -348,29 +347,32 @@ def _get_rel_curve_one_scalar(
 def _get_scores_one_replicate(
         result_table_xarray, full_target_matrix, full_prediction_matrix,
         replicate_index, example_indices_in_replicate,
-        mean_training_target_value,
-        min_reliability_bin_edge, max_reliability_bin_edge,
-        min_reliability_bin_edge_percentile,
-        max_reliability_bin_edge_percentile,
+        mean_training_target_values, num_relia_bins_by_target,
+        min_relia_bin_edge_by_target, max_relia_bin_edge_by_target,
+        min_relia_bin_edge_prctile_by_target,
+        max_relia_bin_edge_prctile_by_target,
         per_grid_cell):
     """Computes scores for one bootstrap replicate.
 
     E = number of examples
     M = number of rows in grid
     N = number of columns in grid
+    T = number of target fields
 
     :param result_table_xarray: See doc for `get_scores_with_bootstrapping`.
-    :param full_target_matrix: E-by-M-by-N numpy array of correct values.
-    :param full_prediction_matrix: E-by-M-by-N numpy array of predicted values.
+    :param full_target_matrix: E-by-M-by-N-by-T numpy array of correct values.
+    :param full_prediction_matrix: E-by-M-by-N-by-T numpy array of predicted
+        values.
     :param replicate_index: Index of current bootstrap replicate.
     :param example_indices_in_replicate: 1-D numpy array with indices of
         examples in this bootstrap replicate.
-    :param mean_training_target_value: Mean target value in training data (i.e.,
-        "climatology").
-    :param min_reliability_bin_edge: See doc for `get_scores_with_bootstrapping`.
-    :param max_reliability_bin_edge: Same.
-    :param min_reliability_bin_edge_percentile: Same.
-    :param max_reliability_bin_edge_percentile: Same.
+    :param mean_training_target_values: length-T numpy array with mean target
+        values in training data (i.e., "climatology").
+    :param num_relia_bins_by_target: See doc for `get_scores_with_bootstrapping`.
+    :param min_relia_bin_edge_by_target: Same.
+    :param max_relia_bin_edge_by_target: Same.
+    :param min_relia_bin_edge_prctile_by_target: Same.
+    :param max_relia_bin_edge_prctile_by_target: Same.
     :param per_grid_cell: Same.
     :return: result_table_xarray: Same as input but with values filled for [i]th
         bootstrap replicate, where i = `replicate_index`.
@@ -399,212 +401,232 @@ def _get_scores_one_replicate(
             prediction_matrix, axis=0
         )
     else:
-        t[TARGET_STDEV_KEY].values[rep_idx] = numpy.std(target_matrix, ddof=1)
-        t[PREDICTION_STDEV_KEY].values[rep_idx] = numpy.std(
-            prediction_matrix, ddof=1
+        t[TARGET_STDEV_KEY].values[:, rep_idx] = numpy.std(
+            target_matrix, ddof=1, axis=(0, 1, 2)
         )
-        t[TARGET_MEAN_KEY].values[rep_idx] = numpy.mean(target_matrix)
-        t[PREDICTION_MEAN_KEY].values[rep_idx] = numpy.mean(prediction_matrix)
-
-    t[MAE_KEY].values[..., rep_idx] = _get_mae_one_scalar(
-        target_values=target_matrix,
-        predicted_values=prediction_matrix,
-        per_grid_cell=per_grid_cell
-    )
-    t[MAE_SKILL_SCORE_KEY].values[..., rep_idx] = _get_mae_ss_one_scalar(
-        target_values=target_matrix,
-        predicted_values=prediction_matrix,
-        mean_training_target_value=mean_training_target_value,
-        per_grid_cell=per_grid_cell
-    )
-
-    (
-        t[MSE_KEY].values[..., rep_idx],
-        t[MSE_BIAS_KEY].values[..., rep_idx],
-        t[MSE_VARIANCE_KEY].values[..., rep_idx]
-    ) = _get_mse_one_scalar(
-        target_values=target_matrix,
-        predicted_values=prediction_matrix,
-        per_grid_cell=per_grid_cell
-    )
-
-    t[MSE_SKILL_SCORE_KEY].values[..., rep_idx] = _get_mse_ss_one_scalar(
-        target_values=target_matrix,
-        predicted_values=prediction_matrix,
-        mean_training_target_value=mean_training_target_value,
-        per_grid_cell=per_grid_cell
-    )
-    t[DWMSE_KEY].values[..., rep_idx] = _get_dwmse_one_scalar(
-        target_values=target_matrix,
-        predicted_values=prediction_matrix,
-        per_grid_cell=per_grid_cell
-    )
-    t[DWMSE_SKILL_SCORE_KEY].values[..., rep_idx] = _get_dwmse_ss_one_scalar(
-        target_values=target_matrix,
-        predicted_values=prediction_matrix,
-        mean_training_target_value=mean_training_target_value,
-        per_grid_cell=per_grid_cell
-    )
-    t[BIAS_KEY].values[..., rep_idx] = _get_bias_one_scalar(
-        target_values=target_matrix,
-        predicted_values=prediction_matrix,
-        per_grid_cell=per_grid_cell
-    )
-    t[CORRELATION_KEY].values[..., rep_idx] = _get_correlation_one_scalar(
-        target_values=target_matrix,
-        predicted_values=prediction_matrix,
-        per_grid_cell=per_grid_cell
-    )
-    t[KGE_KEY].values[..., rep_idx] = _get_kge_one_scalar(
-        target_values=target_matrix,
-        predicted_values=prediction_matrix,
-        per_grid_cell=per_grid_cell
-    )
-
-    if num_examples == 0:
-        min_bin_edge = 0.
-        max_bin_edge = 1.
-    elif min_reliability_bin_edge is not None:
-        min_bin_edge = min_reliability_bin_edge + 0.
-        max_bin_edge = max_reliability_bin_edge + 0.
-    else:
-        min_bin_edge = numpy.percentile(
-            prediction_matrix, min_reliability_bin_edge_percentile
+        t[PREDICTION_STDEV_KEY].values[:, rep_idx] = numpy.std(
+            prediction_matrix, ddof=1, axis=(0, 1, 2)
         )
-        max_bin_edge = numpy.percentile(
-            prediction_matrix, max_reliability_bin_edge_percentile
+        t[TARGET_MEAN_KEY].values[:, rep_idx] = numpy.mean(
+            target_matrix, axis=(0, 1, 2)
+        )
+        t[PREDICTION_MEAN_KEY].values[:, rep_idx] = numpy.mean(
+            prediction_matrix, axis=(0, 1, 2)
         )
 
-    if per_grid_cell:
-        num_grid_rows = len(t.coords[LATITUDE_DIM].values)
-        num_grid_columns = len(t.coords[LONGITUDE_DIM].values)
+    num_target_fields = len(mean_training_target_values)
 
-        for i in range(num_grid_rows):
-            print((
-                'Have computed reliability curve for {0:d} of {1:d} grid '
-                'rows...'
-            ).format(
-                i, num_grid_rows
-            ))
+    for k in range(num_target_fields):
+        t[MAE_KEY].values[..., k, rep_idx] = _get_mae_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            per_grid_cell=per_grid_cell
+        )
+        t[MAE_SKILL_SCORE_KEY].values[..., k, rep_idx] = _get_mae_ss_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            mean_training_target_value=mean_training_target_values[k],
+            per_grid_cell=per_grid_cell
+        )
 
-            for j in range(num_grid_columns):
-                (
-                    t[RELIABILITY_X_KEY].values[i, j, :, rep_idx],
-                    t[RELIABILITY_Y_KEY].values[i, j, :, rep_idx],
-                    these_counts
-                ) = _get_rel_curve_one_scalar(
-                    target_values=target_matrix[:, i, j],
-                    predicted_values=prediction_matrix[:, i, j],
-                    num_bins=len(t.coords[RELIABILITY_BIN_DIM].values),
-                    min_bin_edge=min_bin_edge,
-                    max_bin_edge=max_bin_edge,
-                    invert=False
-                )
+        (
+            t[MSE_KEY].values[..., k, rep_idx],
+            t[MSE_BIAS_KEY].values[..., k, rep_idx],
+            t[MSE_VARIANCE_KEY].values[..., k, rep_idx]
+        ) = _get_mse_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            per_grid_cell=per_grid_cell
+        )
 
-                these_squared_diffs = (
-                    t[RELIABILITY_X_KEY].values[i, j, :, rep_idx] -
-                    t[RELIABILITY_Y_KEY].values[i, j, :, rep_idx]
-                ) ** 2
+        t[MSE_SKILL_SCORE_KEY].values[..., k, rep_idx] = _get_mse_ss_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            mean_training_target_value=mean_training_target_values[k],
+            per_grid_cell=per_grid_cell
+        )
+        t[DWMSE_KEY].values[..., k, rep_idx] = _get_dwmse_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            per_grid_cell=per_grid_cell
+        )
+        t[DWMSE_SKILL_SCORE_KEY].values[..., k, rep_idx] = (
+            _get_dwmse_ss_one_scalar(
+                target_values=target_matrix[..., k],
+                predicted_values=prediction_matrix[..., k],
+                mean_training_target_value=mean_training_target_values[k],
+                per_grid_cell=per_grid_cell
+            )
+        )
+        t[BIAS_KEY].values[..., k, rep_idx] = _get_bias_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            per_grid_cell=per_grid_cell
+        )
+        t[CORRELATION_KEY].values[..., k, rep_idx] = (
+            _get_correlation_one_scalar(
+                target_values=target_matrix[..., k],
+                predicted_values=prediction_matrix[..., k],
+                per_grid_cell=per_grid_cell
+            )
+        )
+        t[KGE_KEY].values[..., k, rep_idx] = _get_kge_one_scalar(
+            target_values=target_matrix[..., k],
+            predicted_values=prediction_matrix[..., k],
+            per_grid_cell=per_grid_cell
+        )
 
-                t[RELIABILITY_KEY].values[i, j, rep_idx] = (
-                    numpy.nansum(these_counts * these_squared_diffs) /
-                    numpy.sum(these_counts)
-                )
+        if num_examples == 0:
+            min_bin_edge = 0.
+            max_bin_edge = 1.
+        elif min_relia_bin_edge_by_target is not None:
+            min_bin_edge = min_relia_bin_edge_by_target[k] + 0.
+            max_bin_edge = max_relia_bin_edge_by_target[k] + 0.
+        else:
+            min_bin_edge = numpy.percentile(
+                prediction_matrix, min_relia_bin_edge_prctile_by_target[k]
+            )
+            max_bin_edge = numpy.percentile(
+                prediction_matrix, max_relia_bin_edge_prctile_by_target[k]
+            )
 
-                if rep_idx == 0:
+        num_bins = num_relia_bins_by_target[k]
+
+        if per_grid_cell:
+            num_grid_rows = len(t.coords[LATITUDE_DIM].values)
+            num_grid_columns = len(t.coords[LONGITUDE_DIM].values)
+
+            for i in range(num_grid_rows):
+                print((
+                    'Have computed reliability curve for {0:d} of {1:d} grid '
+                    'rows...'
+                ).format(
+                    i, num_grid_rows
+                ))
+
+                for j in range(num_grid_columns):
                     (
-                        t[RELIABILITY_BIN_CENTER_KEY].values[i, j, :],
-                        _,
-                        t[RELIABILITY_COUNT_KEY].values[i, j, :]
+                        t[RELIABILITY_X_KEY].values[i, j, k, :num_bins, rep_idx],
+                        t[RELIABILITY_Y_KEY].values[i, j, k, :num_bins, rep_idx],
+                        these_counts
                     ) = _get_rel_curve_one_scalar(
-                        target_values=full_target_matrix[:, i, j],
-                        predicted_values=full_prediction_matrix[:, i, j],
-                        num_bins=len(t.coords[RELIABILITY_BIN_DIM].values),
+                        target_values=target_matrix[:, i, j, k],
+                        predicted_values=prediction_matrix[:, i, j, k],
+                        num_bins=num_bins,
                         min_bin_edge=min_bin_edge,
                         max_bin_edge=max_bin_edge,
                         invert=False
                     )
 
-                    (
-                        t[INV_RELIABILITY_BIN_CENTER_KEY].values[i, j, :],
-                        _,
-                        t[INV_RELIABILITY_COUNT_KEY].values[i, j, :]
-                    ) = _get_rel_curve_one_scalar(
-                        target_values=full_target_matrix[:, i, j],
-                        predicted_values=full_prediction_matrix[:, i, j],
-                        num_bins=len(t.coords[RELIABILITY_BIN_DIM].values),
-                        min_bin_edge=min_bin_edge,
-                        max_bin_edge=max_bin_edge,
-                        invert=True
+                    these_squared_diffs = (
+                        t[RELIABILITY_X_KEY].values[i, j, k, :num_bins, rep_idx]
+                        -
+                        t[RELIABILITY_Y_KEY].values[i, j, k, :num_bins, rep_idx]
+                    ) ** 2
+
+                    t[RELIABILITY_KEY].values[i, j, k, rep_idx] = (
+                        numpy.nansum(these_counts * these_squared_diffs) /
+                        numpy.sum(these_counts)
                     )
 
-                if rep_idx == 0 and full_target_matrix.size > 0:
-                    (
-                        t[KS_STATISTIC_KEY].values[i, j, 0],
-                        t[KS_P_VALUE_KEY].values[i, j, 0]
-                    ) = ks_2samp(
-                        full_target_matrix[:, i, j],
-                        full_prediction_matrix[:, i, j],
-                        alternative='two-sided', mode='auto'
-                    )
-    else:
-        (
-            t[RELIABILITY_X_KEY].values[:, rep_idx],
-            t[RELIABILITY_Y_KEY].values[:, rep_idx],
-            these_counts
-        ) = _get_rel_curve_one_scalar(
-            target_values=numpy.ravel(target_matrix),
-            predicted_values=numpy.ravel(prediction_matrix),
-            num_bins=len(t.coords[RELIABILITY_BIN_DIM].values),
-            min_bin_edge=min_bin_edge, max_bin_edge=max_bin_edge, invert=False
-        )
+                    if rep_idx == 0:
+                        (
+                            t[RELIABILITY_BIN_CENTER_KEY].values[i, j, k, :num_bins],
+                            _,
+                            t[RELIABILITY_COUNT_KEY].values[i, j, k, :num_bins]
+                        ) = _get_rel_curve_one_scalar(
+                            target_values=full_target_matrix[:, i, j, k],
+                            predicted_values=full_prediction_matrix[:, i, j, k],
+                            num_bins=num_bins,
+                            min_bin_edge=min_bin_edge,
+                            max_bin_edge=max_bin_edge,
+                            invert=False
+                        )
 
-        these_squared_diffs = (
-            t[RELIABILITY_X_KEY].values[:, rep_idx] -
-            t[RELIABILITY_Y_KEY].values[:, rep_idx]
-        ) ** 2
+                        (
+                            t[INV_RELIABILITY_BIN_CENTER_KEY].values[i, j, k, :num_bins],
+                            _,
+                            t[INV_RELIABILITY_COUNT_KEY].values[i, j, k, :num_bins]
+                        ) = _get_rel_curve_one_scalar(
+                            target_values=full_target_matrix[:, i, j, k],
+                            predicted_values=full_prediction_matrix[:, i, j, k],
+                            num_bins=num_bins,
+                            min_bin_edge=min_bin_edge,
+                            max_bin_edge=max_bin_edge,
+                            invert=True
+                        )
 
-        t[RELIABILITY_KEY].values[rep_idx] = (
-            numpy.nansum(these_counts * these_squared_diffs) /
-            numpy.sum(these_counts)
-        )
-
-        if rep_idx == 0:
+                    if rep_idx == 0 and full_target_matrix.size > 0:
+                        (
+                            t[KS_STATISTIC_KEY].values[i, j, k],
+                            t[KS_P_VALUE_KEY].values[i, j, k]
+                        ) = ks_2samp(
+                            full_target_matrix[:, i, j, k],
+                            full_prediction_matrix[:, i, j, k],
+                            alternative='two-sided', mode='auto'
+                        )
+        else:
             (
-                t[RELIABILITY_BIN_CENTER_KEY].values[:],
-                _,
-                t[RELIABILITY_COUNT_KEY].values[:]
+                t[RELIABILITY_X_KEY].values[k, :num_bins, rep_idx],
+                t[RELIABILITY_Y_KEY].values[k, :num_bins, rep_idx],
+                these_counts
             ) = _get_rel_curve_one_scalar(
-                target_values=numpy.ravel(full_target_matrix),
-                predicted_values=numpy.ravel(full_prediction_matrix),
-                num_bins=len(t.coords[RELIABILITY_BIN_DIM].values),
+                target_values=numpy.ravel(target_matrix[..., k]),
+                predicted_values=numpy.ravel(prediction_matrix[..., k]),
+                num_bins=num_bins,
                 min_bin_edge=min_bin_edge,
                 max_bin_edge=max_bin_edge,
                 invert=False
             )
 
-            (
-                t[INV_RELIABILITY_BIN_CENTER_KEY].values[:],
-                _,
-                t[INV_RELIABILITY_COUNT_KEY].values[:]
-            ) = _get_rel_curve_one_scalar(
-                target_values=numpy.ravel(full_target_matrix),
-                predicted_values=numpy.ravel(full_prediction_matrix),
-                num_bins=len(t.coords[RELIABILITY_BIN_DIM].values),
-                min_bin_edge=min_bin_edge,
-                max_bin_edge=max_bin_edge,
-                invert=True
+            these_squared_diffs = (
+                t[RELIABILITY_X_KEY].values[k, :num_bins, rep_idx] -
+                t[RELIABILITY_Y_KEY].values[k, :num_bins, rep_idx]
+            ) ** 2
+
+            t[RELIABILITY_KEY].values[k, rep_idx] = (
+                numpy.nansum(these_counts * these_squared_diffs) /
+                numpy.sum(these_counts)
             )
 
-        if rep_idx == 0 and full_target_matrix.size > 0:
-            (
-                t[KS_STATISTIC_KEY].values[0],
-                t[KS_P_VALUE_KEY].values[0]
-            ) = ks_2samp(
-                numpy.ravel(full_target_matrix),
-                numpy.ravel(full_prediction_matrix),
-                alternative='two-sided', mode='auto'
-            )
+            if rep_idx == 0:
+                (
+                    t[RELIABILITY_BIN_CENTER_KEY].values[k, :num_bins],
+                    _,
+                    t[RELIABILITY_COUNT_KEY].values[k, :num_bins]
+                ) = _get_rel_curve_one_scalar(
+                    target_values=numpy.ravel(full_target_matrix[..., k]),
+                    predicted_values=
+                    numpy.ravel(full_prediction_matrix[..., k]),
+                    num_bins=num_bins,
+                    min_bin_edge=min_bin_edge,
+                    max_bin_edge=max_bin_edge,
+                    invert=False
+                )
+
+                (
+                    t[INV_RELIABILITY_BIN_CENTER_KEY].values[k, :num_bins],
+                    _,
+                    t[INV_RELIABILITY_COUNT_KEY].values[k, :num_bins]
+                ) = _get_rel_curve_one_scalar(
+                    target_values=numpy.ravel(full_target_matrix[..., k]),
+                    predicted_values=
+                    numpy.ravel(full_prediction_matrix[..., k]),
+                    num_bins=num_bins,
+                    min_bin_edge=min_bin_edge,
+                    max_bin_edge=max_bin_edge,
+                    invert=True
+                )
+
+            if rep_idx == 0 and full_target_matrix.size > 0:
+                (
+                    t[KS_STATISTIC_KEY].values[k],
+                    t[KS_P_VALUE_KEY].values[k]
+                ) = ks_2samp(
+                    numpy.ravel(full_target_matrix[..., k]),
+                    numpy.ravel(full_prediction_matrix[..., k]),
+                    alternative='two-sided', mode='auto'
+                )
 
     return t
 
@@ -688,25 +710,32 @@ def confidence_interval_to_polygon(
 
 
 def get_scores_with_bootstrapping(
-        prediction_file_names, num_bootstrap_reps, num_reliability_bins,
-        min_reliability_bin_edge, max_reliability_bin_edge,
-        min_reliability_bin_edge_percentile,
-        max_reliability_bin_edge_percentile, per_grid_cell):
+        prediction_file_names, num_bootstrap_reps,
+        target_field_names, num_relia_bins_by_target,
+        min_relia_bin_edge_by_target, max_relia_bin_edge_by_target,
+        min_relia_bin_edge_prctile_by_target,
+        max_relia_bin_edge_prctile_by_target,
+        per_grid_cell):
     """Computes all scores with bootstrapping.
+
+    T = number of target fields
 
     :param prediction_file_names: 1-D list of paths to prediction files.  Each
         file will be read by `prediction_io.read_file`.
     :param num_bootstrap_reps: Number of bootstrap replicates.
-    :param num_reliability_bins: Number of bins for reliability curve.
-    :param min_reliability_bin_edge: Minimum target/predicted value for
-        reliability curves.  If you instead want the minimum value to be a
-        percentile over the data, make this argument None and use
-        `min_reliability_bin_edge_percentile` instead.
-    :param max_reliability_bin_edge: Same but for maximum.
-    :param min_reliability_bin_edge_percentile: Determines minimum
-        target/predicted value for reliability curves.  This percentile must
-        range from 0...100.
-    :param max_reliability_bin_edge_percentile: Same but for maximum.
+    :param target_field_names: length-T list of field names.
+    :param num_relia_bins_by_target: length-T numpy array with number of bins in
+        reliability curve for each target.
+    :param min_relia_bin_edge_by_target: length-T numpy array with minimum
+        target/predicted value in reliability curve for each target.  If you
+        instead want minimum values to be percentiles over the data, make this
+        argument None and use `min_relia_bin_edge_prctile_by_target`.
+    :param max_relia_bin_edge_by_target: Same as above but for max.
+    :param min_relia_bin_edge_prctile_by_target: length-T numpy array with
+        percentile level used to determine minimum target/predicted value in
+        reliability curve for each target.  If you instead want to specify raw
+        values, make this argument None and use `min_relia_bin_edge_by_target`.
+    :param max_relia_bin_edge_prctile_by_target: Same as above but for max.
     :param per_grid_cell: Boolean flag.  If True, will compute a separate set of
         scores at each grid cell.  If False, will compute one set of scores for
         the whole domain.
@@ -720,18 +749,55 @@ def get_scores_with_bootstrapping(
     error_checking.assert_is_string_list(prediction_file_names)
     error_checking.assert_is_integer(num_bootstrap_reps)
     error_checking.assert_is_greater(num_bootstrap_reps, 0)
-    error_checking.assert_is_integer(num_reliability_bins)
-    error_checking.assert_is_geq(num_reliability_bins, 10)
-    error_checking.assert_is_leq(num_reliability_bins, 1000)
+    error_checking.assert_is_string_list(target_field_names)
     error_checking.assert_is_boolean(per_grid_cell)
 
-    if min_reliability_bin_edge is None or max_reliability_bin_edge is None:
-        error_checking.assert_is_leq(min_reliability_bin_edge_percentile, 10.)
-        error_checking.assert_is_geq(max_reliability_bin_edge_percentile, 90.)
-    else:
-        error_checking.assert_is_greater(
-            max_reliability_bin_edge, min_reliability_bin_edge
+    num_target_fields = len(target_field_names)
+    expected_dim = numpy.array([num_target_fields], dtype=int)
+
+    error_checking.assert_is_numpy_array(
+        num_relia_bins_by_target, exact_dimensions=expected_dim
+    )
+    error_checking.assert_is_integer_numpy_array(num_relia_bins_by_target)
+    error_checking.assert_is_geq_numpy_array(num_relia_bins_by_target, 10)
+    error_checking.assert_is_leq_numpy_array(num_relia_bins_by_target, 1000)
+
+    if (
+            min_relia_bin_edge_by_target is None or
+            max_relia_bin_edge_by_target is None
+    ):
+        error_checking.assert_is_numpy_array(
+            min_relia_bin_edge_prctile_by_target, exact_dimensions=expected_dim
         )
+        error_checking.assert_is_geq_numpy_array(
+            min_relia_bin_edge_prctile_by_target, 0.
+        )
+        error_checking.assert_is_leq_numpy_array(
+            min_relia_bin_edge_prctile_by_target, 10.
+        )
+
+        error_checking.assert_is_numpy_array(
+            max_relia_bin_edge_prctile_by_target, exact_dimensions=expected_dim
+        )
+        error_checking.assert_is_geq_numpy_array(
+            max_relia_bin_edge_prctile_by_target, 90.
+        )
+        error_checking.assert_is_leq_numpy_array(
+            max_relia_bin_edge_prctile_by_target, 100.
+        )
+    else:
+        error_checking.assert_is_numpy_array(
+            min_relia_bin_edge_by_target, exact_dimensions=expected_dim
+        )
+        error_checking.assert_is_numpy_array(
+            max_relia_bin_edge_by_target, exact_dimensions=expected_dim
+        )
+
+        for j in range(num_target_fields):
+            error_checking.assert_is_greater(
+                max_relia_bin_edge_by_target[j],
+                min_relia_bin_edge_by_target[j]
+            )
 
     num_times = len(prediction_file_names)
     target_matrix = numpy.array([], dtype=float)
@@ -758,13 +824,24 @@ def get_scores_with_bootstrapping(
                 tpt.attrs[prediction_io.MODEL_FILE_KEY]
             )
 
-        target_matrix[i, ...] = tpt[prediction_io.TARGET_KEY].values
-        prediction_matrix[i, ...] = tpt[prediction_io.PREDICTION_KEY].values
         weight_matrix[i, ...] = tpt[prediction_io.WEIGHT_KEY].values
-        # assert model_file_name == tpt.attrs[prediction_io.MODEL_FILE_KEY]
+        assert model_file_name == tpt.attrs[prediction_io.MODEL_FILE_KEY]
+
+        these_indices = numpy.array([
+            numpy.where(tpt[prediction_io.FIELD_NAME_KEY].values == f)[0][0]
+            for f in target_field_names
+        ], dtype=int)
+
+        target_matrix[i, ...] = tpt[prediction_io.TARGET_KEY].values[
+            ..., these_indices
+        ]
+        prediction_matrix[i, ...] = tpt[prediction_io.PREDICTION_KEY].values[
+            ..., these_indices
+        ]
 
     # TODO(thunderhoser): This is a HACK.  I should use the weight matrix to
     # actually weight the various scores.
+    weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
     target_matrix[weight_matrix < 0.05] = 0.
     prediction_matrix[weight_matrix < 0.05] = 0.
 
@@ -775,41 +852,47 @@ def get_scores_with_bootstrapping(
     print('Reading metadata from: "{0:s}"...'.format(model_metafile_name))
     model_metadata_dict = neural_net.read_metafile(model_metafile_name)
     generator_option_dict = model_metadata_dict[neural_net.TRAINING_OPTIONS_KEY]
-
-    target_field_name = generator_option_dict[neural_net.TARGET_FIELD_KEY]
     target_norm_file_name = generator_option_dict[
         neural_net.TARGET_NORM_FILE_KEY
     ]
 
     # TODO(thunderhoser): This bit will not work if, for some reason, I do not
     # normalized the lagged-target predictors.
-    print('Reading climo-mean {0:s} value from: "{1:s}"...'.format(
-        target_field_name, target_norm_file_name
+    print('Reading climo-mean target values from: "{0:s}"...'.format(
+        target_norm_file_name
     ))
     target_norm_param_table_xarray = canadian_fwi_io.read_normalization_file(
         target_norm_file_name
     )
     tnpt = target_norm_param_table_xarray
 
-    field_index = numpy.where(
-        tnpt.coords[canadian_fwi_utils.FIELD_DIM].values == target_field_name
-    )[0][0]
-    mean_training_target_value = (
-        tnpt[canadian_fwi_utils.MEAN_VALUE_KEY].values[field_index]
+    these_indices = numpy.array([
+        numpy.where(tnpt.coords[canadian_fwi_utils.FIELD_DIM].values == f)[0][0]
+        for f in target_field_names
+    ], dtype=int)
+
+    mean_training_target_values = (
+        tnpt[canadian_fwi_utils.MEAN_VALUE_KEY].values[these_indices]
     )
-    print('Climo-mean {0:s} = {1:.4f}'.format(
-        target_field_name, mean_training_target_value
-    ))
+    for j in range(num_target_fields):
+        print('Climo-mean {0:s} = {1:.4f}'.format(
+            target_field_names[j], mean_training_target_values[j]
+        ))
 
     num_grid_rows = target_matrix.shape[1]
     num_grid_columns = target_matrix.shape[2]
 
     if per_grid_cell:
-        these_dimensions = (num_grid_rows, num_grid_columns, num_bootstrap_reps)
-        these_dim_keys = (LATITUDE_DIM, LONGITUDE_DIM, BOOTSTRAP_REP_DIM)
+        these_dimensions = (
+            num_grid_rows, num_grid_columns, num_target_fields,
+            num_bootstrap_reps
+        )
+        these_dim_keys = (
+            LATITUDE_DIM, LONGITUDE_DIM, FIELD_DIM, BOOTSTRAP_REP_DIM
+        )
     else:
-        these_dimensions = (num_bootstrap_reps,)
-        these_dim_keys = (BOOTSTRAP_REP_DIM,)
+        these_dimensions = (num_target_fields, num_bootstrap_reps)
+        these_dim_keys = (FIELD_DIM, BOOTSTRAP_REP_DIM)
 
     main_data_dict = {
         TARGET_STDEV_KEY: (
@@ -864,16 +947,19 @@ def get_scores_with_bootstrapping(
 
     if per_grid_cell:
         these_dimensions = (
-            num_grid_rows, num_grid_columns,
-            num_reliability_bins, num_bootstrap_reps
+            num_grid_rows, num_grid_columns, num_target_fields,
+            numpy.max(num_relia_bins_by_target), num_bootstrap_reps
         )
         these_dim_keys = (
-            LATITUDE_DIM, LONGITUDE_DIM,
+            LATITUDE_DIM, LONGITUDE_DIM, FIELD_DIM,
             RELIABILITY_BIN_DIM, BOOTSTRAP_REP_DIM
         )
     else:
-        these_dimensions = (num_reliability_bins, num_bootstrap_reps)
-        these_dim_keys = (RELIABILITY_BIN_DIM, BOOTSTRAP_REP_DIM)
+        these_dimensions = (
+            num_target_fields, numpy.max(num_relia_bins_by_target),
+            num_bootstrap_reps
+        )
+        these_dim_keys = (FIELD_DIM, RELIABILITY_BIN_DIM, BOOTSTRAP_REP_DIM)
 
     new_dict = {
         RELIABILITY_X_KEY: (
@@ -887,12 +973,17 @@ def get_scores_with_bootstrapping(
 
     if per_grid_cell:
         these_dimensions = (
-            num_grid_rows, num_grid_columns, num_reliability_bins
+            num_grid_rows, num_grid_columns, num_target_fields,
+            numpy.max(num_relia_bins_by_target)
         )
-        these_dim_keys = (LATITUDE_DIM, LONGITUDE_DIM, RELIABILITY_BIN_DIM)
+        these_dim_keys = (
+            LATITUDE_DIM, LONGITUDE_DIM, FIELD_DIM, RELIABILITY_BIN_DIM
+        )
     else:
-        these_dimensions = (num_reliability_bins,)
-        these_dim_keys = (RELIABILITY_BIN_DIM,)
+        these_dimensions = (
+            num_target_fields, numpy.max(num_relia_bins_by_target)
+        )
+        these_dim_keys = (FIELD_DIM, RELIABILITY_BIN_DIM)
 
     new_dict = {
         RELIABILITY_BIN_CENTER_KEY: (
@@ -911,11 +1002,11 @@ def get_scores_with_bootstrapping(
     main_data_dict.update(new_dict)
 
     if per_grid_cell:
-        these_dimensions = (num_grid_rows, num_grid_columns, 1)
-        these_dim_keys = (LATITUDE_DIM, LONGITUDE_DIM, DUMMY_DIM)
+        these_dimensions = (num_grid_rows, num_grid_columns, num_target_fields)
+        these_dim_keys = (LATITUDE_DIM, LONGITUDE_DIM, FIELD_DIM)
     else:
-        these_dimensions = (1,)
-        these_dim_keys = (DUMMY_DIM,)
+        these_dimensions = (num_target_fields,)
+        these_dim_keys = (FIELD_DIM,)
 
     new_dict = {
         KS_STATISTIC_KEY: (
@@ -928,12 +1019,14 @@ def get_scores_with_bootstrapping(
     main_data_dict.update(new_dict)
 
     reliability_bin_indices = numpy.linspace(
-        0, num_reliability_bins - 1, num=num_reliability_bins, dtype=int
+        0, numpy.max(num_relia_bins_by_target) - 1,
+        num=numpy.max(num_relia_bins_by_target), dtype=int
     )
     bootstrap_indices = numpy.linspace(
         0, num_bootstrap_reps - 1, num=num_bootstrap_reps, dtype=int
     )
     metadata_dict = {
+        FIELD_DIM: target_field_names,
         RELIABILITY_BIN_DIM: reliability_bin_indices,
         BOOTSTRAP_REP_DIM: bootstrap_indices
     }
@@ -982,13 +1075,14 @@ def get_scores_with_bootstrapping(
             full_prediction_matrix=prediction_matrix,
             replicate_index=i,
             example_indices_in_replicate=these_indices,
-            mean_training_target_value=mean_training_target_value,
-            min_reliability_bin_edge=min_reliability_bin_edge,
-            max_reliability_bin_edge=max_reliability_bin_edge,
-            min_reliability_bin_edge_percentile=
-            min_reliability_bin_edge_percentile,
-            max_reliability_bin_edge_percentile=
-            max_reliability_bin_edge_percentile,
+            mean_training_target_values=mean_training_target_values,
+            num_relia_bins_by_target=num_relia_bins_by_target,
+            min_relia_bin_edge_by_target=min_relia_bin_edge_by_target,
+            max_relia_bin_edge_by_target=max_relia_bin_edge_by_target,
+            min_relia_bin_edge_prctile_by_target=
+            min_relia_bin_edge_prctile_by_target,
+            max_relia_bin_edge_prctile_by_target=
+            max_relia_bin_edge_prctile_by_target,
             per_grid_cell=per_grid_cell
         )
 
