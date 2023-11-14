@@ -1788,6 +1788,8 @@ def read_metafile(pickle_file_name):
             training_option_dict['target_field_name']
         ]
 
+    print(training_option_dict)
+
     metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
     metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict
 
