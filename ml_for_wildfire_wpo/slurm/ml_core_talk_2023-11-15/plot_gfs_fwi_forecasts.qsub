@@ -1,0 +1,45 @@
+#!/bin/tcsh
+
+#SBATCH --job-name="plot_gfs_fwi_forecasts"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="batch"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=01:00:00
+#SBATCH --array=1-8
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_gfs_fwi_forecasts_%A_%a.out
+
+module load cuda/10.1
+source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
+conda activate base
+
+set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+set INPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/direct_fwi_calc/processed/daily_fwi"
+set OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/ml_core_talk_2023-11-15/raw_gfs_fwi_forecasts"
+
+set INIT_DATE_STRINGS=("20211223" "20211224" "20211225" "20211226" "20211227" "20211228" "20211229" "20211230")
+set i=$SLURM_ARRAY_TASK_ID
+
+while ($i <= `expr $SLURM_ARRAY_TASK_ID` && $i <= $#INIT_DATE_STRINGS)
+    set init_date_string="${INIT_DATE_STRINGS[$i]}"
+    
+    python3 -u "${CODE_DIR_NAME}/plot_gfs_fwi_forecasts.py" \
+    --input_dir_name="${INPUT_DIR_NAME}" \
+    --field_names "fine_fuel_moisture_code" \
+    --init_date_string="${init_date_string}" \
+    --lead_times_days 1 2 3 4 5 6 7 8 9 10 11 12 13 14 \
+    --output_dir_name="${OUTPUT_DIR_NAME}"
+    
+    @ i = $i + 1
+end

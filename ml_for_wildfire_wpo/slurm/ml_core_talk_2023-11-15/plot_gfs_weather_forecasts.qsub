@@ -1,0 +1,52 @@
+#!/bin/tcsh
+
+#SBATCH --job-name="plot_gfs_weather_forecasts"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="batch"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=01:00:00
+#SBATCH --array=1-8
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_gfs_weather_forecasts_%A_%a.out
+
+module load cuda/10.1
+module load gnu/9.2.0
+module load wgrib2/3.1.1_ncep
+
+source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
+conda activate base
+
+set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+set INPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/merged/normalized_params_from_2019-2020"
+set NORMALIZATION_FILE_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/merged/z_score_params_2019-2020.nc"
+set OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/ml_core_talk_2023-11-15/gfs_weather_forecasts"
+
+set INIT_DATE_STRINGS=("20211223" "20211224" "20211225" "20211226" "20211227" "20211228" "20211229" "20211230")
+set i=$SLURM_ARRAY_TASK_ID
+
+while ($i <= `expr $SLURM_ARRAY_TASK_ID` && $i <= $#INIT_DATE_STRINGS)
+    set init_date_string="${INIT_DATE_STRINGS[$i]}"
+    
+    python3 -u "${CODE_DIR_NAME}/plot_gfs_data.py" \
+    --input_dir_name="${INPUT_DIR_NAME}" \
+    --field_names "temperature_kelvins" "specific_humidity_kg_kg01" "geopotential_height_m_asl" "u_wind_m_s01" "v_wind_m_s01" "temperature_2m_agl_kelvins" "specific_humidity_2m_agl_kg_kg01" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "accumulated_precip_metres" "volumetric_soil_moisture_fraction_0to10cm" "snow_depth_metres" \
+    --pressure_levels_mb 500 700 900 \
+    --init_date_strings ${init_date_string} \
+    --forecast_hours 0 48 \
+    --min_colour_percentile=0 \
+    --max_colour_percentile=100 \
+    --output_dir_name="${OUTPUT_DIR_NAME}/${init_date_string}"
+    
+    @ i = $i + 1
+end
