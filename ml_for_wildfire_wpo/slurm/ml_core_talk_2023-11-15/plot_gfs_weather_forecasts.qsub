@@ -40,6 +40,7 @@ while ($i <= `expr $SLURM_ARRAY_TASK_ID` && $i <= $#INIT_DATE_STRINGS)
     
     python3 -u "${CODE_DIR_NAME}/plot_gfs_data.py" \
     --input_dir_name="${INPUT_DIR_NAME}" \
+    --input_normalization_file_name="${NORMALIZATION_FILE_NAME}" \
     --field_names "temperature_kelvins" "specific_humidity_kg_kg01" "geopotential_height_m_asl" "u_wind_m_s01" "v_wind_m_s01" "temperature_2m_agl_kelvins" "specific_humidity_2m_agl_kg_kg01" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "accumulated_precip_metres" "volumetric_soil_moisture_fraction_0to10cm" "snow_depth_metres" \
     --pressure_levels_mb 500 700 900 \
     --init_date_strings ${init_date_string} \
