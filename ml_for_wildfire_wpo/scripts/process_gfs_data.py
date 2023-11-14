@@ -251,9 +251,55 @@ def _read_incremental_precip_1init(
             read_incremental_precip=True
         )
 
-        data_matrix = gfs_tables_xarray[k][gfs_utils.DATA_KEY_2D].values
-        if numpy.all(numpy.isnan(data_matrix)) and forecast_hours[k] > 0:
+        incremental_precip_matrix_metres = (
+            gfs_tables_xarray[k][gfs_utils.DATA_KEY_2D].values
+        )
+        if not (
+                numpy.all(numpy.isnan(incremental_precip_matrix_metres))
+                and forecast_hours[k] > 0
+        ):
+            continue
+
+        current_gfs_table_xarray = raw_gfs_io.read_file(
+            grib2_file_name=input_file_names[k],
+            desired_row_indices=desired_row_indices,
+            desired_column_indices=desired_column_indices,
+            wgrib2_exe_name=wgrib2_exe_name,
+            temporary_dir_name=temporary_dir_name,
+            field_names_2d=
+            [gfs_utils.PRECIP_NAME, gfs_utils.CONVECTIVE_PRECIP_NAME],
+            field_names_3d=[],
+            read_incremental_precip=False
+        )
+
+        previous_gfs_table_xarray = raw_gfs_io.read_file(
+            grib2_file_name=input_file_names[k - 1],
+            desired_row_indices=desired_row_indices,
+            desired_column_indices=desired_column_indices,
+            wgrib2_exe_name=wgrib2_exe_name,
+            temporary_dir_name=temporary_dir_name,
+            field_names_2d=
+            [gfs_utils.PRECIP_NAME, gfs_utils.CONVECTIVE_PRECIP_NAME],
+            field_names_3d=[],
+            read_incremental_precip=False
+        )
+
+        incremental_precip_matrix_metres = (
+            current_gfs_table_xarray[gfs_utils.DATA_KEY_2D].values -
+            previous_gfs_table_xarray[gfs_utils.DATA_KEY_2D].values
+        )
+        if (
+                numpy.all(numpy.isnan(incremental_precip_matrix_metres))
+                and forecast_hours[k] > 0
+        ):
             return None
+
+        gfs_tables_xarray[k] = current_gfs_table_xarray.assign({
+            gfs_utils.DATA_KEY_2D: (
+                gfs_tables_xarray[k][gfs_utils.DATA_KEY_2D].dims,
+                incremental_precip_matrix_metres
+            )
+        })
 
     return gfs_utils.concat_over_forecast_hours(gfs_tables_xarray)
 

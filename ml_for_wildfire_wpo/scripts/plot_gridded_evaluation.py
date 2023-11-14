@@ -273,111 +273,116 @@ def _run(input_file_name, min_colour_percentile, max_colour_percentile,
     generator_option_dict = model_metadata_dict[
         neural_net.TRAINING_OPTIONS_KEY
     ]
-    target_field_name = generator_option_dict[neural_net.TARGET_FIELD_KEY]
+    target_field_names = generator_option_dict[neural_net.TARGET_FIELDS_KEY]
+    num_target_fields = len(target_field_names)
 
     etx = evaluation_table_xarray
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
-    for this_metric_name in list(METRIC_NAME_TO_VERBOSE.keys()):
-        if this_metric_name == RMSE_KEY:
-            this_score_matrix = numpy.sqrt(
-                numpy.nanmean(etx[regression_eval.MSE_KEY].values, axis=-1)
+    for k in range(num_target_fields):
+        for this_metric_name in list(METRIC_NAME_TO_VERBOSE.keys()):
+            if this_metric_name == RMSE_KEY:
+                this_score_matrix = numpy.sqrt(numpy.nanmean(
+                    etx[regression_eval.MSE_KEY].values[:, :, k, ...], axis=-1
+                ))
+            else:
+                this_score_matrix = numpy.nanmean(
+                    etx[this_metric_name].values[:, :, k, ...], axis=-1
+                )
+
+            if this_metric_name in [
+                    regression_eval.TARGET_MEAN_KEY,
+                    regression_eval.PREDICTION_MEAN_KEY
+            ]:
+                score_matrix_for_cnorm = numpy.stack([
+                    etx[regression_eval.TARGET_MEAN_KEY].values[:, :, k, ...],
+                    etx[regression_eval.PREDICTION_MEAN_KEY].values[:, :, k, ...],
+                ], axis=-1)
+
+                score_matrix_for_cnorm = numpy.nanmean(
+                    score_matrix_for_cnorm, axis=-2
+                )
+            elif this_metric_name in [
+                    regression_eval.TARGET_STDEV_KEY,
+                    regression_eval.PREDICTION_STDEV_KEY
+            ]:
+                score_matrix_for_cnorm = numpy.stack([
+                    etx[regression_eval.TARGET_STDEV_KEY].values[:, :, k, ...],
+                    etx[regression_eval.PREDICTION_STDEV_KEY].values[:, :, k, ...],
+                ], axis=-1)
+
+                score_matrix_for_cnorm = numpy.nanmean(
+                    score_matrix_for_cnorm, axis=-2
+                )
+            else:
+                score_matrix_for_cnorm = this_score_matrix
+
+            colour_norm_type_string = METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING[
+                this_metric_name
+            ]
+
+            if colour_norm_type_string == 'sequential':
+                min_colour_value = numpy.nanpercentile(
+                    score_matrix_for_cnorm, min_colour_percentile
+                )
+                max_colour_value = numpy.nanpercentile(
+                    score_matrix_for_cnorm, max_colour_percentile
+                )
+            elif colour_norm_type_string == 'diverging':
+                max_colour_value = numpy.nanpercentile(
+                    numpy.absolute(score_matrix_for_cnorm),
+                    max_colour_percentile
+                )
+                min_colour_value = -1 * max_colour_value
+            else:
+                max_colour_value = numpy.nanpercentile(
+                    score_matrix_for_cnorm, max_colour_percentile
+                )
+                min_colour_value = -1 * max_colour_value
+
+            if numpy.isnan(max_colour_value):
+                min_colour_value = 0.
+                max_colour_value = 1.
+
+            max_colour_value = max([
+                max_colour_value,
+                min_colour_value + TOLERANCE
+            ])
+            colour_norm_object = pyplot.Normalize(
+                vmin=min_colour_value, vmax=max_colour_value
             )
-        else:
-            this_score_matrix = numpy.nanmean(
-                etx[this_metric_name].values, axis=-1
+
+            title_string = (
+                '{0:s}{1:s} for {2:s}\nMin/avg/max = {3:f}/{4:f}/{5:f}'
+            ).format(
+                METRIC_NAME_TO_VERBOSE[this_metric_name][0].upper(),
+                METRIC_NAME_TO_VERBOSE[this_metric_name][1:],
+                TARGET_FIELD_NAME_TO_VERBOSE[target_field_names[k]],
+                numpy.nanmin(this_score_matrix),
+                numpy.nanmean(this_score_matrix),
+                numpy.nanmax(this_score_matrix),
             )
 
-        if this_metric_name in [
-            regression_eval.TARGET_MEAN_KEY,
-            regression_eval.PREDICTION_MEAN_KEY
-        ]:
-            score_matrix_for_cnorm = numpy.stack([
-                etx[regression_eval.TARGET_MEAN_KEY].values,
-                etx[regression_eval.PREDICTION_MEAN_KEY].values,
-            ], axis=-1)
-
-            score_matrix_for_cnorm = numpy.nanmean(
-                score_matrix_for_cnorm, axis=-2
+            output_file_name = '{0:s}/{1:s}_{2:s}.jpg'.format(
+                output_dir_name,
+                target_field_names[k].replace('_', '-'),
+                this_metric_name
             )
-        elif this_metric_name in [
-            regression_eval.TARGET_STDEV_KEY,
-            regression_eval.PREDICTION_STDEV_KEY
-        ]:
-            score_matrix_for_cnorm = numpy.stack([
-                etx[regression_eval.TARGET_STDEV_KEY].values,
-                etx[regression_eval.PREDICTION_STDEV_KEY].values,
-            ], axis=-1)
 
-            score_matrix_for_cnorm = numpy.nanmean(
-                score_matrix_for_cnorm, axis=-2
+            _plot_one_score(
+                score_matrix=this_score_matrix,
+                grid_latitudes_deg_n=
+                etx.coords[regression_eval.LATITUDE_DIM].values,
+                grid_longitudes_deg_e=
+                etx.coords[regression_eval.LONGITUDE_DIM].values,
+                border_latitudes_deg_n=border_latitudes_deg_n,
+                border_longitudes_deg_e=border_longitudes_deg_e,
+                colour_map_object=
+                METRIC_NAME_TO_COLOUR_MAP_OBJECT[this_metric_name],
+                colour_norm_object=colour_norm_object,
+                title_string=title_string,
+                output_file_name=output_file_name
             )
-        else:
-            score_matrix_for_cnorm = this_score_matrix
-
-        colour_norm_type_string = METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING[
-            this_metric_name
-        ]
-
-        if colour_norm_type_string == 'sequential':
-            min_colour_value = numpy.nanpercentile(
-                score_matrix_for_cnorm, min_colour_percentile
-            )
-            max_colour_value = numpy.nanpercentile(
-                score_matrix_for_cnorm, max_colour_percentile
-            )
-        elif colour_norm_type_string == 'diverging':
-            max_colour_value = numpy.nanpercentile(
-                numpy.absolute(score_matrix_for_cnorm), max_colour_percentile
-            )
-            min_colour_value = -1 * max_colour_value
-        else:
-            max_colour_value = numpy.nanpercentile(
-                score_matrix_for_cnorm, max_colour_percentile
-            )
-            min_colour_value = -1 * max_colour_value
-
-        if numpy.isnan(max_colour_value):
-            min_colour_value = 0.
-            max_colour_value = 1.
-
-        max_colour_value = max([
-            max_colour_value,
-            min_colour_value + TOLERANCE
-        ])
-        colour_norm_object = pyplot.Normalize(
-            vmin=min_colour_value, vmax=max_colour_value
-        )
-
-        title_string = (
-            '{0:s}{1:s} for {2:s}\nMin/avg/max = {3:f}/{4:f}/{5:f}'
-        ).format(
-            METRIC_NAME_TO_VERBOSE[this_metric_name][0].upper(),
-            METRIC_NAME_TO_VERBOSE[this_metric_name][1:],
-            TARGET_FIELD_NAME_TO_VERBOSE[target_field_name],
-            numpy.nanmin(this_score_matrix),
-            numpy.nanmean(this_score_matrix),
-            numpy.nanmax(this_score_matrix),
-        )
-
-        output_file_name = '{0:s}/{1:s}.jpg'.format(
-            output_dir_name, this_metric_name
-        )
-
-        _plot_one_score(
-            score_matrix=this_score_matrix,
-            grid_latitudes_deg_n=
-            etx.coords[regression_eval.LATITUDE_DIM].values,
-            grid_longitudes_deg_e=
-            etx.coords[regression_eval.LONGITUDE_DIM].values,
-            border_latitudes_deg_n=border_latitudes_deg_n,
-            border_longitudes_deg_e=border_longitudes_deg_e,
-            colour_map_object=
-            METRIC_NAME_TO_COLOUR_MAP_OBJECT[this_metric_name],
-            colour_norm_object=colour_norm_object,
-            title_string=title_string,
-            output_file_name=output_file_name
-        )
 
 
 if __name__ == '__main__':

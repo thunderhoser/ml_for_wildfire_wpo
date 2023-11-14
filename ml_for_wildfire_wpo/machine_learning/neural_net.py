@@ -43,11 +43,10 @@ GFS_NORM_FILE_KEY = 'gfs_normalization_file_name'
 ERA5_CONSTANT_PREDICTOR_FIELDS_KEY = 'era5_constant_predictor_field_names'
 ERA5_CONSTANT_FILE_KEY = 'era5_constant_file_name'
 # ERA5_NORM_FILE_KEY = 'era5_normalization_file_name' # TODO
-TARGET_FIELD_KEY = 'target_field_name'
+TARGET_FIELDS_KEY = 'target_field_names'
 TARGET_LEAD_TIME_KEY = 'target_lead_time_days'
 TARGET_LAG_TIMES_KEY = 'target_lag_times_days'
 GFS_FCST_TARGET_LEAD_TIMES_KEY = 'gfs_forecast_target_lead_times_days'
-TARGET_CUTOFFS_KEY = 'target_cutoffs_for_classifn'
 TARGET_DIRECTORY_KEY = 'target_dir_name'
 GFS_FORECAST_TARGET_DIR_KEY = 'gfs_forecast_target_dir_name'
 TARGET_NORM_FILE_KEY = 'target_normalization_file_name'
@@ -60,7 +59,6 @@ DEFAULT_GENERATOR_OPTION_DICT = {
     OUTER_LATITUDE_BUFFER_KEY: 5.,
     OUTER_LONGITUDE_BUFFER_KEY: 5.,
     TARGET_LAG_TIMES_KEY: numpy.array([1], dtype=int),
-    TARGET_CUTOFFS_KEY: None,
     # SENTINEL_VALUE_KEY: -10.
 }
 
@@ -230,7 +228,9 @@ def _check_generator_args(option_dict):
     if option_dict[ERA5_CONSTANT_FILE_KEY] is not None:
         error_checking.assert_file_exists(option_dict[ERA5_CONSTANT_FILE_KEY])
 
-    canadian_fwi_utils.check_field_name(option_dict[TARGET_FIELD_KEY])
+    error_checking.assert_is_string_list(option_dict[TARGET_FIELDS_KEY])
+    for this_field_name in option_dict[TARGET_FIELDS_KEY]:
+        canadian_fwi_utils.check_field_name(this_field_name)
 
     error_checking.assert_is_integer(option_dict[TARGET_LEAD_TIME_KEY])
     error_checking.assert_is_geq(option_dict[TARGET_LEAD_TIME_KEY], 0)
@@ -264,18 +264,6 @@ def _check_generator_args(option_dict):
         )
         error_checking.assert_is_greater_numpy_array(
             option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY], 0
-        )
-
-    if option_dict[TARGET_CUTOFFS_KEY] is not None:
-        error_checking.assert_is_numpy_array(
-            option_dict[TARGET_CUTOFFS_KEY], num_dimensions=1
-        )
-        error_checking.assert_is_greater_numpy_array(
-            option_dict[TARGET_CUTOFFS_KEY], 0
-        )
-        assert numpy.all(numpy.isfinite(option_dict[TARGET_CUTOFFS_KEY]))
-        error_checking.assert_is_greater_numpy_array(
-            numpy.diff(option_dict[TARGET_CUTOFFS_KEY]), 0
         )
 
     error_checking.assert_directory_exists(option_dict[TARGET_DIRECTORY_KEY])
@@ -406,46 +394,6 @@ def _get_3d_gfs_fields(gfs_table_xarray, field_names, pressure_levels_mb):
     return predictor_matrix
 
 
-def _discretize_targets(target_matrix, cutoff_values):
-    """Discretizes targets for classification task.
-
-    E = number of data examples
-    M = number of rows in grid
-    N = number of columns in grid
-    K = number of classes
-
-    :param target_matrix: E-by-M-by-N numpy array of physical target values (FWI
-        values).
-    :param cutoff_values: length-(K - 1) numpy array of cutoff values.  0 and
-        infinity will automatically be added to the beginning and end of this
-        array, respectively.
-    :return: discretized_target_matrix: E-by-M-by-N-by-K numpy array of ones and
-        zeros.
-    """
-
-    full_cutoff_values = numpy.concatenate((
-        numpy.array([0.]),
-        cutoff_values,
-        numpy.array([numpy.inf])
-    ))
-    num_classes = len(full_cutoff_values) - 1
-
-    discretized_target_matrix = numpy.full(
-        target_matrix.shape + (num_classes,), -1, dtype=int
-    )
-
-    for k in range(num_classes):
-        these_flags = numpy.logical_and(
-            target_matrix >= full_cutoff_values[k],
-            target_matrix < full_cutoff_values[k + 1]
-        )
-        discretized_target_matrix[..., k][these_flags] = 1
-        discretized_target_matrix[..., k][these_flags == False] = 0
-
-    assert numpy.all(discretized_target_matrix >= 0)
-    return discretized_target_matrix
-
-
 def _pad_inner_to_outer_domain(
         data_matrix, outer_latitude_buffer_deg, outer_longitude_buffer_deg,
         is_example_axis_present, fill_value):
@@ -495,24 +443,25 @@ def _pad_inner_to_outer_domain(
     )
 
 
-def _get_gfs_forecast_target_field(
+def _get_gfs_forecast_target_fields(
         daily_gfs_file_name, lead_times_days,
         desired_row_indices, desired_column_indices,
-        field_name, norm_param_table_xarray):
-    """Reads GFS-forecast target field from one file.
+        field_names, norm_param_table_xarray):
+    """Reads GFS-forecast target fields from one file.
 
     M = number of rows in grid
     N = number of columns in grid
     L = number of lead times
+    T = number of target fields
 
     :param daily_gfs_file_name: Path to input file.
     :param lead_times_days: length-L numpy array of lead times.
     :param desired_row_indices: length-M numpy array of indices.
     :param desired_column_indices: length-N numpy array of indices.
-    :param field_name: Field name.
+    :param field_names: length-T list of field names.
     :param norm_param_table_xarray: xarray table with normalization parameters.
         If you do not want normalization, make this None.
-    :return: data_matrix: M-by-N-by-L numpy array of data values.
+    :return: data_matrix: M-by-N-by-L-by-T numpy array of data values.
     """
 
     print('Reading data from: "{0:s}"...'.format(daily_gfs_file_name))
@@ -538,30 +487,33 @@ def _get_gfs_forecast_target_field(
             )
         )
 
-    data_matrix = gfs_daily_utils.get_field(
-        daily_gfs_table_xarray=daily_gfs_table_xarray,
-        field_name=field_name
-    )
+    data_matrix = numpy.concatenate([
+        gfs_daily_utils.get_field(
+            daily_gfs_table_xarray=daily_gfs_table_xarray, field_name=f
+        )
+        for f in field_names
+    ], axis=-1)
 
     assert not numpy.any(numpy.isnan(data_matrix))
     return data_matrix
 
 
-def _get_target_field(
+def _get_target_fields(
         target_file_name, desired_row_indices, desired_column_indices,
-        field_name, norm_param_table_xarray):
-    """Reads target field from one file.
+        field_names, norm_param_table_xarray):
+    """Reads target fields from one file.
 
     M = number of rows in grid
     N = number of columns in grid
+    T = number of target fields
 
     :param target_file_name: Path to input file.
     :param desired_row_indices: length-M numpy array of indices.
     :param desired_column_indices: length-N numpy array of indices.
-    :param field_name: Field name.
+    :param field_names: length-T list of field names.
     :param norm_param_table_xarray: xarray table with normalization parameters.
         If you do not want normalization, make this None.
-    :return: data_matrix: M-by-N numpy array of data values.
+    :return: data_matrix: M-by-N-by-T numpy array of data values.
     """
 
     print('Reading data from: "{0:s}"...'.format(target_file_name))
@@ -581,9 +533,12 @@ def _get_target_field(
             z_score_param_table_xarray=norm_param_table_xarray
         )
 
-    data_matrix = canadian_fwi_utils.get_field(
-        fwi_table_xarray=fwi_table_xarray, field_name=field_name
-    )
+    data_matrix = numpy.concatenate([
+        canadian_fwi_utils.get_field(
+            fwi_table_xarray=fwi_table_xarray, field_name=f
+        )
+        for f in field_names
+    ], axis=-1)
 
     assert not numpy.any(numpy.isnan(data_matrix))
     return data_matrix
@@ -823,12 +778,13 @@ def _read_gfs_forecast_targets_1example(
         daily_gfs_dir_name, init_date_string, target_lead_times_days,
         desired_row_indices, desired_column_indices,
         latitude_limits_deg_n, longitude_limits_deg_e,
-        target_field_name, norm_param_table_xarray):
+        target_field_names, norm_param_table_xarray):
     """Reads raw-GFS-forecast target fields for one example.
 
     m = number of rows in grid
     n = number of columns in grid
     l = number of lead times
+    T = number of target fields
 
     :param daily_gfs_dir_name: Name of directory with daily GFS data.
     :param init_date_string: GFS initialization date (format "yyyymmdd") for
@@ -839,9 +795,9 @@ def _read_gfs_forecast_targets_1example(
     :param desired_column_indices: Same.
     :param latitude_limits_deg_n: Same.
     :param longitude_limits_deg_e: Same.
-    :param target_field_name: Same.
+    :param target_field_names: Same.
     :param norm_param_table_xarray: Same.
-    :return: target_field_matrix: m-by-n-by-l-by-1 numpy array.
+    :return: target_field_matrix: m-by-n-by-l-by-T numpy array.
     :return: desired_row_indices: See input documentation.
     :return: desired_column_indices: See input documentation.
     """
@@ -870,16 +826,15 @@ def _read_gfs_forecast_targets_1example(
             end_longitude_deg_e=longitude_limits_deg_e[1]
         )
 
-    target_field_matrix = _get_gfs_forecast_target_field(
+    target_field_matrix = _get_gfs_forecast_target_fields(
         daily_gfs_file_name=daily_gfs_file_name,
         lead_times_days=target_lead_times_days,
         desired_row_indices=desired_row_indices,
         desired_column_indices=desired_column_indices,
-        field_name=target_field_name,
+        field_names=target_field_names,
         norm_param_table_xarray=norm_param_table_xarray
     )
 
-    target_field_matrix = numpy.expand_dims(target_field_matrix, axis=-1)
     return target_field_matrix, desired_row_indices, desired_column_indices
 
 
@@ -887,12 +842,13 @@ def _read_lagged_targets_1example(
         gfs_init_date_string, target_dir_name, target_lag_times_days,
         desired_row_indices, desired_column_indices,
         latitude_limits_deg_n, longitude_limits_deg_e,
-        target_field_name, norm_param_table_xarray):
+        target_field_names, norm_param_table_xarray):
     """Reads lagged-target fields for one example.
 
     m = number of rows in grid
     n = number of columns in grid
     l = number of lag times
+    T = number of target fields
 
     :param gfs_init_date_string: GFS initialization date (format "yyyymmdd") for
         the given data example.
@@ -908,12 +864,12 @@ def _read_lagged_targets_1example(
         `desired_row_indices is not None`, this argument is not used.
     :param longitude_limits_deg_e: See documentation for `data_generator`.  If
         `desired_column_indices is not None`, this argument is not used.
-    :param target_field_name: See documentation for `data_generator`.
+    :param target_field_names: See documentation for `data_generator`.
     :param norm_param_table_xarray: xarray table with normalization
         parameters, in format returned by
         `canadian_fwi_io.read_normalization_file`.  If you do not want
         normalization, make this None.
-    :return: target_field_matrix: m-by-n-by-l-by-1 numpy array.
+    :return: target_field_matrix: m-by-n-by-l-by-T numpy array.
     :return: desired_row_indices: See input documentation.
     :return: desired_column_indices: See input documentation.
     """
@@ -941,17 +897,16 @@ def _read_lagged_targets_1example(
         )
 
     target_field_matrix = numpy.stack([
-        _get_target_field(
+        _get_target_fields(
             target_file_name=f,
             desired_row_indices=desired_row_indices,
             desired_column_indices=desired_column_indices,
-            field_name=target_field_name,
+            field_names=target_field_names,
             norm_param_table_xarray=norm_param_table_xarray
         )
         for f in target_file_names
-    ], axis=-1)
+    ], axis=-2)
 
-    target_field_matrix = numpy.expand_dims(target_field_matrix, axis=-1)
     return target_field_matrix, desired_row_indices, desired_column_indices
 
 
@@ -972,8 +927,8 @@ def data_generator(option_dict):
     FFF = number of 3-D GFS predictor fields
     FF = number of 2-D GFS predictor fields
     F = number of ERA5-constant predictor fields
-    K = number of classes for classification
     l = number of time steps for lag/lead-target predictor fields
+    T = number of target fields
 
     :param option_dict: Dictionary with the following keys.
     option_dict["inner_latitude_limits_deg_n"]: length-2 numpy array with
@@ -1007,24 +962,20 @@ def data_generator(option_dict):
         predictors, make this None.
     option_dict["era5_constant_file_name"]: Path to file with ERA5 constants.
         Will be read by `era5_constant_io.read_file`.
-    option_dict["target_field_name"]: Name of target field (a fire-weather
-        index).
-    option_dict["target_lead_time_days"]: Lead time for target field.
+    option_dict["target_field_names"]: length-T list with names of target fields
+        (fire-weather indices).
+    option_dict["target_lead_time_days"]: Lead time for target fields.
     option_dict["target_lag_times_days"]: 1-D numpy array with lag times for
-        lagged-target predictors.  A "lagged-target predictor" is the actual
-        target field at one lag time.
+        lagged-target predictors.  A "lagged-target predictor" consists of the
+        actual target fields at one lag time.
     option_dict["gfs_forecast_target_lead_times_days"]: 1-D numpy array with
-        lead times for lead-target predictors.  A "lead-target predictor" is the
-        raw-GFS-forecast target field at one lead time.
-    option_dict["target_cutoffs_for_classifn"]: 1-D numpy array of cutoffs for
-        converting regression problem to classification problem.  For example,
-        if this array is [20, 30], the three classes will be 0-20, 20-30, and
-        30-infinity.  If you want to do regression, make this None.
-    option_dict["target_dir_name"]: Name of directory with target variable.
+        lead times for lead-target predictors.  A "lead-target predictor"
+        consists of the raw-GFS-forecast target fields at one lead time.
+    option_dict["target_dir_name"]: Name of directory with target fields.
         Files therein will be found by `canadian_fwo_io.find_file` and read by
         `canadian_fwo_io.read_file`.
     option_dict["gfs_forecast_target_dir_name"]: Name of directory with raw-GFS
-        forecasts of target variable.  Files therein will be found by
+        forecasts of target fields.  Files therein will be found by
         `gfs_daily_io.find_file` and read by `gfs_daily_io.read_file`.
     option_dict["target_normalization_file_name"]: Path to file with
         normalization params for target fields.  Will be read by
@@ -1040,19 +991,15 @@ def data_generator(option_dict):
         predictors.
     predictor_matrices[1]: E-by-M-by-N-by-L-by-FF numpy array of 2-D GFS
         predictors.
-    predictor_matrices[2]: E-by-M-by-N-by-l-by-1 numpy array of lag/lead-target
+    predictor_matrices[2]: E-by-M-by-N-by-l-by-T numpy array of lag/lead-target
         predictors.
     predictor_matrices[3]: E-by-M-by-N-by-F numpy array of ERA5-constant
         predictors.
 
-    :return: target_matrix: If doing regression, this is an E-by-M-by-N-by-2
-        numpy array, where target_matrix[..., 0] contains values of the target
-        field and target_matrix[..., 1] contains a binary mask.  Where the
-        binary mask is 0, predictions should not be evaluated.
-
-        If doing classification, this is an E-by-M-by-N-by-(K + 1) numpy array,
-        where target_matrix[..., -1] is the binary mask and the first K slices
-        on the last axis are a one-hot encoding of class membership.
+    :return: target_matrix: E-by-M-by-N-by-(T + 1) numpy array, where
+        target_matrix[..., 0] through target_matrix[..., -2] contain values of
+        the target fields and target_matrix[..., -1] contains a binary mask.
+        Where the binary mask is 0, predictions should not be evaluated.
     """
 
     # TODO(thunderhoser): Allow multiple lead times for target.
@@ -1078,13 +1025,12 @@ def data_generator(option_dict):
         ERA5_CONSTANT_PREDICTOR_FIELDS_KEY
     ]
     era5_constant_file_name = option_dict[ERA5_CONSTANT_FILE_KEY]
-    target_field_name = option_dict[TARGET_FIELD_KEY]
+    target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
     target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
     gfs_forecast_target_lead_times_days = option_dict[
         GFS_FCST_TARGET_LEAD_TIMES_KEY
     ]
-    target_cutoffs_for_classifn = option_dict[TARGET_CUTOFFS_KEY]
     target_dir_name = option_dict[TARGET_DIRECTORY_KEY]
     gfs_forecast_target_dir_name = option_dict[GFS_FORECAST_TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
@@ -1206,7 +1152,7 @@ def data_generator(option_dict):
                 desired_column_indices=desired_target_column_indices,
                 latitude_limits_deg_n=inner_latitude_limits_deg_n,
                 longitude_limits_deg_e=inner_longitude_limits_deg_e,
-                target_field_name=target_field_name,
+                target_field_names=target_field_names,
                 norm_param_table_xarray=target_norm_param_table_xarray
             )
 
@@ -1226,7 +1172,7 @@ def data_generator(option_dict):
                     desired_gfs_fcst_target_column_indices,
                     latitude_limits_deg_n=inner_latitude_limits_deg_n,
                     longitude_limits_deg_e=inner_longitude_limits_deg_e,
-                    target_field_name=target_field_name,
+                    target_field_names=target_field_names,
                     norm_param_table_xarray=target_norm_param_table_xarray
                 )
 
@@ -1247,11 +1193,11 @@ def data_generator(option_dict):
                 numpy.array([target_lead_time_days], dtype=int)
             )[0]
 
-            this_target_matrix = _get_target_field(
+            this_target_matrix = _get_target_fields(
                 target_file_name=target_file_name,
                 desired_row_indices=desired_target_row_indices,
                 desired_column_indices=desired_target_column_indices,
-                field_name=target_field_name,
+                field_names=target_field_names,
                 norm_param_table_xarray=None
             )
 
@@ -1358,18 +1304,11 @@ def data_generator(option_dict):
             outer_longitude_buffer_deg=outer_longitude_buffer_deg,
             is_example_axis_present=True, fill_value=0.
         )
-
-        if target_cutoffs_for_classifn is None:
-            target_matrix = numpy.expand_dims(target_matrix, axis=-1)
-        else:
-            target_matrix = _discretize_targets(
-                target_matrix=target_matrix,
-                cutoff_values=target_cutoffs_for_classifn
-            )
-
         target_matrix_with_weights = numpy.concatenate(
-            (target_matrix, weight_matrix), axis=-1
+            (target_matrix, numpy.expand_dims(weight_matrix, axis=-1)),
+            axis=-1
         )
+
         predictor_matrices = [
             m for m in [
                 gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
@@ -1434,13 +1373,12 @@ def create_data(option_dict, init_date_string):
         ERA5_CONSTANT_PREDICTOR_FIELDS_KEY
     ]
     era5_constant_file_name = option_dict[ERA5_CONSTANT_FILE_KEY]
-    target_field_name = option_dict[TARGET_FIELD_KEY]
+    target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
     target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
     gfs_forecast_target_lead_times_days = option_dict[
         GFS_FCST_TARGET_LEAD_TIMES_KEY
     ]
-    target_cutoffs_for_classifn = option_dict[TARGET_CUTOFFS_KEY]
     target_dir_name = option_dict[TARGET_DIRECTORY_KEY]
     gfs_forecast_target_dir_name = option_dict[GFS_FORECAST_TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
@@ -1549,7 +1487,7 @@ def create_data(option_dict, init_date_string):
         desired_column_indices=None,
         latitude_limits_deg_n=inner_latitude_limits_deg_n,
         longitude_limits_deg_e=inner_longitude_limits_deg_e,
-        target_field_name=target_field_name,
+        target_field_names=target_field_names,
         norm_param_table_xarray=target_norm_param_table_xarray
     )
 
@@ -1562,7 +1500,7 @@ def create_data(option_dict, init_date_string):
             desired_column_indices=None,
             latitude_limits_deg_n=inner_latitude_limits_deg_n,
             longitude_limits_deg_e=inner_longitude_limits_deg_e,
-            target_field_name=target_field_name,
+            target_field_names=target_field_names,
             norm_param_table_xarray=target_norm_param_table_xarray
         )[0]
 
@@ -1582,11 +1520,11 @@ def create_data(option_dict, init_date_string):
         numpy.array([target_lead_time_days], dtype=int)
     )[0]
 
-    target_matrix = _get_target_field(
+    target_matrix = _get_target_fields(
         target_file_name=target_file_name,
         desired_row_indices=desired_target_row_indices,
         desired_column_indices=desired_target_column_indices,
-        field_name=target_field_name,
+        field_names=target_field_names,
         norm_param_table_xarray=None
     )
     target_matrix = numpy.expand_dims(target_matrix, axis=0)
@@ -1648,17 +1586,9 @@ def create_data(option_dict, init_date_string):
         outer_longitude_buffer_deg=outer_longitude_buffer_deg,
         is_example_axis_present=True, fill_value=0.
     )
-
-    if target_cutoffs_for_classifn is None:
-        target_matrix = numpy.expand_dims(target_matrix, axis=-1)
-    else:
-        target_matrix = _discretize_targets(
-            target_matrix=target_matrix,
-            cutoff_values=target_cutoffs_for_classifn
-        )
-
     target_matrix_with_weights = numpy.concatenate(
-        (target_matrix, weight_matrix), axis=-1
+        (target_matrix, numpy.expand_dims(weight_matrix, axis=-1)),
+        axis=-1
     )
 
     predictor_matrices = [
@@ -1843,6 +1773,14 @@ def read_metafile(pickle_file_name):
         validation_option_dict[GFS_FORECAST_TARGET_DIR_KEY] = None
         validation_option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY] = None
 
+    if TARGET_FIELDS_KEY not in training_option_dict:
+        training_option_dict[TARGET_FIELDS_KEY] = [
+            training_option_dict['target_field_name']
+        ]
+        validation_option_dict[TARGET_FIELDS_KEY] = [
+            training_option_dict['target_field_name']
+        ]
+
     metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
     metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict
 
@@ -2007,24 +1945,20 @@ def train_model(
 
 
 def apply_model(
-        model_object, predictor_matrices, num_examples_per_batch,
-        for_classification, verbose=True):
+        model_object, predictor_matrices, num_examples_per_batch, verbose=True):
     """Applies trained neural net -- inference time!
 
     E = number of examples
     M = number of rows in grid
     N = number of columns in grid
-    K = number of classes
+    T = number of target fields
 
     :param model_object: Trained neural net (instance of `keras.models.Model`).
     :param predictor_matrices: See output doc for `data_generator`.
     :param num_examples_per_batch: Batch size.
-    :param for_classification: Boolean flag.  If True (False), the model is
-        assumed to do classification (regression).
     :param verbose: Boolean flag.  If True, will print progress messages.
-    :return: prediction_matrix: If the model does classification, this is an
-        E-by-M-by-N-by-K numpy array of probabilities.  If the model does
-        regression, this is an E-by-M-by-N numpy array of predicted values.
+    :return: prediction_matrix: E-by-M-by-N-by-T numpy array of predicted
+        values.
     """
 
     # Check input args.
@@ -2036,7 +1970,6 @@ def apply_model(
     num_examples = predictor_matrices[0].shape[0]
     num_examples_per_batch = min([num_examples_per_batch, num_examples])
 
-    error_checking.assert_is_boolean(for_classification)
     error_checking.assert_is_boolean(verbose)
 
     # Do actual stuff.
@@ -2064,24 +1997,7 @@ def apply_model(
     if verbose:
         print('Have applied model to all {0:d} examples!'.format(num_examples))
 
-    if for_classification:
-        error_checking.assert_is_geq(len(prediction_matrix.shape), 3)
-        error_checking.assert_is_leq(len(prediction_matrix.shape), 4)
-
-        if len(prediction_matrix.shape) == 3:
-            prediction_matrix = numpy.expand_dims(prediction_matrix, axis=-1)
-
-        if prediction_matrix.shape[3] == 1:
-            prediction_matrix = numpy.concatenate(
-                (1. - prediction_matrix, prediction_matrix), axis=-1
-            )
-    else:
-        if (
-                len(prediction_matrix.shape) == 4 and
-                prediction_matrix.shape[-1] == 1
-        ):
-            prediction_matrix = prediction_matrix[..., 0]
-
-        error_checking.assert_equals(len(prediction_matrix.shape), 3)
+    while len(prediction_matrix.shape) < 4:
+        prediction_matrix = numpy.expand_dims(prediction_matrix, axis=-1)
 
     return prediction_matrix

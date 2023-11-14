@@ -14,7 +14,8 @@ DATE_FORMAT = '%Y%m%d'
 
 ROW_DIM = 'grid_row'
 COLUMN_DIM = 'grid_column'
-CLASS_DIM = 'class'
+FIELD_DIM = 'field'
+FIELD_CHAR_DIM = 'field_char'
 
 MODEL_FILE_KEY = 'model_file_name'
 INIT_DATE_KEY = 'init_date_string'
@@ -24,6 +25,7 @@ PREDICTION_KEY = 'prediction'
 WEIGHT_KEY = 'evaluation_weight'
 LATITUDE_KEY = 'latitude_deg_n'
 LONGITUDE_KEY = 'longitude_deg_e'
+FIELD_NAME_KEY = 'field_name'
 
 
 def find_file(directory_name, init_date_string, raise_error_if_missing=True):
@@ -134,27 +136,23 @@ def read_file(netcdf_file_name):
 
 def write_file(
         netcdf_file_name, target_matrix_with_weights, prediction_matrix,
-        grid_latitudes_deg_n, grid_longitudes_deg_e,
+        grid_latitudes_deg_n, grid_longitudes_deg_e, field_names,
         init_date_string, model_file_name):
     """Writes predictions to NetCDF file.
 
     M = number of rows in grid
     N = number of columns in grid
-    K = number of classes
+    T = number of target fields
 
     :param netcdf_file_name: Path to output file.
-    :param target_matrix_with_weights: If the model does classification, should
-        be M-by-N-by-(K + 1) numpy array, where
-        target_matrix_with_weights[..., -1] contains evaluation weights and
-        target_matrix_with_weights[..., :-1] contains a one-hot encoding of the
-        true classes.  If the model does regression, should be M-by-N-by-2 numpy
-        array, where target_matrix_with_weights[..., -1] contains weights and
-        target_matrix_with_weights[..., 0] contains target values.
-    :param prediction_matrix: If the model does classification, should be
-        M-by-N-by-K numpy array of class probabilities.  If the model does
-        regression, should be M-by-N numpy array of predicted target values.
+    :param target_matrix_with_weights: M-by-N-by-(T + 1) numpy array, where
+        target_matrix_with_weights[..., -1] contains weights and
+        target_matrix_with_weights[..., :-1] contains target values.
+    :param prediction_matrix: M-by-N-by-T numpy array of predicted target
+        values.
     :param grid_latitudes_deg_n: length-M numpy array of latitudes (deg north).
     :param grid_longitudes_deg_e: length-N numpy array of longitudes (deg east).
+    :param field_names: length-T list of field names.
     :param init_date_string: Initialization date (format "yyyymmdd").
     :param model_file_name: Path to file with trained model.
     """
@@ -170,53 +168,22 @@ def write_file(
 
     num_grid_rows = target_matrix_with_weights.shape[0]
     num_grid_columns = target_matrix_with_weights.shape[1]
-    for_classification = target_matrix_with_weights.shape[-1] > 2
+    num_fields = target_matrix_with_weights.shape[2] - 1
 
-    if for_classification:
-        target_matrix = target_matrix_with_weights[..., :-1]
-
-        diff_from_zero_matrix = numpy.absolute(target_matrix - 0.)
-        diff_from_one_matrix = numpy.absolute(target_matrix - 1.)
-        diff_matrix = numpy.minimum(diff_from_zero_matrix, diff_from_one_matrix)
-        error_checking.assert_is_leq_numpy_array(diff_matrix, TOLERANCE)
-
-        target_matrix = numpy.round(target_matrix).astype(int)
-        error_checking.assert_is_geq_numpy_array(target_matrix, 0)
-        error_checking.assert_is_leq_numpy_array(target_matrix, 1)
-    else:
-        target_matrix = target_matrix_with_weights[..., 0]
-        error_checking.assert_is_numpy_array_without_nan(target_matrix)
+    target_matrix = target_matrix_with_weights[..., :-1]
+    error_checking.assert_is_numpy_array_without_nan(target_matrix)
 
     weight_matrix = target_matrix_with_weights[..., -1]
     error_checking.assert_is_geq_numpy_array(weight_matrix, 0.)
     error_checking.assert_is_leq_numpy_array(weight_matrix, 1.)
 
-    if for_classification:
-        num_classes = target_matrix.shape[-1]
-        expected_dim = numpy.array(
-            [num_grid_rows, num_grid_columns, num_classes], dtype=int
-        )
-        error_checking.assert_is_numpy_array(
-            prediction_matrix, exact_dimensions=expected_dim
-        )
-
-        error_checking.assert_is_geq_numpy_array(prediction_matrix, 0.)
-        error_checking.assert_is_leq_numpy_array(prediction_matrix, 1.)
-
-        diff_from_one_matrix = numpy.absolute(
-            numpy.mean(prediction_matrix, axis=-1) - 1.
-        )
-        error_checking.assert_is_leq_numpy_array(
-            diff_from_one_matrix, TOLERANCE
-        )
-    else:
-        num_classes = 0
-
-        expected_dim = numpy.array([num_grid_rows, num_grid_columns], dtype=int)
-        error_checking.assert_is_numpy_array(
-            prediction_matrix, exact_dimensions=expected_dim
-        )
-        error_checking.assert_is_numpy_array_without_nan(prediction_matrix)
+    expected_dim = numpy.array(
+        [num_grid_rows, num_grid_columns, num_fields], dtype=int
+    )
+    error_checking.assert_is_numpy_array(
+        prediction_matrix, exact_dimensions=expected_dim
+    )
+    error_checking.assert_is_numpy_array_without_nan(prediction_matrix)
 
     error_checking.assert_is_numpy_array(
         grid_latitudes_deg_n,
@@ -242,30 +209,31 @@ def write_file(
             grid_longitudes_deg_e
         )
 
+    error_checking.assert_is_string_list(field_names)
+    error_checking.assert_is_numpy_array(
+        numpy.array(field_names),
+        exact_dimensions=numpy.array([num_fields], dtype=int)
+    )
+
     # Do actual stuff.
     file_system_utils.mkdir_recursive_if_necessary(file_name=netcdf_file_name)
     dataset_object = netCDF4.Dataset(
         netcdf_file_name, 'w', format='NETCDF3_64BIT_OFFSET'
     )
 
+    num_field_chars = max([len(f) for f in field_names])
+
     dataset_object.setncattr(MODEL_FILE_KEY, model_file_name)
     dataset_object.setncattr(INIT_DATE_KEY, init_date_string)
     dataset_object.createDimension(ROW_DIM, num_grid_rows)
     dataset_object.createDimension(COLUMN_DIM, num_grid_columns)
+    dataset_object.createDimension(FIELD_DIM, num_fields)
+    dataset_object.createDimension(FIELD_CHAR_DIM, num_field_chars)
 
-    if for_classification:
-        dataset_object.createDimension(CLASS_DIM, num_classes)
-
-        these_dim = (ROW_DIM, COLUMN_DIM, CLASS_DIM)
-        dataset_object.createVariable(
-            TARGET_KEY, datatype=numpy.int32, dimensions=these_dim
-        )
-    else:
-        these_dim = (ROW_DIM, COLUMN_DIM)
-        dataset_object.createVariable(
-            TARGET_KEY, datatype=numpy.float32, dimensions=these_dim
-        )
-
+    these_dim = (ROW_DIM, COLUMN_DIM, FIELD_DIM)
+    dataset_object.createVariable(
+        TARGET_KEY, datatype=numpy.float32, dimensions=these_dim
+    )
     dataset_object.variables[TARGET_KEY][:] = target_matrix
 
     dataset_object.createVariable(
@@ -288,5 +256,17 @@ def write_file(
         LONGITUDE_KEY, datatype=numpy.float32, dimensions=COLUMN_DIM
     )
     dataset_object.variables[LONGITUDE_KEY][:] = grid_longitudes_deg_e
+
+    this_string_format = 'S{0:d}'.format(num_field_chars)
+    field_names_char_array = netCDF4.stringtochar(numpy.array(
+        field_names, dtype=this_string_format
+    ))
+
+    dataset_object.createVariable(
+        FIELD_NAME_KEY, datatype='S1', dimensions=(FIELD_DIM, FIELD_CHAR_DIM)
+    )
+    dataset_object.variables[FIELD_NAME_KEY][:] = numpy.array(
+        field_names_char_array
+    )
 
     dataset_object.close()
