@@ -824,7 +824,7 @@ def get_scores_with_bootstrapping(
                 tpt.attrs[prediction_io.MODEL_FILE_KEY]
             )
 
-        weight_matrix[i, ...] = tpt[prediction_io.WEIGHT_KEY].values
+        weight_matrix[i, ..., 0] = tpt[prediction_io.WEIGHT_KEY].values
         assert model_file_name == tpt.attrs[prediction_io.MODEL_FILE_KEY]
 
         these_indices = numpy.array([
