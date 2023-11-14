@@ -196,6 +196,7 @@ def _run(prediction_dir_name, init_date_limit_strings, num_bootstrap_reps,
             'MAE and skill score = {7:f}, {8:f} ... '
             'bias = {9:f} ... correlation = {10:f} ... KGE = {11:f}'
         ).format(
+            target_field_names[k],
             numpy.nanmean(
                 t[regression_eval.TARGET_STDEV_KEY].values[..., k, :]
             ),
