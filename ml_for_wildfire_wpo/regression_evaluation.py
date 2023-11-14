@@ -831,12 +831,10 @@ def get_scores_with_bootstrapping(
         weight_matrix[i, ...] = tpt[prediction_io.WEIGHT_KEY].values
         assert model_file_name == tpt.attrs[prediction_io.MODEL_FILE_KEY]
 
-        all_field_names = [
-            f.decode('utf-8') for f in tpt[prediction_io.FIELD_NAME_KEY].values
-        ]
-        these_indices = numpy.array(
-            [all_field_names.index(f) for f in target_field_names], dtype=int
-        )
+        these_indices = numpy.array([
+            numpy.where(tpt[prediction_io.FIELD_NAME_KEY].values == f)[0][0]
+            for f in target_field_names
+        ], dtype=int)
 
         target_matrix[i, ...] = tpt[prediction_io.TARGET_KEY].values[
             ..., these_indices
