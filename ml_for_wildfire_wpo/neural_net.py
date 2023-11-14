@@ -1312,8 +1312,7 @@ def data_generator(option_dict):
             is_example_axis_present=True, fill_value=0.
         )
         target_matrix_with_weights = numpy.concatenate(
-            (target_matrix, numpy.expand_dims(weight_matrix, axis=-1)),
-            axis=-1
+            (target_matrix, weight_matrix), axis=-1
         )
 
         predictor_matrices = [
@@ -1511,9 +1510,6 @@ def create_data(option_dict, init_date_string):
             norm_param_table_xarray=target_norm_param_table_xarray
         )[0]
 
-        print(laglead_target_predictor_matrix.shape)
-        print(new_matrix.shape)
-
         laglead_target_predictor_matrix = numpy.concatenate(
             (laglead_target_predictor_matrix, new_matrix),
             axis=-2
@@ -1597,8 +1593,7 @@ def create_data(option_dict, init_date_string):
         is_example_axis_present=True, fill_value=0.
     )
     target_matrix_with_weights = numpy.concatenate(
-        (target_matrix, numpy.expand_dims(weight_matrix, axis=-1)),
-        axis=-1
+        (target_matrix, weight_matrix), axis=-1
     )
 
     predictor_matrices = [
