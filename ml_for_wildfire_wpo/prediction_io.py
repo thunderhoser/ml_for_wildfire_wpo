@@ -138,7 +138,18 @@ def read_file(netcdf_file_name):
         table should make values self-explanatory.
     """
 
-    return xarray.open_dataset(netcdf_file_name)
+    prediction_table_xarray = xarray.open_dataset(netcdf_file_name)
+    target_field_names = [
+        f.decode('utf-8') for f in
+        prediction_table_xarray[FIELD_NAME_KEY].values
+    ]
+
+    return prediction_table_xarray.assign({
+        FIELD_NAME_KEY: (
+            prediction_table_xarray[FIELD_NAME_KEY].dims,
+            target_field_names
+        )
+    })
 
 
 def write_file(
