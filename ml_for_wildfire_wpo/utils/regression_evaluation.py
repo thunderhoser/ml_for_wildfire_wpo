@@ -810,6 +810,10 @@ def get_scores_with_bootstrapping(
             )
             target_matrix = numpy.full(these_dim, numpy.nan)
             prediction_matrix = numpy.full(these_dim, numpy.nan)
+
+            these_dim = (
+                (num_times,) + tpt[prediction_io.WEIGHT_KEY].values.shape
+            )
             weight_matrix = numpy.full(these_dim, numpy.nan)
 
             model_file_name = copy.deepcopy(

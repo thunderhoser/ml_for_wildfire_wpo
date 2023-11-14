@@ -487,7 +487,7 @@ def _get_gfs_forecast_target_fields(
             )
         )
 
-    data_matrix = numpy.concatenate([
+    data_matrix = numpy.stack([
         gfs_daily_utils.get_field(
             daily_gfs_table_xarray=daily_gfs_table_xarray, field_name=f
         )
@@ -533,7 +533,7 @@ def _get_target_fields(
             z_score_param_table_xarray=norm_param_table_xarray
         )
 
-    data_matrix = numpy.concatenate([
+    data_matrix = numpy.stack([
         canadian_fwi_utils.get_field(
             fwi_table_xarray=fwi_table_xarray, field_name=f
         )
@@ -1305,8 +1305,7 @@ def data_generator(option_dict):
             is_example_axis_present=True, fill_value=0.
         )
         target_matrix_with_weights = numpy.concatenate(
-            (target_matrix, numpy.expand_dims(weight_matrix, axis=-1)),
-            axis=-1
+            (target_matrix, weight_matrix), axis=-1
         )
 
         predictor_matrices = [
@@ -1587,8 +1586,7 @@ def create_data(option_dict, init_date_string):
         is_example_axis_present=True, fill_value=0.
     )
     target_matrix_with_weights = numpy.concatenate(
-        (target_matrix, numpy.expand_dims(weight_matrix, axis=-1)),
-        axis=-1
+        (target_matrix, weight_matrix), axis=-1
     )
 
     predictor_matrices = [
@@ -1759,10 +1757,6 @@ def read_metafile(pickle_file_name):
     metadata_dict = pickle.load(pickle_file_handle)
     pickle_file_handle.close()
 
-    missing_keys = list(set(METADATA_KEYS) - set(metadata_dict.keys()))
-    if len(missing_keys) == 0:
-        return metadata_dict
-
     training_option_dict = metadata_dict[TRAINING_OPTIONS_KEY]
     validation_option_dict = metadata_dict[VALIDATION_OPTIONS_KEY]
 
@@ -1783,6 +1777,10 @@ def read_metafile(pickle_file_name):
 
     metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
     metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict
+
+    missing_keys = list(set(METADATA_KEYS) - set(metadata_dict.keys()))
+    if len(missing_keys) == 0:
+        return metadata_dict
 
     error_string = (
         '\n{0:s}\nKeys listed above were expected, but not found, in file '
