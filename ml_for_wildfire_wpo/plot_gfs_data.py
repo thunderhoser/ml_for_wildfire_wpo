@@ -21,6 +21,7 @@ import error_checking
 import gfs_io
 import border_io
 import gfs_utils
+import normalization
 import plotting_utils
 import gfs_plotting
 
@@ -35,6 +36,7 @@ FIGURE_HEIGHT_INCHES = 15
 FIGURE_RESOLUTION_DPI = 300
 
 INPUT_DIR_ARG_NAME = 'input_dir_name'
+NORMALIZATION_FILE_ARG_NAME = 'input_normalization_file_name'
 FIELDS_ARG_NAME = 'field_names'
 PRESSURE_LEVELS_ARG_NAME = 'pressure_levels_mb'
 INIT_DATES_ARG_NAME = 'init_date_strings'
@@ -47,6 +49,13 @@ INPUT_DIR_HELP_STRING = (
     'Name of input directory.  Files therein will be found by '
     '`gfs_io.find_file` and read by `gfs_io.read_file`.'
 )
+NORMALIZATION_FILE_HELP_STRING = (
+    'Path to normalization file.  Will be read by '
+    '`gfs_io.read_normalization_file` and used to denormalize GFS fields '
+    'before plotting, if necessary.  If {0:s} contains unnormalized GFS data '
+    'already, leave this argument alone.'
+).format(INPUT_DIR_ARG_NAME)
+
 FIELDS_HELP_STRING = 'List of fields to plot.'
 PRESSURE_LEVELS_HELP_STRING = (
     'List of pressure levels.  Will be used only for 3-D fields.'
@@ -71,6 +80,10 @@ INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
     '--' + INPUT_DIR_ARG_NAME, type=str, required=True,
     help=INPUT_DIR_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + NORMALIZATION_FILE_ARG_NAME, type=str, required=False, default='',
+    help=NORMALIZATION_FILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + FIELDS_ARG_NAME, type=str, nargs='+', required=True,
@@ -221,14 +234,15 @@ def _plot_one_field(
     pyplot.close(figure_object)
 
 
-def _run(input_dir_name, field_names, pressure_levels_mb, init_date_strings,
-         forecast_hours, min_colour_percentile, max_colour_percentile,
-         output_dir_name):
+def _run(input_dir_name, normalization_file_name, field_names,
+         pressure_levels_mb, init_date_strings, forecast_hours,
+         min_colour_percentile, max_colour_percentile, output_dir_name):
     """Plots GFS data (model output).
 
     This is effectively the main method.
 
     :param input_dir_name: See documentation at top of file.
+    :param normalization_file_name: Same.
     :param field_names: Same.
     :param pressure_levels_mb: Same.
     :param init_date_strings: Same.
@@ -243,6 +257,8 @@ def _run(input_dir_name, field_names, pressure_levels_mb, init_date_strings,
         directory_name=output_dir_name
     )
 
+    if normalization_file_name == '':
+        normalization_file_name = None
     for this_field_name in field_names:
         gfs_utils.check_field_name(this_field_name)
     for this_date_string in init_date_strings:
@@ -259,6 +275,16 @@ def _run(input_dir_name, field_names, pressure_levels_mb, init_date_strings,
 
     # Do actual stuff.
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
+
+    if normalization_file_name is not None:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            normalization_file_name
+        ))
+        norm_param_table_xarray = gfs_io.read_normalization_file(
+            normalization_file_name
+        )
+    else:
+        norm_param_table_xarray = None
 
     for this_date_string in init_date_strings:
         gfs_file_name = gfs_io.find_file(
@@ -277,6 +303,13 @@ def _run(input_dir_name, field_names, pressure_levels_mb, init_date_strings,
 
         print('Reading data from: "{0:s}"...'.format(gfs_file_name))
         gfs_table_xarray = gfs_io.read_file(gfs_file_name)
+
+        if norm_param_table_xarray is not None:
+            gfs_table_xarray = normalization.denormalize_gfs_data_from_z_scores(
+                gfs_table_xarray=gfs_table_xarray,
+                z_score_param_table_xarray=norm_param_table_xarray
+            )
+
         gfstx = gfs_table_xarray
 
         for this_forecast_hour in forecast_hours:
@@ -399,6 +432,9 @@ if __name__ == '__main__':
 
     _run(
         input_dir_name=getattr(INPUT_ARG_OBJECT, INPUT_DIR_ARG_NAME),
+        normalization_file_name=getattr(
+            INPUT_ARG_OBJECT, NORMALIZATION_FILE_ARG_NAME
+        ),
         field_names=getattr(INPUT_ARG_OBJECT, FIELDS_ARG_NAME),
         pressure_levels_mb=numpy.array(
             getattr(INPUT_ARG_OBJECT, PRESSURE_LEVELS_ARG_NAME), dtype=int

@@ -361,6 +361,112 @@ def get_z_score_params_for_targets(target_file_names):
     return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
 
 
+def denormalize_gfs_data_from_z_scores(gfs_table_xarray,
+                                       z_score_param_table_xarray):
+    """Returns GFS data from z-scores to physical units.
+
+    :param gfs_table_xarray: xarray table with GFS data in z-scores.
+    :param z_score_param_table_xarray: xarray table with normalization
+        parameters (means and standard deviations), created by
+        `get_z_score_params_for_gfs`.
+    :return: gfs_table_xarray: Same as input but in physical units.
+    """
+
+    # TODO(thunderhoser): Still need unit test.
+
+    gfst = gfs_table_xarray
+    zspt = z_score_param_table_xarray
+
+    field_names_3d = gfst.coords[gfs_utils.FIELD_DIM_3D].values.tolist()
+    field_names_2d = gfst.coords[gfs_utils.FIELD_DIM_2D].values.tolist()
+    pressure_levels_mb = numpy.round(
+        gfst.coords[gfs_utils.PRESSURE_LEVEL_DIM].values
+    ).astype(int)
+    forecast_hours = numpy.round(
+        gfst.coords[gfs_utils.FORECAST_HOUR_DIM].values
+    ).astype(int)
+
+    num_pressure_levels = len(pressure_levels_mb)
+    num_forecast_hours = len(forecast_hours)
+    num_3d_fields = len(field_names_3d)
+    num_2d_fields = len(field_names_2d)
+
+    data_matrix_3d = gfst[gfs_utils.DATA_KEY_3D].values
+    data_matrix_2d = gfst[gfs_utils.DATA_KEY_2D].values
+
+    for j in range(num_3d_fields):
+        for k in range(num_pressure_levels):
+            j_new = numpy.where(
+                zspt.coords[gfs_utils.FIELD_DIM_3D].values == field_names_3d[j]
+            )[0][0]
+
+            k_new = numpy.where(
+                numpy.round(
+                    zspt.coords[gfs_utils.PRESSURE_LEVEL_DIM].values
+                ).astype(int)
+                == pressure_levels_mb[k]
+            )[0][0]
+
+            this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_3D].values[k_new, j_new]
+            this_stdev = zspt[gfs_utils.STDEV_KEY_3D].values[k_new, j_new]
+
+            if numpy.isnan(this_stdev):
+                data_matrix_3d[..., k, j] = this_mean
+            else:
+                data_matrix_3d[..., k, j] = (
+                    this_mean + this_stdev * data_matrix_3d[..., k, j]
+                )
+
+    for j in range(num_2d_fields):
+        j_new = numpy.where(
+            zspt.coords[gfs_utils.FIELD_DIM_2D].values == field_names_2d[j]
+        )[0][0]
+
+        if field_names_2d[j] not in ACCUM_PRECIP_FIELD_NAMES:
+            this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_2D].values[0, j_new]
+            this_stdev = zspt[gfs_utils.STDEV_KEY_2D].values[0, j_new]
+
+            if numpy.isnan(this_stdev):
+                data_matrix_2d[..., j] = this_mean
+            else:
+                data_matrix_2d[..., j] = (
+                    this_mean + this_stdev * data_matrix_2d[..., j]
+                )
+
+            continue
+
+        for k in range(num_forecast_hours):
+            k_new = numpy.where(
+                numpy.round(
+                    zspt.coords[gfs_utils.FORECAST_HOUR_DIM].values
+                ).astype(int)
+                == forecast_hours[k]
+            )[0][0]
+
+            this_mean = zspt[gfs_utils.MEAN_VALUE_KEY_2D].values[
+                k_new, j_new
+            ]
+            this_stdev = zspt[gfs_utils.STDEV_KEY_2D].values[k_new, j_new]
+
+            if numpy.isnan(this_stdev):
+                data_matrix_2d[k, ..., j] = this_mean
+            else:
+                data_matrix_2d[k, ..., j] = (
+                    this_mean + this_stdev * data_matrix_2d[k, ..., j]
+                )
+
+    return gfs_table_xarray.assign({
+        gfs_utils.DATA_KEY_3D: (
+            gfs_table_xarray[gfs_utils.DATA_KEY_3D].dims,
+            data_matrix_3d
+        ),
+        gfs_utils.DATA_KEY_2D: (
+            gfs_table_xarray[gfs_utils.DATA_KEY_2D].dims,
+            data_matrix_2d
+        )
+    })
+
+
 def normalize_gfs_data_to_z_scores(gfs_table_xarray,
                                    z_score_param_table_xarray):
     """Normalizes GFS data from physical units to z-scores.
@@ -372,7 +478,6 @@ def normalize_gfs_data_to_z_scores(gfs_table_xarray,
     :return: gfs_table_xarray: Same as input but in z-score units.
     """
 
-    # TODO(thunderhoser): Still need denormalization method.
     # TODO(thunderhoser): Still need unit test.
 
     gfst = gfs_table_xarray
