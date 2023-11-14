@@ -494,7 +494,7 @@ def _get_gfs_forecast_target_fields(
             )
         )
 
-    data_matrix = numpy.concatenate([
+    data_matrix = numpy.stack([
         gfs_daily_utils.get_field(
             daily_gfs_table_xarray=daily_gfs_table_xarray, field_name=f
         )
@@ -540,7 +540,7 @@ def _get_target_fields(
             z_score_param_table_xarray=norm_param_table_xarray
         )
 
-    data_matrix = numpy.concatenate([
+    data_matrix = numpy.stack([
         canadian_fwi_utils.get_field(
             fwi_table_xarray=fwi_table_xarray, field_name=f
         )
