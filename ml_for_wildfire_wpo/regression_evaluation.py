@@ -818,13 +818,17 @@ def get_scores_with_bootstrapping(
             )
             target_matrix = numpy.full(these_dim, numpy.nan)
             prediction_matrix = numpy.full(these_dim, numpy.nan)
+
+            these_dim = (
+                (num_times,) + tpt[prediction_io.WEIGHT_KEY].values.shape
+            )
             weight_matrix = numpy.full(these_dim, numpy.nan)
 
             model_file_name = copy.deepcopy(
                 tpt.attrs[prediction_io.MODEL_FILE_KEY]
             )
 
-        weight_matrix[i, ..., 0] = tpt[prediction_io.WEIGHT_KEY].values
+        weight_matrix[i, ...] = tpt[prediction_io.WEIGHT_KEY].values
         assert model_file_name == tpt.attrs[prediction_io.MODEL_FILE_KEY]
 
         all_field_names = [
