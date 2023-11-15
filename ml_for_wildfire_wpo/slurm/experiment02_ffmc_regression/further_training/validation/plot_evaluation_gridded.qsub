@@ -42,6 +42,6 @@ echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
 --input_evaluation_file_name="${model_dir_name}/validation/gridded_evaluation.nc" \
---min_colour_percentile=0 \
---max_colour_percentile=100 \
+--min_colour_percentile=1 \
+--max_colour_percentile=99 \
 --output_dir_name="${model_dir_name}/validation/gridded_evaluation"
