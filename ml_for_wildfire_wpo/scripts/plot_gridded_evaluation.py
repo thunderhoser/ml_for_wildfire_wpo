@@ -286,9 +286,13 @@ def _run(input_file_name, min_colour_percentile, max_colour_percentile,
                     etx[regression_eval.MSE_KEY].values[:, :, k, ...], axis=-1
                 ))
             else:
-                this_score_matrix = numpy.nanmean(
-                    etx[this_metric_name].values[:, :, k, ...], axis=-1
+                this_score_matrix = (
+                    etx[this_metric_name].values[:, :, k, ...] + 0.
                 )
+                if len(this_score_matrix.shape) > 2:
+                    this_score_matrix = numpy.nanmean(
+                        this_score_matrix, axis=-1
+                    )
 
             if this_metric_name in [
                     regression_eval.TARGET_MEAN_KEY,
