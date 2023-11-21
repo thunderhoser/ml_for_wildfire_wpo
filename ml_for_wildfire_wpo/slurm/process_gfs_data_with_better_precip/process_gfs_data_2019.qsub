@@ -53,4 +53,6 @@ while ($i <= `expr $SLURM_ARRAY_TASK_ID + 7` && $i <= $#DATE_STRINGS)
     --temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${first_date_string}-${last_date_string}" \
     --for_direct_fwi_calc=0 \
     --output_zarr_dir_name="${OUTPUT_DIR_NAME}"
+    
+    @ i = $i + 1
 end
