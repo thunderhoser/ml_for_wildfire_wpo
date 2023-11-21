@@ -196,7 +196,7 @@ INPUT_ARG_PARSER.add_argument(
     help=ALLOW_N_MISSING_HOURS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + MAX_FORECAST_HOUR_ARG_NAME, type=int, required=True,
+    '--' + MAX_FORECAST_HOUR_ARG_NAME, type=int, required=False, default=-1,
     help=MAX_FORECAST_HOUR_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
