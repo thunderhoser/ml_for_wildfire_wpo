@@ -509,19 +509,21 @@ def _run(main_input_dir_name, input_precip_dir_name,
                     this_field_name
                 )[0][0]
 
-                orig_num_nans = numpy.sum(numpy.isnan(
+                num_nans_main = numpy.sum(numpy.isnan(
                     main_data_matrix_2d[..., k_main]
                 ))
-                main_data_matrix_2d[..., k_main] = (
-                    aux_data_matrix_2d[..., k_aux] + 0.
-                )
-                num_nans = numpy.sum(numpy.isnan(
-                    main_data_matrix_2d[..., k_main]
+                num_nans_aux = numpy.sum(numpy.isnan(
+                    aux_data_matrix_2d[..., k_aux]
                 ))
 
+                if num_nans_aux < num_nans_main:
+                    main_data_matrix_2d[..., k_main] = (
+                        aux_data_matrix_2d[..., k_aux] + 0.
+                    )
+
                 print('Replaced {0:d} of {1:d} NaN values for {2:s}!'.format(
-                    orig_num_nans - num_nans,
-                    orig_num_nans,
+                    num_nans_main - num_nans_aux,
+                    num_nans_main,
                     this_field_name
                 ))
 
