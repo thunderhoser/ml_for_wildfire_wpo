@@ -37,7 +37,7 @@ while ($i <= `expr $SLURM_ARRAY_TASK_ID + 5` && $i <= $#DATE_STRINGS)
     set first_date_string="${DATE_STRINGS[$i]}"
     set last_date_string="${DATE_STRINGS[$i]}"
     
-    python3 -u "${CODE_DIR_NAME}/process_gfs_data.py" \
+    python3 -u "${CODE_DIR_NAME}/process_ncar_gfs_data.py" \
     --main_input_grib2_dir_name="${MAIN_INPUT_DIR_NAME}" \
     --input_grib2_precip_dir_name="${INPUT_PRECIP_DIR_NAME}" \
     --start_date_string="${first_date_string}" \
@@ -48,8 +48,6 @@ while ($i <= `expr $SLURM_ARRAY_TASK_ID + 5` && $i <= $#DATE_STRINGS)
     --end_longitude_deg_e=-55 \
     --wgrib2_exe_file_name="${WGRIB2_EXE_NAME}" \
     --temporary_dir_name="${OUTPUT_DIR_NAME}/tmp/${first_date_string}-${last_date_string}" \
-    --for_direct_fwi_calc=0 \
-    --is_ncar_format=1 \
     --output_zarr_dir_name="${OUTPUT_DIR_NAME}"
     
     @ i = $i + 1
