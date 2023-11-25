@@ -25,7 +25,7 @@ source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
 conda activate base
 
 set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
-set MAIN_INPUT_DIR_NAME="/scratch1/BMC/gsd-hpcs/Ryan.Lagerquist/gfs_data_for_fire_weather/raw_from_ncar"
+set MAIN_INPUT_DIR_NAME="/scratch1/BMC/gsd-hpcs/Ryan.Lagerquist/gfs_data_for_fire_weather/raw_from_ncar/2022"
 set INPUT_PRECIP_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/gfs_data_fwi_inputs_only/grib2"
 set OUTPUT_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_from_ncar"
 set WGRIB2_EXE_NAME="wgrib2"
