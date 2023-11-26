@@ -1,0 +1,38 @@
+#!/bin/tcsh
+
+#SBATCH --job-name="plot_gfs_data_20211211"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpu"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=01:00:00
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_gfs_data_20211211_%A.out
+
+module load cuda/10.1
+source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
+conda activate base
+
+set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+set INPUT_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed"
+set OUTPUT_DIR_NAME="${INPUT_DIR_NAME}/plots/20211211"
+
+python3 -u "${CODE_DIR_NAME}/plot_gfs_data.py" \
+--input_dir_name="${INPUT_DIR_NAME}" \
+--field_names "accumulated_precip_metres" \
+--pressure_levels_mb 500 \
+--init_date_strings "20211211" \
+--forecast_hours 0 6 12 18 24 144 \
+--min_colour_percentile=0.1 \
+--max_colour_percentile=99.9 \
+--output_dir_name="${OUTPUT_DIR_NAME}"

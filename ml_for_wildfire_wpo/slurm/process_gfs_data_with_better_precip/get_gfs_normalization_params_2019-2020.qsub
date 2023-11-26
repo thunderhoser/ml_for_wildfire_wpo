@@ -24,7 +24,7 @@ source /scratch2/BMC/gsd-hpcs/Jebb.Q.Stewart/conda3.7/etc/profile.d/conda.csh
 conda activate base
 
 set CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
-set INPUT_DIR_NAME="/scratch1/RDARCH/rda-aidata/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_merged"
+set INPUT_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed"
 set OUTPUT_FILE_NAME="${INPUT_DIR_NAME}/z_score_params_2019-2020.nc"
 
 python3 -u "${CODE_DIR_NAME}/get_z_score_params_for_gfs.py" \
