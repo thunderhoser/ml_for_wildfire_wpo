@@ -237,7 +237,8 @@ def _check_args(option_dict):
     )
 
     these_dim = numpy.array([
-        num_grid_rows, num_grid_columns, input_dimensions_lagged_target[2], 1
+        num_grid_rows, num_grid_columns,
+        input_dimensions_lagged_target[2], input_dimensions_lagged_target[3]
     ], dtype=int)
 
     assert numpy.array_equal(input_dimensions_lagged_target, these_dim)
