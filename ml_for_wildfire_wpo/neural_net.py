@@ -1751,12 +1751,16 @@ def read_metafile(pickle_file_name):
         validation_option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY] = None
 
     if TARGET_FIELDS_KEY not in training_option_dict:
-        training_option_dict[TARGET_FIELDS_KEY] = [
-            training_option_dict['target_field_name']
-        ]
-        validation_option_dict[TARGET_FIELDS_KEY] = [
-            training_option_dict['target_field_name']
-        ]
+        if 'target_field_name' in training_option_dict:
+            training_option_dict[TARGET_FIELDS_KEY] = [
+                training_option_dict['target_field_name']
+            ]
+            validation_option_dict[TARGET_FIELDS_KEY] = [
+                training_option_dict['target_field_name']
+            ]
+        else:
+            training_option_dict[TARGET_FIELDS_KEY] = []
+            validation_option_dict[TARGET_FIELDS_KEY] = []
 
     metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
     metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict
