@@ -324,30 +324,33 @@ def get_z_score_params_for_targets(target_file_names):
 
     num_fields = len(field_names)
     mean_values = numpy.full(num_fields, numpy.nan)
+    mean_squared_values = numpy.full(num_fields, numpy.nan)
     stdev_values = numpy.full(num_fields, numpy.nan)
 
     for j in range(num_fields):
         f = field_names[j]
 
         mean_values[j] = z_score_dict_dict[f][MEAN_VALUE_KEY]
+        mean_squared_values[j] = z_score_dict_dict[f][MEAN_OF_SQUARES_KEY]
         stdev_values[j] = _get_standard_deviation(z_score_dict_dict[f])
 
         print((
-            'Mean and standard deviation for {0:s} = {1:.4g}, {2:.4g}'
+            'Mean, squared mean, and standard deviation for {0:s} = '
+            '{1:.4g}, {2:.4g}, {3:.4g}'
         ).format(
-            field_names[j], mean_values[j], stdev_values[j]
+            field_names[j],
+            mean_values[j], mean_squared_values[j], stdev_values[j]
         ))
 
     coord_dict = {canadian_fwi_utils.FIELD_DIM: field_names}
 
     these_dim = (canadian_fwi_utils.FIELD_DIM,)
     main_data_dict = {
-        canadian_fwi_utils.MEAN_VALUE_KEY: (
-            these_dim, mean_values
+        canadian_fwi_utils.MEAN_VALUE_KEY: (these_dim, mean_values),
+        canadian_fwi_utils.MEAN_SQUARED_VALUE_KEY: (
+            these_dim, mean_squared_values
         ),
-        canadian_fwi_utils.STDEV_KEY: (
-            these_dim, stdev_values
-        )
+        canadian_fwi_utils.STDEV_KEY: (these_dim, stdev_values)
     }
 
     return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)

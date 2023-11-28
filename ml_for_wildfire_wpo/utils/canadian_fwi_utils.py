@@ -9,6 +9,7 @@ FIELD_DIM = 'field_name'
 DATA_KEY = 'data'
 
 MEAN_VALUE_KEY = 'mean_value'
+MEAN_SQUARED_VALUE_KEY = 'mean_squared_value'
 STDEV_KEY = 'standard_deviation'
 
 FFMC_NAME = 'fine_fuel_moisture_code'
