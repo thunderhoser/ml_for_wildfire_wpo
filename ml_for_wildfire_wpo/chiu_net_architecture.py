@@ -573,6 +573,7 @@ def create_model(option_dict, loss_function, metric_list):
     )(input_layer_object_lagged_target)
 
     num_target_lag_times = input_dimensions_lagged_target[-2]
+    num_target_fields = input_dimensions_lagged_target[-1]
 
     regularizer_object = architecture_utils.get_weight_regularizer(
         l1_weight=l1_weight, l2_weight=l2_weight
@@ -1002,7 +1003,8 @@ def create_model(option_dict, loss_function, metric_list):
         if i == 0 and include_penultimate_conv:
             skip_layer_by_level[i] = architecture_utils.get_2d_conv_layer(
                 num_kernel_rows=3, num_kernel_columns=3,
-                num_rows_per_stride=1, num_columns_per_stride=1, num_filters=2,
+                num_rows_per_stride=1, num_columns_per_stride=1,
+                num_filters=2 * num_target_fields,
                 padding_type_string=architecture_utils.YES_PADDING_STRING,
                 weight_regularizer=regularizer_object,
                 layer_name='penultimate_conv'
@@ -1077,7 +1079,8 @@ def create_model(option_dict, loss_function, metric_list):
 
     skip_layer_by_level[0] = architecture_utils.get_2d_conv_layer(
         num_kernel_rows=1, num_kernel_columns=1,
-        num_rows_per_stride=1, num_columns_per_stride=1, num_filters=1,
+        num_rows_per_stride=1, num_columns_per_stride=1,
+        num_filters=num_target_fields,
         padding_type_string=architecture_utils.YES_PADDING_STRING,
         weight_regularizer=regularizer_object,
         layer_name='last_conv'
