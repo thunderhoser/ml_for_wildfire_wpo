@@ -68,6 +68,7 @@ TRAINING_OPTIONS_KEY = 'training_option_dict'
 NUM_VALIDATION_BATCHES_KEY = 'num_validation_batches_per_epoch'
 VALIDATION_OPTIONS_KEY = 'validation_option_dict'
 LOSS_FUNCTION_KEY = 'loss_function_string'
+METRIC_FUNCTIONS_KEY = 'metric_function_strings'
 PLATEAU_PATIENCE_KEY = 'plateau_patience_epochs'
 PLATEAU_LR_MUTIPLIER_KEY = 'plateau_learning_rate_multiplier'
 EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
@@ -75,45 +76,14 @@ EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
 METADATA_KEYS = [
     NUM_EPOCHS_KEY, NUM_TRAINING_BATCHES_KEY, TRAINING_OPTIONS_KEY,
     NUM_VALIDATION_BATCHES_KEY, VALIDATION_OPTIONS_KEY, LOSS_FUNCTION_KEY,
-    PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY, EARLY_STOPPING_PATIENCE_KEY
+    METRIC_FUNCTIONS_KEY, PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY,
+    EARLY_STOPPING_PATIENCE_KEY
 ]
 
 PREDICTOR_MATRICES_KEY = 'predictor_matrices'
 TARGETS_AND_WEIGHTS_KEY = 'target_matrix_with_weights'
 GRID_LATITUDES_KEY = 'grid_latitudes_deg_n'
 GRID_LONGITUDES_KEY = 'grid_longitudes_deg_e'
-
-METRIC_FUNCTION_LIST = [
-    custom_metrics.max_prediction_anywhere(
-        function_name='max_prediction_anywhere'
-    ),
-    custom_metrics.max_prediction_unmasked(
-        function_name='max_prediction_unmasked'
-    ),
-    custom_metrics.mean_squared_error_everywhere(
-        function_name='mean_squared_error_everywhere'
-    ),
-    custom_losses.mean_squared_error(function_name='mean_squared_error'),
-    custom_losses.dual_weighted_mse(function_name='dual_weighted_mse')
-]
-
-METRIC_FUNCTION_DICT = {
-    'max_prediction_anywhere': custom_metrics.max_prediction_anywhere(
-        function_name='max_prediction_anywhere'
-    ),
-    'max_prediction_unmasked': custom_metrics.max_prediction_unmasked(
-        function_name='max_prediction_unmasked'
-    ),
-    'mean_squared_error_everywhere': custom_metrics.mean_squared_error_everywhere(
-        function_name='mean_squared_error_everywhere'
-    ),
-    'mean_squared_error': custom_losses.mean_squared_error(
-        function_name='mean_squared_error'
-    ),
-    'dual_weighted_mse': custom_losses.dual_weighted_mse(
-        function_name='dual_weighted_mse'
-    )
-}
 
 
 def _check_generator_args(option_dict):
@@ -1697,7 +1667,7 @@ def find_metafile(model_file_name, raise_error_if_missing=True):
 def write_metafile(
         pickle_file_name, num_epochs, num_training_batches_per_epoch,
         training_option_dict, num_validation_batches_per_epoch,
-        validation_option_dict, loss_function_string,
+        validation_option_dict, loss_function_string, metric_function_strings,
         plateau_patience_epochs, plateau_learning_rate_multiplier,
         early_stopping_patience_epochs):
     """Writes metadata to Pickle file.
@@ -1709,6 +1679,7 @@ def write_metafile(
     :param num_validation_batches_per_epoch: Same.
     :param validation_option_dict: Same.
     :param loss_function_string: Same.
+    :param metric_function_strings: Same.
     :param plateau_patience_epochs: Same.
     :param plateau_learning_rate_multiplier: Same.
     :param early_stopping_patience_epochs: Same.
@@ -1721,6 +1692,7 @@ def write_metafile(
         NUM_VALIDATION_BATCHES_KEY: num_validation_batches_per_epoch,
         VALIDATION_OPTIONS_KEY: validation_option_dict,
         LOSS_FUNCTION_KEY: loss_function_string,
+        METRIC_FUNCTIONS_KEY: metric_function_strings,
         PLATEAU_PATIENCE_KEY: plateau_patience_epochs,
         PLATEAU_LR_MUTIPLIER_KEY: plateau_learning_rate_multiplier,
         EARLY_STOPPING_PATIENCE_KEY: early_stopping_patience_epochs
@@ -1744,6 +1716,7 @@ def read_metafile(pickle_file_name):
     metadata_dict["num_validation_batches_per_epoch"]: Same.
     metadata_dict["validation_option_dict"]: Same.
     metadata_dict["loss_function_string"]: Same.
+    metadata_dict["metric_function_strings"]: Same.
     metadata_dict["plateau_patience_epochs"]: Same.
     metadata_dict["plateau_learning_rate_multiplier"]: Same.
     metadata_dict["early_stopping_patience_epochs"]: Same.
@@ -1756,6 +1729,9 @@ def read_metafile(pickle_file_name):
     pickle_file_handle = open(pickle_file_name, 'rb')
     metadata_dict = pickle.load(pickle_file_handle)
     pickle_file_handle.close()
+
+    if METRIC_FUNCTIONS_KEY not in metadata_dict:
+        metadata_dict[METRIC_FUNCTIONS_KEY] = []
 
     training_option_dict = metadata_dict[TRAINING_OPTIONS_KEY]
     validation_option_dict = metadata_dict[VALIDATION_OPTIONS_KEY]
@@ -1810,10 +1786,14 @@ def read_model(hdf5_file_name):
     model_object = tf_keras.models.load_model(
         hdf5_file_name, custom_objects=custom_object_dict, compile=False
     )
+
+    metric_function_list = [
+        eval(m) for m in metadata_dict[METRIC_FUNCTIONS_KEY]
+    ]
     model_object.compile(
         loss=custom_object_dict['loss'],
         optimizer=keras.optimizers.Adam(clipnorm=1.),
-        metrics=METRIC_FUNCTION_LIST
+        metrics=metric_function_list
     )
 
     return model_object
@@ -1823,7 +1803,7 @@ def train_model(
         model_object, num_epochs,
         num_training_batches_per_epoch, training_option_dict,
         num_validation_batches_per_epoch, validation_option_dict,
-        loss_function_string, plateau_patience_epochs,
+        loss_function_string, metric_function_strings, plateau_patience_epochs,
         plateau_learning_rate_multiplier, early_stopping_patience_epochs,
         output_dir_name):
     """Trains neural net with generator.
@@ -1846,6 +1826,9 @@ def train_model(
 
     :param loss_function_string: Loss function.  This string should be formatted
         such that `eval(loss_function_string)` returns the actual loss function.
+    :param metric_function_strings: 1-D list with names of metrics.  Each string
+        should be formatted such that `eval(metric_function_strings[i])` returns
+        the actual metric function.
     :param plateau_patience_epochs: Training will be deemed to have reached
         "plateau" if validation loss has not decreased in the last N epochs,
         where N = plateau_patience_epochs.
@@ -1928,6 +1911,7 @@ def train_model(
         num_validation_batches_per_epoch=num_validation_batches_per_epoch,
         validation_option_dict=validation_option_dict,
         loss_function_string=loss_function_string,
+        metric_function_strings=metric_function_strings,
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs

@@ -34,6 +34,12 @@ FORECAST_HOURS = numpy.array([
     144, 168, 192, 216, 240, 264, 288, 312, 336
 ], dtype=int)
 
+FORECAST_HOURS_FOR_FWI_CALC = set(gfs_utils.ALL_FORECAST_HOURS.tolist())
+FORECAST_HOURS_FOR_FWI_CALC.remove(384)
+FORECAST_HOURS_FOR_FWI_CALC = numpy.array(
+    list(FORECAST_HOURS_FOR_FWI_CALC), dtype=int
+)
+
 FIELD_NAMES_3D = gfs_utils.ALL_3D_FIELD_NAMES
 FIELD_NAMES_2D = gfs_utils.ALL_2D_FIELD_NAMES
 
@@ -166,12 +172,10 @@ def _read_incremental_precip_1init(
         Metadata and variable names should make this table self-explanatory.
     """
 
-    forecast_hours = set(gfs_utils.ALL_FORECAST_HOURS.tolist())
-    forecast_hours.remove(384)
-    forecast_hours = numpy.array(list(forecast_hours), dtype=int)
+    forecast_hours = FORECAST_HOURS_FOR_FWI_CALC
 
     input_file_names = [
-        raw_ncar_gfs_io.find_file(
+        raw_gfs_io.find_file(
             directory_name=input_dir_name,
             init_date_string=init_date_string,
             forecast_hour=h,
@@ -187,14 +191,15 @@ def _read_incremental_precip_1init(
     gfs_tables_xarray = [None] * num_forecast_hours
 
     for k in range(num_forecast_hours):
-        gfs_tables_xarray[k] = raw_ncar_gfs_io.read_file(
+        gfs_tables_xarray[k] = raw_gfs_io.read_file(
             grib2_file_name=input_file_names[k],
             desired_row_indices=desired_row_indices,
             desired_column_indices=desired_column_indices,
             wgrib2_exe_name=wgrib2_exe_name,
             temporary_dir_name=temporary_dir_name,
-            field_names=
+            field_names_2d=
             [gfs_utils.PRECIP_NAME, gfs_utils.CONVECTIVE_PRECIP_NAME],
+            field_names_3d=[],
             read_incremental_precip=True
         )
 
@@ -207,25 +212,27 @@ def _read_incremental_precip_1init(
         ):
             continue
 
-        current_gfs_table_xarray = raw_ncar_gfs_io.read_file(
+        current_gfs_table_xarray = raw_gfs_io.read_file(
             grib2_file_name=input_file_names[k],
             desired_row_indices=desired_row_indices,
             desired_column_indices=desired_column_indices,
             wgrib2_exe_name=wgrib2_exe_name,
             temporary_dir_name=temporary_dir_name,
-            field_names=
+            field_names_2d=
             [gfs_utils.PRECIP_NAME, gfs_utils.CONVECTIVE_PRECIP_NAME],
+            field_names_3d=[],
             read_incremental_precip=False
         )
 
-        previous_gfs_table_xarray = raw_ncar_gfs_io.read_file(
+        previous_gfs_table_xarray = raw_gfs_io.read_file(
             grib2_file_name=input_file_names[k - 1],
             desired_row_indices=desired_row_indices,
             desired_column_indices=desired_column_indices,
             wgrib2_exe_name=wgrib2_exe_name,
             temporary_dir_name=temporary_dir_name,
-            field_names=
+            field_names_2d=
             [gfs_utils.PRECIP_NAME, gfs_utils.CONVECTIVE_PRECIP_NAME],
+            field_names_3d=[],
             read_incremental_precip=False
         )
 

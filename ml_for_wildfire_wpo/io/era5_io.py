@@ -1,7 +1,7 @@
 """Input/output methods for processed ERA5 reanalysis data.
 
 Processed ERA5 data are stored with NetCDF file per day, containing fire-weather
-inputs valid at 1200 local standard time everywhere in the grid.
+inputs valid at 1200 local standard time anywhere in the grid.
 """
 
 import os
