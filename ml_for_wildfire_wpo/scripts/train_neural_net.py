@@ -151,6 +151,8 @@ def _run(template_file_name, output_dir_name,
         num_validation_batches_per_epoch=num_validation_batches_per_epoch,
         validation_option_dict=validation_option_dict,
         loss_function_string=model_metadata_dict[neural_net.LOSS_FUNCTION_KEY],
+        metric_function_strings=
+        model_metadata_dict[neural_net.METRIC_FUNCTIONS_KEY],
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs,

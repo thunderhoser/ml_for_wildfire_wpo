@@ -8,6 +8,8 @@ import keras
 from gewittergefahr.gg_utils import error_checking
 from gewittergefahr.deep_learning import architecture_utils
 
+DUMMY_ENSEMBLE_SIZE = 2
+
 GFS_3D_DIMENSIONS_KEY = 'input_dimensions_gfs_3d'
 GFS_2D_DIMENSIONS_KEY = 'input_dimensions_gfs_2d'
 ERA5_CONST_DIMENSIONS_KEY = 'input_dimensions_era5_constants'
@@ -229,7 +231,8 @@ def _check_args(option_dict):
     )
 
     these_dim = numpy.array([
-        num_grid_rows, num_grid_columns, input_dimensions_lagged_target[2], 1
+        num_grid_rows, num_grid_columns,
+        input_dimensions_lagged_target[2], input_dimensions_lagged_target[3]
     ], dtype=int)
 
     assert numpy.array_equal(input_dimensions_lagged_target, these_dim)
@@ -565,6 +568,7 @@ def create_model(option_dict, loss_function, metric_list):
     )(input_layer_object_lagged_target)
 
     num_target_lag_times = input_dimensions_lagged_target[-2]
+    num_target_fields = input_dimensions_lagged_target[-1]
 
     regularizer_object = architecture_utils.get_weight_regularizer(
         l1_weight=l1_weight, l2_weight=l2_weight
@@ -994,7 +998,8 @@ def create_model(option_dict, loss_function, metric_list):
         if i == 0 and include_penultimate_conv:
             skip_layer_by_level[i] = architecture_utils.get_2d_conv_layer(
                 num_kernel_rows=3, num_kernel_columns=3,
-                num_rows_per_stride=1, num_columns_per_stride=1, num_filters=2,
+                num_rows_per_stride=1, num_columns_per_stride=1,
+                num_filters=2 * num_target_fields * DUMMY_ENSEMBLE_SIZE,
                 padding_type_string=architecture_utils.YES_PADDING_STRING,
                 weight_regularizer=regularizer_object,
                 layer_name='penultimate_conv'
@@ -1069,7 +1074,8 @@ def create_model(option_dict, loss_function, metric_list):
 
     skip_layer_by_level[0] = architecture_utils.get_2d_conv_layer(
         num_kernel_rows=1, num_kernel_columns=1,
-        num_rows_per_stride=1, num_columns_per_stride=1, num_filters=1,
+        num_rows_per_stride=1, num_columns_per_stride=1,
+        num_filters=num_target_fields * DUMMY_ENSEMBLE_SIZE,
         padding_type_string=architecture_utils.YES_PADDING_STRING,
         weight_regularizer=regularizer_object,
         layer_name='last_conv'
@@ -1080,6 +1086,14 @@ def create_model(option_dict, loss_function, metric_list):
         alpha_for_relu=output_activ_function_alpha,
         alpha_for_elu=output_activ_function_alpha,
         layer_name='last_conv_activation'
+    )(skip_layer_by_level[0])
+
+    new_dims = (
+        input_dimensions_lagged_target[0], input_dimensions_lagged_target[1],
+        num_target_fields, DUMMY_ENSEMBLE_SIZE
+    )
+    skip_layer_by_level[0] = keras.layers.Reshape(
+        target_shape=new_dims, name='reshape_predictions'
     )(skip_layer_by_level[0])
 
     input_layer_objects = [
