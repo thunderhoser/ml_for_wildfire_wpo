@@ -76,8 +76,11 @@ def max_prediction_unmasked(channel_index, function_name, test_mode=False):
         :return: metric: Max prediction.
         """
 
+        # Output shape: E x M x N
         weight_tensor = target_tensor[..., -1]
         mask_tensor = K.cast(weight_tensor >= 0.05, prediction_tensor.dtype)
+
+        # Input shapes for multiplication: E x M x N x S and E x M x N x 1
         return K.max(
             prediction_tensor[:, :, :, channel_index, ...] *
             K.expand_dims(mask_tensor, axis=-1)
@@ -111,6 +114,7 @@ def mean_squared_error_anywhere(channel_index, function_name, test_mode=False):
         :return: metric: MSE anywhere.
         """
 
+        # Input shapes for multiplication: E x M x N and E x M x N
         squared_error_tensor = (
             target_tensor[..., channel_index] -
             K.mean(prediction_tensor[:, :, :, channel_index, ...], axis=-1)
@@ -144,12 +148,15 @@ def mean_squared_error_unmasked(channel_index, function_name, test_mode=False):
         :return: metric: MSE at unmasked grid cells.
         """
 
+        # Input shapes for multiplication: E x M x N and E x M x N
         squared_error_tensor = (
             target_tensor[..., channel_index] -
             K.mean(prediction_tensor[:, :, :, channel_index, ...], axis=-1)
         ) ** 2
 
+        # Output shape: E x M x N
         weight_tensor = target_tensor[..., -1]
+
         mask_tensor = K.cast(weight_tensor >= 0.05, prediction_tensor.dtype)
         return K.sum(squared_error_tensor * mask_tensor) / K.sum(mask_tensor)
 
@@ -181,13 +188,18 @@ def dual_weighted_mse_anywhere(channel_index, function_name, test_mode=False):
         :return: metric: DWMSE anywhere.
         """
 
+        # Output shape: E x M x N
         ensemble_mean_prediction_tensor = K.mean(
             prediction_tensor[:, :, :, channel_index, ...], axis=-1
         )
+
+        # Output shape: E x M x N
         dual_weight_tensor = K.maximum(
             K.abs(target_tensor[..., channel_index]),
             K.abs(ensemble_mean_prediction_tensor)
         )
+
+        # Output shape: E x M x N
         error_tensor = (
             dual_weight_tensor *
             (target_tensor[..., channel_index] -
@@ -222,20 +234,27 @@ def dual_weighted_mse_unmasked(channel_index, function_name, test_mode=False):
         :return: metric: DWMSE at unmasked grid cells.
         """
 
+        # Output shape: E x M x N
         ensemble_mean_prediction_tensor = K.mean(
             prediction_tensor[:, :, :, channel_index, ...], axis=-1
         )
+
+        # Output shape: E x M x N
         dual_weight_tensor = K.maximum(
             K.abs(target_tensor[..., channel_index]),
             K.abs(ensemble_mean_prediction_tensor)
         )
+
+        # Output shape: E x M x N
         error_tensor = (
             dual_weight_tensor *
             (target_tensor[..., channel_index] -
              ensemble_mean_prediction_tensor) ** 2
         )
 
+        # Output shape: E x M x N
         weight_tensor = target_tensor[..., -1]
+
         mask_tensor = K.cast(weight_tensor >= 0.05, prediction_tensor.dtype)
         return K.sum(error_tensor * mask_tensor) / K.sum(mask_tensor)
 
