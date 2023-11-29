@@ -16,6 +16,8 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import error_checking
 import architecture_utils
 
+DUMMY_ENSEMBLE_SIZE = 2
+
 GFS_3D_DIMENSIONS_KEY = 'input_dimensions_gfs_3d'
 GFS_2D_DIMENSIONS_KEY = 'input_dimensions_gfs_2d'
 ERA5_CONST_DIMENSIONS_KEY = 'input_dimensions_era5_constants'
@@ -1005,7 +1007,7 @@ def create_model(option_dict, loss_function, metric_list):
             skip_layer_by_level[i] = architecture_utils.get_2d_conv_layer(
                 num_kernel_rows=3, num_kernel_columns=3,
                 num_rows_per_stride=1, num_columns_per_stride=1,
-                num_filters=2 * num_target_fields,
+                num_filters=2 * num_target_fields * DUMMY_ENSEMBLE_SIZE,
                 padding_type_string=architecture_utils.YES_PADDING_STRING,
                 weight_regularizer=regularizer_object,
                 layer_name='penultimate_conv'
@@ -1081,7 +1083,7 @@ def create_model(option_dict, loss_function, metric_list):
     skip_layer_by_level[0] = architecture_utils.get_2d_conv_layer(
         num_kernel_rows=1, num_kernel_columns=1,
         num_rows_per_stride=1, num_columns_per_stride=1,
-        num_filters=num_target_fields,
+        num_filters=num_target_fields * DUMMY_ENSEMBLE_SIZE,
         padding_type_string=architecture_utils.YES_PADDING_STRING,
         weight_regularizer=regularizer_object,
         layer_name='last_conv'
@@ -1095,13 +1097,11 @@ def create_model(option_dict, loss_function, metric_list):
     )(skip_layer_by_level[0])
 
     new_dims = (
-        input_dimensions_lagged_target[0],
-        input_dimensions_lagged_target[1],
-        input_dimensions_lagged_target[3],
-        1
+        input_dimensions_lagged_target[0], input_dimensions_lagged_target[1],
+        num_target_fields, DUMMY_ENSEMBLE_SIZE
     )
     skip_layer_by_level[0] = keras.layers.Reshape(
-        target_shape=new_dims, name='add_ensemble_dim'
+        target_shape=new_dims, name='reshape_predictions'
     )(skip_layer_by_level[0])
 
     input_layer_objects = [

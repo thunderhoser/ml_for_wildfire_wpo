@@ -108,6 +108,8 @@ def dual_weighted_mse(channel_weights, function_name, test_mode=False):
             K.abs(ensemble_mean_prediction_tensor)
         )
 
+        print(ensemble_mean_prediction_tensor)
+
         channel_weight_tensor = K.cast(
             K.constant(channel_weights), dual_weight_tensor.dtype
         )
