@@ -1094,6 +1094,16 @@ def create_model(option_dict, loss_function, metric_list):
         layer_name='last_conv_activation'
     )(skip_layer_by_level[0])
 
+    new_dims = (
+        input_dimensions_lagged_target[0],
+        input_dimensions_lagged_target[1],
+        input_dimensions_lagged_target[3],
+        1
+    )
+    skip_layer_by_level[0] = keras.layers.Reshape(
+        target_shape=new_dims, name='add_ensemble_dim'
+    )(skip_layer_by_level[0])
+
     input_layer_objects = [
         l for l in [
             input_layer_object_gfs_3d, input_layer_object_gfs_2d,
