@@ -1807,6 +1807,8 @@ def read_model(hdf5_file_name):
         metrics=metric_function_list
     )
 
+    model_object.summary()
+
     return model_object
 
 
