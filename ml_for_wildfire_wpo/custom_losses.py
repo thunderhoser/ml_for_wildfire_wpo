@@ -99,6 +99,9 @@ def dual_weighted_mse(channel_weights, function_name, test_mode=False):
         #     (target_tensor[..., :-1] - prediction_tensor) ** 2, axis=-1
         # )
 
+        print(target_tensor)
+        print(prediction_tensor)
+
         ensemble_mean_prediction_tensor = K.mean(prediction_tensor, axis=-1)
         dual_weight_tensor = K.maximum(
             K.abs(target_tensor[..., :-1]),
