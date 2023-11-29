@@ -112,6 +112,10 @@ def dual_weighted_mse(channel_weights, function_name, test_mode=False):
         channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
         channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
 
+        print(channel_weight_tensor)
+        print(dual_weight_tensor)
+        print(target_tensor[..., :-1] - ensemble_mean_prediction_tensor)
+
         error_tensor = (
             channel_weight_tensor * dual_weight_tensor *
             (target_tensor[..., :-1] - ensemble_mean_prediction_tensor) ** 2
