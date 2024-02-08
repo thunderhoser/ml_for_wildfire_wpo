@@ -35,7 +35,7 @@ set template_file_name="${TEMPLATE_DIR_NAME}/num-conv-layers-per-block=${num_lay
 set output_dir_name="${TOP_OUTPUT_DIR_NAME}/num-conv-layers-per-block=${num_layers_per_block}_num-first-layer-filters=${num_first_layer_filters}_gfs-lead-times-hours=${gfs_lead_time_string}"
 echo $output_dir_name
 
-set gfs_lead_time_string="$gfs_lead_time_string:gas/-/ /"
+# set gfs_lead_time_string="$gfs_lead_time_string:gas/-/ /"
 
 set this_directory_name=`pwd`
 singularity exec --nv /scratch1/RDARCH/rda-ghpcs/Jebb.Q.Stewart/ml-ryan.simg /bin/sh -c "cd ${this_directory_name}; sh train_neural_net.sh ${template_file_name} ${output_dir_name} ${gfs_lead_time_string}"

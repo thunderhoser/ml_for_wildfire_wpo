@@ -4,6 +4,8 @@ template_file_name=$1
 output_dir_name=$2
 gfs_lead_time_string=$3
 
+gfs_lead_time_string=$(echo $gfs_lead_time_string | tr "-" " ")
+
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
 
 GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/normalized_params_from_2019-2020"
