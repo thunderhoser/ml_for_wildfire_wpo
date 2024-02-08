@@ -16,7 +16,7 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import error_checking
 import architecture_utils
 
-DUMMY_ENSEMBLE_SIZE = 1
+DUMMY_ENSEMBLE_SIZE = 2
 
 GFS_3D_DIMENSIONS_KEY = 'input_dimensions_gfs_3d'
 GFS_2D_DIMENSIONS_KEY = 'input_dimensions_gfs_2d'
