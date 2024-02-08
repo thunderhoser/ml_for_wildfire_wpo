@@ -8,7 +8,7 @@ import keras
 from gewittergefahr.gg_utils import error_checking
 from gewittergefahr.deep_learning import architecture_utils
 
-DUMMY_ENSEMBLE_SIZE = 2
+DUMMY_ENSEMBLE_SIZE = 1
 
 GFS_3D_DIMENSIONS_KEY = 'input_dimensions_gfs_3d'
 GFS_2D_DIMENSIONS_KEY = 'input_dimensions_gfs_2d'
