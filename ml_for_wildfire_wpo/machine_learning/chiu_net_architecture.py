@@ -1091,13 +1091,14 @@ def create_model(option_dict, loss_function, metric_list):
         layer_name='last_conv_activation'
     )(skip_layer_by_level[0])
 
-    new_dims = (
-        input_dimensions_lagged_target[0], input_dimensions_lagged_target[1],
-        num_target_fields, ensemble_size
-    )
-    skip_layer_by_level[0] = keras.layers.Reshape(
-        target_shape=new_dims, name='reshape_predictions'
-    )(skip_layer_by_level[0])
+    if ensemble_size > 1:
+        new_dims = (
+            input_dimensions_lagged_target[0], input_dimensions_lagged_target[1],
+            num_target_fields, ensemble_size
+        )
+        skip_layer_by_level[0] = keras.layers.Reshape(
+            target_shape=new_dims, name='reshape_predictions'
+        )(skip_layer_by_level[0])
 
     input_layer_objects = [
         l for l in [
