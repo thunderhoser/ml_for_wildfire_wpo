@@ -16,8 +16,6 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import error_checking
 import architecture_utils
 
-DUMMY_ENSEMBLE_SIZE = 2
-
 GFS_3D_DIMENSIONS_KEY = 'input_dimensions_gfs_3d'
 GFS_2D_DIMENSIONS_KEY = 'input_dimensions_gfs_2d'
 ERA5_CONST_DIMENSIONS_KEY = 'input_dimensions_era5_constants'
@@ -58,6 +56,7 @@ OUTPUT_ACTIV_FUNCTION_ALPHA_KEY = 'output_activ_function_alpha'
 L1_WEIGHT_KEY = 'l1_weight'
 L2_WEIGHT_KEY = 'l2_weight'
 USE_BATCH_NORM_KEY = 'use_batch_normalization'
+ENSEMBLE_SIZE_KEY = 'ensemble_size'
 
 DEFAULT_ARCHITECTURE_OPTION_DICT = {
     GFS_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
@@ -162,6 +161,7 @@ def _check_args(option_dict):
     option_dict["l2_weight"]: Weight for L_2 regularization.
     option_dict["use_batch_normalization"]: Boolean flag.  If True, will use
         batch normalization after each inner (non-output) conv layer.
+    option_dict["ensemble_size"]: Ensemble size.
 
     :return: option_dict: Same as input, except defaults may have been added.
     """
@@ -372,6 +372,8 @@ def _check_args(option_dict):
     error_checking.assert_is_geq(option_dict[L1_WEIGHT_KEY], 0.)
     error_checking.assert_is_geq(option_dict[L2_WEIGHT_KEY], 0.)
     error_checking.assert_is_boolean(option_dict[USE_BATCH_NORM_KEY])
+    error_checking.assert_is_integer(option_dict[ENSEMBLE_SIZE_KEY])
+    error_checking.assert_is_greater(option_dict[ENSEMBLE_SIZE_KEY], 0)
 
     return option_dict
 
@@ -506,6 +508,7 @@ def create_model(option_dict, loss_function, metric_list):
     l1_weight = option_dict[L1_WEIGHT_KEY]
     l2_weight = option_dict[L2_WEIGHT_KEY]
     use_batch_normalization = option_dict[USE_BATCH_NORM_KEY]
+    ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
 
     if input_dimensions_gfs_3d is None:
         input_layer_object_gfs_3d = None
@@ -1007,7 +1010,7 @@ def create_model(option_dict, loss_function, metric_list):
             skip_layer_by_level[i] = architecture_utils.get_2d_conv_layer(
                 num_kernel_rows=3, num_kernel_columns=3,
                 num_rows_per_stride=1, num_columns_per_stride=1,
-                num_filters=2 * num_target_fields * DUMMY_ENSEMBLE_SIZE,
+                num_filters=2 * num_target_fields * ensemble_size,
                 padding_type_string=architecture_utils.YES_PADDING_STRING,
                 weight_regularizer=regularizer_object,
                 layer_name='penultimate_conv'
@@ -1083,7 +1086,7 @@ def create_model(option_dict, loss_function, metric_list):
     skip_layer_by_level[0] = architecture_utils.get_2d_conv_layer(
         num_kernel_rows=1, num_kernel_columns=1,
         num_rows_per_stride=1, num_columns_per_stride=1,
-        num_filters=num_target_fields * DUMMY_ENSEMBLE_SIZE,
+        num_filters=num_target_fields * ensemble_size,
         padding_type_string=architecture_utils.YES_PADDING_STRING,
         weight_regularizer=regularizer_object,
         layer_name='last_conv'
@@ -1096,13 +1099,14 @@ def create_model(option_dict, loss_function, metric_list):
         layer_name='last_conv_activation'
     )(skip_layer_by_level[0])
 
-    new_dims = (
-        input_dimensions_lagged_target[0], input_dimensions_lagged_target[1],
-        num_target_fields, DUMMY_ENSEMBLE_SIZE
-    )
-    skip_layer_by_level[0] = keras.layers.Reshape(
-        target_shape=new_dims, name='reshape_predictions'
-    )(skip_layer_by_level[0])
+    if ensemble_size > 1:
+        new_dims = (
+            input_dimensions_lagged_target[0], input_dimensions_lagged_target[1],
+            num_target_fields, ensemble_size
+        )
+        skip_layer_by_level[0] = keras.layers.Reshape(
+            target_shape=new_dims, name='reshape_predictions'
+        )(skip_layer_by_level[0])
 
     input_layer_objects = [
         l for l in [

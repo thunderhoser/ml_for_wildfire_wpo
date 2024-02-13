@@ -23,29 +23,32 @@ OUTPUT_DIR_NAME = (
 )
 
 LOSS_FUNCTION = custom_losses.dual_weighted_mse(
-    channel_weights=numpy.array([1.]), function_name='loss_dwmse'
+    channel_weights=numpy.array([1.]), expect_ensemble=False,
+    function_name='loss_dwmse'
 )
 
 LOSS_FUNCTION_STRING = (
     'custom_losses.dual_weighted_mse('
-    'channel_weights=numpy.array([1.]), '
+    'channel_weights=numpy.array([1.]), expect_ensemble=False, '
     'function_name="loss_dwmse")'
 )
 
 METRIC_FUNCTIONS = [
-    custom_metrics.max_prediction_unmasked(channel_index=0, function_name='ffmc_max_prediction'),
-    custom_metrics.mean_squared_error_unmasked(channel_index=0, function_name='ffmc_mse'),
-    custom_metrics.dual_weighted_mse_unmasked(channel_index=0, function_name='ffmc_dwmse'),
-    custom_metrics.mean_squared_error_anywhere(channel_index=0, function_name='ffmc_mse_incl_masked'),
-    custom_metrics.dual_weighted_mse_anywhere(channel_index=0, function_name='ffmc_dwmse_incl_masked')
+    custom_metrics.max_prediction_unmasked(channel_index=0, expect_ensemble=False, function_name='ffmc_max_prediction'),
+    custom_metrics.max_prediction_anywhere(channel_index=0, expect_ensemble=False, function_name='ffmc_max_prediction_anywhere'),
+    custom_metrics.mean_squared_error_unmasked(channel_index=0, expect_ensemble=False, function_name='ffmc_mse'),
+    custom_metrics.mean_squared_error_anywhere(channel_index=0, expect_ensemble=False, function_name='ffmc_mse_anywhere'),
+    custom_metrics.dual_weighted_mse_unmasked(channel_index=0, expect_ensemble=False, function_name='ffmc_dwmse'),
+    custom_metrics.dual_weighted_mse_anywhere(channel_index=0, expect_ensemble=False, function_name='ffmc_dwmse_anywhere')
 ]
 
 METRIC_FUNCTION_STRINGS = [
-    'custom_metrics.max_prediction_unmasked(channel_index=0, function_name="ffmc_max_prediction")',
-    'custom_metrics.mean_squared_error_unmasked(channel_index=0, function_name="ffmc_mse")',
-    'custom_metrics.dual_weighted_mse_unmasked(channel_index=0, function_name="ffmc_dwmse")',
-    'custom_metrics.mean_squared_error_anywhere(channel_index=0, function_name="ffmc_mse_incl_masked")',
-    'custom_metrics.dual_weighted_mse_anywhere(channel_index=0, function_name="ffmc_dwmse_incl_masked")'
+    'custom_metrics.max_prediction_unmasked(channel_index=0, expect_ensemble=False, function_name="ffmc_max_prediction")',
+    'custom_metrics.max_prediction_anywhere(channel_index=0, expect_ensemble=False, function_name="ffmc_max_prediction_anywhere")',
+    'custom_metrics.mean_squared_error_unmasked(channel_index=0, expect_ensemble=False, function_name="ffmc_mse")',
+    'custom_metrics.mean_squared_error_anywhere(channel_index=0, expect_ensemble=False, function_name="ffmc_mse_anywhere")',
+    'custom_metrics.dual_weighted_mse_unmasked(channel_index=0, expect_ensemble=False, function_name="ffmc_dwmse")',
+    'custom_metrics.dual_weighted_mse_anywhere(channel_index=0, expect_ensemble=False, function_name="ffmc_dwmse_anywhere")'
 ]
 
 LAYERS_PER_BLOCK_COUNTS_AXIS1 = numpy.array([1, 2], dtype=int)
@@ -95,7 +98,8 @@ DEFAULT_OPTION_DICT = {
     chiu_net_arch.OUTPUT_ACTIV_FUNCTION_ALPHA_KEY: 0.,
     chiu_net_arch.L1_WEIGHT_KEY: 0.,
     chiu_net_arch.L2_WEIGHT_KEY: 1e-6,
-    chiu_net_arch.USE_BATCH_NORM_KEY: True
+    chiu_net_arch.USE_BATCH_NORM_KEY: True,
+    chiu_net_arch.ENSEMBLE_SIZE_KEY: 1
 }
 
 
