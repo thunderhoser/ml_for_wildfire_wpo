@@ -4,7 +4,8 @@ from tensorflow.keras import backend as K
 from gewittergefahr.gg_utils import error_checking
 
 
-def max_prediction_anywhere(channel_index, function_name, test_mode=False):
+def max_prediction_anywhere(channel_index, function_name, expect_ensemble=True,
+                            test_mode=False):
     """Creates metric to return max prediction anywhere.
 
     "Anywhere" = at masked or unmasked grid cell
@@ -12,6 +13,9 @@ def max_prediction_anywhere(channel_index, function_name, test_mode=False):
     :param channel_index: Will compute metric for the [k]th channel, where
         k = `channel_index`.
     :param function_name: Function name (string).
+    :param expect_ensemble: Boolean flag.  If True, will expect
+        prediction_tensor to have dimensions E x M x N x T x S.  If False, will
+        expect prediction_tensor to have dimensions E x M x N x T.
     :param test_mode: Leave this alone.
     :return: metric: Metric function (defined below).
     """
@@ -19,6 +23,7 @@ def max_prediction_anywhere(channel_index, function_name, test_mode=False):
     error_checking.assert_is_integer(channel_index)
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
     def metric(target_tensor, prediction_tensor):
@@ -33,8 +38,9 @@ def max_prediction_anywhere(channel_index, function_name, test_mode=False):
         :param target_tensor: E-by-M-by-N-by-(T + 1) tensor, where
             target_tensor[..., :-1] contains the actual target values and
             target_tensor[..., -1] contains weights.
-        :param prediction_tensor: E-by-M-by-N-by-T-by-S tensor of predicted
-            values.
+        :param prediction_tensor: Tensor of predicted values.  If
+            expect_ensemble == True, will expect dimensions E x M x N x T x S.
+            Otherwise, will expect E x M x N x T.
         :return: metric: Max prediction.
         """
 
@@ -44,13 +50,15 @@ def max_prediction_anywhere(channel_index, function_name, test_mode=False):
     return metric
 
 
-def max_prediction_unmasked(channel_index, function_name, test_mode=False):
+def max_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
+                            test_mode=False):
     """Creates metric to return max unmasked prediction.
 
     "Unmasked" = at grid cell with weight >= 0.05
 
     :param channel_index: See doc for `max_prediction_anywhere`.
     :param function_name: Same.
+    :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: metric: Metric function (defined below).
     """
@@ -58,6 +66,7 @@ def max_prediction_unmasked(channel_index, function_name, test_mode=False):
     error_checking.assert_is_integer(channel_index)
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
     def metric(target_tensor, prediction_tensor):
@@ -72,6 +81,13 @@ def max_prediction_unmasked(channel_index, function_name, test_mode=False):
         weight_tensor = target_tensor[..., -1]
         mask_tensor = K.cast(weight_tensor >= 0.05, prediction_tensor.dtype)
 
+        if not expect_ensemble:
+            # Input shapes for multiplication: E x M x N and E x M x N
+            return K.max(
+                prediction_tensor[:, :, :, channel_index] *
+                mask_tensor
+            )
+
         # Input shapes for multiplication: E x M x N x S and E x M x N x 1
         return K.max(
             prediction_tensor[:, :, :, channel_index, ...] *
@@ -82,13 +98,15 @@ def max_prediction_unmasked(channel_index, function_name, test_mode=False):
     return metric
 
 
-def mean_squared_error_anywhere(channel_index, function_name, test_mode=False):
+def mean_squared_error_anywhere(channel_index, function_name,
+                                expect_ensemble=True, test_mode=False):
     """Creates function to return mean squared error (MSE) anywhere.
 
     "Anywhere" = over masked and unmasked grid cells
 
     :param channel_index: See doc for `max_prediction_anywhere`.
     :param function_name: Same.
+    :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: metric: Metric function (defined below).
     """
@@ -96,6 +114,7 @@ def mean_squared_error_anywhere(channel_index, function_name, test_mode=False):
     error_checking.assert_is_integer(channel_index)
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
     def metric(target_tensor, prediction_tensor):
@@ -106,23 +125,35 @@ def mean_squared_error_anywhere(channel_index, function_name, test_mode=False):
         :return: metric: MSE anywhere.
         """
 
-        # Input shapes for multiplication: E x M x N and E x M x N
-        squared_error_tensor = (
-            target_tensor[..., channel_index] -
-            K.mean(prediction_tensor[:, :, :, channel_index, ...], axis=-1)
-        ) ** 2
+        if expect_ensemble:
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., channel_index], axis=-1
+            )
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index, :]
+            )
+        else:
+            relevant_target_tensor = target_tensor[..., channel_index]
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index]
+            )
 
+        squared_error_tensor = (
+            (relevant_target_tensor - relevant_prediction_tensor) ** 2
+        )
         return K.mean(squared_error_tensor)
 
     metric.__name__ = function_name
     return metric
 
 
-def mean_squared_error_unmasked(channel_index, function_name, test_mode=False):
+def mean_squared_error_unmasked(channel_index, function_name,
+                                expect_ensemble=True, test_mode=False):
     """Creates function to return MSE at unmasked grid cells.
 
     :param channel_index: See doc for `max_prediction_anywhere`.
     :param function_name: Same.
+    :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: metric: Metric function (defined below).
     """
@@ -130,6 +161,7 @@ def mean_squared_error_unmasked(channel_index, function_name, test_mode=False):
     error_checking.assert_is_integer(channel_index)
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
     def metric(target_tensor, prediction_tensor):
@@ -140,29 +172,45 @@ def mean_squared_error_unmasked(channel_index, function_name, test_mode=False):
         :return: metric: MSE at unmasked grid cells.
         """
 
-        # Input shapes for multiplication: E x M x N and E x M x N
-        squared_error_tensor = (
-            target_tensor[..., channel_index] -
-            K.mean(prediction_tensor[:, :, :, channel_index, ...], axis=-1)
-        ) ** 2
+        if expect_ensemble:
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., channel_index], axis=-1
+            )
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index, :]
+            )
+            weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        else:
+            relevant_target_tensor = target_tensor[..., channel_index]
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index]
+            )
+            weight_tensor = target_tensor[..., -1]
 
-        # Output shape: E x M x N
-        weight_tensor = target_tensor[..., -1]
+        squared_error_tensor = (
+            (relevant_target_tensor - relevant_prediction_tensor) ** 2
+        )
 
         mask_tensor = K.cast(weight_tensor >= 0.05, prediction_tensor.dtype)
-        return K.sum(squared_error_tensor * mask_tensor) / K.sum(mask_tensor)
+        # return K.sum(squared_error_tensor * mask_tensor) / K.sum(mask_tensor)
+        return (
+            K.sum(mask_tensor * squared_error_tensor) /
+            K.sum(mask_tensor * K.ones_like(squared_error_tensor))
+        )
 
     metric.__name__ = function_name
     return metric
 
 
-def dual_weighted_mse_anywhere(channel_index, function_name, test_mode=False):
+def dual_weighted_mse_anywhere(channel_index, function_name,
+                               expect_ensemble=True, test_mode=False):
     """Creates function to return dual-weighted MSE (DWMSE) anywhere.
 
     "Anywhere" = over masked and unmasked grid cells
 
     :param channel_index: See doc for `max_prediction_anywhere`.
     :param function_name: Same.
+    :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: metric: Metric function (defined below).
     """
@@ -170,6 +218,7 @@ def dual_weighted_mse_anywhere(channel_index, function_name, test_mode=False):
     error_checking.assert_is_integer(channel_index)
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
     def metric(target_tensor, prediction_tensor):
@@ -180,22 +229,26 @@ def dual_weighted_mse_anywhere(channel_index, function_name, test_mode=False):
         :return: metric: DWMSE anywhere.
         """
 
-        # Output shape: E x M x N
-        ensemble_mean_prediction_tensor = K.mean(
-            prediction_tensor[:, :, :, channel_index, ...], axis=-1
-        )
+        if expect_ensemble:
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., channel_index], axis=-1
+            )
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index, :]
+            )
+        else:
+            relevant_target_tensor = target_tensor[..., channel_index]
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index]
+            )
 
-        # Output shape: E x M x N
         dual_weight_tensor = K.maximum(
-            K.abs(target_tensor[..., channel_index]),
-            K.abs(ensemble_mean_prediction_tensor)
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_prediction_tensor)
         )
-
-        # Output shape: E x M x N
         error_tensor = (
             dual_weight_tensor *
-            (target_tensor[..., channel_index] -
-             ensemble_mean_prediction_tensor) ** 2
+            (relevant_target_tensor - relevant_prediction_tensor) ** 2
         )
 
         return K.mean(error_tensor)
@@ -204,11 +257,13 @@ def dual_weighted_mse_anywhere(channel_index, function_name, test_mode=False):
     return metric
 
 
-def dual_weighted_mse_unmasked(channel_index, function_name, test_mode=False):
+def dual_weighted_mse_unmasked(channel_index, function_name,
+                               expect_ensemble=True, test_mode=False):
     """Creates function to return DWMSE at unmasked grid cells.
 
     :param channel_index: See doc for `max_prediction_anywhere`.
     :param function_name: Same.
+    :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: metric: Metric function (defined below).
     """
@@ -216,6 +271,7 @@ def dual_weighted_mse_unmasked(channel_index, function_name, test_mode=False):
     error_checking.assert_is_integer(channel_index)
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
     def metric(target_tensor, prediction_tensor):
@@ -226,29 +282,36 @@ def dual_weighted_mse_unmasked(channel_index, function_name, test_mode=False):
         :return: metric: DWMSE at unmasked grid cells.
         """
 
-        # Output shape: E x M x N
-        ensemble_mean_prediction_tensor = K.mean(
-            prediction_tensor[:, :, :, channel_index, ...], axis=-1
-        )
+        if expect_ensemble:
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., channel_index], axis=-1
+            )
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index, :]
+            )
+            weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        else:
+            relevant_target_tensor = target_tensor[..., channel_index]
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index]
+            )
+            weight_tensor = target_tensor[..., -1]
 
-        # Output shape: E x M x N
         dual_weight_tensor = K.maximum(
-            K.abs(target_tensor[..., channel_index]),
-            K.abs(ensemble_mean_prediction_tensor)
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_prediction_tensor)
         )
-
-        # Output shape: E x M x N
         error_tensor = (
             dual_weight_tensor *
-            (target_tensor[..., channel_index] -
-             ensemble_mean_prediction_tensor) ** 2
+            (relevant_target_tensor - relevant_prediction_tensor) ** 2
         )
 
-        # Output shape: E x M x N
-        weight_tensor = target_tensor[..., -1]
-
         mask_tensor = K.cast(weight_tensor >= 0.05, prediction_tensor.dtype)
-        return K.sum(error_tensor * mask_tensor) / K.sum(mask_tensor)
+        # return K.sum(error_tensor * mask_tensor) / K.sum(mask_tensor)
+        return (
+            K.sum(mask_tensor * error_tensor) /
+            K.sum(mask_tensor * K.ones_like(error_tensor))
+        )
 
     metric.__name__ = function_name
     return metric

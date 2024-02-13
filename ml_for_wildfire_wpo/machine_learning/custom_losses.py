@@ -19,15 +19,19 @@ def _log2(input_tensor):
     )
 
 
-def mean_squared_error(function_name, test_mode=False):
+def mean_squared_error(function_name, expect_ensemble=True, test_mode=False):
     """Creates mean squared error (MSE) loss function.
 
     :param function_name: Function name (string).
+    :param expect_ensemble: Boolean flag.  If True, will expect
+        prediction_tensor to have dimensions E x M x N x T x S.  If False, will
+        expect prediction_tensor to have dimensions E x M x N x T.
     :param test_mode: Leave this alone.
     :return: loss: Loss function (defined below).
     """
 
     error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
     def loss(target_tensor, prediction_tensor):
@@ -42,37 +46,47 @@ def mean_squared_error(function_name, test_mode=False):
         :param target_tensor: E-by-M-by-N-by-(T + 1) tensor, where
             target_tensor[..., :-1] contains the actual target values and
             target_tensor[..., -1] contains weights.
-        :param prediction_tensor: E-by-M-by-N-by-T-by-S tensor of predicted
-            values.
+        :param prediction_tensor: Tensor of predicted values.  If
+            expect_ensemble == True, will expect dimensions E x M x N x T x S.
+            Otherwise, will expect E x M x N x T.
         :return: loss: Mean squared error.
         """
 
-        # squared_error_tensor = K.mean(
-        #     (target_tensor[..., :-1] - prediction_tensor) ** 2, axis=-1
-        # )
+        if expect_ensemble:
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., :-1], axis=-1
+            )
+            relevant_prediction_tensor = prediction_tensor
+            weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        else:
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor
+            weight_tensor = target_tensor[..., -1]
 
-        # Output shape: E x M x N x T
         squared_error_tensor = (
-            target_tensor[..., :-1] -
-            K.mean(prediction_tensor, axis=-1)
-        ) ** 2
+            (relevant_target_tensor - relevant_prediction_tensor) ** 2
+        )
+        weight_tensor = K.expand_dims(weight_tensor, axis=-1)
 
-        # Output shape: E x M x N x 1
-        weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
-
-        return K.mean(weight_tensor * squared_error_tensor)
+        # return K.mean(weight_tensor * squared_error_tensor)
+        return (
+            K.sum(weight_tensor * squared_error_tensor) /
+            K.sum(weight_tensor * K.ones_like(squared_error_tensor))
+        )
 
     loss.__name__ = function_name
     return loss
 
 
-def dual_weighted_mse(channel_weights, function_name, test_mode=False):
+def dual_weighted_mse(channel_weights, function_name, expect_ensemble=True,
+                      test_mode=False):
     """Creates dual-weighted mean squared error (DWMSE) loss function.
 
     K = number of output channels (target variables)
 
     :param channel_weights: length-K numpy array of channel weights.
     :param function_name: See doc for `mean_squared_error`.
+    :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: loss: Loss function (defined below).
     """
@@ -80,6 +94,7 @@ def dual_weighted_mse(channel_weights, function_name, test_mode=False):
     error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
     error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
     error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
     def loss(target_tensor, prediction_tensor):
@@ -90,20 +105,22 @@ def dual_weighted_mse(channel_weights, function_name, test_mode=False):
         :return: loss: Mean squared error.
         """
 
-        # squared_error_tensor = K.mean(
-        #     (target_tensor[..., :-1] - prediction_tensor) ** 2, axis=-1
-        # )
+        if expect_ensemble:
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., :-1], axis=-1
+            )
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        else:
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = target_tensor[..., -1]
 
-        # Output shape: E x M x N x T
-        ensemble_mean_prediction_tensor = K.mean(prediction_tensor, axis=-1)
-
-        # Output shape: E x M x N x T
         dual_weight_tensor = K.maximum(
-            K.abs(target_tensor[..., :-1]),
-            K.abs(ensemble_mean_prediction_tensor)
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_prediction_tensor)
         )
 
-        # Output shape: 1 x 1 x 1 x T
         channel_weight_tensor = K.cast(
             K.constant(channel_weights), dual_weight_tensor.dtype
         )
@@ -111,28 +128,35 @@ def dual_weighted_mse(channel_weights, function_name, test_mode=False):
         channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
         channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
 
-        # Output shape: E x M x N x T
+        if expect_ensemble:
+            channel_weight_tensor = K.expand_dims(
+                channel_weight_tensor, axis=-1
+            )
+
         error_tensor = (
             channel_weight_tensor * dual_weight_tensor *
-            (target_tensor[..., :-1] - ensemble_mean_prediction_tensor) ** 2
+            (relevant_target_tensor - relevant_prediction_tensor) ** 2
         )
+        mask_weight_tensor = K.expand_dims(mask_weight_tensor, axis=-1)
 
-        # Output shape: E x M x N x 1
-        mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
-
-        return K.mean(mask_weight_tensor * error_tensor)
+        # return K.mean(mask_weight_tensor * error_tensor)
+        return (
+            K.sum(mask_weight_tensor * error_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        )
 
     loss.__name__ = function_name
     return loss
 
 
 def dual_weighted_mse_1channel(channel_weight, channel_index, function_name,
-                               test_mode=False):
+                               expect_ensemble=True, test_mode=False):
     """Creates DWMSE loss function for one channel (target variable).
 
     :param channel_weight: Channel weight.
     :param channel_index: Channel index.
     :param function_name: See doc for `mean_squared_error`.
+    :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: loss: Loss function (defined below).
     """
@@ -141,6 +165,7 @@ def dual_weighted_mse_1channel(channel_weight, channel_index, function_name,
     error_checking.assert_is_integer(channel_index)
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
     def loss(target_tensor, prediction_tensor):
@@ -151,26 +176,35 @@ def dual_weighted_mse_1channel(channel_weight, channel_index, function_name,
         :return: loss: One-channel DWMSE.
         """
 
-        # Output shape: E x M x N
-        ensemble_mean_prediction_tensor = K.mean(
-            prediction_tensor[:, :, :, channel_index, ...], axis=-1
-        )
+        if expect_ensemble:
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., channel_index], axis=-1
+            )
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index, :]
+            )
+            mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        else:
+            relevant_target_tensor = target_tensor[..., channel_index]
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index]
+            )
+            mask_weight_tensor = target_tensor[..., -1]
 
-        # Output shape: E x M x N
         dual_weight_tensor = K.maximum(
-            K.abs(target_tensor[..., channel_index]),
-            K.abs(ensemble_mean_prediction_tensor)
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_prediction_tensor)
         )
-
-        # Output shape: E x M x N
         error_tensor = (
             channel_weight * dual_weight_tensor *
-            (target_tensor[..., channel_index] - ensemble_mean_prediction_tensor) ** 2
+            (relevant_target_tensor - relevant_prediction_tensor) ** 2
         )
 
-        # Output shape: E x M x N
-        mask_weight_tensor = target_tensor[..., -1]
-        return K.mean(mask_weight_tensor * error_tensor)
+        # return K.mean(mask_weight_tensor * error_tensor)
+        return (
+            K.sum(mask_weight_tensor * error_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        )
 
     loss.__name__ = function_name
     return loss

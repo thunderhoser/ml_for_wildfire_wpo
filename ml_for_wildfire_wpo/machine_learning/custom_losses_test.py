@@ -203,10 +203,11 @@ class CustomLossesTests(unittest.TestCase):
         this_loss_function = custom_losses.dual_weighted_mse(
             channel_weights=numpy.array([1.]),
             function_name='dual_weighted_mse',
+            expect_ensemble=False,
             test_mode=True
         )
         this_dwmse = K.eval(this_loss_function(
-            TARGET_TENSOR_1CHANNEL, PREDICTION_TENSOR_1CHANNEL
+            TARGET_TENSOR_1CHANNEL, PREDICTION_TENSOR_1CHANNEL[..., 0]
         ))
 
         self.assertTrue(numpy.isclose(
@@ -222,10 +223,11 @@ class CustomLossesTests(unittest.TestCase):
         this_loss_function = custom_losses.dual_weighted_mse(
             channel_weights=CHANNEL_WEIGHTS_2CHANNELS,
             function_name='dual_weighted_mse',
+            expect_ensemble=False,
             test_mode=True
         )
         this_dwmse = K.eval(this_loss_function(
-            TARGET_TENSOR_2CHANNELS, PREDICTION_TENSOR_2CHANNELS
+            TARGET_TENSOR_2CHANNELS, PREDICTION_TENSOR_2CHANNELS[..., 0]
         ))
 
         self.assertTrue(numpy.isclose(
@@ -239,20 +241,22 @@ class CustomLossesTests(unittest.TestCase):
             channel_weight=CHANNEL_WEIGHTS_2CHANNELS[0],
             channel_index=0,
             function_name='dwmse_channel1',
+            expect_ensemble=False,
             test_mode=True
         )
         dwmse_channel1 = K.eval(loss_function_channel1(
-            TARGET_TENSOR_2CHANNELS, PREDICTION_TENSOR_2CHANNELS
+            TARGET_TENSOR_2CHANNELS, PREDICTION_TENSOR_2CHANNELS[..., 0]
         ))
 
         loss_function_channel2 = custom_losses.dual_weighted_mse_1channel(
             channel_weight=CHANNEL_WEIGHTS_2CHANNELS[1],
             channel_index=1,
             function_name='dwmse_channel2',
+            expect_ensemble=False,
             test_mode=True
         )
         dwmse_channel2 = K.eval(loss_function_channel2(
-            TARGET_TENSOR_2CHANNELS, PREDICTION_TENSOR_2CHANNELS
+            TARGET_TENSOR_2CHANNELS, PREDICTION_TENSOR_2CHANNELS[..., 0]
         ))
 
         this_dwmse = (dwmse_channel1 + dwmse_channel2) / 2
