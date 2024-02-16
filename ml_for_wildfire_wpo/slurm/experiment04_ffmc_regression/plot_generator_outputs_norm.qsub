@@ -18,7 +18,7 @@
 #SBATCH --output=plot_generator_outputs_norm_%A.out
 
 set TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment04_ffmc_regression/templates"
-set OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment04_ffmc_regression/generator_plots"
+set TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment04_ffmc_regression/generator_plots"
 
 set LAYERS_PER_BLOCK_COUNTS=("1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2" "1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2" "1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2" "1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2" "1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2")
 set FIRST_LAYER_FILTER_COUNTS=("10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "10" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "15" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "20" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "25" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30" "30")
