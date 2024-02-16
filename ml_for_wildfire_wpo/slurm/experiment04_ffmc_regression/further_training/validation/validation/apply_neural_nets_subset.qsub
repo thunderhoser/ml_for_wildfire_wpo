@@ -3,7 +3,7 @@
 #SBATCH --job-name="apply_neural_nets"
 #SBATCH --partition="bigmem"
 #SBATCH --account="gsd-hpcs"
-#SBATCH --qos="gpu"
+#SBATCH --qos="batch"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=1
