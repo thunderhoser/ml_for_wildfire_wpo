@@ -68,6 +68,7 @@ TRAINING_OPTIONS_KEY = 'training_option_dict'
 NUM_VALIDATION_BATCHES_KEY = 'num_validation_batches_per_epoch'
 VALIDATION_OPTIONS_KEY = 'validation_option_dict'
 LOSS_FUNCTION_KEY = 'loss_function_string'
+OPTIMIZER_FUNCTION_KEY = 'optimizer_function_string'
 METRIC_FUNCTIONS_KEY = 'metric_function_strings'
 PLATEAU_PATIENCE_KEY = 'plateau_patience_epochs'
 PLATEAU_LR_MUTIPLIER_KEY = 'plateau_learning_rate_multiplier'
@@ -76,8 +77,8 @@ EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
 METADATA_KEYS = [
     NUM_EPOCHS_KEY, NUM_TRAINING_BATCHES_KEY, TRAINING_OPTIONS_KEY,
     NUM_VALIDATION_BATCHES_KEY, VALIDATION_OPTIONS_KEY, LOSS_FUNCTION_KEY,
-    METRIC_FUNCTIONS_KEY, PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY,
-    EARLY_STOPPING_PATIENCE_KEY
+    OPTIMIZER_FUNCTION_KEY, METRIC_FUNCTIONS_KEY, PLATEAU_PATIENCE_KEY,
+    PLATEAU_LR_MUTIPLIER_KEY, EARLY_STOPPING_PATIENCE_KEY
 ]
 
 PREDICTOR_MATRICES_KEY = 'predictor_matrices'
@@ -1667,9 +1668,9 @@ def find_metafile(model_file_name, raise_error_if_missing=True):
 def write_metafile(
         pickle_file_name, num_epochs, num_training_batches_per_epoch,
         training_option_dict, num_validation_batches_per_epoch,
-        validation_option_dict, loss_function_string, metric_function_strings,
-        plateau_patience_epochs, plateau_learning_rate_multiplier,
-        early_stopping_patience_epochs):
+        validation_option_dict, loss_function_string, optimizer_function_string,
+        metric_function_strings, plateau_patience_epochs,
+        plateau_learning_rate_multiplier, early_stopping_patience_epochs):
     """Writes metadata to Pickle file.
 
     :param pickle_file_name: Path to output file.
@@ -1679,6 +1680,7 @@ def write_metafile(
     :param num_validation_batches_per_epoch: Same.
     :param validation_option_dict: Same.
     :param loss_function_string: Same.
+    :param optimizer_function_string: Same.
     :param metric_function_strings: Same.
     :param plateau_patience_epochs: Same.
     :param plateau_learning_rate_multiplier: Same.
@@ -1692,6 +1694,7 @@ def write_metafile(
         NUM_VALIDATION_BATCHES_KEY: num_validation_batches_per_epoch,
         VALIDATION_OPTIONS_KEY: validation_option_dict,
         LOSS_FUNCTION_KEY: loss_function_string,
+        OPTIMIZER_FUNCTION_KEY: optimizer_function_string,
         METRIC_FUNCTIONS_KEY: metric_function_strings,
         PLATEAU_PATIENCE_KEY: plateau_patience_epochs,
         PLATEAU_LR_MUTIPLIER_KEY: plateau_learning_rate_multiplier,
@@ -1716,6 +1719,7 @@ def read_metafile(pickle_file_name):
     metadata_dict["num_validation_batches_per_epoch"]: Same.
     metadata_dict["validation_option_dict"]: Same.
     metadata_dict["loss_function_string"]: Same.
+    metadata_dict["optimizer_function_string"]: Same.
     metadata_dict["metric_function_strings"]: Same.
     metadata_dict["plateau_patience_epochs"]: Same.
     metadata_dict["plateau_learning_rate_multiplier"]: Same.
@@ -1732,6 +1736,10 @@ def read_metafile(pickle_file_name):
 
     if METRIC_FUNCTIONS_KEY not in metadata_dict:
         metadata_dict[METRIC_FUNCTIONS_KEY] = []
+    if OPTIMIZER_FUNCTION_KEY not in metadata_dict:
+        metadata_dict[OPTIMIZER_FUNCTION_KEY] = (
+            'keras.optimizers.Adam(clipnorm=1.)'
+        )
 
     training_option_dict = metadata_dict[TRAINING_OPTIONS_KEY]
     validation_option_dict = metadata_dict[VALIDATION_OPTIONS_KEY]
@@ -1796,7 +1804,7 @@ def read_model(hdf5_file_name):
     ]
     model_object.compile(
         loss=custom_object_dict['loss'],
-        optimizer=keras.optimizers.Adam(clipnorm=1.),
+        optimizer=eval(metadata_dict[OPTIMIZER_FUNCTION_KEY]),
         metrics=metric_function_list
     )
 
@@ -1807,7 +1815,8 @@ def train_model(
         model_object, num_epochs,
         num_training_batches_per_epoch, training_option_dict,
         num_validation_batches_per_epoch, validation_option_dict,
-        loss_function_string, metric_function_strings, plateau_patience_epochs,
+        loss_function_string, optimizer_function_string,
+        metric_function_strings, plateau_patience_epochs,
         plateau_learning_rate_multiplier, early_stopping_patience_epochs,
         output_dir_name):
     """Trains neural net with generator.
@@ -1830,6 +1839,9 @@ def train_model(
 
     :param loss_function_string: Loss function.  This string should be formatted
         such that `eval(loss_function_string)` returns the actual loss function.
+    :param optimizer_function_string: Optimizer.  This string should be
+        formatted such that `eval(optimizer_function_string)` returns the actual
+        optimizer.
     :param metric_function_strings: 1-D list with names of metrics.  Each string
         should be formatted such that `eval(metric_function_strings[i])` returns
         the actual metric function.
@@ -1847,6 +1859,11 @@ def train_model(
 
     file_system_utils.mkdir_recursive_if_necessary(
         directory_name=output_dir_name
+    )
+
+    backup_dir_name = '{0:s}/backup_and_restore'.format(output_dir_name)
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=backup_dir_name
     )
 
     error_checking.assert_is_integer(num_epochs)
@@ -1894,9 +1911,14 @@ def train_model(
         patience=plateau_patience_epochs, verbose=1, mode='min',
         min_delta=0., cooldown=0
     )
+    backup_object = keras.callbacks.BackupAndRestore(
+        backup_dir_name, save_freq='epoch', delete_checkpoint=True
+    )
 
     list_of_callback_objects = [
-        history_object, checkpoint_object, early_stopping_object, plateau_object
+        history_object, checkpoint_object,
+        early_stopping_object, plateau_object,
+        backup_object
     ]
 
     training_generator = data_generator(training_option_dict)
@@ -1915,6 +1937,7 @@ def train_model(
         num_validation_batches_per_epoch=num_validation_batches_per_epoch,
         validation_option_dict=validation_option_dict,
         loss_function_string=loss_function_string,
+        optimizer_function_string=optimizer_function_string,
         metric_function_strings=metric_function_strings,
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,

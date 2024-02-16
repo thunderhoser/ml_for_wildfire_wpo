@@ -50,6 +50,8 @@ L2_WEIGHT_KEY = 'l2_weight'
 USE_BATCH_NORM_KEY = 'use_batch_normalization'
 ENSEMBLE_SIZE_KEY = 'ensemble_size'
 
+OPTIMIZER_FUNCTION_KEY = 'optimizer_function'
+
 DEFAULT_ARCHITECTURE_OPTION_DICT = {
     GFS_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
     GFS_FC_MODULE_DROPOUT_RATES_KEY: numpy.full(1, 0.),
@@ -154,6 +156,7 @@ def _check_args(option_dict):
     option_dict["use_batch_normalization"]: Boolean flag.  If True, will use
         batch normalization after each inner (non-output) conv layer.
     option_dict["ensemble_size"]: Ensemble size.
+    option_dict["optimizer_function"]: Optimizer function.
 
     :return: option_dict: Same as input, except defaults may have been added.
     """
@@ -501,6 +504,8 @@ def create_model(option_dict, loss_function, metric_list):
     l2_weight = option_dict[L2_WEIGHT_KEY]
     use_batch_normalization = option_dict[USE_BATCH_NORM_KEY]
     ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
+
+    optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
 
     if input_dimensions_gfs_3d is None:
         input_layer_object_gfs_3d = None
@@ -1111,7 +1116,7 @@ def create_model(option_dict, loss_function, metric_list):
     )
 
     model_object.compile(
-        loss=loss_function, optimizer=keras.optimizers.Adam(clipnorm=1.),
+        loss=loss_function, optimizer=optimizer_function,
         metrics=metric_list
     )
 
