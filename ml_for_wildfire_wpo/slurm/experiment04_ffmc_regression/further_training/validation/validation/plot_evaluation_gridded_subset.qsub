@@ -1,9 +1,9 @@
 #!/bin/tcsh
 
 #SBATCH --job-name="plot_evaluation_gridded"
-#SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
-#SBATCH --qos="gpuwf"
+#SBATCH --partition="bigmem"
+#SBATCH --account="gsd-hpcs"
+#SBATCH --qos="batch"
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --cpus-per-task=1
@@ -12,7 +12,7 @@
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
 #SBATCH --time=00:10:00
-#SBATCH --array=-1
+#SBATCH --array=1,2,6,8,10,28,31,38,40,46,49,52,53,71,79
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
