@@ -183,9 +183,10 @@ def _run(template_file_name, output_dir_name,
 
     for _ in range(3):
         predictor_matrices, target_matrix_with_weights = next(generator_object)
-        gfs_3d_predictor_matrix = predictor_matrices[0]
-        gfs_2d_predictor_matrix = predictor_matrices[1]
-        laglead_target_predictor_matrix = predictor_matrices[2]
+        gfs_3d_predictor_matrix = predictor_matrices[0].astype(numpy.float64)
+        gfs_2d_predictor_matrix = predictor_matrices[1].astype(numpy.float64)
+        laglead_target_predictor_matrix = predictor_matrices[2].astype(numpy.float64)
+        target_matrix_with_weights = target_matrix_with_weights.astype(numpy.float64)
 
         this_num_examples = target_matrix_with_weights.shape[0]
 
