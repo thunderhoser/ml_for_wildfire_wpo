@@ -97,25 +97,20 @@ DEFAULT_OPTION_DICT = {
     chiu_net_arch.GFS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
         7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
     ),
-    chiu_net_arch.GFS_ENCODER_NUM_CHANNELS_KEY: numpy.array(
-        NUM_FIRST_LAYER_FILTERS * [1, 2, 3, 4, 5, 6, 7], dtype=int
-    ),
+    chiu_net_arch.GFS_ENCODER_NUM_CHANNELS_KEY:
+        NUM_FIRST_LAYER_FILTERS * numpy.array([1, 2, 3, 4, 5, 6, 7], dtype=int),
     chiu_net_arch.GFS_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
     chiu_net_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
         7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
     ),
-    chiu_net_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array(
+    chiu_net_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY:
         int(numpy.round(0.25 * NUM_FIRST_LAYER_FILTERS)) *
-        [1, 2, 3, 4, 5, 6, 7],
-        dtype=int
-    ),
+        numpy.array([1, 2, 3, 4, 5, 6, 7], dtype=int),
     chiu_net_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
     chiu_net_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(6, 2, dtype=int),
-    chiu_net_arch.DECODER_NUM_CHANNELS_KEY: numpy.array(
+    chiu_net_arch.DECODER_NUM_CHANNELS_KEY:
         int(numpy.round(1.25 * NUM_FIRST_LAYER_FILTERS)) *
-        [1, 2, 3, 4, 5, 6],
-        dtype=int
-    ),
+        numpy.array([1, 2, 3, 4, 5, 6], dtype=int),
     # chiu_net_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(6, 0.),
     # chiu_net_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(6, 0.),
     chiu_net_arch.INCLUDE_PENULTIMATE_KEY: False,
