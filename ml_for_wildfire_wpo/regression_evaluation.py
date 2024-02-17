@@ -851,8 +851,10 @@ def get_scores_with_bootstrapping(
     print(target_matrix.shape)
     print(prediction_matrix.shape)
 
-    target_matrix[weight_matrix < 0.05] = 0.
-    prediction_matrix[weight_matrix < 0.05] = 0.
+    num_channels = target_matrix.shape[-1]
+    for k in range(num_channels):
+        target_matrix[..., k][weight_matrix < 0.05] = 0.
+        prediction_matrix[..., k][weight_matrix < 0.05] = 0.
 
     model_metafile_name = neural_net.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=True
