@@ -845,7 +845,7 @@ def get_scores_with_bootstrapping(
 
     # TODO(thunderhoser): This is a HACK.  I should use the weight matrix to
     # actually weight the various scores.
-    weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
+    # weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
 
     print(weight_matrix.shape)
     print(target_matrix.shape)
