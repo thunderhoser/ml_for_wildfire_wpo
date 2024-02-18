@@ -87,7 +87,10 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
         [265, 537, NUM_GFS_LEAD_TIMES, 7], dtype=int
     ),
-    chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: None,
+    # chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: None,
+        chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
+        [265, 537, 7], dtype=int
+    ),
     chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
         [265, 537, 6, 2], dtype=int
     ),
@@ -199,12 +202,12 @@ def _run():
                 skip_dropout_rates = numpy.full(6, 0.)
 
                 if num_upconv_dropout_layers > 0:
-                    upsampling_dropout_rates[-num_upconv_dropout_layers:] = (
+                    upsampling_dropout_rates[:num_upconv_dropout_layers] = (
                         DROPOUT_RATES[k]
                     )
 
                 if num_skip_dropout_layers > 0:
-                    skip_dropout_rates[-num_skip_dropout_layers:] = (
+                    skip_dropout_rates[:num_skip_dropout_layers] = (
                         DROPOUT_RATES[k]
                     )
 

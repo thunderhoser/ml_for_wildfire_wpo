@@ -196,12 +196,12 @@ def _run():
                 skip_dropout_rates = numpy.full(6, 0.)
 
                 if num_upconv_dropout_layers > 0:
-                    upsampling_dropout_rates[-num_upconv_dropout_layers:] = (
+                    upsampling_dropout_rates[:num_upconv_dropout_layers] = (
                         DROPOUT_RATES[k]
                     )
 
                 if num_skip_dropout_layers > 0:
-                    skip_dropout_rates[-num_skip_dropout_layers:] = (
+                    skip_dropout_rates[:num_skip_dropout_layers] = (
                         DROPOUT_RATES[k]
                     )
 
