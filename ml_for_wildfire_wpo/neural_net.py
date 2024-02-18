@@ -969,9 +969,9 @@ def data_generator(option_dict):
         predictors.
     predictor_matrices[1]: E-by-M-by-N-by-L-by-FF numpy array of 2-D GFS
         predictors.
-    predictor_matrices[2]: E-by-M-by-N-by-l-by-T numpy array of lag/lead-target
+    predictor_matrices[2]: E-by-M-by-N-by-F numpy array of ERA5-constant
         predictors.
-    predictor_matrices[3]: E-by-M-by-N-by-F numpy array of ERA5-constant
+    predictor_matrices[3]: E-by-M-by-N-by-l-by-T numpy array of lag/lead-target
         predictors.
 
     :return: target_matrix: E-by-M-by-N-by-(T + 1) numpy array, where

@@ -90,7 +90,26 @@ DEFAULT_ARCHITECTURE_OPTION_DICT = {
 }
 
 
-def _check_args(option_dict):
+def _get_time_slicing_function(time_index):
+    """Returns function that takes one time step from input tensor.
+
+    :param time_index: Will take the [k]th time step, where k = `time_index`.
+    :return: time_slicing_function: Function handle (see below).
+    """
+
+    def time_slicing_function(input_tensor_3d):
+        """Takes one time step from the input tensor.
+
+        :param input_tensor_3d: Input tensor with 3 spatiotemporal dimensions.
+        :return: input_tensor_2d: Input tensor with 2 spatial dimensions.
+        """
+
+        return input_tensor_3d[:, time_index, ...]
+
+    return time_slicing_function
+
+
+def check_args(option_dict):
     """Error-checks input arguments.
 
     L = number of levels in encoder = number of levels in decoder
@@ -381,25 +400,6 @@ def _check_args(option_dict):
     return option_dict
 
 
-def _get_time_slicing_function(time_index):
-    """Returns function that takes one time step from input tensor.
-
-    :param time_index: Will take the [k]th time step, where k = `time_index`.
-    :return: time_slicing_function: Function handle (see below).
-    """
-
-    def time_slicing_function(input_tensor_3d):
-        """Takes one time step from the input tensor.
-
-        :param input_tensor_3d: Input tensor with 3 spatiotemporal dimensions.
-        :return: input_tensor_2d: Input tensor with 2 spatial dimensions.
-        """
-
-        return input_tensor_3d[:, time_index, ...]
-
-    return time_slicing_function
-
-
 def _create_skip_connection(
         encoder_conv_layer_objects, decoder_upconv_layer_object,
         current_level_num):
@@ -451,16 +451,22 @@ def create_model(option_dict, loss_function, metric_list):
     M = number of rows in grid
     N = number of columns in grid
 
-    :param option_dict: See doc for `_check_args`.
+    :param option_dict: See doc for `check_args`.
     :param loss_function: Loss function.
     :param metric_list: 1-D list of metrics.
     :return: model_object: Instance of `keras.models.Model`, with the
         aforementioned architecture.
     """
 
-    # TODO(thunderhoser): Add info from ERA5 constants to the network.
+    # TODO(thunderhoser): Might want to combine info from lag/lead targets and
+    # GFS earlier in the network -- instead of waiting until the forecast
+    # module, which is the bottleneck.
 
-    option_dict = _check_args(option_dict)
+    # TODO(thunderhoser): Might want more efficient way to incorporate ERA5 data
+    # in network -- one that doesn't involve repeating ERA5 data over the
+    # GFS-lead-time axis and target-lag/lead-time axis.
+
+    option_dict = check_args(option_dict)
     error_checking.assert_is_list(metric_list)
 
     input_dimensions_gfs_3d = option_dict[GFS_3D_DIMENSIONS_KEY]
@@ -514,6 +520,7 @@ def create_model(option_dict, loss_function, metric_list):
     ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
 
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
+    num_gfs_lead_times = None
 
     if input_dimensions_gfs_3d is None:
         input_layer_object_gfs_3d = None
@@ -567,14 +574,6 @@ def create_model(option_dict, loss_function, metric_list):
             [layer_object_gfs_3d, layer_object_gfs_2d]
         )
 
-    if input_dimensions_era5 is None:
-        input_layer_object_era5 = None
-    else:
-        input_layer_object_era5 = keras.layers.Input(
-            shape=tuple(input_dimensions_era5.tolist()),
-            name='era5_constant_inputs'
-        )
-
     input_layer_object_lagged_target = keras.layers.Input(
         shape=tuple(input_dimensions_lagged_target.tolist()),
         name='lagged_target_inputs'
@@ -585,6 +584,42 @@ def create_model(option_dict, loss_function, metric_list):
 
     num_target_lag_times = input_dimensions_lagged_target[-2]
     num_target_fields = input_dimensions_lagged_target[-1]
+
+    if input_dimensions_era5 is None:
+        input_layer_object_era5 = None
+    else:
+        input_layer_object_era5 = keras.layers.Input(
+            shape=tuple(input_dimensions_era5.tolist()), name='era5_inputs'
+        )
+
+        new_dims = (1,) + tuple(input_dimensions_era5.tolist())
+        layer_object_era5 = keras.layers.Reshape(
+            target_shape=new_dims, name='era5_add-time-dim'
+        )(input_layer_object_era5)
+
+        this_layer_object = keras.layers.Concatenate(
+            axis=-1, name='era5_add-gfs-times'
+        )(
+            num_gfs_lead_times * [layer_object_era5]
+        )
+
+        layer_object_gfs = keras.layers.Concatenate(
+            axis=-1, name='gfs_concat-era5'
+        )(
+            [layer_object_gfs, this_layer_object]
+        )
+
+        this_layer_object = keras.layers.Concatenate(
+            axis=-1, name='era5_add-lag-times'
+        )(
+            num_target_lag_times * [layer_object_era5]
+        )
+
+        layer_object_lagged_target = keras.layers.Concatenate(
+            axis=-1, name='lagged_targets_concat-era5'
+        )(
+            [layer_object_lagged_target, this_layer_object]
+        )
 
     regularizer_object = architecture_utils.get_weight_regularizer(
         l1_weight=l1_weight, l2_weight=l2_weight
@@ -666,7 +701,7 @@ def create_model(option_dict, loss_function, metric_list):
     )(gfs_encoder_conv_layer_objects[-1])
 
     if not gfs_fcst_use_3d_conv:
-        orig_dims = gfs_encoder_conv_layer_objects[-1].get_shape()
+        orig_dims = gfs_fcst_module_layer_object.get_shape()
         new_dims = orig_dims[1:-2] + [orig_dims[-2] * orig_dims[-1]]
 
         gfs_fcst_module_layer_object = keras.layers.Reshape(
@@ -825,7 +860,7 @@ def create_model(option_dict, loss_function, metric_list):
     )(lagtgt_encoder_conv_layer_objects[-1])
 
     if not lagtgt_fcst_use_3d_conv:
-        orig_dims = lagtgt_encoder_conv_layer_objects[-1].get_shape()
+        orig_dims = lagtgt_fcst_module_layer_object.get_shape()
         new_dims = orig_dims[1:-2] + [orig_dims[-2] * orig_dims[-1]]
 
         lagtgt_fcst_module_layer_object = keras.layers.Reshape(
