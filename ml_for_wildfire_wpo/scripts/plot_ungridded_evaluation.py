@@ -571,10 +571,10 @@ def _run(evaluation_file_names, line_styles, line_colour_strings,
                 tpt[prediction_io.PREDICTION_KEY].values[..., these_indices] -
                 tpt[prediction_io.TARGET_KEY].values[..., these_indices]
             )
-            error_matrix[j, ...][
-                numpy.expand_dims(tpt[prediction_io.WEIGHT_KEY].values, axis=-1)
-                < 0.05
-            ] = numpy.nan
+
+            weight_matrix = tpt[prediction_io.WEIGHT_KEY].values
+            for k in range(num_target_fields):
+                error_matrix[j, ..., k][weight_matrix < 0.05] = numpy.nan
 
         for k in range(num_target_fields):
             error_values = numpy.ravel(error_matrix[..., k])
