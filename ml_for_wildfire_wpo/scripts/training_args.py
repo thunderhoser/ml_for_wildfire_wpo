@@ -13,6 +13,7 @@ GFS_PREDICTOR_LEADS_ARG_NAME = 'gfs_predictor_lead_times_hours'
 GFS_NORM_FILE_ARG_NAME = 'gfs_normalization_file_name'
 ERA5_CONSTANT_FILE_ARG_NAME = 'era5_constant_file_name'
 ERA5_CONSTANT_PREDICTORS_ARG_NAME = 'era5_constant_predictor_field_names'
+ERA5_NORM_FILE_ARG_NAME = 'era5_normalization_file_name'
 TARGET_FIELDS_ARG_NAME = 'target_field_names'
 TARGET_LEAD_TIME_ARG_NAME = 'target_lead_time_days'
 TARGET_LAG_TIMES_ARG_NAME = 'target_lag_times_days'
@@ -88,6 +89,11 @@ ERA5_CONSTANT_FILE_HELP_STRING = (
     'Path to file with ERA5 constants (will be read by '
     '`era5_constant_io.read_file`).  If you do not want to use ERA5, leave '
     'this argument alone.'
+)
+ERA5_NORM_FILE_HELP_STRING = (
+    'Path to file with normalization params for ERA5-constant predictors (will '
+    'be read by `era5_constant_io.read_normalization_file`).  If you do not '
+    'want to normalize ERA5 predictors, leave this argument alone.'
 )
 TARGET_FIELDS_HELP_STRING = 'List of target fields (fire-weather indices).'
 TARGET_LEAD_TIME_HELP_STRING = 'Lead time for target field.'
@@ -217,6 +223,10 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + ERA5_CONSTANT_PREDICTORS_ARG_NAME, type=str, nargs='+',
         required=False, default=[''], help=ERA5_CONSTANT_PREDICTORS_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + ERA5_NORM_FILE_ARG_NAME, type=str,
+        required=False, default='', help=ERA5_NORM_FILE_HELP_STRING
     )
     parser_object.add_argument(
         '--' + TARGET_FIELDS_ARG_NAME, type=str, nargs='+',

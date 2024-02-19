@@ -15,6 +15,7 @@ def _run(template_file_name, output_dir_name,
          gfs_predictor_field_names, gfs_pressure_levels_mb,
          gfs_predictor_lead_times_hours, gfs_normalization_file_name,
          era5_constant_file_name, era5_constant_predictor_field_names,
+         era5_normalization_file_name,
          target_field_names, target_lead_time_days, target_lag_times_days,
          gfs_forecast_target_lead_times_days, target_normalization_file_name,
          num_examples_per_batch, sentinel_value,
@@ -44,6 +45,7 @@ def _run(template_file_name, output_dir_name,
     :param gfs_normalization_file_name: Same.
     :param era5_constant_file_name: Same.
     :param era5_constant_predictor_field_names: Same.
+    :param era5_normalization_file_name: Same.
     :param target_field_names: Same.
     :param target_lead_time_days: Same.
     :param target_lag_times_days: Same.
@@ -73,6 +75,8 @@ def _run(template_file_name, output_dir_name,
         gfs_normalization_file_name = None
     if target_normalization_file_name == '':
         target_normalization_file_name = None
+    if era5_normalization_file_name == '':
+        era5_normalization_file_name = None
 
     if era5_constant_file_name == '':
         era5_constant_file_name = None
@@ -111,6 +115,7 @@ def _run(template_file_name, output_dir_name,
         neural_net.ERA5_CONSTANT_PREDICTOR_FIELDS_KEY:
             era5_constant_predictor_field_names,
         neural_net.ERA5_CONSTANT_FILE_KEY: era5_constant_file_name,
+        neural_net.ERA5_NORM_FILE_KEY: era5_normalization_file_name,
         neural_net.TARGET_FIELDS_KEY: target_field_names,
         neural_net.TARGET_LEAD_TIME_KEY: target_lead_time_days,
         neural_net.TARGET_LAG_TIMES_KEY: target_lag_times_days,
@@ -213,6 +218,9 @@ if __name__ == '__main__':
         ),
         era5_constant_predictor_field_names=getattr(
             INPUT_ARG_OBJECT, training_args.ERA5_CONSTANT_PREDICTORS_ARG_NAME
+        ),
+        era5_normalization_file_name=getattr(
+            INPUT_ARG_OBJECT, training_args.ERA5_NORM_FILE_ARG_NAME
         ),
         target_field_names=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_FIELDS_ARG_NAME
