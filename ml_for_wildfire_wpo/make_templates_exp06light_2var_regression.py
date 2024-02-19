@@ -1,6 +1,7 @@
 """Makes templates for Experiment 6-light with FFMC/BUI regression.
 
 Same as Experiment 5-light, except with Chiu-net++ instead of basic Chiu net.
+Also, this experiment uses ERA5 constants!
 """
 
 import os
@@ -20,8 +21,6 @@ import neural_net
 import chiu_net_pp_architecture as chiu_net_pp_arch
 import architecture_utils
 import file_system_utils
-
-# TODO(thunderhoser): Change channel counts when I add ERA5 constants.
 
 OUTPUT_DIR_NAME = (
     '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/'
@@ -88,7 +87,7 @@ DEFAULT_OPTION_DICT = {
         [265, 537, NUM_GFS_LEAD_TIMES, 7], dtype=int
     ),
     # chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: None,
-        chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
+    chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
         [265, 537, 7], dtype=int
     ),
     chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
@@ -104,8 +103,10 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.GFS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
         7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
     ),
+    # chiu_net_pp_arch.GFS_ENCODER_NUM_CHANNELS_KEY:
+    #     NUM_FIRST_LAYER_FILTERS * numpy.array([1, 2, 3, 4, 5, 6, 7], dtype=int),
     chiu_net_pp_arch.GFS_ENCODER_NUM_CHANNELS_KEY:
-        NUM_FIRST_LAYER_FILTERS * numpy.array([1, 2, 3, 4, 5, 6, 7], dtype=int),
+        numpy.array([40, 55, 70, 85, 100, 120, 140], dtype=int),
     chiu_net_pp_arch.GFS_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
     chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
         7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
@@ -115,9 +116,11 @@ DEFAULT_OPTION_DICT = {
         numpy.array([1, 2, 3, 4, 5, 6, 7], dtype=int),
     chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
     chiu_net_pp_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(6, 2, dtype=int),
+    # chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY:
+    #     int(numpy.round(1.25 * NUM_FIRST_LAYER_FILTERS)) *
+    #     numpy.array([1, 2, 3, 4, 5, 6], dtype=int),
     chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY:
-        int(numpy.round(1.25 * NUM_FIRST_LAYER_FILTERS)) *
-        numpy.array([1, 2, 3, 4, 5, 6], dtype=int),
+        numpy.array([45, 65, 85, 105, 125, 150], dtype=int),
     # chiu_net_pp_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(6, 0.),
     # chiu_net_pp_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(6, 0.),
     chiu_net_pp_arch.INCLUDE_PENULTIMATE_KEY: False,
