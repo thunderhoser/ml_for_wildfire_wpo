@@ -42,4 +42,4 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --gfs_init_date_limit_strings_for_validation "20210101" "20211210" \
 --num_epochs=1000 \
 --num_training_batches_per_epoch=${batch_size} \
---num_validation_batches_per_epoch=8
+--num_validation_batches_per_epoch=3
