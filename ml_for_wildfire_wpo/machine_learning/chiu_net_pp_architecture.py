@@ -60,6 +60,90 @@ ENSEMBLE_SIZE_KEY = chiu_net_arch.ENSEMBLE_SIZE_KEY
 OPTIMIZER_FUNCTION_KEY = chiu_net_arch.OPTIMIZER_FUNCTION_KEY
 
 
+def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
+    """Determines number of channels for each input layer to skip connection.
+
+    A = number of input layers.
+
+    :param input_layer_objects: length-A list of input layers (instances of
+        subclass of `keras.layers`).
+    :param num_output_channels: Number of desired output channels (after
+        concatenation).
+    :return: desired_channel_counts: length-A numpy array with number of
+        desired channels for each input layer.
+    """
+
+    current_channel_counts = numpy.array(
+        [l.get_shape()[-1] for l in input_layer_objects], dtype=float
+    )
+
+    num_input_layers = len(input_layer_objects)
+    desired_channel_counts = numpy.full(num_input_layers, -1, dtype=int)
+
+    half_num_output_channels = int(numpy.round(0.5 * num_output_channels))
+    desired_channel_counts[-1] = half_num_output_channels
+
+    remaining_num_output_channels = (
+        num_output_channels - half_num_output_channels
+    )
+    this_ratio = (
+        float(remaining_num_output_channels) /
+        numpy.sum(current_channel_counts[:-1])
+    )
+    desired_channel_counts[:-1] = numpy.round(
+        current_channel_counts[:-1] * this_ratio
+    ).astype(int)
+
+    while numpy.sum(desired_channel_counts) > num_output_channels:
+        desired_channel_counts[numpy.argmax(desired_channel_counts)] -= 1
+    while numpy.sum(desired_channel_counts) < num_output_channels:
+        desired_channel_counts[numpy.argmin(desired_channel_counts)] += 1
+
+    assert numpy.sum(desired_channel_counts) == num_output_channels
+
+    return desired_channel_counts
+
+
+def _create_skip_connection(input_layer_objects, num_output_channels,
+                            current_level_num, regularizer_object):
+    """Creates skip connection.
+
+    :param input_layer_objects: 1-D list of input layers (instances of subclass
+        of `keras.layers`).
+    :param num_output_channels: Desired number of output channels.
+    :param current_level_num: Current level in Chiu-net++ architecture.  This
+        should be a zero-based integer index.
+    :param regularizer_object: Regularizer for conv layers (instance of
+        `keras.regularizers.l1_l2` or similar).
+    :return: concat_layer_object: Instance of `keras.layers.Concatenate`.
+    """
+
+    desired_input_channel_counts = _get_channel_counts_for_skip_cnxn(
+        input_layer_objects=input_layer_objects,
+        num_output_channels=num_output_channels
+    )
+    current_width = len(input_layer_objects) - 1
+
+    for j in range(current_width):
+        this_name = 'block{0:d}-{1:d}_preskipconv{2:d}'.format(
+            current_level_num, current_width, j
+        )
+
+        input_layer_objects[j] = architecture_utils.get_2d_conv_layer(
+            num_kernel_rows=3, num_kernel_columns=3,
+            num_rows_per_stride=1, num_columns_per_stride=1,
+            num_filters=desired_input_channel_counts[j],
+            padding_type_string=architecture_utils.YES_PADDING_STRING,
+            weight_regularizer=regularizer_object,
+            layer_name=this_name
+        )(input_layer_objects[j])
+
+    this_name = 'block{0:d}-{1:d}_skip'.format(current_level_num, current_width)
+    return keras.layers.Concatenate(axis=-1, name=this_name)(
+        input_layer_objects
+    )
+
+
 def create_model(option_dict, loss_function, metric_list):
     """Creates Chiu-net++.
 
@@ -589,18 +673,24 @@ def create_model(option_dict, loss_function, metric_list):
             i_new -= 1
             j += 1
 
-            this_name = 'block{0:d}-{1:d}_upsampling'.format(i_new, j)
-            this_layer_object = keras.layers.UpSampling2D(
-                size=(2, 2), name=this_name
-            )(last_conv_layer_matrix[i_new + 1, j - 1])
+            this_num_channels = _get_channel_counts_for_skip_cnxn(
+                input_layer_objects=
+                last_conv_layer_matrix[i_new, :(j + 1)].tolist(),
+                num_output_channels=decoder_num_channels_by_level[i_new]
+            )[-1]
 
             this_name = 'block{0:d}-{1:d}_upconv'.format(i_new, j)
             this_layer_object = architecture_utils.get_2d_conv_layer(
                 num_kernel_rows=3, num_kernel_columns=3,
                 num_rows_per_stride=1, num_columns_per_stride=1,
-                num_filters=decoder_num_channels_by_level[i_new],
+                num_filters=this_num_channels,
                 padding_type_string=architecture_utils.YES_PADDING_STRING,
                 weight_regularizer=regularizer_object, layer_name=this_name
+            )(last_conv_layer_matrix[i_new + 1, j - 1])
+
+            this_name = 'block{0:d}-{1:d}_upsampling'.format(i_new, j)
+            this_layer_object = keras.layers.UpSampling2D(
+                size=(2, 2), name=this_name
             )(this_layer_object)
 
             this_name = 'block{0:d}-{1:d}_upconv_activation'.format(i_new, j)
@@ -636,25 +726,31 @@ def create_model(option_dict, loss_function, metric_list):
                 )(this_layer_object)
 
             last_conv_layer_matrix[i_new, j] = this_layer_object
-
-            this_name = 'block{0:d}-{1:d}_skip'.format(i_new, j)
-            last_conv_layer_matrix[i_new, j] = keras.layers.Concatenate(
-                axis=-1, name=this_name
-            )(last_conv_layer_matrix[i_new, :(j + 1)].tolist())
+            last_conv_layer_matrix[i_new, j] = _create_skip_connection(
+                input_layer_objects=
+                last_conv_layer_matrix[i_new, :(j + 1)].tolist(),
+                num_output_channels=decoder_num_channels_by_level[i_new],
+                current_level_num=i_new,
+                regularizer_object=regularizer_object
+            )
 
             for k in range(decoder_num_conv_layers_by_level[i_new]):
-                this_name = 'block{0:d}-{1:d}_skipconv{2:d}'.format(i_new, j, k)
-                last_conv_layer_matrix[i_new, j] = (
-                    architecture_utils.get_2d_conv_layer(
-                        num_kernel_rows=3, num_kernel_columns=3,
-                        num_rows_per_stride=1, num_columns_per_stride=1,
-                        num_filters=decoder_num_channels_by_level[i_new],
-                        padding_type_string=
-                        architecture_utils.YES_PADDING_STRING,
-                        weight_regularizer=regularizer_object,
-                        layer_name=this_name
-                    )(last_conv_layer_matrix[i_new, j])
-                )
+                if k > 0:
+                    this_name = 'block{0:d}-{1:d}_skipconv{2:d}'.format(
+                        i_new, j, k
+                    )
+
+                    last_conv_layer_matrix[i_new, j] = (
+                        architecture_utils.get_2d_conv_layer(
+                            num_kernel_rows=3, num_kernel_columns=3,
+                            num_rows_per_stride=1, num_columns_per_stride=1,
+                            num_filters=decoder_num_channels_by_level[i_new],
+                            padding_type_string=
+                            architecture_utils.YES_PADDING_STRING,
+                            weight_regularizer=regularizer_object,
+                            layer_name=this_name
+                        )(last_conv_layer_matrix[i_new, j])
+                    )
 
                 this_name = 'block{0:d}-{1:d}_skipconv{2:d}_activation'.format(
                     i_new, j, k
