@@ -21,7 +21,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --outer_latitude_buffer_deg=5 \
 --outer_longitude_buffer_deg=5 \
 --gfs_predictor_field_names "temperature_kelvins" "specific_humidity_kg_kg01" "geopotential_height_m_asl" "u_wind_m_s01" "v_wind_m_s01" "temperature_2m_agl_kelvins" "specific_humidity_2m_agl_kg_kg01" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "accumulated_precip_metres" "volumetric_soil_moisture_fraction_0to10cm" "snow_depth_metres" \
---gfs_pressure_levels_mb 500 700 900 \
+--gfs_pressure_levels_mb 700 900 \
 --gfs_predictor_lead_times_hours 0 48 \
 --gfs_normalization_file_name="" \
 --era5_constant_file_name="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_constants.nc" \
