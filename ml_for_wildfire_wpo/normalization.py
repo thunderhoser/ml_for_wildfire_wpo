@@ -12,9 +12,11 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import gfs_io
 import canadian_fwi_io
+import era5_constant_io
 import gfs_utils
 import gfs_daily_utils
 import canadian_fwi_utils
+import era5_constant_utils
 
 NUM_VALUES_KEY = 'num_values'
 MEAN_VALUE_KEY = 'mean_value'
@@ -364,6 +366,74 @@ def get_z_score_params_for_targets(target_file_names):
     return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
 
 
+def get_z_score_params_for_era5_constants(era5_constant_file_name):
+    """Computes z-score parameters for each ERA5 (time-constant) variable.
+
+    z-score parameters = mean and standard deviation for every variable
+
+    :param era5_constant_file_name: Path to input file (will be read by
+        `era5_constant_io.read_file`).
+    :return: z_score_param_table_xarray: xarray table with z-score parameters.
+        Metadata and variable names in this table should make it self-
+        explanatory.
+    """
+
+    print('Reading data from: "{0:s}"...'.format(era5_constant_file_name))
+    era5_constant_table_xarray = era5_constant_io.read_file(
+        era5_constant_file_name
+    )
+
+    e5ct = era5_constant_table_xarray
+    field_names = e5ct.coords[era5_constant_utils.FIELD_DIM].values.tolist()
+
+    z_score_dict_dict = {}
+    for this_field_name in field_names:
+        z_score_dict_dict[this_field_name] = {
+            NUM_VALUES_KEY: 0,
+            MEAN_VALUE_KEY: 0.,
+            MEAN_OF_SQUARES_KEY: 0.
+        }
+
+    for j in range(len(field_names)):
+        z_score_dict_dict[field_names[j]] = _update_z_score_params(
+            z_score_param_dict=z_score_dict_dict[field_names[j]],
+            new_data_matrix=e5ct[era5_constant_utils.DATA_KEY].values[..., j]
+        )
+
+    num_fields = len(field_names)
+    mean_values = numpy.full(num_fields, numpy.nan)
+    mean_squared_values = numpy.full(num_fields, numpy.nan)
+    stdev_values = numpy.full(num_fields, numpy.nan)
+
+    for j in range(num_fields):
+        f = field_names[j]
+
+        mean_values[j] = z_score_dict_dict[f][MEAN_VALUE_KEY]
+        mean_squared_values[j] = z_score_dict_dict[f][MEAN_OF_SQUARES_KEY]
+        stdev_values[j] = _get_standard_deviation(z_score_dict_dict[f])
+
+        print((
+            'Mean, squared mean, and standard deviation for {0:s} = '
+            '{1:.4g}, {2:.4g}, {3:.4g}'
+        ).format(
+            field_names[j],
+            mean_values[j], mean_squared_values[j], stdev_values[j]
+        ))
+
+    coord_dict = {era5_constant_utils.FIELD_DIM: field_names}
+
+    these_dim = (era5_constant_utils.FIELD_DIM,)
+    main_data_dict = {
+        era5_constant_utils.MEAN_VALUE_KEY: (these_dim, mean_values),
+        era5_constant_utils.MEAN_SQUARED_VALUE_KEY: (
+            these_dim, mean_squared_values
+        ),
+        era5_constant_utils.STDEV_KEY: (these_dim, stdev_values)
+    }
+
+    return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
+
+
 def denormalize_gfs_data_from_z_scores(gfs_table_xarray,
                                        z_score_param_table_xarray):
     """Returns GFS data from z-scores to physical units.
@@ -657,6 +727,50 @@ def normalize_gfs_fwi_forecasts_to_z_scores(
     return daily_gfs_table_xarray.assign({
         gfs_daily_utils.DATA_KEY_2D: (
             daily_gfs_table_xarray[gfs_daily_utils.DATA_KEY_2D].dims,
+            data_matrix
+        )
+    })
+
+
+def normalize_era5_constants_to_z_scores(
+        era5_constant_table_xarray, z_score_param_table_xarray):
+    """Normalizes ERA5 time-constant variables from physical units to z-scores.
+
+    :param era5_constant_table_xarray: xarray table with ERA5 variables in
+        physical units.
+    :param z_score_param_table_xarray: xarray table with normalization
+        parameters (means and standard deviations), created by
+        `get_z_score_params_for_era5_constants`.
+    :return: era5_constant_table_xarray: Same as input but in z-score units.
+    """
+
+    # TODO(thunderhoser): Still need denormalization method.
+    # TODO(thunderhoser): Still need unit test.
+
+    e5ct = era5_constant_table_xarray
+    zspt = z_score_param_table_xarray
+
+    field_names = e5ct.coords[era5_constant_utils.FIELD_DIM].values.tolist()
+    num_fields = len(field_names)
+
+    data_matrix = e5ct[era5_constant_utils.DATA_KEY].values
+
+    for j in range(num_fields):
+        j_new = numpy.where(
+            zspt.coords[era5_constant_utils.FIELD_DIM].values == field_names[j]
+        )[0][0]
+
+        this_mean = zspt[era5_constant_utils.MEAN_VALUE_KEY].values[j_new]
+        this_stdev = zspt[era5_constant_utils.STDEV_KEY].values[j_new]
+
+        if numpy.isnan(this_stdev):
+            data_matrix[..., j] = 0.
+        else:
+            data_matrix[..., j] = (data_matrix[..., j] - this_mean) / this_stdev
+
+    return era5_constant_table_xarray.assign({
+        era5_constant_utils.DATA_KEY: (
+            era5_constant_table_xarray[era5_constant_utils.DATA_KEY].dims,
             data_matrix
         )
     })

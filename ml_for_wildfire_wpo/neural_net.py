@@ -49,7 +49,7 @@ GFS_DIRECTORY_KEY = 'gfs_directory_name'
 GFS_NORM_FILE_KEY = 'gfs_normalization_file_name'
 ERA5_CONSTANT_PREDICTOR_FIELDS_KEY = 'era5_constant_predictor_field_names'
 ERA5_CONSTANT_FILE_KEY = 'era5_constant_file_name'
-# ERA5_NORM_FILE_KEY = 'era5_normalization_file_name' # TODO
+ERA5_NORM_FILE_KEY = 'era5_normalization_file_name'
 TARGET_FIELDS_KEY = 'target_field_names'
 TARGET_LEAD_TIME_KEY = 'target_lead_time_days'
 TARGET_LAG_TIMES_KEY = 'target_lag_times_days'
@@ -205,6 +205,8 @@ def _check_generator_args(option_dict):
 
     if option_dict[ERA5_CONSTANT_FILE_KEY] is not None:
         error_checking.assert_file_exists(option_dict[ERA5_CONSTANT_FILE_KEY])
+    if option_dict[ERA5_NORM_FILE_KEY] is not None:
+        error_checking.assert_file_exists(option_dict[ERA5_NORM_FILE_KEY])
 
     error_checking.assert_is_string_list(option_dict[TARGET_FIELDS_KEY])
     for this_field_name in option_dict[TARGET_FIELDS_KEY]:
@@ -594,7 +596,7 @@ def _create_weight_matrix(
 
 def _get_era5_constants(
         era5_constant_file_name, latitude_limits_deg_n, longitude_limits_deg_e,
-        field_names):
+        field_names, norm_param_table_xarray):
     """Reads ERA5 constants.
 
     M = number of rows in grid
@@ -605,6 +607,10 @@ def _get_era5_constants(
     :param latitude_limits_deg_n: Same.
     :param longitude_limits_deg_e: Same.
     :param field_names: Same.
+    :param norm_param_table_xarray: xarray table with normalization
+        parameters, in format returned by
+        `era5_constant_io.read_normalization_file`.  If you do not want
+        normalization, make this None.
     :return: predictor_matrix: M-by-N-by-F numpy array with ERA5 constants to
         use as predictors.
     """
@@ -635,6 +641,17 @@ def _get_era5_constants(
         era5_constant_table_xarray=ect,
         desired_column_indices=desired_column_indices
     )
+
+    if norm_param_table_xarray is not None:
+        exec_start_time_unix_sec = time.time()
+        ect = normalization.normalize_era5_constants_to_z_scores(
+            era5_constant_table_xarray=ect,
+            z_score_param_table_xarray=norm_param_table_xarray
+        )
+
+        print('Normalizing ERA5 data took {0:.4f} seconds.'.format(
+            time.time() - exec_start_time_unix_sec
+        ))
 
     return numpy.stack([
         era5_constant_utils.get_field(
@@ -940,6 +957,9 @@ def data_generator(option_dict):
         predictors, make this None.
     option_dict["era5_constant_file_name"]: Path to file with ERA5 constants.
         Will be read by `era5_constant_io.read_file`.
+    option_dict["era5_normalization_file_name"]: Path to file with normalization
+        params for ERA5 time-constant data.  Will be read by
+        `era5_constant_io.read_normalization_file`.
     option_dict["target_field_names"]: length-T list with names of target fields
         (fire-weather indices).
     option_dict["target_lead_time_days"]: Lead time for target fields.
@@ -1003,6 +1023,7 @@ def data_generator(option_dict):
         ERA5_CONSTANT_PREDICTOR_FIELDS_KEY
     ]
     era5_constant_file_name = option_dict[ERA5_CONSTANT_FILE_KEY]
+    era5_normalization_file_name = option_dict[ERA5_NORM_FILE_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
     target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
@@ -1037,6 +1058,16 @@ def data_generator(option_dict):
             )
         )
 
+    if era5_normalization_file_name is None:
+        era5_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            era5_normalization_file_name
+        ))
+        era5_norm_param_table_xarray = era5_constant_io.read_normalization_file(
+            era5_normalization_file_name
+        )
+
     # TODO(thunderhoser): The longitude command below might fail.
     outer_latitude_limits_deg_n = inner_latitude_limits_deg_n + numpy.array([
         -1 * outer_latitude_buffer_deg, outer_latitude_buffer_deg
@@ -1061,7 +1092,8 @@ def data_generator(option_dict):
             era5_constant_file_name=era5_constant_file_name,
             latitude_limits_deg_n=outer_latitude_limits_deg_n,
             longitude_limits_deg_e=outer_longitude_limits_deg_e,
-            field_names=era5_constant_predictor_field_names
+            field_names=era5_constant_predictor_field_names,
+            norm_param_table_xarray=era5_norm_param_table_xarray
         )
         era5_constant_matrix = numpy.repeat(
             numpy.expand_dims(era5_constant_matrix, axis=0),
@@ -1350,6 +1382,7 @@ def create_data(option_dict, init_date_string):
         ERA5_CONSTANT_PREDICTOR_FIELDS_KEY
     ]
     era5_constant_file_name = option_dict[ERA5_CONSTANT_FILE_KEY]
+    era5_normalization_file_name = option_dict[ERA5_NORM_FILE_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
     target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
@@ -1383,6 +1416,16 @@ def create_data(option_dict, init_date_string):
             )
         )
 
+    if era5_normalization_file_name is None:
+        era5_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            era5_normalization_file_name
+        ))
+        era5_norm_param_table_xarray = era5_constant_io.read_normalization_file(
+            era5_normalization_file_name
+        )
+
     outer_latitude_limits_deg_n = inner_latitude_limits_deg_n + numpy.array([
         -1 * outer_latitude_buffer_deg, outer_latitude_buffer_deg
     ])
@@ -1397,7 +1440,8 @@ def create_data(option_dict, init_date_string):
             era5_constant_file_name=era5_constant_file_name,
             latitude_limits_deg_n=outer_latitude_limits_deg_n,
             longitude_limits_deg_e=outer_longitude_limits_deg_e,
-            field_names=era5_constant_predictor_field_names
+            field_names=era5_constant_predictor_field_names,
+            norm_param_table_xarray=era5_norm_param_table_xarray
         )
         era5_constant_matrix = numpy.expand_dims(era5_constant_matrix, axis=0)
 
@@ -1757,6 +1801,10 @@ def read_metafile(pickle_file_name):
 
         validation_option_dict[GFS_FORECAST_TARGET_DIR_KEY] = None
         validation_option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY] = None
+
+    if ERA5_NORM_FILE_KEY not in training_option_dict:
+        training_option_dict[ERA5_NORM_FILE_KEY] = None
+        validation_option_dict[ERA5_NORM_FILE_KEY] = None
 
     if TARGET_FIELDS_KEY not in training_option_dict:
         if 'target_field_name' in training_option_dict:
