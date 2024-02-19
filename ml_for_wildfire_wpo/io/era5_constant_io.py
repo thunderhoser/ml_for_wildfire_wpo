@@ -29,3 +29,29 @@ def write_file(netcdf_file_name, era5_constant_table_xarray):
     era5_constant_table_xarray.to_netcdf(
         path=netcdf_file_name, mode='w', format='NETCDF3_64BIT'
     )
+
+
+def write_normalization_file(norm_param_table_xarray, netcdf_file_name):
+    """Writes normalization parameters for ERA5 constants to NetCDF file.
+
+    :param norm_param_table_xarray: xarray table (metadata and variable names
+        should make the table self-explanatory).
+    :param netcdf_file_name: Path to output file.
+    """
+
+    file_system_utils.mkdir_recursive_if_necessary(file_name=netcdf_file_name)
+    norm_param_table_xarray.to_netcdf(
+        path=netcdf_file_name, mode='w', format='NETCDF3_64BIT'
+    )
+
+
+def read_normalization_file(netcdf_file_name):
+    """Reads normalization parameters for ERA5 constants from NetCDF file.
+
+    :param netcdf_file_name: Path to input file.
+    :return: norm_param_table_xarray: xarray table (metadata and variable names
+        should make the table self-explanatory).
+    """
+
+    error_checking.assert_file_exists(netcdf_file_name)
+    return xarray.open_dataset(netcdf_file_name)

@@ -8,6 +8,10 @@ LONGITUDE_DIM = 'longitude_deg_e'
 FIELD_DIM = 'field'
 DATA_KEY = 'data'
 
+MEAN_VALUE_KEY = 'mean_value'
+MEAN_SQUARED_VALUE_KEY = 'mean_squared_value'
+STDEV_KEY = 'standard_deviation'
+
 SUBGRID_OROGRAPHY_SINE_NAME = 'subgrid_orography_angle_sine'
 SUBGRID_OROGRAPHY_COSINE_NAME = 'subgrid_orography_angle_cosine'
 SUBGRID_OROGRAPHY_ANISOTROPY_NAME = 'subgrid_orography_angle_anisotropy'

@@ -60,25 +60,6 @@ ENSEMBLE_SIZE_KEY = chiu_net_arch.ENSEMBLE_SIZE_KEY
 OPTIMIZER_FUNCTION_KEY = chiu_net_arch.OPTIMIZER_FUNCTION_KEY
 
 
-def _get_time_slicing_function(time_index):
-    """Returns function that takes one time step from input tensor.
-
-    :param time_index: Will take the [k]th time step, where k = `time_index`.
-    :return: time_slicing_function: Function handle (see below).
-    """
-
-    def time_slicing_function(input_tensor_3d):
-        """Takes one time step from the input tensor.
-
-        :param input_tensor_3d: Input tensor with 3 spatiotemporal dimensions.
-        :return: input_tensor_2d: Input tensor with 2 spatial dimensions.
-        """
-
-        return input_tensor_3d[:, time_index, ...]
-
-    return time_slicing_function
-
-
 def create_model(option_dict, loss_function, metric_list):
     """Creates Chiu-net++.
 
@@ -232,7 +213,7 @@ def create_model(option_dict, loss_function, metric_list):
         )(input_layer_object_era5)
 
         this_layer_object = keras.layers.Concatenate(
-            axis=-1, name='era5_add-gfs-times'
+            axis=-4, name='era5_add-gfs-times'
         )(
             num_gfs_lead_times * [layer_object_era5]
         )
@@ -244,7 +225,7 @@ def create_model(option_dict, loss_function, metric_list):
         )
 
         this_layer_object = keras.layers.Concatenate(
-            axis=-1, name='era5_add-lag-times'
+            axis=-4, name='era5_add-lag-times'
         )(
             num_target_lag_times * [layer_object_era5]
         )
