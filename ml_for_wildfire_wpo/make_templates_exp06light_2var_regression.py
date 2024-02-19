@@ -106,21 +106,20 @@ DEFAULT_OPTION_DICT = {
     # chiu_net_pp_arch.GFS_ENCODER_NUM_CHANNELS_KEY:
     #     NUM_FIRST_LAYER_FILTERS * numpy.array([1, 2, 3, 4, 5, 6, 7], dtype=int),
     chiu_net_pp_arch.GFS_ENCODER_NUM_CHANNELS_KEY:
-        numpy.array([40, 55, 70, 85, 100, 120, 140], dtype=int),
+        numpy.array([20, 25, 30, 35, 40, 45, 50], dtype=int),
     chiu_net_pp_arch.GFS_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
     chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
         7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
     ),
     chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY:
-        int(numpy.round(0.25 * NUM_FIRST_LAYER_FILTERS)) *
-        numpy.array([1, 2, 3, 4, 5, 6, 7], dtype=int),
+        numpy.array([6, 8, 10, 12, 14, 16], dtype=int),
     chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
     chiu_net_pp_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(6, 2, dtype=int),
     # chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY:
     #     int(numpy.round(1.25 * NUM_FIRST_LAYER_FILTERS)) *
     #     numpy.array([1, 2, 3, 4, 5, 6], dtype=int),
     chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY:
-        numpy.array([45, 65, 85, 105, 125, 150], dtype=int),
+        numpy.array([26, 33, 40, 47, 54, 61], dtype=int),
     # chiu_net_pp_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(6, 0.),
     # chiu_net_pp_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(6, 0.),
     chiu_net_pp_arch.INCLUDE_PENULTIMATE_KEY: False,
