@@ -112,7 +112,7 @@ DEFAULT_OPTION_DICT = {
         7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
     ),
     chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY:
-        numpy.array([6, 8, 10, 12, 14, 16], dtype=int),
+        numpy.array([6, 8, 10, 12, 14, 16, 18], dtype=int),
     chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
     chiu_net_pp_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(6, 2, dtype=int),
     # chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY:
