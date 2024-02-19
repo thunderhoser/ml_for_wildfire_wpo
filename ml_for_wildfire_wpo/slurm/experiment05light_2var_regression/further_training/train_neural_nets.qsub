@@ -19,7 +19,7 @@
 #SBATCH --output=train_neural_nets_%A_%a.out
 
 set TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment05light_2var_regression"
-set TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment05light_2var_regression/further_training_batch-size=24"
+set TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment05light_2var_regression/further_training_batch-size=16"
 
 set BATCH_SIZES=("08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32")
 set DROPOUT_LAYER_COUNTS=("1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6")

@@ -30,7 +30,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --target_lag_times_days 1 2 3 \
 --gfs_forecast_target_lead_times_days 1 2 3 \
 --target_normalization_file_name="${TARGET_NORM_FILE_NAME}" \
---num_examples_per_batch=12 \
+--num_examples_per_batch=8 \
 --sentinel_value=-10 \
 --gfs_dir_name_for_training="${GFS_DIR_NAME}" \
 --target_dir_name_for_training="${TARGET_DIR_NAME}" \
@@ -42,4 +42,4 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --gfs_init_date_limit_strings_for_validation "20210101" "20211210" \
 --num_epochs=1000 \
 --num_training_batches_per_epoch=${batch_size} \
---num_validation_batches_per_epoch=4
+--num_validation_batches_per_epoch=6
