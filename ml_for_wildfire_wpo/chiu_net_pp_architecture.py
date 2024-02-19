@@ -102,9 +102,9 @@ def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
     ).astype(int)
 
     while numpy.sum(desired_channel_counts) > num_output_channels:
-        desired_channel_counts[numpy.argmax(desired_channel_counts)] -= 1
+        desired_channel_counts[numpy.argmax(desired_channel_counts[:-1])] -= 1
     while numpy.sum(desired_channel_counts) < num_output_channels:
-        desired_channel_counts[numpy.argmin(desired_channel_counts)] += 1
+        desired_channel_counts[numpy.argmin(desired_channel_counts[:-1])] += 1
 
     assert numpy.sum(desired_channel_counts) == num_output_channels
 
@@ -680,11 +680,9 @@ def create_model(option_dict, loss_function, metric_list):
             i_new -= 1
             j += 1
 
-            this_num_channels = _get_channel_counts_for_skip_cnxn(
-                input_layer_objects=
-                last_conv_layer_matrix[i_new, :(j + 1)].tolist(),
-                num_output_channels=decoder_num_channels_by_level[i_new]
-            )[-1]
+            this_num_channels = int(numpy.round(
+                0.5 * decoder_num_channels_by_level[i_new]
+            ))
 
             this_name = 'block{0:d}-{1:d}_upconv'.format(i_new, j)
             this_layer_object = architecture_utils.get_2d_conv_layer(
