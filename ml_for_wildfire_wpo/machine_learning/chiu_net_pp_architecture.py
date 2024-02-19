@@ -673,11 +673,9 @@ def create_model(option_dict, loss_function, metric_list):
             i_new -= 1
             j += 1
 
-            this_num_channels = _get_channel_counts_for_skip_cnxn(
-                input_layer_objects=
-                last_conv_layer_matrix[i_new, :(j + 1)].tolist(),
-                num_output_channels=decoder_num_channels_by_level[i_new]
-            )[-1]
+            this_num_channels = int(numpy.round(
+                0.5 * decoder_num_channels_by_level[i_new]
+            ))
 
             this_name = 'block{0:d}-{1:d}_upconv'.format(i_new, j)
             this_layer_object = architecture_utils.get_2d_conv_layer(
