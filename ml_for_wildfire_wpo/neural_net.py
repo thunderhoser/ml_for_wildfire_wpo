@@ -31,6 +31,7 @@ import canadian_fwi_utils
 import normalization
 import custom_losses
 import custom_metrics
+import gradient_accumulators
 
 DATE_FORMAT = '%Y%m%d'
 GRID_SPACING_DEG = 0.25
