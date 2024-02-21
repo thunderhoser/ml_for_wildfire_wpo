@@ -100,6 +100,7 @@ def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
         desired_channel_counts[numpy.argmin(desired_channel_counts)] += 1
 
     assert numpy.sum(desired_channel_counts) == num_output_channels
+    desired_channel_counts = numpy.maximum(desired_channel_counts, 1)
 
     return desired_channel_counts
 
