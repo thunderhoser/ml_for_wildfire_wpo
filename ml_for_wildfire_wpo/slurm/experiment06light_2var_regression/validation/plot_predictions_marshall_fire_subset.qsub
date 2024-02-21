@@ -1,0 +1,45 @@
+#!/bin/tcsh
+
+#SBATCH --job-name="plot_predictions_marshall_fire_subset"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpu"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=00:10:00
+#SBATCH --array=5,22,23,24,25,42,43,44,62,64,81,83,84,103,105
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_predictions_marshall_fire_subset_%A_%a.out
+
+set TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment06light_2var_regression"
+
+set BATCH_SIZES=("08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32")
+set DROPOUT_LAYER_COUNTS=("1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6")
+set DROPOUT_RATES=("0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5")
+
+set batch_size=${BATCH_SIZES[$SLURM_ARRAY_TASK_ID]}
+set num_dropout_layers=${DROPOUT_LAYER_COUNTS[$SLURM_ARRAY_TASK_ID]}
+set dropout_rate=${DROPOUT_RATES[$SLURM_ARRAY_TASK_ID]}
+
+set model_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_num-dropout-layers=${num_dropout_layers}_dropout-rate=${dropout_rate}"
+echo $model_dir_name
+
+set INIT_DATE_STRINGS=("20211223" "20211224" "20211225" "20211226" "20211227" "20211228" "20211229" "20211230")
+set i=1
+
+while ($i <= $#INIT_DATE_STRINGS)
+    set init_date_string="${INIT_DATE_STRINGS[$i]}"
+    set this_directory_name=`pwd`
+    singularity exec --nv /scratch1/RDARCH/rda-ghpcs/Jebb.Q.Stewart/ml-ryan.simg /bin/sh -c "cd ${this_directory_name}; sh plot_predictions_marshall_fire.sh ${model_dir_name} ${init_date_string}"
+    
+    @ i = $i + 1
+end
