@@ -16,6 +16,7 @@ import custom_metrics
 import neural_net
 import chiu_net_architecture as chiu_net_arch
 import architecture_utils
+import gradient_accumulators
 import file_system_utils
 
 # TODO(thunderhoser): Add ERA5 constant fields next!!
@@ -176,11 +177,15 @@ def _run():
                     optimizer_function = keras.optimizers.Nadam()
                     optimizer_function_string = 'keras.optimizers.Nadam()'
                 else:
-                    optimizer_function = keras.optimizers.Nadam(
-                        gradient_accumulation_steps=num_grad_accum_steps
+                    optimizer_function = gradient_accumulators.GradientAccumulateOptimizer(
+                        optimizer=keras.optimizers.Nadam(),
+                        accum_steps=num_grad_accum_steps
                     )
+
                     optimizer_function_string = (
-                        'keras.optimizers.Nadam(gradient_accumulation_steps={0:d})'
+                        'gradient_accumulators.GradientAccumulateOptimizer('
+                        'optimizer=keras.optimizers.Nadam(), accum_steps={0:d}'
+                        ')'
                     ).format(num_grad_accum_steps)
 
                 num_upconv_dropout_layers = (
