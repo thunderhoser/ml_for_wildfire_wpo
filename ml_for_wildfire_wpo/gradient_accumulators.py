@@ -1,7 +1,7 @@
 """From https://github.com/andreped/GradientAccumulator"""
 
 import tensorflow as tf
-from . import agc
+import agc
 
 # dynamically handle which Optimizer class to use dep on tf version
 opt = tf.keras.optimizers.Optimizer
