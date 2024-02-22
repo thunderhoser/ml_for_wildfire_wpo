@@ -19,7 +19,9 @@
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
 #SBATCH --output=create_templates_%A.out
 
+conda init
 conda activate base
+
 echo `which conda`
 echo `which python`
 echo `which python3`

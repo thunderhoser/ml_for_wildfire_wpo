@@ -398,7 +398,7 @@ def create_model(option_dict, loss_function, metric_list):
 
         if not gfs_fcst_use_3d_conv:
             orig_dims = gfs_fcst_module_layer_objects[i].get_shape()
-            new_dims = orig_dims[1:-2] + [orig_dims[-2] * orig_dims[-1]]
+            new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
 
             this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
             gfs_fcst_module_layer_objects[i] = keras.layers.Reshape(
@@ -426,7 +426,7 @@ def create_model(option_dict, loss_function, metric_list):
 
                     new_dims = (
                         gfs_fcst_module_layer_objects[i].shape[1:3] +
-                        [gfs_fcst_module_layer_objects[i].shape[-1]]
+                        (gfs_fcst_module_layer_objects[i].shape[-1],)
                     )
 
                     this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
@@ -561,7 +561,7 @@ def create_model(option_dict, loss_function, metric_list):
 
         if not lagtgt_fcst_use_3d_conv:
             orig_dims = lagtgt_fcst_module_layer_objects[i].get_shape()
-            new_dims = orig_dims[1:-2] + [orig_dims[-2] * orig_dims[-1]]
+            new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
 
             this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
             lagtgt_fcst_module_layer_objects[i] = keras.layers.Reshape(
@@ -589,7 +589,7 @@ def create_model(option_dict, loss_function, metric_list):
 
                     new_dims = (
                         lagtgt_fcst_module_layer_objects[i].shape[1:3] +
-                        [lagtgt_fcst_module_layer_objects[i].shape[-1]]
+                        (lagtgt_fcst_module_layer_objects[i].shape[-1],)
                     )
 
                     this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
