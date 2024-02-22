@@ -19,7 +19,7 @@
 #SBATCH --output=train_neural_nets_batch2_%A_%a.out
 
 module load cuda/12.1.0
-module load cudnn/8.8.1
+# module load cudnn/8.8.1
 
 conda init
 conda activate base
@@ -73,7 +73,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --target_lag_times_days 1 2 3 \
 --gfs_forecast_target_lead_times_days 1 2 3 \
 --target_normalization_file_name="${TARGET_NORM_FILE_NAME}" \
---num_examples_per_batch=2 \
+--num_examples_per_batch=8 \
 --sentinel_value=-10 \
 --gfs_dir_name_for_training="${GFS_DIR_NAME}" \
 --target_dir_name_for_training="${TARGET_DIR_NAME}" \
