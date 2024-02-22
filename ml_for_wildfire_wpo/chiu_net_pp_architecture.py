@@ -8,7 +8,6 @@ import os
 import sys
 import numpy
 import keras
-import tensorflow.keras
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))

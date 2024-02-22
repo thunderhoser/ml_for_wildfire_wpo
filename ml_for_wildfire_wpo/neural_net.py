@@ -8,10 +8,6 @@ import random
 import pickle
 import numpy
 import keras
-import tensorflow
-
-# tensorflow.compat.v1.disable_eager_execution()
-
 import tensorflow.keras as tf_keras
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -1864,16 +1860,9 @@ def read_model(hdf5_file_name):
     metric_function_list = [
         eval(m) for m in metadata_dict[METRIC_FUNCTIONS_KEY]
     ]
-    optimizer_function_string = metadata_dict[OPTIMIZER_FUNCTION_KEY]
-    print(optimizer_function_string)
-    if optimizer_function_string.startswith('Optimizer('):
-        print('FOOOOOOOOO')
-        # import tensorflow
-        # tensorflow.compat.v1.disable_eager_execution()
-
     model_object.compile(
         loss=custom_object_dict['loss'],
-        optimizer=eval(optimizer_function_string),
+        optimizer=eval(metadata_dict[OPTIMIZER_FUNCTION_KEY]),
         metrics=metric_function_list
     )
 
@@ -1980,14 +1969,14 @@ def train_model(
         patience=plateau_patience_epochs, verbose=1, mode='min',
         min_delta=0., cooldown=0
     )
-    # backup_object = keras.callbacks.BackupAndRestore(
-    #     backup_dir_name, save_freq='epoch', delete_checkpoint=True
-    # )
+    backup_object = keras.callbacks.BackupAndRestore(
+        backup_dir_name, save_freq='epoch', delete_checkpoint=True
+    )
 
     list_of_callback_objects = [
         history_object, checkpoint_object,
         early_stopping_object, plateau_object,
-        # backup_object
+        backup_object
     ]
 
     training_generator = data_generator(training_option_dict)
