@@ -7,7 +7,6 @@ import os
 import sys
 import copy
 import numpy
-import tensorflow
 import tensorflow.keras as tf_keras
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -22,8 +21,6 @@ import chiu_net_pp_architecture as chiu_net_pp_arch
 import architecture_utils
 from accum_optimizers import Optimizer
 import file_system_utils
-
-tensorflow.compat.v1.disable_eager_execution()
 
 OUTPUT_DIR_NAME = (
     '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/'

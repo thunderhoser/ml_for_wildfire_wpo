@@ -2,6 +2,7 @@
 
 import os
 import sys
+import tensorflow
 import tensorflow.keras as tf_keras
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -15,3 +16,5 @@ optimizer_function = Optimizer(
     optimizer=tf_keras.optimizers.Nadam(),
     steps=2
 )
+
+print(tensorflow.executing_eagerly())
