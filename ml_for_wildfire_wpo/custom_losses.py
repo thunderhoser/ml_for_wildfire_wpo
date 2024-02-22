@@ -60,6 +60,8 @@ def mean_squared_error(function_name, expect_ensemble=True, test_mode=False):
         :return: loss: Mean squared error.
         """
 
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
                 target_tensor[..., :-1], axis=-1
@@ -112,6 +114,8 @@ def dual_weighted_mse(channel_weights, function_name, expect_ensemble=True,
         :param prediction_tensor: Same.
         :return: loss: Mean squared error.
         """
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
@@ -183,6 +187,8 @@ def dual_weighted_mse_1channel(channel_weight, channel_index, function_name,
         :param prediction_tensor: Same.
         :return: loss: One-channel DWMSE.
         """
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
