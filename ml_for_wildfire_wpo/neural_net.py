@@ -8,7 +8,7 @@ import random
 import pickle
 import numpy
 import keras
-import tensorflow.keras as tf_keras
+from tensorflow.keras.saving import load_model
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -1852,7 +1852,8 @@ def read_model(hdf5_file_name):
     custom_object_dict = {
         'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
     }
-    model_object = keras.saving.load_model(
+
+    model_object = load_model(
         hdf5_file_name, custom_objects=custom_object_dict, compile=False
     )
     # model_object = tf_keras.models.load_model(
