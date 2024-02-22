@@ -1320,13 +1320,23 @@ def data_generator(option_dict):
             (target_matrix, weight_matrix), axis=-1
         )
 
-        predictor_matrices = [
-            m for m in [
-                gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
-                era5_constant_matrix, laglead_target_predictor_matrix
-            ]
-            if m is not None
-        ]
+        predictor_matrices = {}
+        if gfs_predictor_matrix_3d is not None:
+            predictor_matrices.update({
+                'gfs_3d_inputs': gfs_predictor_matrix_3d.astype('float32')
+            })
+        if gfs_predictor_matrix_2d is not None:
+            predictor_matrices.update({
+                'gfs_2d_inputs': gfs_predictor_matrix_3d.astype('float32')
+            })
+        if era5_constant_matrix is not None:
+            predictor_matrices.update({
+                'era5_inputs': gfs_predictor_matrix_3d.astype('float32')
+            })
+        if laglead_target_predictor_matrix is not None:
+            predictor_matrices.update({
+                'lagged_target_inputs': gfs_predictor_matrix_3d.astype('float32')
+            })
 
         print((
             'Shape of target matrix (including land mask as last channel): '
@@ -1339,7 +1349,7 @@ def data_generator(option_dict):
             numpy.min(target_matrix), numpy.max(target_matrix)
         ))
 
-        predictor_matrices = [p.astype('float32') for p in predictor_matrices]
+        # predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
         yield predictor_matrices, target_matrix_with_weights
 
