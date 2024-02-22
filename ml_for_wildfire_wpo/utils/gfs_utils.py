@@ -16,16 +16,19 @@ FORECAST_HOUR_DIM = 'forecast_hour'
 LATITUDE_DIM = 'latitude_deg_n'
 LONGITUDE_DIM = 'longitude_deg_e'
 PRESSURE_LEVEL_DIM = 'pressure_level_mb'
+QUANTILE_LEVEL_DIM = 'quantile_level'
+
 FIELD_DIM_2D = 'field_name_2d'
 FIELD_DIM_3D = 'field_name_3d'
-
 DATA_KEY_2D = 'data_matrix_2d'
 DATA_KEY_3D = 'data_matrix_3d'
 
-MEAN_VALUE_KEY_3D = 'mean_value_3d'
-STDEV_KEY_3D = 'standard_deviation_3d'
 MEAN_VALUE_KEY_2D = 'mean_value_2d'
+MEAN_VALUE_KEY_3D = 'mean_value_3d'
 STDEV_KEY_2D = 'standard_deviation_2d'
+STDEV_KEY_3D = 'standard_deviation_3d'
+QUANTILE_KEY_2D = 'quantile_2d'
+QUANTILE_KEY_3D = 'quantile_3d'
 
 TEMPERATURE_NAME = 'temperature_kelvins'
 SPECIFIC_HUMIDITY_NAME = 'specific_humidity_kg_kg01'

@@ -6,11 +6,14 @@ from gewittergefahr.gg_utils import error_checking
 LATITUDE_DIM = 'latitude_deg_n'
 LONGITUDE_DIM = 'longitude_deg_e'
 FIELD_DIM = 'field_name'
+QUANTILE_LEVEL_DIM = 'quantile_level'
+
 DATA_KEY = 'data'
 
 MEAN_VALUE_KEY = 'mean_value'
 MEAN_SQUARED_VALUE_KEY = 'mean_squared_value'
 STDEV_KEY = 'standard_deviation'
+QUANTILE_KEY = 'quantile'
 
 FFMC_NAME = 'fine_fuel_moisture_code'
 DMC_NAME = 'duff_moisture_code'

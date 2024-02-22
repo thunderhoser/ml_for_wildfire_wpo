@@ -6,6 +6,7 @@ from ml_for_wildfire_wpo.utils import normalization
 
 INPUT_FILE_ARG_NAME = 'input_era5_constant_file_name'
 NORMALIZATION_FILE_ARG_NAME = 'input_normalization_file_name'
+USE_QUANTILE_NORM_ARG_NAME = 'use_quantile_norm'
 OUTPUT_FILE_ARG_NAME = 'output_era5_constant_file_name'
 
 INPUT_FILE_HELP_STRING = (
@@ -15,6 +16,11 @@ INPUT_FILE_HELP_STRING = (
 NORMALIZATION_FILE_HELP_STRING = (
     'Path to file with normalization params.  Will be read by '
     '`era5_constant_io.read_normalization_file`.'
+)
+USE_QUANTILE_NORM_HELP_STRING = (
+    'Boolean flag.  If 1, will use quantile normalization and then convert '
+    'ranks to standard normal distribution.  If 0, will just use z-score '
+    'normalization.'
 )
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file (with ERA5 data in z-score units).  Will be written '
@@ -31,18 +37,24 @@ INPUT_ARG_PARSER.add_argument(
     help=NORMALIZATION_FILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + USE_QUANTILE_NORM_ARG_NAME, type=int, required=True,
+    help=USE_QUANTILE_NORM_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
     help=OUTPUT_FILE_HELP_STRING
 )
 
 
-def _run(input_file_name, normalization_file_name, output_file_name):
+def _run(input_file_name, normalization_file_name, use_quantile_norm,
+         output_file_name):
     """Normalizes ERA5 constants.
 
     This is effectively the main method.
 
     :param input_file_name: See documentation at top of file.
     :param normalization_file_name: Same.
+    :param use_quantile_norm: Same.
     :param output_file_name: Same.
     """
 
@@ -56,11 +68,10 @@ def _run(input_file_name, normalization_file_name, output_file_name):
     print('Reading data from: "{0:s}"...'.format(input_file_name))
     era5_constant_table_xarray = era5_constant_io.read_file(input_file_name)
 
-    era5_constant_table_xarray = (
-        normalization.normalize_era5_constants_to_z_scores(
-            era5_constant_table_xarray=era5_constant_table_xarray,
-            z_score_param_table_xarray=norm_param_table_xarray
-        )
+    era5_constant_table_xarray = normalization.normalize_era5_constants(
+        era5_constant_table_xarray=era5_constant_table_xarray,
+        norm_param_table_xarray=norm_param_table_xarray,
+        use_quantile_norm=use_quantile_norm
     )
 
     print('Writing data to: "{0:s}"...'.format(output_file_name))
@@ -77,6 +88,9 @@ if __name__ == '__main__':
         input_file_name=getattr(INPUT_ARG_OBJECT, INPUT_FILE_ARG_NAME),
         normalization_file_name=getattr(
             INPUT_ARG_OBJECT, NORMALIZATION_FILE_ARG_NAME
+        ),
+        use_quantile_norm=bool(
+            getattr(INPUT_ARG_OBJECT, USE_QUANTILE_NORM_ARG_NAME)
         ),
         output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )

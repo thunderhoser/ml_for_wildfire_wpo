@@ -24,6 +24,8 @@ from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 from ml_for_wildfire_wpo.utils import normalization
 from ml_for_wildfire_wpo.machine_learning import custom_losses
 from ml_for_wildfire_wpo.machine_learning import custom_metrics
+from ml_for_wildfire_wpo.outside_code import gradient_accumulators
+from ml_for_wildfire_wpo.outside_code import accum_grad_optimizer
 
 DATE_FORMAT = '%Y%m%d'
 GRID_SPACING_DEG = 0.25
