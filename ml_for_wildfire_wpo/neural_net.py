@@ -1327,15 +1327,15 @@ def data_generator(option_dict):
             })
         if gfs_predictor_matrix_2d is not None:
             predictor_matrices.update({
-                'gfs_2d_inputs': gfs_predictor_matrix_3d.astype('float32')
+                'gfs_2d_inputs': gfs_predictor_matrix_2d.astype('float32')
             })
         if era5_constant_matrix is not None:
             predictor_matrices.update({
-                'era5_inputs': gfs_predictor_matrix_3d.astype('float32')
+                'era5_inputs': era5_constant_matrix.astype('float32')
             })
         if laglead_target_predictor_matrix is not None:
             predictor_matrices.update({
-                'lagged_target_inputs': gfs_predictor_matrix_3d.astype('float32')
+                'lagged_target_inputs': laglead_target_predictor_matrix.astype('float32')
             })
 
         print((
