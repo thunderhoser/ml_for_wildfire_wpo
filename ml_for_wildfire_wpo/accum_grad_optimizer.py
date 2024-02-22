@@ -18,9 +18,13 @@ def convert_to_accumulate_gradient_optimizer(orig_optimizer, update_params_frequ
     orig_optimizer.accumulated_iterations = accumulated_iterations
 
     def updated_get_gradients(self, loss, params):
+        print('Using updated_get_gradients -- yay!')
+
         return self.accumulate_gradient_accumulators
 
     def updated_get_updates(self, loss, params):
+        print('Using updated_get_updates -- yay!')
+
         self.accumulate_gradient_accumulators = [K.zeros(K.int_shape(p), dtype=K.dtype(p)) for p in params]
         updates_accumulated_iterations = K.update_add(accumulated_iterations, 1)
         new_grads = orig_get_gradients(loss, params)
