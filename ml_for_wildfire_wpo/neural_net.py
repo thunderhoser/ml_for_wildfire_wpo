@@ -10,7 +10,7 @@ import numpy
 import keras
 import tensorflow
 
-tensorflow.compat.v1.disable_eager_execution()
+# tensorflow.compat.v1.disable_eager_execution()
 
 import tensorflow.keras as tf_keras
 
