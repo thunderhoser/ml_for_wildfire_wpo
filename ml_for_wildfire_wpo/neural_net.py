@@ -1980,14 +1980,14 @@ def train_model(
         patience=plateau_patience_epochs, verbose=1, mode='min',
         min_delta=0., cooldown=0
     )
-    backup_object = keras.callbacks.BackupAndRestore(
-        backup_dir_name, save_freq='epoch', delete_checkpoint=True
-    )
+    # backup_object = keras.callbacks.BackupAndRestore(
+    #     backup_dir_name, save_freq='epoch', delete_checkpoint=True
+    # )
 
     list_of_callback_objects = [
         history_object, checkpoint_object,
         early_stopping_object, plateau_object,
-        backup_object
+        # backup_object
     ]
 
     training_generator = data_generator(training_option_dict)
