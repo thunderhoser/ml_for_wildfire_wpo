@@ -1852,7 +1852,7 @@ def read_model(hdf5_file_name):
     custom_object_dict = {
         'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
     }
-    model_object = tf_keras.saving.load_model(
+    model_object = keras.saving.load_model(
         hdf5_file_name, custom_objects=custom_object_dict, compile=False
     )
     # model_object = tf_keras.models.load_model(
