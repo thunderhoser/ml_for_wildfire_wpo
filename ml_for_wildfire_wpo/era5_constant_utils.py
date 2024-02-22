@@ -14,11 +14,14 @@ import error_checking
 LATITUDE_DIM = 'latitude_deg_n'
 LONGITUDE_DIM = 'longitude_deg_e'
 FIELD_DIM = 'field'
+QUANTILE_LEVEL_DIM = 'quantile_level'
+
 DATA_KEY = 'data'
 
 MEAN_VALUE_KEY = 'mean_value'
 MEAN_SQUARED_VALUE_KEY = 'mean_squared_value'
 STDEV_KEY = 'standard_deviation'
+QUANTILE_KEY = 'quantile'
 
 SUBGRID_OROGRAPHY_SINE_NAME = 'subgrid_orography_angle_sine'
 SUBGRID_OROGRAPHY_COSINE_NAME = 'subgrid_orography_angle_cosine'
