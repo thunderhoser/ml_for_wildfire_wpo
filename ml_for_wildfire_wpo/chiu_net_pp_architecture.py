@@ -714,8 +714,7 @@ def create_model(option_dict, loss_function, metric_list):
                     layer_name=this_name
                 )(this_layer_object)
 
-            import tensorflow
-            print(tensorflow.shape(this_layer_object))
+            print(dir(this_layer_object))
 
             num_upconv_rows = this_layer_object.get_shape()[1]
             num_desired_rows = last_conv_layer_matrix[i_new, 0].get_shape()[1]
