@@ -1860,9 +1860,14 @@ def read_model(hdf5_file_name):
     metric_function_list = [
         eval(m) for m in metadata_dict[METRIC_FUNCTIONS_KEY]
     ]
+    optimizer_function_string = metadata_dict[OPTIMIZER_FUNCTION_KEY]
+    if optimizer_function_string.startswith('Optimizer('):
+        import tensorflow
+        tensorflow.compat.v1.disable_eager_execution()
+
     model_object.compile(
         loss=custom_object_dict['loss'],
-        optimizer=eval(metadata_dict[OPTIMIZER_FUNCTION_KEY]),
+        optimizer=eval(optimizer_function_string),
         metrics=metric_function_list
     )
 
