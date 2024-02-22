@@ -1861,7 +1861,9 @@ def read_model(hdf5_file_name):
         eval(m) for m in metadata_dict[METRIC_FUNCTIONS_KEY]
     ]
     optimizer_function_string = metadata_dict[OPTIMIZER_FUNCTION_KEY]
+    print(optimizer_function_string)
     if optimizer_function_string.startswith('Optimizer('):
+        print('FOOOOOOOOO')
         import tensorflow
         tensorflow.compat.v1.disable_eager_execution()
 
