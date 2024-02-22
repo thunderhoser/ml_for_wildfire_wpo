@@ -16,6 +16,13 @@ import training_args
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER = training_args.add_input_args(parser_object=INPUT_ARG_PARSER)
 
+import keras
+
+print(dir(keras.optimizers.Adam()))
+print('\n\n\n')
+print(dir(keras.optimizers.Nadam()))
+print('\n\n\n')
+
 
 def _run(template_file_name, output_dir_name,
          inner_latitude_limits_deg_n, inner_longitude_limits_deg_e,
