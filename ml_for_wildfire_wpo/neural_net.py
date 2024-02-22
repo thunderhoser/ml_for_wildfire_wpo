@@ -33,6 +33,7 @@ import custom_losses
 import custom_metrics
 import gradient_accumulators
 import accum_grad_optimizer
+from accum_optimizers import Optimizer
 
 DATE_FORMAT = '%Y%m%d'
 GRID_SPACING_DEG = 0.25
