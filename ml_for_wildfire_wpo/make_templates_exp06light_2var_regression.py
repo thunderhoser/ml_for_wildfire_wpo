@@ -20,7 +20,7 @@ import custom_metrics
 import neural_net
 import chiu_net_pp_architecture as chiu_net_pp_arch
 import architecture_utils
-import gradient_accumulators
+import accum_grad_optimizer
 import file_system_utils
 
 OUTPUT_DIR_NAME = (
@@ -185,14 +185,17 @@ def _run():
                     optimizer_function = keras.optimizers.Nadam()
                     optimizer_function_string = 'keras.optimizers.Nadam()'
                 else:
-                    optimizer_function = gradient_accumulators.GradientAccumulateOptimizer(
-                        optimizer=keras.optimizers.Nadam(),
-                        accum_steps=num_grad_accum_steps
+                    optimizer_function = accum_grad_optimizer.convert_to_accumulate_gradient_optimizer(
+                        orig_optimizer=keras.optimizers.Nadam(),
+                        update_params_frequency=num_grad_accum_steps,
+                        accumulate_sum_or_mean=False
                     )
 
                     optimizer_function_string = (
-                        'gradient_accumulators.GradientAccumulateOptimizer('
-                        'optimizer=keras.optimizers.Nadam(), accum_steps={0:d}'
+                        'accum_grad_optimizer.convert_to_accumulate_gradient_optimizer('
+                        'orig_optimizer=keras.optimizers.Nadam(), '
+                        'update_params_frequency={0:d}, '
+                        'accumulate_sum_or_mean=False'
                         ')'
                     ).format(num_grad_accum_steps)
 
