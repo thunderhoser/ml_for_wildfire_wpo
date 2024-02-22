@@ -42,7 +42,7 @@ set batch_size=${BATCH_SIZES[$SLURM_ARRAY_TASK_ID]}
 set num_dropout_layers=${DROPOUT_LAYER_COUNTS[$SLURM_ARRAY_TASK_ID]}
 set dropout_rate=${DROPOUT_RATES[$SLURM_ARRAY_TASK_ID]}
 
-set template_file_name="${TEMPLATE_DIR_NAME}/batch-size=${batch_size}_num-dropout-layers=${num_dropout_layers}_dropout-rate=${dropout_rate}/model.h5"
+set template_file_name="${TEMPLATE_DIR_NAME}/batch-size=${batch_size}_num-dropout-layers=${num_dropout_layers}_dropout-rate=${dropout_rate}/model.keras"
 set output_dir_name="${TOP_OUTPUT_DIR_NAME}/batch-size=${batch_size}_num-dropout-layers=${num_dropout_layers}_dropout-rate=${dropout_rate}"
 echo $output_dir_name
 
