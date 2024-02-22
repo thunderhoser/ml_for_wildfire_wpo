@@ -8,7 +8,7 @@ import sys
 import copy
 import numpy
 import tensorflow
-import tensorflow.keras as tf_keras
+import tensorflow.keras
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -24,7 +24,7 @@ from accum_optimizers import Optimizer
 import file_system_utils
 
 optimizer_function = Optimizer(
-    optimizer=tf_keras.optimizers.Nadam(),
+    optimizer=tensorflow.keras.optimizers.Nadam(),
     steps=2
 )
 
@@ -190,17 +190,17 @@ def _run():
                 )
 
                 if num_grad_accum_steps == 1:
-                    optimizer_function = tf_keras.optimizers.Nadam()
-                    optimizer_function_string = 'tf_keras.optimizers.Nadam()'
+                    optimizer_function = tensorflow.keras.optimizers.Nadam()
+                    optimizer_function_string = 'tensorflow.keras.optimizers.Nadam()'
                 else:
                     optimizer_function = Optimizer(
-                        optimizer=tf_keras.optimizers.Nadam(),
+                        optimizer=tensorflow.keras.optimizers.Nadam(),
                         steps=num_grad_accum_steps
                     )
 
                     optimizer_function_string = (
                         'Optimizer('
-                        'optimizer=tf_keras.optimizers.Nadam(), '
+                        'optimizer=tensorflow.keras.optimizers.Nadam(), '
                         'steps={0:d}'
                         ')'
                     ).format(num_grad_accum_steps)
