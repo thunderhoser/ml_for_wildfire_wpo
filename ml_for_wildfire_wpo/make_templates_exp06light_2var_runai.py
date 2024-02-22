@@ -8,6 +8,7 @@ import sys
 import copy
 import numpy
 import keras
+import tensorflow.keras as tf_keras
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -135,7 +136,8 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 1
 }
 
-BATCH_SIZES = numpy.array([8, 16, 24, 32], dtype=int)
+# BATCH_SIZES = numpy.array([8, 16, 24, 32], dtype=int)
+BATCH_SIZES = numpy.array([16, 24, 32], dtype=int)
 DROPOUT_LAYER_COUNTS = numpy.array([1, 2, 3, 4, 5, 6], dtype=int)
 DROPOUT_RATES = numpy.array([0.1, 0.2, 0.3, 0.4, 0.5])
 
@@ -181,17 +183,17 @@ def _run():
                 )
 
                 if num_grad_accum_steps == 1:
-                    optimizer_function = keras.optimizers.Nadam()
-                    optimizer_function_string = 'keras.optimizers.Nadam()'
+                    optimizer_function = tf_keras.optimizers.Nadam()
+                    optimizer_function_string = 'tf_keras.optimizers.Nadam()'
                 else:
                     optimizer_function = Optimizer(
-                        optimizer=keras.optimizers.Nadam(),
+                        optimizer=tf_keras.optimizers.Nadam(),
                         steps=num_grad_accum_steps
                     )
 
                     optimizer_function_string = (
                         'Optimizer('
-                        'optimizer=keras.optimizers.Nadam(), '
+                        'optimizer=tf_keras.optimizers.Nadam(), '
                         'steps={0:d}'
                         ')'
                     ).format(num_grad_accum_steps)
