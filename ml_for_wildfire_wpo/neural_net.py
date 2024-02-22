@@ -2005,8 +2005,8 @@ def train_model(
         early_stopping_patience_epochs=early_stopping_patience_epochs
     )
 
-    model_object.fit_generator(
-        generator=training_generator,
+    model_object.fit(
+        x=training_generator,
         steps_per_epoch=num_training_batches_per_epoch,
         epochs=num_epochs, verbose=1, callbacks=list_of_callback_objects,
         validation_data=validation_generator,
