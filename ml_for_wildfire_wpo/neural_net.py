@@ -8,6 +8,10 @@ import random
 import pickle
 import numpy
 import keras
+import tensorflow
+
+tensorflow.compat.v1.disable_eager_execution()
+
 import tensorflow.keras as tf_keras
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -1864,8 +1868,8 @@ def read_model(hdf5_file_name):
     print(optimizer_function_string)
     if optimizer_function_string.startswith('Optimizer('):
         print('FOOOOOOOOO')
-        import tensorflow
-        tensorflow.compat.v1.disable_eager_execution()
+        # import tensorflow
+        # tensorflow.compat.v1.disable_eager_execution()
 
     model_object.compile(
         loss=custom_object_dict['loss'],
