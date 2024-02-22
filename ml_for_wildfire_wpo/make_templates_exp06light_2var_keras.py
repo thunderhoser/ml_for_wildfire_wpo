@@ -234,7 +234,7 @@ def _run():
                 output_file_name = (
                     '{0:s}/batch-size={1:02d}_'
                     'num-dropout-layers={2:d}_'
-                    'dropout-rate={3:.1f}/model.h5'
+                    'dropout-rate={3:.1f}/model.keras'
                 ).format(
                     OUTPUT_DIR_NAME,
                     BATCH_SIZES[i],

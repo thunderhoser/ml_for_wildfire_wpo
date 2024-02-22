@@ -1852,9 +1852,12 @@ def read_model(hdf5_file_name):
     custom_object_dict = {
         'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
     }
-    model_object = tf_keras.models.load_model(
+    model_object = tf_keras.saving.load_model(
         hdf5_file_name, custom_objects=custom_object_dict, compile=False
     )
+    # model_object = tf_keras.models.load_model(
+    #     hdf5_file_name, custom_objects=custom_object_dict, compile=False
+    # )
 
     metric_function_list = [
         eval(m) for m in metadata_dict[METRIC_FUNCTIONS_KEY]
@@ -1949,7 +1952,7 @@ def train_model(
     training_option_dict = _check_generator_args(training_option_dict)
     validation_option_dict = _check_generator_args(validation_option_dict)
 
-    model_file_name = '{0:s}/model.h5'.format(output_dir_name)
+    model_file_name = '{0:s}/model.keras'.format(output_dir_name)
 
     history_object = keras.callbacks.CSVLogger(
         filename='{0:s}/history.csv'.format(output_dir_name),
