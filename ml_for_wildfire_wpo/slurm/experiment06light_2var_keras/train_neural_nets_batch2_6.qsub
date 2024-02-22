@@ -18,7 +18,7 @@
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
 #SBATCH --output=train_neural_nets_batch2_%A_%a.out
 
-module load cuda/11.2.1
+module load cuda/12.1.0
 conda init
 conda activate base
 
