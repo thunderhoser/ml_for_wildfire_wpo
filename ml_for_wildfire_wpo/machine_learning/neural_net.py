@@ -24,8 +24,6 @@ from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 from ml_for_wildfire_wpo.utils import normalization
 from ml_for_wildfire_wpo.machine_learning import custom_losses
 from ml_for_wildfire_wpo.machine_learning import custom_metrics
-from ml_for_wildfire_wpo.outside_code import gradient_accumulators
-from ml_for_wildfire_wpo.outside_code import accum_grad_optimizer
 
 DATE_FORMAT = '%Y%m%d'
 GRID_SPACING_DEG = 0.25
@@ -455,11 +453,10 @@ def _get_gfs_forecast_target_fields(
         lead_times_days=lead_times_days
     )
     if norm_param_table_xarray is not None:
-        daily_gfs_table_xarray = (
-            normalization.normalize_gfs_fwi_forecasts_to_z_scores(
-                daily_gfs_table_xarray=daily_gfs_table_xarray,
-                z_score_param_table_xarray=norm_param_table_xarray
-            )
+        daily_gfs_table_xarray = normalization.normalize_gfs_fwi_forecasts(
+            daily_gfs_table_xarray=daily_gfs_table_xarray,
+            norm_param_table_xarray=norm_param_table_xarray,
+            use_quantile_norm=False
         )
 
     data_matrix = numpy.stack([
@@ -503,9 +500,10 @@ def _get_target_fields(
         desired_column_indices=desired_column_indices
     )
     if norm_param_table_xarray is not None:
-        fwi_table_xarray = normalization.normalize_targets_to_z_scores(
+        fwi_table_xarray = normalization.normalize_targets(
             fwi_table_xarray=fwi_table_xarray,
-            z_score_param_table_xarray=norm_param_table_xarray
+            norm_param_table_xarray=norm_param_table_xarray,
+            use_quantile_norm=False
         )
 
     data_matrix = numpy.stack([
@@ -639,9 +637,10 @@ def _get_era5_constants(
 
     if norm_param_table_xarray is not None:
         exec_start_time_unix_sec = time.time()
-        ect = normalization.normalize_era5_constants_to_z_scores(
+        ect = normalization.normalize_era5_constants(
             era5_constant_table_xarray=ect,
-            z_score_param_table_xarray=norm_param_table_xarray
+            norm_param_table_xarray=norm_param_table_xarray,
+            use_quantile_norm=False
         )
 
         print('Normalizing ERA5 data took {0:.4f} seconds.'.format(
@@ -739,9 +738,10 @@ def _read_gfs_data_1example(
 
     if norm_param_table_xarray is not None:
         exec_start_time_unix_sec = time.time()
-        gfs_table_xarray = normalization.normalize_gfs_data_to_z_scores(
+        gfs_table_xarray = normalization.normalize_gfs_data(
             gfs_table_xarray=gfs_table_xarray,
-            z_score_param_table_xarray=norm_param_table_xarray
+            norm_param_table_xarray=norm_param_table_xarray,
+            use_quantile_norm=False
         )
 
         print('Normalizing GFS data took {0:.4f} seconds.'.format(
