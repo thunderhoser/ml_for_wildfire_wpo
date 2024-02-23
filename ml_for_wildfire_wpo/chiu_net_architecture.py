@@ -431,8 +431,9 @@ def _create_skip_connection(
     for i in range(len(encoder_conv_layer_objects)):
         this_num_times = encoder_conv_layer_objects[i].shape[1]
 
-        encoder_conv_layer_objects[i] = keras.layers.Cropping1D(
-            cropping=(this_num_times - 1, 0)
+        encoder_conv_layer_objects[i] = keras.layers.Cropping3D(
+            cropping=((this_num_times - 1, 0), (0, 0), (0, 0)),
+            data_format='channels_last'
         )(encoder_conv_layer_objects[i])
 
         # this_function = _get_time_slicing_function(-1)
