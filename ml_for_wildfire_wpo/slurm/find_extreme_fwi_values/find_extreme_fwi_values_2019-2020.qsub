@@ -1,0 +1,38 @@
+#!/bin/bash
+
+#SBATCH --job-name="find_extreme_fwi_values_2019-2020"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=04:00:00
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=find_extreme_fwi_values_2019-2020_%A.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+INPUT_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+NORMALIZATION_FILE_ARG_NAME="${INPUT_DIR_NAME}/normalization_params_2019-2020.nc"
+
+python3 -u "${CODE_DIR_NAME}/find_extreme_fwi_values.py" \
+--input_fwi_dir_name="${INPUT_DIR_NAME}" \
+--input_normalization_file_name="${NORMALIZATION_FILE_ARG_NAME}" \
+--first_valid_date_string="20190101" \
+--last_valid_date_string="20201231" \
+--quantile_level=0.999
