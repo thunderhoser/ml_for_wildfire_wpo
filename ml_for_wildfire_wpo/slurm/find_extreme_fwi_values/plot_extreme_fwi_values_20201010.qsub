@@ -1,0 +1,38 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_extreme_fwi_values_20201010"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=04:00:00
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_extreme_fwi_values_20201010_%A.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+INPUT_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+OUTPUT_DIR_NAME="${INPUT_DIR_NAME}/extreme_value_plots"
+
+python3 -u "${CODE_DIR_NAME}/plot_fwi_fields.py" \
+--input_fwi_dir_name="${INPUT_DIR_NAME}" \
+--valid_date_string="20201010" \
+--field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" \
+--extreme_value_threshold_by_field 98.13 646.7 2064 38.22 691.8 84.19 67.22 \
+--output_dir_name="${OUTPUT_DIR_NAME}"
