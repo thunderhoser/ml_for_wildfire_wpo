@@ -181,9 +181,7 @@ def _run():
 
                 if num_grad_accum_steps == 1:
                     optimizer_function = keras.optimizers.Nadam()
-                    optimizer_function_string = (
-                        'tensorflow.keras.optimizers.Nadam()'
-                    )
+                    optimizer_function_string = 'keras.optimizers.Nadam()'
                 else:
                     optimizer_function = keras.optimizers.Nadam(
                         gradient_accumulation_steps=num_grad_accum_steps
