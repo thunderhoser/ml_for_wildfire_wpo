@@ -431,7 +431,8 @@ def _create_skip_connection(
     for i in range(len(encoder_conv_layer_objects)):
         this_function = _get_time_slicing_function(-1)
         encoder_conv_layer_objects[i] = keras.layers.Lambda(
-            this_function
+            this_function,
+            output_shape=encoder_conv_layer_objects[i].shape[1:]
         )(encoder_conv_layer_objects[i])
 
     this_name = 'skip_level{0:d}'.format(current_level_num)
