@@ -7,7 +7,7 @@ import random
 import pickle
 import numpy
 import keras
-import tensorflow.keras as tf_keras
+from tensorflow.keras.saving import load_model
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import number_rounding
 from gewittergefahr.gg_utils import file_system_utils
@@ -1313,13 +1313,31 @@ def data_generator(option_dict):
             (target_matrix, weight_matrix), axis=-1
         )
 
-        predictor_matrices = [
-            m for m in [
-                gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
-                era5_constant_matrix, laglead_target_predictor_matrix
-            ]
-            if m is not None
-        ]
+        predictor_matrices = {}
+        if gfs_predictor_matrix_3d is not None:
+            predictor_matrices.update({
+                'gfs_3d_inputs': gfs_predictor_matrix_3d.astype('float32')
+            })
+        if gfs_predictor_matrix_2d is not None:
+            predictor_matrices.update({
+                'gfs_2d_inputs': gfs_predictor_matrix_2d.astype('float32')
+            })
+        if era5_constant_matrix is not None:
+            predictor_matrices.update({
+                'era5_inputs': era5_constant_matrix.astype('float32')
+            })
+        if laglead_target_predictor_matrix is not None:
+            predictor_matrices.update({
+                'lagged_target_inputs':
+                    laglead_target_predictor_matrix.astype('float32')
+            })
+
+        print((
+            'Shape of target matrix (including land mask as last channel): '
+            '{0:s}'
+        ).format(
+            str(target_matrix_with_weights.shape)
+        ))
 
         print((
             'Shape of target matrix (including land mask as last channel): '
@@ -1332,7 +1350,7 @@ def data_generator(option_dict):
             numpy.min(target_matrix), numpy.max(target_matrix)
         ))
 
-        predictor_matrices = [p.astype('float32') for p in predictor_matrices]
+        # predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
         yield predictor_matrices, target_matrix_with_weights
 
@@ -1845,7 +1863,7 @@ def read_model(hdf5_file_name):
     custom_object_dict = {
         'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
     }
-    model_object = tf_keras.models.load_model(
+    model_object = load_model(
         hdf5_file_name, custom_objects=custom_object_dict, compile=False
     )
 
@@ -1942,7 +1960,7 @@ def train_model(
     training_option_dict = _check_generator_args(training_option_dict)
     validation_option_dict = _check_generator_args(validation_option_dict)
 
-    model_file_name = '{0:s}/model.h5'.format(output_dir_name)
+    model_file_name = '{0:s}/model.keras'.format(output_dir_name)
 
     history_object = keras.callbacks.CSVLogger(
         filename='{0:s}/history.csv'.format(output_dir_name),
@@ -1950,7 +1968,8 @@ def train_model(
     )
     checkpoint_object = keras.callbacks.ModelCheckpoint(
         filepath=model_file_name, monitor='val_loss', verbose=1,
-        save_best_only=True, save_weights_only=False, mode='min', period=1
+        save_best_only=True, save_weights_only=False, mode='min',
+        save_freq='epoch'
     )
     early_stopping_object = keras.callbacks.EarlyStopping(
         monitor='val_loss', min_delta=0.,
@@ -1994,8 +2013,8 @@ def train_model(
         early_stopping_patience_epochs=early_stopping_patience_epochs
     )
 
-    model_object.fit_generator(
-        generator=training_generator,
+    model_object.fit(
+        x=training_generator,
         steps_per_epoch=num_training_batches_per_epoch,
         epochs=num_epochs, verbose=1, callbacks=list_of_callback_objects,
         validation_data=validation_generator,

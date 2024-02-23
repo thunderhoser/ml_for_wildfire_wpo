@@ -125,6 +125,8 @@ def mean_squared_error_anywhere(channel_index, function_name,
         :return: metric: MSE anywhere.
         """
 
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
                 target_tensor[..., channel_index], axis=-1
@@ -171,6 +173,8 @@ def mean_squared_error_unmasked(channel_index, function_name,
         :param prediction_tensor: Same.
         :return: metric: MSE at unmasked grid cells.
         """
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
@@ -229,6 +233,8 @@ def dual_weighted_mse_anywhere(channel_index, function_name,
         :return: metric: DWMSE anywhere.
         """
 
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
                 target_tensor[..., channel_index], axis=-1
@@ -281,6 +287,8 @@ def dual_weighted_mse_unmasked(channel_index, function_name,
         :param prediction_tensor: Same.
         :return: metric: DWMSE at unmasked grid cells.
         """
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
         if expect_ensemble:
             relevant_target_tensor = K.expand_dims(
