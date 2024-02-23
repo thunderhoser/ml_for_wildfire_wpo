@@ -38,15 +38,15 @@ j=$SLURM_ARRAY_TASK_ID
 while [ $j -le $(( $SLURM_ARRAY_TASK_ID + 9 )) ] && [ $j -lt ${#DATE_STRINGS[@]} ]; do
     echo $j
     
-    # date_string=${DATE_STRINGS[$j]}
+    date_string=${DATE_STRINGS[$j]}
     
-    # python3 -u "${CODE_DIR_NAME}/normalize_gfs_data.py" \
-    # --input_gfs_dir_name="${INPUT_GFS_DIR_NAME}" \
-    # --input_normalization_file_name="${NORMALIZATION_FILE_NAME}" \
-    # --start_date_string="${date_string}" \
-    # --end_date_string="${date_string}" \
-    # --use_quantile_norm=1 \
-    # --output_gfs_dir_name="${OUTPUT_GFS_DIR_NAME}"
+    python3 -u "${CODE_DIR_NAME}/normalize_gfs_data.py" \
+    --input_gfs_dir_name="${INPUT_GFS_DIR_NAME}" \
+    --input_normalization_file_name="${NORMALIZATION_FILE_NAME}" \
+    --start_date_string="${date_string}" \
+    --end_date_string="${date_string}" \
+    --use_quantile_norm=1 \
+    --output_gfs_dir_name="${OUTPUT_GFS_DIR_NAME}"
   
     j=$(( $j + 1 ))
 done
