@@ -1,0 +1,39 @@
+#!/bin/bash
+
+#SBATCH --job-name="get_gfs_normalization_params_test"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=30:00:00
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=get_gfs_normalization_params_test_%A.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+INPUT_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed"
+OUTPUT_FILE_NAME="${INPUT_DIR_NAME}/normalization_params_test.nc"
+
+python3 -u "${CODE_DIR_NAME}/get_norm_params_for_gfs.py" \
+--input_gfs_dir_name="${INPUT_DIR_NAME}" \
+--first_init_date_strings "20190101" "20190108" \
+--last_init_date_strings "20190101" "20190108" \
+--num_quantiles=1001 \
+--num_sample_values_per_file=5000 \
+--output_norm_file_name="${OUTPUT_FILE_NAME}"
