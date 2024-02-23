@@ -14,10 +14,12 @@ def _run(template_file_name, output_dir_name,
          outer_latitude_buffer_deg, outer_longitude_buffer_deg,
          gfs_predictor_field_names, gfs_pressure_levels_mb,
          gfs_predictor_lead_times_hours, gfs_normalization_file_name,
+         gfs_use_quantile_norm,
          era5_constant_file_name, era5_constant_predictor_field_names,
-         era5_normalization_file_name,
+         era5_normalization_file_name, era5_use_quantile_norm,
          target_field_names, target_lead_time_days, target_lag_times_days,
          gfs_forecast_target_lead_times_days, target_normalization_file_name,
+         targets_use_quantile_norm,
          num_examples_per_batch, sentinel_value,
          gfs_dir_name_for_training, target_dir_name_for_training,
          gfs_forecast_target_dir_name_for_training,
@@ -43,14 +45,17 @@ def _run(template_file_name, output_dir_name,
     :param gfs_pressure_levels_mb: Same.
     :param gfs_predictor_lead_times_hours: Same.
     :param gfs_normalization_file_name: Same.
+    :param gfs_use_quantile_norm: Same.
     :param era5_constant_file_name: Same.
     :param era5_constant_predictor_field_names: Same.
     :param era5_normalization_file_name: Same.
+    :param era5_use_quantile_norm: Same.
     :param target_field_names: Same.
     :param target_lead_time_days: Same.
     :param target_lag_times_days: Same.
     :param gfs_forecast_target_lead_times_days: Same.
     :param target_normalization_file_name: Same.
+    :param targets_use_quantile_norm: Same.
     :param num_examples_per_batch: Same.
     :param sentinel_value: Same.
     :param gfs_dir_name_for_training: Same.
@@ -112,16 +117,19 @@ def _run(template_file_name, output_dir_name,
         neural_net.GFS_PRESSURE_LEVELS_KEY: gfs_pressure_levels_mb,
         neural_net.GFS_PREDICTOR_LEADS_KEY: gfs_predictor_lead_times_hours,
         neural_net.GFS_NORM_FILE_KEY: gfs_normalization_file_name,
+        neural_net.GFS_USE_QUANTILE_NORM_KEY: gfs_use_quantile_norm,
         neural_net.ERA5_CONSTANT_PREDICTOR_FIELDS_KEY:
             era5_constant_predictor_field_names,
         neural_net.ERA5_CONSTANT_FILE_KEY: era5_constant_file_name,
         neural_net.ERA5_NORM_FILE_KEY: era5_normalization_file_name,
+        neural_net.ERA5_USE_QUANTILE_NORM_KEY: era5_use_quantile_norm,
         neural_net.TARGET_FIELDS_KEY: target_field_names,
         neural_net.TARGET_LEAD_TIME_KEY: target_lead_time_days,
         neural_net.TARGET_LAG_TIMES_KEY: target_lag_times_days,
         neural_net.GFS_FCST_TARGET_LEAD_TIMES_KEY:
             gfs_forecast_target_lead_times_days,
         neural_net.TARGET_NORM_FILE_KEY: target_normalization_file_name,
+        neural_net.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
         neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
         neural_net.SENTINEL_VALUE_KEY: sentinel_value,
         neural_net.INIT_DATE_LIMITS_KEY: init_date_limit_strings_for_training,
@@ -213,6 +221,9 @@ if __name__ == '__main__':
         gfs_normalization_file_name=getattr(
             INPUT_ARG_OBJECT, training_args.GFS_NORM_FILE_ARG_NAME
         ),
+        gfs_use_quantile_norm=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.GFS_USE_QUANTILE_NORM_ARG_NAME
+        )),
         era5_constant_file_name=getattr(
             INPUT_ARG_OBJECT, training_args.ERA5_CONSTANT_FILE_ARG_NAME
         ),
@@ -222,6 +233,9 @@ if __name__ == '__main__':
         era5_normalization_file_name=getattr(
             INPUT_ARG_OBJECT, training_args.ERA5_NORM_FILE_ARG_NAME
         ),
+        era5_use_quantile_norm=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.ERA5_USE_QUANTILE_NORM_ARG_NAME
+        )),
         target_field_names=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_FIELDS_ARG_NAME
         ),
@@ -242,6 +256,9 @@ if __name__ == '__main__':
         target_normalization_file_name=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_NORM_FILE_ARG_NAME
         ),
+        targets_use_quantile_norm=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.TARGETS_USE_QUANTILE_NORM_ARG_NAME
+        )),
         num_examples_per_batch=getattr(
             INPUT_ARG_OBJECT, training_args.BATCH_SIZE_ARG_NAME
         ),

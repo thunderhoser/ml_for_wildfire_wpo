@@ -30,6 +30,7 @@ FIGURE_RESOLUTION_DPI = 300
 
 INPUT_DIR_ARG_NAME = 'input_dir_name'
 NORMALIZATION_FILE_ARG_NAME = 'input_normalization_file_name'
+USE_QUANTILE_NORM_ARG_NAME = 'use_quantile_norm'
 FIELDS_ARG_NAME = 'field_names'
 PRESSURE_LEVELS_ARG_NAME = 'pressure_levels_mb'
 INIT_DATES_ARG_NAME = 'init_date_strings'
@@ -48,6 +49,12 @@ NORMALIZATION_FILE_HELP_STRING = (
     'before plotting, if necessary.  If {0:s} contains unnormalized GFS data '
     'already, leave this argument alone.'
 ).format(INPUT_DIR_ARG_NAME)
+
+USE_QUANTILE_NORM_HELP_STRING = (
+    '[used only if {0:s} is not empty] Boolean flag.  If 1, will assume that '
+    'two-step normalization was used, beginning with quantile normalization.  '
+    'If 0, will assume that simple z-score transformation was used.'
+).format(NORMALIZATION_FILE_ARG_NAME)
 
 FIELDS_HELP_STRING = 'List of fields to plot.'
 PRESSURE_LEVELS_HELP_STRING = (
@@ -77,6 +84,10 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + NORMALIZATION_FILE_ARG_NAME, type=str, required=False, default='',
     help=NORMALIZATION_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + USE_QUANTILE_NORM_ARG_NAME, type=int, required=False, default=0,
+    help=USE_QUANTILE_NORM_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + FIELDS_ARG_NAME, type=str, nargs='+', required=True,
@@ -227,8 +238,8 @@ def _plot_one_field(
     pyplot.close(figure_object)
 
 
-def _run(input_dir_name, normalization_file_name, field_names,
-         pressure_levels_mb, init_date_strings, forecast_hours,
+def _run(input_dir_name, normalization_file_name, use_quantile_norm,
+         field_names, pressure_levels_mb, init_date_strings, forecast_hours,
          min_colour_percentile, max_colour_percentile, output_dir_name):
     """Plots GFS data (model output).
 
@@ -236,6 +247,7 @@ def _run(input_dir_name, normalization_file_name, field_names,
 
     :param input_dir_name: See documentation at top of file.
     :param normalization_file_name: Same.
+    :param use_quantile_norm: Same.
     :param field_names: Same.
     :param pressure_levels_mb: Same.
     :param init_date_strings: Same.
@@ -298,9 +310,10 @@ def _run(input_dir_name, normalization_file_name, field_names,
         gfs_table_xarray = gfs_io.read_file(gfs_file_name)
 
         if norm_param_table_xarray is not None:
-            gfs_table_xarray = normalization.denormalize_gfs_data_from_z_scores(
+            gfs_table_xarray = normalization.denormalize_gfs_data(
                 gfs_table_xarray=gfs_table_xarray,
-                z_score_param_table_xarray=norm_param_table_xarray
+                norm_param_table_xarray=norm_param_table_xarray,
+                use_quantile_norm=use_quantile_norm
             )
 
         gfstx = gfs_table_xarray
@@ -428,6 +441,9 @@ if __name__ == '__main__':
         normalization_file_name=getattr(
             INPUT_ARG_OBJECT, NORMALIZATION_FILE_ARG_NAME
         ),
+        use_quantile_norm=bool(getattr(
+            INPUT_ARG_OBJECT, USE_QUANTILE_NORM_ARG_NAME
+        )),
         field_names=getattr(INPUT_ARG_OBJECT, FIELDS_ARG_NAME),
         pressure_levels_mb=numpy.array(
             getattr(INPUT_ARG_OBJECT, PRESSURE_LEVELS_ARG_NAME), dtype=int

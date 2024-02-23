@@ -11,14 +11,17 @@ GFS_PREDICTORS_ARG_NAME = 'gfs_predictor_field_names'
 GFS_PRESSURE_LEVELS_ARG_NAME = 'gfs_pressure_levels_mb'
 GFS_PREDICTOR_LEADS_ARG_NAME = 'gfs_predictor_lead_times_hours'
 GFS_NORM_FILE_ARG_NAME = 'gfs_normalization_file_name'
+GFS_USE_QUANTILE_NORM_ARG_NAME = 'gfs_use_quantile_norm'
 ERA5_CONSTANT_FILE_ARG_NAME = 'era5_constant_file_name'
 ERA5_CONSTANT_PREDICTORS_ARG_NAME = 'era5_constant_predictor_field_names'
 ERA5_NORM_FILE_ARG_NAME = 'era5_normalization_file_name'
+ERA5_USE_QUANTILE_NORM_ARG_NAME = 'era5_use_quantile_norm'
 TARGET_FIELDS_ARG_NAME = 'target_field_names'
 TARGET_LEAD_TIME_ARG_NAME = 'target_lead_time_days'
 TARGET_LAG_TIMES_ARG_NAME = 'target_lag_times_days'
 GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME = 'gfs_forecast_target_lead_times_days'
 TARGET_NORM_FILE_ARG_NAME = 'target_normalization_file_name'
+TARGETS_USE_QUANTILE_NORM_ARG_NAME = 'targets_use_quantile_norm'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
 
@@ -81,6 +84,11 @@ GFS_NORM_FILE_HELP_STRING = (
     'by `gfs_io.read_normalization_file`).  If you do not want to normalize '
     'GFS predictors, leave this argument alone.'
 )
+GFS_USE_QUANTILE_NORM_HELP_STRING = (
+    'Boolean flag.  If 1, GFS predictors will be converted to quantiles and '
+    'then quantiles will be converted to standard normal distribution.  If 0, '
+    'will convert straight to z-scores.'
+)
 ERA5_CONSTANT_PREDICTORS_HELP_STRING = (
     'List with names of ERA5-constant fields to be used as predictors.  If you '
     'do not want to use ERA5, leave this argument alone.'
@@ -94,6 +102,9 @@ ERA5_NORM_FILE_HELP_STRING = (
     'Path to file with normalization params for ERA5-constant predictors (will '
     'be read by `era5_constant_io.read_normalization_file`).  If you do not '
     'want to normalize ERA5 predictors, leave this argument alone.'
+)
+ERA5_USE_QUANTILE_NORM_HELP_STRING = 'Same as {0:s} but for ERA5 data.'.format(
+    GFS_USE_QUANTILE_NORM_ARG_NAME
 )
 TARGET_FIELDS_HELP_STRING = 'List of target fields (fire-weather indices).'
 TARGET_LEAD_TIME_HELP_STRING = 'Lead time for target field.'
@@ -109,6 +120,11 @@ TARGET_NORM_FILE_HELP_STRING = (
     'Path to file with normalization params for lagged-target predictors (will '
     'be read by `canadian_fwi_io.read_normalization_file`).  If you do not '
     'want to normalize lagged-target predictors, leave this argument alone.'
+)
+TARGETS_USE_QUANTILE_NORM_HELP_STRING = (
+    'Same as {0:s} but for target fields.'
+).format(
+    GFS_USE_QUANTILE_NORM_ARG_NAME
 )
 BATCH_SIZE_HELP_STRING = 'Number of data examples per batch.'
 SENTINEL_VALUE_HELP_STRING = (
@@ -217,6 +233,10 @@ def add_input_args(parser_object):
         required=False, default='', help=GFS_NORM_FILE_HELP_STRING
     )
     parser_object.add_argument(
+        '--' + GFS_USE_QUANTILE_NORM_ARG_NAME, type=int,
+        required=False, default=0, help=GFS_USE_QUANTILE_NORM_HELP_STRING
+    )
+    parser_object.add_argument(
         '--' + ERA5_CONSTANT_FILE_ARG_NAME, type=str,
         required=False, default='', help=ERA5_CONSTANT_FILE_HELP_STRING
     )
@@ -227,6 +247,10 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + ERA5_NORM_FILE_ARG_NAME, type=str,
         required=False, default='', help=ERA5_NORM_FILE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + ERA5_USE_QUANTILE_NORM_ARG_NAME, type=int,
+        required=False, default=0, help=ERA5_USE_QUANTILE_NORM_HELP_STRING
     )
     parser_object.add_argument(
         '--' + TARGET_FIELDS_ARG_NAME, type=str, nargs='+',
@@ -247,6 +271,10 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + TARGET_NORM_FILE_ARG_NAME, type=str,
         required=False, default='', help=TARGET_NORM_FILE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + TARGETS_USE_QUANTILE_NORM_ARG_NAME, type=int,
+        required=False, default=0, help=TARGETS_USE_QUANTILE_NORM_HELP_STRING
     )
     parser_object.add_argument(
         '--' + BATCH_SIZE_ARG_NAME, type=int,
