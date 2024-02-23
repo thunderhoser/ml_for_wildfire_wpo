@@ -1,4 +1,4 @@
-"""Makes templates for Experiment 6-light with FFMC/BUI regression.
+"""Makes templates for Experiment 6 with Chiu-net++ arch and 2 target vars.
 
 Using Keras implementation of gradient accumulation!
 """
@@ -23,7 +23,7 @@ import file_system_utils
 
 OUTPUT_DIR_NAME = (
     '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/'
-    'experiment06light_2var_keras/templates'
+    'experiment06plusplus_grad_accum_2var/templates'
 )
 
 # TODO(thunderhoser): Weights are subject to change!
@@ -135,7 +135,6 @@ DEFAULT_OPTION_DICT = {
 }
 
 BATCH_SIZES = numpy.array([8, 16, 24, 32], dtype=int)
-# BATCH_SIZES = numpy.array([16, 24, 32], dtype=int)
 DROPOUT_LAYER_COUNTS = numpy.array([1, 2, 3, 4, 5, 6], dtype=int)
 DROPOUT_RATES = numpy.array([0.1, 0.2, 0.3, 0.4, 0.5])
 
@@ -166,7 +165,7 @@ DROPOUT_COUNT_TO_UPCONV_DROPOUT_COUNT = {
 
 
 def _run():
-    """Makes templates for Experiment 6-light with FFMC/BUI regression.
+    """Makes templates for Experiment 6 with Chiu-net++ arch and 2 target vars.
 
     This is effectively the main method.
     """
