@@ -1,7 +1,6 @@
-"""Makes templates for Experiment 6-light with FFMC/BUI regression.
+"""Makes templates for Experiment 6 with Chiu-net arch and 2 target vars.
 
-Same as Experiment 5-light, except with Chiu-net++ instead of basic Chiu net.
-Also, this experiment uses ERA5 constants!
+Using Keras implementation of gradient accumulation!
 """
 
 import os
@@ -18,14 +17,13 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import custom_losses
 import custom_metrics
 import neural_net
-import chiu_net_pp_architecture as chiu_net_pp_arch
+import chiu_net_architecture as chiu_net_arch
 import architecture_utils
-import accum_grad_optimizer
 import file_system_utils
 
 OUTPUT_DIR_NAME = (
     '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/'
-    'experiment06light_2var_regression/templates'
+    'experiment06_grad_accum_2var/templates'
 )
 
 # TODO(thunderhoser): Weights are subject to change!
@@ -76,64 +74,64 @@ METRIC_FUNCTION_STRINGS = [
     'custom_losses.dual_weighted_mse_1channel(channel_index=1, channel_weight=0.1, expect_ensemble=False, function_name="bui_dwmse_in_loss")'
 ]
 
-NUM_CONV_LAYERS_PER_BLOCK = 2
-NUM_FIRST_LAYER_FILTERS = 20
-NUM_GFS_LEAD_TIMES = 2
+NUM_CONV_LAYERS_PER_BLOCK = 1
+NUM_FIRST_LAYER_FILTERS = 30
+NUM_GFS_LEAD_TIMES = 7
 
 DEFAULT_OPTION_DICT = {
-    chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY: numpy.array(
-        [265, 537, 2, NUM_GFS_LEAD_TIMES, 5], dtype=int
+    chiu_net_arch.GFS_3D_DIMENSIONS_KEY: numpy.array(
+        [265, 537, 3, NUM_GFS_LEAD_TIMES, 5], dtype=int
     ),
-    chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
+    chiu_net_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
         [265, 537, NUM_GFS_LEAD_TIMES, 7], dtype=int
     ),
-    # chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: None,
-    chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
+    # chiu_net_arch.ERA5_CONST_DIMENSIONS_KEY: None,
+    chiu_net_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
         [265, 537, 7], dtype=int
     ),
-    chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
+    chiu_net_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
         [265, 537, 6, 2], dtype=int
     ),
-    chiu_net_pp_arch.GFS_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
-    chiu_net_pp_arch.GFS_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
-    chiu_net_pp_arch.GFS_FC_MODULE_USE_3D_CONV: True,
-    chiu_net_pp_arch.LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
-    chiu_net_pp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
-    chiu_net_pp_arch.LAGTGT_FC_MODULE_USE_3D_CONV: True,
-    chiu_net_pp_arch.NUM_LEVELS_KEY: 6,
-    chiu_net_pp_arch.GFS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
+    chiu_net_arch.GFS_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
+    chiu_net_arch.GFS_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
+    chiu_net_arch.GFS_FC_MODULE_USE_3D_CONV: True,
+    chiu_net_arch.LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
+    chiu_net_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
+    chiu_net_arch.LAGTGT_FC_MODULE_USE_3D_CONV: True,
+    chiu_net_arch.NUM_LEVELS_KEY: 6,
+    chiu_net_arch.GFS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
         7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
     ),
-    # chiu_net_pp_arch.GFS_ENCODER_NUM_CHANNELS_KEY:
+    # chiu_net_arch.GFS_ENCODER_NUM_CHANNELS_KEY:
     #     NUM_FIRST_LAYER_FILTERS * numpy.array([1, 2, 3, 4, 5, 6, 7], dtype=int),
-    chiu_net_pp_arch.GFS_ENCODER_NUM_CHANNELS_KEY:
+    chiu_net_arch.GFS_ENCODER_NUM_CHANNELS_KEY:
         numpy.array([10, 15, 20, 25, 30, 35, 40], dtype=int),
-    chiu_net_pp_arch.GFS_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
-    chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
+    chiu_net_arch.GFS_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
+    chiu_net_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
         7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
     ),
-    chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY:
+    chiu_net_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY:
         numpy.array([6, 8, 10, 12, 14, 16, 18], dtype=int),
-    chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
-    chiu_net_pp_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(6, 2, dtype=int),
-    # chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY:
+    chiu_net_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
+    chiu_net_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(6, 2, dtype=int),
+    # chiu_net_arch.DECODER_NUM_CHANNELS_KEY:
     #     int(numpy.round(1.25 * NUM_FIRST_LAYER_FILTERS)) *
     #     numpy.array([1, 2, 3, 4, 5, 6], dtype=int),
-    chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY:
+    chiu_net_arch.DECODER_NUM_CHANNELS_KEY:
         numpy.array([16, 23, 30, 37, 44, 51], dtype=int),
-    # chiu_net_pp_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(6, 0.),
-    # chiu_net_pp_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(6, 0.),
-    chiu_net_pp_arch.INCLUDE_PENULTIMATE_KEY: False,
-    chiu_net_pp_arch.INNER_ACTIV_FUNCTION_KEY:
+    # chiu_net_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(6, 0.),
+    # chiu_net_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(6, 0.),
+    chiu_net_arch.INCLUDE_PENULTIMATE_KEY: False,
+    chiu_net_arch.INNER_ACTIV_FUNCTION_KEY:
         architecture_utils.RELU_FUNCTION_STRING,
-    chiu_net_pp_arch.INNER_ACTIV_FUNCTION_ALPHA_KEY: 0.2,
-    chiu_net_pp_arch.OUTPUT_ACTIV_FUNCTION_KEY:
+    chiu_net_arch.INNER_ACTIV_FUNCTION_ALPHA_KEY: 0.2,
+    chiu_net_arch.OUTPUT_ACTIV_FUNCTION_KEY:
         architecture_utils.RELU_FUNCTION_STRING,
-    chiu_net_pp_arch.OUTPUT_ACTIV_FUNCTION_ALPHA_KEY: 0.,
-    chiu_net_pp_arch.L1_WEIGHT_KEY: 0.,
-    chiu_net_pp_arch.L2_WEIGHT_KEY: 1e-6,
-    chiu_net_pp_arch.USE_BATCH_NORM_KEY: True,
-    chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 1
+    chiu_net_arch.OUTPUT_ACTIV_FUNCTION_ALPHA_KEY: 0.,
+    chiu_net_arch.L1_WEIGHT_KEY: 0.,
+    chiu_net_arch.L2_WEIGHT_KEY: 1e-6,
+    chiu_net_arch.USE_BATCH_NORM_KEY: True,
+    chiu_net_arch.ENSEMBLE_SIZE_KEY: 1
 }
 
 BATCH_SIZES = numpy.array([8, 16, 24, 32], dtype=int)
@@ -167,7 +165,7 @@ DROPOUT_COUNT_TO_UPCONV_DROPOUT_COUNT = {
 
 
 def _run():
-    """Makes templates for Experiment 6-light with FFMC/BUI regression.
+    """Makes templates for Experiment 6 with Chiu-net arch and 2 target vars.
 
     This is effectively the main method.
     """
@@ -183,19 +181,17 @@ def _run():
 
                 if num_grad_accum_steps == 1:
                     optimizer_function = keras.optimizers.Nadam()
-                    optimizer_function_string = 'keras.optimizers.Nadam()'
+                    optimizer_function_string = (
+                        'tensorflow.keras.optimizers.Nadam()'
+                    )
                 else:
-                    optimizer_function = accum_grad_optimizer.convert_to_accumulate_gradient_optimizer(
-                        orig_optimizer=keras.optimizers.Nadam(),
-                        update_params_frequency=num_grad_accum_steps,
-                        accumulate_sum_or_mean=False
+                    optimizer_function = keras.optimizers.Nadam(
+                        gradient_accumulation_steps=num_grad_accum_steps
                     )
 
                     optimizer_function_string = (
-                        'accum_grad_optimizer.convert_to_accumulate_gradient_optimizer('
-                        'orig_optimizer=keras.optimizers.Nadam(), '
-                        'update_params_frequency={0:d}, '
-                        'accumulate_sum_or_mean=False'
+                        'keras.optimizers.Nadam('
+                        'gradient_accumulation_steps={0:d}'
                         ')'
                     ).format(num_grad_accum_steps)
 
@@ -222,13 +218,13 @@ def _run():
                     )
 
                 option_dict.update({
-                    chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: optimizer_function,
-                    chiu_net_pp_arch.UPSAMPLING_DROPOUT_RATES_KEY:
+                    chiu_net_arch.OPTIMIZER_FUNCTION_KEY: optimizer_function,
+                    chiu_net_arch.UPSAMPLING_DROPOUT_RATES_KEY:
                         upsampling_dropout_rates,
-                    chiu_net_pp_arch.SKIP_DROPOUT_RATES_KEY: skip_dropout_rates
+                    chiu_net_arch.SKIP_DROPOUT_RATES_KEY: skip_dropout_rates
                 })
 
-                model_object = chiu_net_pp_arch.create_model(
+                model_object = chiu_net_arch.create_model(
                     option_dict=option_dict,
                     loss_function=LOSS_FUNCTION,
                     metric_list=METRIC_FUNCTIONS
@@ -237,7 +233,7 @@ def _run():
                 output_file_name = (
                     '{0:s}/batch-size={1:02d}_'
                     'num-dropout-layers={2:d}_'
-                    'dropout-rate={3:.1f}/model.h5'
+                    'dropout-rate={3:.1f}/model.keras'
                 ).format(
                     OUTPUT_DIR_NAME,
                     BATCH_SIZES[i],
