@@ -41,7 +41,7 @@ while [ $j -le $(( $SLURM_ARRAY_TASK_ID + 6 )) ] && [ $j -lt ${#DATE_STRINGS[@]}
     
     python3 -u "${CODE_DIR_NAME}/plot_fwi_fields.py" \
     --input_fwi_dir_name="${INPUT_DIR_NAME}" \
-    --valid_date_string="date_string" \
+    --valid_date_string="${date_string}" \
     --field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" \
     --extreme_value_threshold_by_field 98.13 646.7 2064 38.22 691.8 84.19 67.22 \
     --output_dir_name="${OUTPUT_DIR_NAME}"
