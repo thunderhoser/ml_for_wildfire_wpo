@@ -134,8 +134,8 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 1
 }
 
-# BATCH_SIZES = numpy.array([8, 16, 24, 32], dtype=int)
-BATCH_SIZES = numpy.array([16, 24, 32], dtype=int)
+BATCH_SIZES = numpy.array([8, 16, 24, 32], dtype=int)
+# BATCH_SIZES = numpy.array([16, 24, 32], dtype=int)
 DROPOUT_LAYER_COUNTS = numpy.array([1, 2, 3, 4, 5, 6], dtype=int)
 DROPOUT_RATES = numpy.array([0.1, 0.2, 0.3, 0.4, 0.5])
 
