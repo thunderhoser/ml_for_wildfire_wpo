@@ -109,8 +109,12 @@ def plot_grid_lines(
         rotation=90.
     )
 
+    # axes_object.grid(
+    #     b=True, which='major', axis='both', linestyle='--',
+    #     linewidth=GRID_LINE_WIDTH, color=GRID_LINE_COLOUR
+    # )
     axes_object.grid(
-        b=True, which='major', axis='both', linestyle='--',
+        which='major', axis='both', linestyle='--',
         linewidth=GRID_LINE_WIDTH, color=GRID_LINE_COLOUR
     )
 
