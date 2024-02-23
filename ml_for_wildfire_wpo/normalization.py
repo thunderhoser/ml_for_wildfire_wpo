@@ -697,7 +697,7 @@ def get_normalization_params_for_era5_const(era5_constant_file_name,
             norm_param_dict=norm_param_dict_dict[field_names[j]],
             new_data_matrix=e5ct[era5_constant_utils.DATA_KEY].values[..., j],
             num_sample_values_per_file=num_sample_values_total,
-            file_index=1
+            file_index=0
         )
 
     num_fields = len(field_names)
