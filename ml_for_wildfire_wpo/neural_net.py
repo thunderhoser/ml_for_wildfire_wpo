@@ -47,9 +47,11 @@ GFS_PRESSURE_LEVELS_KEY = 'gfs_pressure_levels_mb'
 GFS_PREDICTOR_LEADS_KEY = 'gfs_predictor_lead_times_hours'
 GFS_DIRECTORY_KEY = 'gfs_directory_name'
 GFS_NORM_FILE_KEY = 'gfs_normalization_file_name'
+GFS_USE_QUANTILE_NORM_KEY = 'gfs_use_quantile_norm'
 ERA5_CONSTANT_PREDICTOR_FIELDS_KEY = 'era5_constant_predictor_field_names'
 ERA5_CONSTANT_FILE_KEY = 'era5_constant_file_name'
 ERA5_NORM_FILE_KEY = 'era5_normalization_file_name'
+ERA5_USE_QUANTILE_NORM_KEY = 'era5_use_quantile_norm'
 TARGET_FIELDS_KEY = 'target_field_names'
 TARGET_LEAD_TIME_KEY = 'target_lead_time_days'
 TARGET_LAG_TIMES_KEY = 'target_lag_times_days'
@@ -57,6 +59,7 @@ GFS_FCST_TARGET_LEAD_TIMES_KEY = 'gfs_forecast_target_lead_times_days'
 TARGET_DIRECTORY_KEY = 'target_dir_name'
 GFS_FORECAST_TARGET_DIR_KEY = 'gfs_forecast_target_dir_name'
 TARGET_NORM_FILE_KEY = 'target_normalization_file_name'
+TARGETS_USE_QUANTILE_NORM_KEY = 'targets_use_quantile_norm'
 BATCH_SIZE_KEY = 'num_examples_per_batch'
 SENTINEL_VALUE_KEY = 'sentinel_value'
 
@@ -193,8 +196,11 @@ def _check_generator_args(option_dict):
     )
 
     error_checking.assert_directory_exists(option_dict[GFS_DIRECTORY_KEY])
-    if option_dict[GFS_NORM_FILE_KEY] is not None:
+    if option_dict[GFS_NORM_FILE_KEY] is None:
+        option_dict[GFS_USE_QUANTILE_NORM_KEY] = False
+    else:
         error_checking.assert_file_exists(option_dict[GFS_NORM_FILE_KEY])
+        error_checking.assert_is_boolean(option_dict[GFS_USE_QUANTILE_NORM_KEY])
 
     if option_dict[ERA5_CONSTANT_PREDICTOR_FIELDS_KEY] is not None:
         error_checking.assert_is_string_list(
@@ -205,8 +211,13 @@ def _check_generator_args(option_dict):
 
     if option_dict[ERA5_CONSTANT_FILE_KEY] is not None:
         error_checking.assert_file_exists(option_dict[ERA5_CONSTANT_FILE_KEY])
-    if option_dict[ERA5_NORM_FILE_KEY] is not None:
+    if option_dict[ERA5_NORM_FILE_KEY] is None:
+        option_dict[ERA5_USE_QUANTILE_NORM_KEY] = False
+    else:
         error_checking.assert_file_exists(option_dict[ERA5_NORM_FILE_KEY])
+        error_checking.assert_is_boolean(
+            option_dict[ERA5_USE_QUANTILE_NORM_KEY]
+        )
 
     error_checking.assert_is_string_list(option_dict[TARGET_FIELDS_KEY])
     for this_field_name in option_dict[TARGET_FIELDS_KEY]:
@@ -247,9 +258,14 @@ def _check_generator_args(option_dict):
         )
 
     error_checking.assert_directory_exists(option_dict[TARGET_DIRECTORY_KEY])
-    if option_dict[TARGET_NORM_FILE_KEY] is not None:
+    if option_dict[TARGET_NORM_FILE_KEY] is None:
+        option_dict[TARGETS_USE_QUANTILE_NORM_KEY] = False
+    else:
         error_checking.assert_file_exists(
             option_dict[TARGET_NORM_FILE_KEY]
+        )
+        error_checking.assert_is_boolean(
+            option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
         )
 
     error_checking.assert_is_integer(option_dict[BATCH_SIZE_KEY])
@@ -426,7 +442,7 @@ def _pad_inner_to_outer_domain(
 def _get_gfs_forecast_target_fields(
         daily_gfs_file_name, lead_times_days,
         desired_row_indices, desired_column_indices,
-        field_names, norm_param_table_xarray):
+        field_names, norm_param_table_xarray, use_quantile_norm):
     """Reads GFS-forecast target fields from one file.
 
     M = number of rows in grid
@@ -441,6 +457,8 @@ def _get_gfs_forecast_target_fields(
     :param field_names: length-T list of field names.
     :param norm_param_table_xarray: xarray table with normalization parameters.
         If you do not want normalization, make this None.
+    :param use_quantile_norm: Boolean flag.  If True, will use quantile
+        normalization before converting to z-scores.
     :return: data_matrix: M-by-N-by-L-by-T numpy array of data values.
     """
 
@@ -463,7 +481,7 @@ def _get_gfs_forecast_target_fields(
         daily_gfs_table_xarray = normalization.normalize_gfs_fwi_forecasts(
             daily_gfs_table_xarray=daily_gfs_table_xarray,
             norm_param_table_xarray=norm_param_table_xarray,
-            use_quantile_norm=False
+            use_quantile_norm=use_quantile_norm
         )
 
     data_matrix = numpy.stack([
@@ -479,7 +497,7 @@ def _get_gfs_forecast_target_fields(
 
 def _get_target_fields(
         target_file_name, desired_row_indices, desired_column_indices,
-        field_names, norm_param_table_xarray):
+        field_names, norm_param_table_xarray, use_quantile_norm):
     """Reads target fields from one file.
 
     M = number of rows in grid
@@ -492,6 +510,8 @@ def _get_target_fields(
     :param field_names: length-T list of field names.
     :param norm_param_table_xarray: xarray table with normalization parameters.
         If you do not want normalization, make this None.
+    :param use_quantile_norm: Boolean flag.  If True, will use quantile
+        normalization before converting to z-scores.
     :return: data_matrix: M-by-N-by-T numpy array of data values.
     """
 
@@ -510,7 +530,7 @@ def _get_target_fields(
         fwi_table_xarray = normalization.normalize_targets(
             fwi_table_xarray=fwi_table_xarray,
             norm_param_table_xarray=norm_param_table_xarray,
-            use_quantile_norm=False
+            use_quantile_norm=use_quantile_norm
         )
 
     data_matrix = numpy.stack([
@@ -596,7 +616,7 @@ def _create_weight_matrix(
 
 def _get_era5_constants(
         era5_constant_file_name, latitude_limits_deg_n, longitude_limits_deg_e,
-        field_names, norm_param_table_xarray):
+        field_names, norm_param_table_xarray, use_quantile_norm):
     """Reads ERA5 constants.
 
     M = number of rows in grid
@@ -611,6 +631,8 @@ def _get_era5_constants(
         parameters, in format returned by
         `era5_constant_io.read_normalization_file`.  If you do not want
         normalization, make this None.
+    :param use_quantile_norm: Boolean flag.  If True, will use quantile
+        normalization before converting to z-scores.
     :return: predictor_matrix: M-by-N-by-F numpy array with ERA5 constants to
         use as predictors.
     """
@@ -647,7 +669,7 @@ def _get_era5_constants(
         ect = normalization.normalize_era5_constants(
             era5_constant_table_xarray=ect,
             norm_param_table_xarray=norm_param_table_xarray,
-            use_quantile_norm=False
+            use_quantile_norm=use_quantile_norm
         )
 
         print('Normalizing ERA5 data took {0:.4f} seconds.'.format(
@@ -665,7 +687,8 @@ def _get_era5_constants(
 def _read_gfs_data_1example(
         gfs_file_name, desired_row_indices, desired_column_indices,
         latitude_limits_deg_n, longitude_limits_deg_e, lead_times_hours,
-        field_names, pressure_levels_mb, norm_param_table_xarray):
+        field_names, pressure_levels_mb, norm_param_table_xarray,
+        use_quantile_norm):
     """Reads GFS data for one example.
 
     M = number of rows in grid
@@ -693,6 +716,8 @@ def _read_gfs_data_1example(
     :param norm_param_table_xarray: xarray table with normalization
         parameters, in format returned by `gfs_io.read_normalization_file`.  If
         you do not want normalization, make this None.
+    :param use_quantile_norm: Boolean flag.  If True, will use quantile
+        normalization before converting to z-scores.
     :return: predictor_matrix_3d: None or an M-by-N-by-L-by-P-by-FFF numpy
         array.
     :return: predictor_matrix_2d: None or an M-by-N-by-L-by-FF numpy array.
@@ -748,7 +773,7 @@ def _read_gfs_data_1example(
         gfs_table_xarray = normalization.normalize_gfs_data(
             gfs_table_xarray=gfs_table_xarray,
             norm_param_table_xarray=norm_param_table_xarray,
-            use_quantile_norm=False
+            use_quantile_norm=use_quantile_norm
         )
 
         print('Normalizing GFS data took {0:.4f} seconds.'.format(
@@ -775,7 +800,7 @@ def _read_gfs_forecast_targets_1example(
         daily_gfs_dir_name, init_date_string, target_lead_times_days,
         desired_row_indices, desired_column_indices,
         latitude_limits_deg_n, longitude_limits_deg_e,
-        target_field_names, norm_param_table_xarray):
+        target_field_names, norm_param_table_xarray, use_quantile_norm):
     """Reads raw-GFS-forecast target fields for one example.
 
     m = number of rows in grid
@@ -794,6 +819,7 @@ def _read_gfs_forecast_targets_1example(
     :param longitude_limits_deg_e: Same.
     :param target_field_names: Same.
     :param norm_param_table_xarray: Same.
+    :param use_quantile_norm: Same.
     :return: target_field_matrix: m-by-n-by-l-by-T numpy array.
     :return: desired_row_indices: See input documentation.
     :return: desired_column_indices: See input documentation.
@@ -829,7 +855,8 @@ def _read_gfs_forecast_targets_1example(
         desired_row_indices=desired_row_indices,
         desired_column_indices=desired_column_indices,
         field_names=target_field_names,
-        norm_param_table_xarray=norm_param_table_xarray
+        norm_param_table_xarray=norm_param_table_xarray,
+        use_quantile_norm=use_quantile_norm
     )
 
     return target_field_matrix, desired_row_indices, desired_column_indices
@@ -839,7 +866,7 @@ def _read_lagged_targets_1example(
         gfs_init_date_string, target_dir_name, target_lag_times_days,
         desired_row_indices, desired_column_indices,
         latitude_limits_deg_n, longitude_limits_deg_e,
-        target_field_names, norm_param_table_xarray):
+        target_field_names, norm_param_table_xarray, use_quantile_norm):
     """Reads lagged-target fields for one example.
 
     m = number of rows in grid
@@ -866,6 +893,8 @@ def _read_lagged_targets_1example(
         parameters, in format returned by
         `canadian_fwi_io.read_normalization_file`.  If you do not want
         normalization, make this None.
+    :param use_quantile_norm: Boolean flag.  If True, will use quantile
+        normalization before converting to z-scores.
     :return: target_field_matrix: m-by-n-by-l-by-T numpy array.
     :return: desired_row_indices: See input documentation.
     :return: desired_column_indices: See input documentation.
@@ -899,7 +928,8 @@ def _read_lagged_targets_1example(
             desired_row_indices=desired_row_indices,
             desired_column_indices=desired_column_indices,
             field_names=target_field_names,
-            norm_param_table_xarray=norm_param_table_xarray
+            norm_param_table_xarray=norm_param_table_xarray,
+            use_quantile_norm=use_quantile_norm
         )
         for f in target_file_names
     ], axis=-2)
@@ -954,6 +984,9 @@ def data_generator(option_dict):
         `gfs_io.read_file`.
     option_dict["gfs_normalization_file_name"]: Path to file with normalization
         params for GFS data.  Will be read by `gfs_io.read_normalization_file`.
+    option_dict["gfs_use_quantile_norm"]: Boolean flag.  If True, will do
+        quantile normalization, then convert quantiles to standard normal
+        distribution.  If False, will convert directly to z-scores.
     option_dict["era5_constant_predictor_field_names"]: 1-D list with names of
         ERA5 constant fields to be used as predictors.  If you do not want such
         predictors, make this None.
@@ -962,6 +995,8 @@ def data_generator(option_dict):
     option_dict["era5_normalization_file_name"]: Path to file with normalization
         params for ERA5 time-constant data.  Will be read by
         `era5_constant_io.read_normalization_file`.
+    option_dict["era5_use_quantile_norm"]: Same as "gfs_use_quantile_norm" but
+        for ERA5 data.
     option_dict["target_field_names"]: length-T list with names of target fields
         (fire-weather indices).
     option_dict["target_lead_time_days"]: Lead time for target fields.
@@ -980,6 +1015,8 @@ def data_generator(option_dict):
     option_dict["target_normalization_file_name"]: Path to file with
         normalization params for target fields.  Will be read by
         `canadian_fwi_io.read_normalization_file`.
+    option_dict["targets_use_quantile_norm"]: Same as "gfs_use_quantile_norm"
+        but for target fields.
     option_dict["num_examples_per_batch"]: Number of data examples per batch,
         usually just called "batch size".
     option_dict["sentinel_value"]: All NaN will be replaced with this value.
@@ -1021,11 +1058,13 @@ def data_generator(option_dict):
     gfs_predictor_lead_times_hours = option_dict[GFS_PREDICTOR_LEADS_KEY]
     gfs_directory_name = option_dict[GFS_DIRECTORY_KEY]
     gfs_normalization_file_name = option_dict[GFS_NORM_FILE_KEY]
+    gfs_use_quantile_norm = option_dict[GFS_USE_QUANTILE_NORM_KEY]
     era5_constant_predictor_field_names = option_dict[
         ERA5_CONSTANT_PREDICTOR_FIELDS_KEY
     ]
     era5_constant_file_name = option_dict[ERA5_CONSTANT_FILE_KEY]
     era5_normalization_file_name = option_dict[ERA5_NORM_FILE_KEY]
+    era5_use_quantile_norm = option_dict[ERA5_USE_QUANTILE_NORM_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
     target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
@@ -1035,6 +1074,7 @@ def data_generator(option_dict):
     target_dir_name = option_dict[TARGET_DIRECTORY_KEY]
     gfs_forecast_target_dir_name = option_dict[GFS_FORECAST_TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
+    targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
 
@@ -1095,7 +1135,8 @@ def data_generator(option_dict):
             latitude_limits_deg_n=outer_latitude_limits_deg_n,
             longitude_limits_deg_e=outer_longitude_limits_deg_e,
             field_names=era5_constant_predictor_field_names,
-            norm_param_table_xarray=era5_norm_param_table_xarray
+            norm_param_table_xarray=era5_norm_param_table_xarray,
+            use_quantile_norm=era5_use_quantile_norm
         )
         era5_constant_matrix = numpy.repeat(
             numpy.expand_dims(era5_constant_matrix, axis=0),
@@ -1147,7 +1188,8 @@ def data_generator(option_dict):
                 lead_times_hours=gfs_predictor_lead_times_hours,
                 field_names=gfs_predictor_field_names,
                 pressure_levels_mb=gfs_pressure_levels_mb,
-                norm_param_table_xarray=gfs_norm_param_table_xarray
+                norm_param_table_xarray=gfs_norm_param_table_xarray,
+                use_quantile_norm=gfs_use_quantile_norm
             )
 
             (
@@ -1165,7 +1207,8 @@ def data_generator(option_dict):
                 latitude_limits_deg_n=inner_latitude_limits_deg_n,
                 longitude_limits_deg_e=inner_longitude_limits_deg_e,
                 target_field_names=target_field_names,
-                norm_param_table_xarray=target_norm_param_table_xarray
+                norm_param_table_xarray=target_norm_param_table_xarray,
+                use_quantile_norm=targets_use_quantile_norm
             )
 
             if gfs_forecast_target_dir_name is not None:
@@ -1185,7 +1228,8 @@ def data_generator(option_dict):
                     latitude_limits_deg_n=inner_latitude_limits_deg_n,
                     longitude_limits_deg_e=inner_longitude_limits_deg_e,
                     target_field_names=target_field_names,
-                    norm_param_table_xarray=target_norm_param_table_xarray
+                    norm_param_table_xarray=target_norm_param_table_xarray,
+                    use_quantile_norm=gfs_use_quantile_norm
                 )
 
                 if new_matrix is None:
@@ -1210,7 +1254,8 @@ def data_generator(option_dict):
                 desired_row_indices=desired_target_row_indices,
                 desired_column_indices=desired_target_column_indices,
                 field_names=target_field_names,
-                norm_param_table_xarray=None
+                norm_param_table_xarray=None,
+                use_quantile_norm=False
             )
 
             if this_gfs_predictor_matrix_3d is not None:
@@ -1335,8 +1380,16 @@ def data_generator(option_dict):
             })
         if laglead_target_predictor_matrix is not None:
             predictor_matrices.update({
-                'lagged_target_inputs': laglead_target_predictor_matrix.astype('float32')
+                'lagged_target_inputs':
+                    laglead_target_predictor_matrix.astype('float32')
             })
+
+        print((
+            'Shape of target matrix (including land mask as last channel): '
+            '{0:s}'
+        ).format(
+            str(target_matrix_with_weights.shape)
+        ))
 
         print((
             'Shape of target matrix (including land mask as last channel): '
@@ -1390,11 +1443,13 @@ def create_data(option_dict, init_date_string):
     gfs_predictor_lead_times_hours = option_dict[GFS_PREDICTOR_LEADS_KEY]
     gfs_directory_name = option_dict[GFS_DIRECTORY_KEY]
     gfs_normalization_file_name = option_dict[GFS_NORM_FILE_KEY]
+    gfs_use_quantile_norm = option_dict[GFS_USE_QUANTILE_NORM_KEY]
     era5_constant_predictor_field_names = option_dict[
         ERA5_CONSTANT_PREDICTOR_FIELDS_KEY
     ]
     era5_constant_file_name = option_dict[ERA5_CONSTANT_FILE_KEY]
     era5_normalization_file_name = option_dict[ERA5_NORM_FILE_KEY]
+    era5_use_quantile_norm = option_dict[ERA5_USE_QUANTILE_NORM_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
     target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
     target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
@@ -1404,6 +1459,7 @@ def create_data(option_dict, init_date_string):
     target_dir_name = option_dict[TARGET_DIRECTORY_KEY]
     gfs_forecast_target_dir_name = option_dict[GFS_FORECAST_TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
+    targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
 
     if gfs_normalization_file_name is None:
@@ -1453,7 +1509,8 @@ def create_data(option_dict, init_date_string):
             latitude_limits_deg_n=outer_latitude_limits_deg_n,
             longitude_limits_deg_e=outer_longitude_limits_deg_e,
             field_names=era5_constant_predictor_field_names,
-            norm_param_table_xarray=era5_norm_param_table_xarray
+            norm_param_table_xarray=era5_norm_param_table_xarray,
+            use_quantile_norm=era5_use_quantile_norm
         )
         era5_constant_matrix = numpy.expand_dims(era5_constant_matrix, axis=0)
 
@@ -1487,7 +1544,8 @@ def create_data(option_dict, init_date_string):
         lead_times_hours=gfs_predictor_lead_times_hours,
         field_names=gfs_predictor_field_names,
         pressure_levels_mb=gfs_pressure_levels_mb,
-        norm_param_table_xarray=gfs_norm_param_table_xarray
+        norm_param_table_xarray=gfs_norm_param_table_xarray,
+        use_quantile_norm=gfs_use_quantile_norm
     )
 
     gfs_table_xarray = gfs_io.read_file(gfs_file_name)
@@ -1521,7 +1579,8 @@ def create_data(option_dict, init_date_string):
         latitude_limits_deg_n=inner_latitude_limits_deg_n,
         longitude_limits_deg_e=inner_longitude_limits_deg_e,
         target_field_names=target_field_names,
-        norm_param_table_xarray=target_norm_param_table_xarray
+        norm_param_table_xarray=target_norm_param_table_xarray,
+        use_quantile_norm=targets_use_quantile_norm
     )
 
     if gfs_forecast_target_dir_name is not None:
@@ -1534,7 +1593,8 @@ def create_data(option_dict, init_date_string):
             latitude_limits_deg_n=inner_latitude_limits_deg_n,
             longitude_limits_deg_e=inner_longitude_limits_deg_e,
             target_field_names=target_field_names,
-            norm_param_table_xarray=target_norm_param_table_xarray
+            norm_param_table_xarray=target_norm_param_table_xarray,
+            use_quantile_norm=gfs_use_quantile_norm
         )[0]
 
         laglead_target_predictor_matrix = numpy.concatenate(
@@ -1558,7 +1618,8 @@ def create_data(option_dict, init_date_string):
         desired_row_indices=desired_target_row_indices,
         desired_column_indices=desired_target_column_indices,
         field_names=target_field_names,
-        norm_param_table_xarray=None
+        norm_param_table_xarray=None,
+        use_quantile_norm=False
     )
     target_matrix = numpy.expand_dims(target_matrix, axis=0)
 
@@ -1818,6 +1879,18 @@ def read_metafile(pickle_file_name):
         training_option_dict[ERA5_NORM_FILE_KEY] = None
         validation_option_dict[ERA5_NORM_FILE_KEY] = None
 
+    if GFS_USE_QUANTILE_NORM_KEY not in training_option_dict:
+        training_option_dict[GFS_USE_QUANTILE_NORM_KEY] = False
+        validation_option_dict[GFS_USE_QUANTILE_NORM_KEY] = False
+
+    if ERA5_USE_QUANTILE_NORM_KEY not in training_option_dict:
+        training_option_dict[ERA5_USE_QUANTILE_NORM_KEY] = False
+        validation_option_dict[ERA5_USE_QUANTILE_NORM_KEY] = False
+
+    if TARGETS_USE_QUANTILE_NORM_KEY not in training_option_dict:
+        training_option_dict[TARGETS_USE_QUANTILE_NORM_KEY] = False
+        validation_option_dict[TARGETS_USE_QUANTILE_NORM_KEY] = False
+
     if TARGET_FIELDS_KEY not in training_option_dict:
         if 'target_field_name' in training_option_dict:
             training_option_dict[TARGET_FIELDS_KEY] = [
@@ -1862,13 +1935,9 @@ def read_model(hdf5_file_name):
     custom_object_dict = {
         'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
     }
-
     model_object = load_model(
         hdf5_file_name, custom_objects=custom_object_dict, compile=False
     )
-    # model_object = tf_keras.models.load_model(
-    #     hdf5_file_name, custom_objects=custom_object_dict, compile=False
-    # )
 
     metric_function_list = [
         eval(m) for m in metadata_dict[METRIC_FUNCTIONS_KEY]

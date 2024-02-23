@@ -412,12 +412,12 @@ def _create_skip_connection(
     :return: merged_layer_object: Instance of `keras.layers.Concatenate`.
     """
 
-    num_upconv_rows = decoder_upconv_layer_object.get_shape()[1]
-    num_desired_rows = encoder_conv_layer_objects[0].get_shape()[2]
+    num_upconv_rows = decoder_upconv_layer_object.shape[1]
+    num_desired_rows = encoder_conv_layer_objects[0].shape[2]
     num_padding_rows = num_desired_rows - num_upconv_rows
 
-    num_upconv_columns = decoder_upconv_layer_object.get_shape()[2]
-    num_desired_columns = encoder_conv_layer_objects[0].get_shape()[3]
+    num_upconv_columns = decoder_upconv_layer_object.shape[2]
+    num_desired_columns = encoder_conv_layer_objects[0].shape[3]
     num_padding_columns = num_desired_columns - num_upconv_columns
 
     if num_padding_rows + num_padding_columns > 0:
@@ -701,8 +701,8 @@ def create_model(option_dict, loss_function, metric_list):
     )(gfs_encoder_conv_layer_objects[-1])
 
     if not gfs_fcst_use_3d_conv:
-        orig_dims = gfs_fcst_module_layer_object.get_shape()
-        new_dims = orig_dims[1:-2] + [orig_dims[-2] * orig_dims[-1]]
+        orig_dims = gfs_fcst_module_layer_object.shape
+        new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
 
         gfs_fcst_module_layer_object = keras.layers.Reshape(
             target_shape=new_dims, name='gfs_fcst_module_remove-time-dim'
@@ -729,7 +729,7 @@ def create_model(option_dict, loss_function, metric_list):
 
                 new_dims = (
                     gfs_fcst_module_layer_object.shape[1:3] +
-                    [gfs_fcst_module_layer_object.shape[-1]]
+                    (gfs_fcst_module_layer_object.shape[-1],)
                 )
                 gfs_fcst_module_layer_object = keras.layers.Reshape(
                     target_shape=new_dims,
@@ -860,8 +860,8 @@ def create_model(option_dict, loss_function, metric_list):
     )(lagtgt_encoder_conv_layer_objects[-1])
 
     if not lagtgt_fcst_use_3d_conv:
-        orig_dims = lagtgt_fcst_module_layer_object.get_shape()
-        new_dims = orig_dims[1:-2] + [orig_dims[-2] * orig_dims[-1]]
+        orig_dims = lagtgt_fcst_module_layer_object.shape
+        new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
 
         lagtgt_fcst_module_layer_object = keras.layers.Reshape(
             target_shape=new_dims, name='lagtgt_fcst_module_remove-time-dim'
@@ -888,7 +888,7 @@ def create_model(option_dict, loss_function, metric_list):
 
                 new_dims = (
                     lagtgt_fcst_module_layer_object.shape[1:3] +
-                    [lagtgt_fcst_module_layer_object.shape[-1]]
+                    (lagtgt_fcst_module_layer_object.shape[-1],)
                 )
                 lagtgt_fcst_module_layer_object = keras.layers.Reshape(
                     target_shape=new_dims,
