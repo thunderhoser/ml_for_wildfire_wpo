@@ -36,8 +36,13 @@ LATITUDE_DIM = gfs_utils.LATITUDE_DIM
 LONGITUDE_DIM = gfs_utils.LONGITUDE_DIM
 FIELD_DIM = gfs_utils.FIELD_DIM_2D
 LEAD_TIME_DIM = 'lead_time_days'
+QUANTILE_LEVEL_DIM = 'quantile_level'
 
 DATA_KEY_2D = gfs_utils.DATA_KEY_2D
+
+MEAN_VALUE_KEY = 'mean_value'
+STDEV_KEY = 'standard_deviation'
+QUANTILE_KEY = 'quantile'
 
 
 def check_field_name(field_name):
