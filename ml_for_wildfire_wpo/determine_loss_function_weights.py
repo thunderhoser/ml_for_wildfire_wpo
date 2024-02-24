@@ -203,13 +203,16 @@ def _run(input_dir_name, target_field_names,
                 num_sample_values=num_sample_values_per_file
             )
 
-            these_means = numpy.array([dwmse_by_field[j], new_dwmse])
-            these_weights = numpy.array([
-                num_values_by_field[j], new_num_values
-            ])
-            dwmse_by_field[j] = numpy.average(
-                these_means, weights=these_weights
-            )
+            if num_values_by_field[j] == 0:
+                dwmse_by_field[j] = new_dwmse + 0.
+            else:
+                these_means = numpy.array([dwmse_by_field[j], new_dwmse])
+                these_weights = numpy.array([
+                    num_values_by_field[j], new_num_values
+                ])
+                dwmse_by_field[j] = numpy.average(
+                    these_means, weights=these_weights
+                )
 
             num_values_by_field[j] += new_num_values
 
