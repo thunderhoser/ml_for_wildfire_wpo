@@ -17,6 +17,7 @@ ERA5_CONSTANT_PREDICTORS_ARG_NAME = 'era5_constant_predictor_field_names'
 ERA5_NORM_FILE_ARG_NAME = 'era5_normalization_file_name'
 ERA5_USE_QUANTILE_NORM_ARG_NAME = 'era5_use_quantile_norm'
 TARGET_FIELDS_ARG_NAME = 'target_field_names'
+MAX_TARGET_VALUES_ARG_NAME = 'max_value_by_target_field'
 TARGET_LEAD_TIME_ARG_NAME = 'target_lead_time_days'
 TARGET_LAG_TIMES_ARG_NAME = 'target_lag_times_days'
 GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME = 'gfs_forecast_target_lead_times_days'
@@ -107,6 +108,13 @@ ERA5_USE_QUANTILE_NORM_HELP_STRING = 'Same as {0:s} but for ERA5 data.'.format(
     GFS_USE_QUANTILE_NORM_ARG_NAME
 )
 TARGET_FIELDS_HELP_STRING = 'List of target fields (fire-weather indices).'
+MAX_TARGET_VALUES_HELP_STRING = (
+    'List of max values, one per target field.  For the [j]th target field, '
+    'all values above {0:s}[j] will be clipped down to {0:s}[j].  If you do '
+    'not want to set max values, leave this argument alone.'
+).format(
+    MAX_TARGET_VALUES_ARG_NAME
+)
 TARGET_LEAD_TIME_HELP_STRING = 'Lead time for target field.'
 TARGET_LAG_TIMES_HELP_STRING = (
     'List of lag times to be used for lagged-target predictors.'
@@ -255,6 +263,10 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + TARGET_FIELDS_ARG_NAME, type=str, nargs='+',
         required=True, help=TARGET_FIELDS_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + MAX_TARGET_VALUES_ARG_NAME, type=float, nargs='+',
+        required=False, default=[-1], help=MAX_TARGET_VALUES_HELP_STRING
     )
     parser_object.add_argument(
         '--' + TARGET_LEAD_TIME_ARG_NAME, type=int,

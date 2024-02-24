@@ -195,13 +195,16 @@ def _run(input_dir_name, target_field_names,
                 num_sample_values=num_sample_values_per_file
             )
 
-            these_means = numpy.array([dwmse_by_field[j], new_dwmse])
-            these_weights = numpy.array([
-                num_values_by_field[j], new_num_values
-            ])
-            dwmse_by_field[j] = numpy.average(
-                these_means, weights=these_weights
-            )
+            if num_values_by_field[j] == 0:
+                dwmse_by_field[j] = new_dwmse + 0.
+            else:
+                these_means = numpy.array([dwmse_by_field[j], new_dwmse])
+                these_weights = numpy.array([
+                    num_values_by_field[j], new_num_values
+                ])
+                dwmse_by_field[j] = numpy.average(
+                    these_means, weights=these_weights
+                )
 
             num_values_by_field[j] += new_num_values
 
@@ -210,12 +213,14 @@ def _run(input_dir_name, target_field_names,
 
     for j in range(num_fields):
         print((
-            'DWMSE, climo mean, unnormalized weight, and normalized weight for '
-            '{0:s} = {1:.2f}, {2:.4f}, {3:.4f}, {4:.4f}'
+            '{0:s} ... DWMSE = {1:.2f} ... climo mean = {2:.4f} ... '
+            'extreme-value threshold = {3:.4f} ... '
+            'unnormalized weight = {4:.4f} ... normalized weight = {5:.4f}'
         ).format(
             target_field_names[j],
             dwmse_by_field[j],
             climo_mean_by_field[j],
+            extreme_threshold_by_field[j],
             unnorm_weight_by_field[j],
             weight_by_field[j]
         ))
