@@ -13,6 +13,7 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import error_checking
 import gfs_io
+import gfs_daily_io
 import canadian_fwi_io
 import era5_constant_io
 import gfs_utils
@@ -539,6 +540,151 @@ def get_normalization_params_for_gfs(
     main_data_dict.update({
         gfs_utils.QUANTILE_KEY_3D: (these_dim_3d, quantile_matrix_3d),
         gfs_utils.QUANTILE_KEY_2D: (these_dim_2d, quantile_matrix_2d)
+    })
+
+    return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
+
+
+def get_normalization_params_for_gfs_fwi(
+        daily_gfs_file_names, num_quantiles, num_sample_values_per_file):
+    """Computes normalization parameters for GFS-based FWI forecasts.
+
+    :param daily_gfs_file_names: 1-D list of paths to GFS files (will be read by
+        `gfs_daily_io.read_file`).
+    :param num_quantiles: See doc for `get_normalization_params_for_gfs`.
+    :param num_sample_values_per_file: Same.
+    :return: normalization_param_table_xarray: Same.
+    """
+
+    # TODO(thunderhoser): In practice, when normalizing GFS-based FWI forecasts,
+    # I plan to use normalization params based on actual FWI reanalyses.
+    # This method is just to satisfy my curiosity about what the normalization
+    # params would be, were they based on the GFS forecasts.
+
+    error_checking.assert_is_geq(num_sample_values_per_file, 10)
+    error_checking.assert_is_geq(num_quantiles, 100)
+
+    first_daily_gfs_table_xarray = gfs_daily_io.read_file(
+        daily_gfs_file_names[0]
+    )
+    first_dgfst = first_daily_gfs_table_xarray
+
+    field_names = gfs_daily_utils.ALL_FWI_FIELD_NAMES
+    forecast_days = numpy.round(
+        first_dgfst.coords[gfs_daily_utils.LEAD_TIME_DIM].values
+    ).astype(int)
+
+    norm_param_dict_dict = {}
+    num_sample_values_total = (
+        len(daily_gfs_file_names) * num_sample_values_per_file
+    )
+
+    for this_field_name in field_names:
+        for this_forecast_day in forecast_days:
+            norm_param_dict_dict[this_field_name, this_forecast_day] = {
+                NUM_VALUES_KEY: 0,
+                MEAN_VALUE_KEY: 0.,
+                MEAN_OF_SQUARES_KEY: 0.,
+                SAMPLE_VALUES_KEY:
+                    numpy.full(num_sample_values_total, numpy.nan)
+            }
+
+    for i in range(len(daily_gfs_file_names)):
+        print('Reading data from: "{0:s}"...'.format(daily_gfs_file_names[i]))
+        this_daily_gfs_table_xarray = gfs_daily_io.read_file(
+            daily_gfs_file_names[i]
+        )
+        this_dgfst = this_daily_gfs_table_xarray
+
+        for j in range(
+                len(this_dgfst.coords[gfs_daily_utils.FIELD_DIM].values)
+        ):
+            f = this_dgfst.coords[gfs_daily_utils.FIELD_DIM].values[j]
+
+            for k in range(
+                    len(this_dgfst.coords[gfs_daily_utils.LEAD_TIME_DIM].values)
+            ):
+                h = int(numpy.round(
+                    this_dgfst.coords[gfs_daily_utils.LEAD_TIME_DIM].values[k]
+                ))
+
+                norm_param_dict_dict[f, h] = _update_norm_params_1var_1file(
+                    norm_param_dict=norm_param_dict_dict[f, h],
+                    new_data_matrix=
+                    this_dgfst[gfs_daily_utils.DATA_KEY_2D].values[k, ..., j],
+                    num_sample_values_per_file=num_sample_values_per_file,
+                    file_index=i
+                )
+
+    num_fields = len(field_names)
+    num_forecast_days = len(forecast_days)
+
+    mean_value_matrix = numpy.full(
+        (num_forecast_days, num_fields), numpy.nan
+    )
+    stdev_matrix = numpy.full(
+        (num_forecast_days, num_fields), numpy.nan
+    )
+    quantile_matrix = numpy.full(
+        (num_forecast_days, num_fields, num_quantiles), numpy.nan
+    )
+
+    quantile_levels = numpy.linspace(0, 1, num=num_quantiles, dtype=float)
+
+    for j in range(num_fields):
+        for k in range(num_forecast_days):
+            f = field_names[j]
+            h = forecast_days[k]
+
+            mean_value_matrix[k, j] = (
+                norm_param_dict_dict[f, h][MEAN_VALUE_KEY]
+            )
+            stdev_matrix[k, j] = _get_standard_deviation_1var(
+                norm_param_dict_dict[f, h]
+            )
+            quantile_matrix[k, j, :] = numpy.nanpercentile(
+                norm_param_dict_dict[f, h][SAMPLE_VALUES_KEY],
+                100 * quantile_levels
+            )
+
+            print((
+                'Mean and standard deviation for {0:s} at {1:d}-day lead'
+                ' = {2:.4g}, {3:.4g}'
+            ).format(
+                field_names[j],
+                forecast_days[k],
+                mean_value_matrix[k, j],
+                stdev_matrix[k, j]
+            ))
+
+            for m in range(num_quantiles)[::10]:
+                print((
+                    '{0:.2f}th percentile for {1:s} at {2:d}-day lead = {3:.4g}'
+                ).format(
+                    100 * quantile_levels[m],
+                    field_names[j],
+                    forecast_days[k],
+                    quantile_matrix[k, j, m]
+                ))
+
+    coord_dict = {
+        gfs_daily_utils.LEAD_TIME_DIM: forecast_days,
+        gfs_daily_utils.FIELD_DIM: field_names,
+        gfs_daily_utils.QUANTILE_LEVEL_DIM: quantile_levels
+    }
+
+    these_dim = (gfs_daily_utils.LEAD_TIME_DIM, gfs_daily_utils.FIELD_DIM)
+    main_data_dict = {
+        gfs_daily_utils.MEAN_VALUE_KEY: (these_dim, mean_value_matrix),
+        gfs_daily_utils.STDEV_KEY: (these_dim, stdev_matrix)
+    }
+
+    these_dim = (
+        gfs_daily_utils.LEAD_TIME_DIM, gfs_daily_utils.FIELD_DIM,
+        gfs_daily_utils.QUANTILE_LEVEL_DIM
+    )
+    main_data_dict.update({
+        gfs_daily_utils.QUANTILE_KEY: (these_dim, quantile_matrix)
     })
 
     return xarray.Dataset(data_vars=main_data_dict, coords=coord_dict)
