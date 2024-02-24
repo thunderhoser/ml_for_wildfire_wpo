@@ -49,7 +49,7 @@ def file_name_to_date(fwi_file_name):
 
     pathless_file_name = os.path.split(fwi_file_name)[1]
     extensionless_file_name = os.path.splitext(pathless_file_name)[0]
-    valid_date_string = extensionless_file_name.split('_')[1]
+    valid_date_string = extensionless_file_name.split('_')[-1]
 
     _ = time_conversion.string_to_unix_sec(valid_date_string, DATE_FORMAT)
 

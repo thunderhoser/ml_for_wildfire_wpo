@@ -134,7 +134,7 @@ def _plot_one_field(
         grid_longitudes_deg_e[column_indices],
         grid_latitudes_deg_n[row_indices],
         linestyle='None',
-        marker='*', markersize=12, markeredgewidth=1,
+        marker='*', markersize=6, markeredgewidth=0,
         markerfacecolor=numpy.full(3, 1.), markeredgecolor=numpy.full(3, 0.)
     )
 

@@ -590,7 +590,7 @@ def create_model(option_dict, loss_function, metric_list):
         )(input_layer_object_era5)
 
         this_layer_object = keras.layers.Concatenate(
-            axis=-1, name='era5_add-gfs-times'
+            axis=-4, name='era5_add-gfs-times'
         )(
             num_gfs_lead_times * [layer_object_era5]
         )
@@ -602,7 +602,7 @@ def create_model(option_dict, loss_function, metric_list):
         )
 
         this_layer_object = keras.layers.Concatenate(
-            axis=-1, name='era5_add-lag-times'
+            axis=-4, name='era5_add-lag-times'
         )(
             num_target_lag_times * [layer_object_era5]
         )
