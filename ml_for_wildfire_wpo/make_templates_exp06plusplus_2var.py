@@ -26,8 +26,7 @@ OUTPUT_DIR_NAME = (
     'experiment06plusplus_grad_accum_2var/templates'
 )
 
-# TODO(thunderhoser): Weights are subject to change!
-CHANNEL_WEIGHTS = numpy.array([0.9, 0.1])
+CHANNEL_WEIGHTS = numpy.array([0.9571, 0.0429])
 LOSS_FUNCTION = custom_losses.dual_weighted_mse(
     channel_weights=CHANNEL_WEIGHTS, expect_ensemble=False,
     function_name='loss_dwmse'
@@ -35,7 +34,7 @@ LOSS_FUNCTION = custom_losses.dual_weighted_mse(
 
 LOSS_FUNCTION_STRING = (
     'custom_losses.dual_weighted_mse('
-    'channel_weights=numpy.array([0.9, 0.1]), '
+    'channel_weights=numpy.array([0.9571, 0.0429]), '
     'expect_ensemble=False, '
     'function_name="loss_dwmse")'
 )
@@ -53,8 +52,8 @@ METRIC_FUNCTIONS = [
     custom_metrics.dual_weighted_mse_unmasked(channel_index=1, expect_ensemble=False, function_name='bui_dwmse'),
     custom_metrics.dual_weighted_mse_anywhere(channel_index=0, expect_ensemble=False, function_name='ffmc_dwmse_anywhere'),
     custom_metrics.dual_weighted_mse_anywhere(channel_index=1, expect_ensemble=False, function_name='bui_dwmse_anywhere'),
-    custom_losses.dual_weighted_mse_1channel(channel_index=0, channel_weight=0.9, expect_ensemble=False, function_name='ffmc_dwmse_in_loss'),
-    custom_losses.dual_weighted_mse_1channel(channel_index=1, channel_weight=0.1, expect_ensemble=False, function_name='bui_dwmse_in_loss')
+    custom_losses.dual_weighted_mse_1channel(channel_index=0, channel_weight=0.9571, expect_ensemble=False, function_name='ffmc_dwmse_in_loss'),
+    custom_losses.dual_weighted_mse_1channel(channel_index=1, channel_weight=0.0429, expect_ensemble=False, function_name='bui_dwmse_in_loss')
 ]
 
 METRIC_FUNCTION_STRINGS = [
@@ -70,8 +69,8 @@ METRIC_FUNCTION_STRINGS = [
     'custom_metrics.dual_weighted_mse_unmasked(channel_index=1, expect_ensemble=False, function_name="bui_dwmse")',
     'custom_metrics.dual_weighted_mse_anywhere(channel_index=0, expect_ensemble=False, function_name="ffmc_dwmse_anywhere")',
     'custom_metrics.dual_weighted_mse_anywhere(channel_index=1, expect_ensemble=False, function_name="bui_dwmse_anywhere")',
-    'custom_losses.dual_weighted_mse_1channel(channel_index=0, channel_weight=0.9, expect_ensemble=False, function_name="ffmc_dwmse_in_loss")',
-    'custom_losses.dual_weighted_mse_1channel(channel_index=1, channel_weight=0.1, expect_ensemble=False, function_name="bui_dwmse_in_loss")'
+    'custom_losses.dual_weighted_mse_1channel(channel_index=0, channel_weight=0.9571, expect_ensemble=False, function_name="ffmc_dwmse_in_loss")',
+    'custom_losses.dual_weighted_mse_1channel(channel_index=1, channel_weight=0.0429, expect_ensemble=False, function_name="bui_dwmse_in_loss")'
 ]
 
 NUM_CONV_LAYERS_PER_BLOCK = 2

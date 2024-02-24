@@ -25,7 +25,8 @@ def _run(template_file_name, output_dir_name,
          gfs_use_quantile_norm,
          era5_constant_file_name, era5_constant_predictor_field_names,
          era5_normalization_file_name, era5_use_quantile_norm,
-         target_field_names, target_lead_time_days, target_lag_times_days,
+         target_field_names, max_value_by_target_field,
+         target_lead_time_days, target_lag_times_days,
          gfs_forecast_target_lead_times_days, target_normalization_file_name,
          targets_use_quantile_norm,
          num_examples_per_batch, sentinel_value,
@@ -59,6 +60,7 @@ def _run(template_file_name, output_dir_name,
     :param era5_normalization_file_name: Same.
     :param era5_use_quantile_norm: Same.
     :param target_field_names: Same.
+    :param max_value_by_target_field: Same.
     :param target_lead_time_days: Same.
     :param target_lag_times_days: Same.
     :param gfs_forecast_target_lead_times_days: Same.
@@ -90,6 +92,8 @@ def _run(template_file_name, output_dir_name,
         target_normalization_file_name = None
     if era5_normalization_file_name == '':
         era5_normalization_file_name = None
+    if len(max_value_by_target_field) == 1 and max_value_by_target_field[0] < 0:
+        max_value_by_target_field = None
 
     if era5_constant_file_name == '':
         era5_constant_file_name = None
@@ -132,6 +136,7 @@ def _run(template_file_name, output_dir_name,
         neural_net.ERA5_NORM_FILE_KEY: era5_normalization_file_name,
         neural_net.ERA5_USE_QUANTILE_NORM_KEY: era5_use_quantile_norm,
         neural_net.TARGET_FIELDS_KEY: target_field_names,
+        neural_net.MAX_TARGET_VALUES_KEY: max_value_by_target_field,
         neural_net.TARGET_LEAD_TIME_KEY: target_lead_time_days,
         neural_net.TARGET_LAG_TIMES_KEY: target_lag_times_days,
         neural_net.GFS_FCST_TARGET_LEAD_TIMES_KEY:
@@ -246,6 +251,10 @@ if __name__ == '__main__':
         )),
         target_field_names=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_FIELDS_ARG_NAME
+        ),
+        max_value_by_target_field=numpy.array(
+            getattr(INPUT_ARG_OBJECT, training_args.MAX_TARGET_VALUES_ARG_NAME),
+            dtype=float
         ),
         target_lead_time_days=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_LEAD_TIME_ARG_NAME
