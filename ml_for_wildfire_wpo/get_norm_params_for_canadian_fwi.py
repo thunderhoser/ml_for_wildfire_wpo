@@ -89,9 +89,10 @@ def _run(input_dir_name, first_date_strings, last_date_strings,
     :param output_file_name: Same.
     """
 
-    valid_date_strings = []
     num_periods = len(first_date_strings)
+    assert len(last_date_strings) == num_periods
 
+    valid_date_strings = []
     for i in range(num_periods):
         valid_date_strings += time_conversion.get_spc_dates_in_range(
             first_date_strings[i], last_date_strings[i]
