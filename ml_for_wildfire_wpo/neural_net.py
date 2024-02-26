@@ -53,7 +53,6 @@ ERA5_CONSTANT_FILE_KEY = 'era5_constant_file_name'
 ERA5_NORM_FILE_KEY = 'era5_normalization_file_name'
 ERA5_USE_QUANTILE_NORM_KEY = 'era5_use_quantile_norm'
 TARGET_FIELDS_KEY = 'target_field_names'
-MAX_TARGET_VALUES_KEY = 'max_value_by_target'
 TARGET_LEAD_TIME_KEY = 'target_lead_time_days'
 TARGET_LAG_TIMES_KEY = 'target_lag_times_days'
 GFS_FCST_TARGET_LEAD_TIMES_KEY = 'gfs_forecast_target_lead_times_days'
@@ -223,20 +222,6 @@ def _check_generator_args(option_dict):
     error_checking.assert_is_string_list(option_dict[TARGET_FIELDS_KEY])
     for this_field_name in option_dict[TARGET_FIELDS_KEY]:
         canadian_fwi_utils.check_field_name(this_field_name)
-
-    num_target_fields = len(option_dict[TARGET_FIELDS_KEY])
-    if option_dict[MAX_TARGET_VALUES_KEY] is None:
-        option_dict[MAX_TARGET_VALUES_KEY] = numpy.full(
-            num_target_fields, 1e12
-        )
-
-    error_checking.assert_is_numpy_array(
-        option_dict[MAX_TARGET_VALUES_KEY],
-        exact_dimensions=numpy.array([num_target_fields], dtype=int)
-    )
-    error_checking.assert_is_greater_numpy_array(
-        option_dict[MAX_TARGET_VALUES_KEY], 0.
-    )
 
     error_checking.assert_is_integer(option_dict[TARGET_LEAD_TIME_KEY])
     error_checking.assert_is_geq(option_dict[TARGET_LEAD_TIME_KEY], 0)
@@ -512,8 +497,7 @@ def _get_gfs_forecast_target_fields(
 
 def _get_target_fields(
         target_file_name, desired_row_indices, desired_column_indices,
-        field_names, max_value_by_field, norm_param_table_xarray,
-        use_quantile_norm):
+        field_names, norm_param_table_xarray, use_quantile_norm):
     """Reads target fields from one file.
 
     M = number of rows in grid
@@ -524,8 +508,6 @@ def _get_target_fields(
     :param desired_row_indices: length-M numpy array of indices.
     :param desired_column_indices: length-N numpy array of indices.
     :param field_names: length-T list of field names.
-    :param max_value_by_field: length-T numpy array with max value per field.
-        If you do not want to specify max values, make this None.
     :param norm_param_table_xarray: xarray table with normalization parameters.
         If you do not want normalization, make this None.
     :param use_quantile_norm: Boolean flag.  If True, will use quantile
@@ -559,15 +541,6 @@ def _get_target_fields(
     ], axis=-1)
 
     assert not numpy.any(numpy.isnan(data_matrix))
-
-    if max_value_by_field is None:
-        return data_matrix
-
-    for j in range(len(field_names)):
-        data_matrix[..., j] = numpy.minimum(
-            data_matrix[..., j], max_value_by_field[j]
-        )
-
     return data_matrix
 
 
@@ -955,7 +928,6 @@ def _read_lagged_targets_1example(
             desired_row_indices=desired_row_indices,
             desired_column_indices=desired_column_indices,
             field_names=target_field_names,
-            max_value_by_field=None,
             norm_param_table_xarray=norm_param_table_xarray,
             use_quantile_norm=use_quantile_norm
         )
@@ -1094,7 +1066,6 @@ def data_generator(option_dict):
     era5_normalization_file_name = option_dict[ERA5_NORM_FILE_KEY]
     era5_use_quantile_norm = option_dict[ERA5_USE_QUANTILE_NORM_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
-    max_value_by_target_field = option_dict[MAX_TARGET_VALUES_KEY]
     target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
     target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
     gfs_forecast_target_lead_times_days = option_dict[
@@ -1283,7 +1254,6 @@ def data_generator(option_dict):
                 desired_row_indices=desired_target_row_indices,
                 desired_column_indices=desired_target_column_indices,
                 field_names=target_field_names,
-                max_value_by_field=max_value_by_target_field,
                 norm_param_table_xarray=None,
                 use_quantile_norm=False
             )
@@ -1481,7 +1451,6 @@ def create_data(option_dict, init_date_string):
     era5_normalization_file_name = option_dict[ERA5_NORM_FILE_KEY]
     era5_use_quantile_norm = option_dict[ERA5_USE_QUANTILE_NORM_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
-    max_value_by_target_field = option_dict[MAX_TARGET_VALUES_KEY]
     target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
     target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
     gfs_forecast_target_lead_times_days = option_dict[
@@ -1649,7 +1618,6 @@ def create_data(option_dict, init_date_string):
         desired_row_indices=desired_target_row_indices,
         desired_column_indices=desired_target_column_indices,
         field_names=target_field_names,
-        max_value_by_field=max_value_by_target_field,
         norm_param_table_xarray=None,
         use_quantile_norm=False
     )
@@ -1922,10 +1890,6 @@ def read_metafile(pickle_file_name):
     if TARGETS_USE_QUANTILE_NORM_KEY not in training_option_dict:
         training_option_dict[TARGETS_USE_QUANTILE_NORM_KEY] = False
         validation_option_dict[TARGETS_USE_QUANTILE_NORM_KEY] = False
-
-    if MAX_TARGET_VALUES_KEY not in training_option_dict:
-        training_option_dict[MAX_TARGET_VALUES_KEY] = None
-        validation_option_dict[MAX_TARGET_VALUES_KEY] = None
 
     if TARGET_FIELDS_KEY not in training_option_dict:
         if 'target_field_name' in training_option_dict:
