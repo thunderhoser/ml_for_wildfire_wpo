@@ -143,7 +143,7 @@ NUM_UPCONV_LAYERS_WITH_DROPOUT = 3
 BATCH_SIZES = numpy.array([40, 60, 80, 100], dtype=int)
 DROPOUT_RATES = numpy.array([0.00, 0.05, 0.10, 0.15, 0.20])
 
-# TODO(thunderhoser): Subbatch size is 10.
+# Subbatch size is 10.
 BATCH_SIZE_TO_NUM_GRAD_ACCUM_STEPS = {
     40: 4,
     60: 6,

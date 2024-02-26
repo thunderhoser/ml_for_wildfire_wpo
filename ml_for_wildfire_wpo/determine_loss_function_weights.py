@@ -116,7 +116,7 @@ def _increment_dwmse_one_field(fwi_table_xarray, field_name, extreme_threshold,
         numpy.absolute(real_data_values)
     )
     sample_weights = numpy.minimum(sample_weights, extreme_threshold)
-    error_values = sample_weights * (climo_mean - real_data_values) ** 2
+    error_values = sample_weights * (0.5 * (climo_mean - real_data_values)) ** 2
 
     return numpy.mean(error_values), len(error_values)
 
