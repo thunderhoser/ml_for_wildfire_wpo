@@ -294,12 +294,20 @@ def plot_inset_histogram(
     inset_axes_object.set_xticks(x_tick_values)
     inset_axes_object.set_xticklabels(x_tick_labels)
 
-    for this_tick_object in inset_axes_object.xaxis.get_major_ticks():
-        this_tick_object.label.set_fontsize(HISTOGRAM_FONT_SIZE)
-        this_tick_object.label.set_rotation('vertical')
+    try:
+        for this_tick_object in inset_axes_object.xaxis.get_major_ticks():
+            this_tick_object.label.set_fontsize(HISTOGRAM_FONT_SIZE)
+            this_tick_object.label.set_rotation('vertical')
 
-    for this_tick_object in inset_axes_object.yaxis.get_major_ticks():
-        this_tick_object.label.set_fontsize(HISTOGRAM_FONT_SIZE)
+        for this_tick_object in inset_axes_object.yaxis.get_major_ticks():
+            this_tick_object.label.set_fontsize(HISTOGRAM_FONT_SIZE)
+    except:
+        for this_tick_object in inset_axes_object.xaxis.get_major_ticks():
+            this_tick_object._label.set_fontsize(HISTOGRAM_FONT_SIZE)
+            this_tick_object._label.set_rotation('vertical')
+
+        for this_tick_object in inset_axes_object.yaxis.get_major_ticks():
+            this_tick_object._label.set_fontsize(HISTOGRAM_FONT_SIZE)
 
     inset_axes_object.set_title(
         'Prediction frequency' if has_predictions else 'Observation frequency',
