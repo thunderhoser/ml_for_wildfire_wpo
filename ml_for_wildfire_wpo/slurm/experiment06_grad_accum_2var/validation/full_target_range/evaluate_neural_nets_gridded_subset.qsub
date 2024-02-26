@@ -1,0 +1,56 @@
+#!/bin/bash
+
+#SBATCH --job-name="evaluate_neural_nets_gridded"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=04:00:00
+#SBATCH --array=1,32,52,54,56,61,63,64,68,70,78,81,82,110,113
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=evaluate_neural_nets_gridded_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment06_grad_accum_2var"
+
+BATCH_SIZES=("08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32" "08" "08" "08" "08" "08" "16" "16" "16" "16" "16" "24" "24" "24" "24" "24" "32" "32" "32" "32" "32")
+DROPOUT_LAYER_COUNTS=("1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6" "6")
+DROPOUT_RATES=("0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5" "0.1" "0.2" "0.3" "0.4" "0.5")
+
+batch_size=${BATCH_SIZES[$SLURM_ARRAY_TASK_ID]}
+num_dropout_layers=${DROPOUT_LAYER_COUNTS[$SLURM_ARRAY_TASK_ID]}
+dropout_rate=${DROPOUT_RATES[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_num-dropout-layers=${num_dropout_layers}_dropout-rate=${dropout_rate}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
+--input_prediction_dir_name="${model_dir_name}/validation" \
+--init_date_limit_strings "20210101" "20211210" \
+--num_bootstrap_reps=1 \
+--target_field_names "fine_fuel_moisture_code" "buildup_index" \
+--num_relia_bins_by_target 102 250 \
+--min_relia_bin_edge_by_target 0 0 \
+--max_relia_bin_edge_by_target 102 2500 \
+--per_grid_cell=1 \
+--output_file_name="${model_dir_name}/validation/full_target_range/gridded_evaluation.nc"
