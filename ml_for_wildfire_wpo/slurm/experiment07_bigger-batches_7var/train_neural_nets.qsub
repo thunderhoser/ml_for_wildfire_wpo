@@ -40,7 +40,7 @@ TARGET_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wp
 ERA5_CONSTANT_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_constants.nc"
 ERA5_CONSTANT_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/normalization_params_era5_constants.nc"
 
-BATCH_SIZES=("040" "040" "040" "040" "040" "060" "060" "060" "060" "060" "080" "080" "080" "080" "080" "100" "100" "100" "100" "100")
+BATCH_SIZES=("024" "024" "024" "024" "024" "032" "032" "032" "032" "032" "040" "040" "040" "040" "040" "048" "048" "048" "048" "048")
 DROPOUT_RATES=("0.00" "0.05" "0.10" "0.15" "0.20" "0.00" "0.05" "0.10" "0.15" "0.20" "0.00" "0.05" "0.10" "0.15" "0.20" "0.00" "0.05" "0.10" "0.15" "0.20")
 
 batch_size=${BATCH_SIZES[$SLURM_ARRAY_TASK_ID]}
@@ -71,7 +71,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --gfs_forecast_target_lead_times_days 1 2 3 \
 --target_normalization_file_name="${TARGET_NORM_FILE_NAME}" \
 --targets_use_quantile_norm=1 \
---num_examples_per_batch=10 \
+--num_examples_per_batch=8 \
 --sentinel_value=-10 \
 --gfs_dir_name_for_training="${GFS_DIR_NAME}" \
 --target_dir_name_for_training="${TARGET_DIR_NAME}" \
