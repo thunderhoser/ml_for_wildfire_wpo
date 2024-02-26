@@ -1,5 +1,6 @@
 """Custom loss functions."""
 
+import numpy
 import tensorflow
 from tensorflow.keras import backend as K
 from gewittergefahr.gg_utils import error_checking
@@ -80,14 +81,17 @@ def mean_squared_error(function_name, expect_ensemble=True, test_mode=False):
     return loss
 
 
-def dual_weighted_mse(channel_weights, function_name, expect_ensemble=True,
-                      test_mode=False):
+def dual_weighted_mse(
+        channel_weights, function_name, max_dual_weight_by_channel=None,
+        expect_ensemble=True, test_mode=False):
     """Creates dual-weighted mean squared error (DWMSE) loss function.
 
     K = number of output channels (target variables)
 
     :param channel_weights: length-K numpy array of channel weights.
     :param function_name: See doc for `mean_squared_error`.
+    :param max_dual_weight_by_channel: length-K numpy array of maximum dual
+        weights.
     :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: loss: Loss function (defined below).
@@ -98,6 +102,15 @@ def dual_weighted_mse(channel_weights, function_name, expect_ensemble=True,
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
+
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    error_checking.assert_is_numpy_array(
+        channel_weights,
+        exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
+    )
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
 
     def loss(target_tensor, prediction_tensor):
         """Computes loss (DWMSE).
@@ -125,13 +138,27 @@ def dual_weighted_mse(channel_weights, function_name, expect_ensemble=True,
             K.abs(relevant_prediction_tensor)
         )
 
+        max_dual_weight_tensor = K.cast(
+            K.constant(max_dual_weight_by_channel), dual_weight_tensor.dtype
+        )
+        for _ in range(3):
+            max_dual_weight_tensor = K.expand_dims(
+                max_dual_weight_tensor, axis=0
+            )
+        if expect_ensemble:
+            max_dual_weight_tensor = K.expand_dims(
+                max_dual_weight_tensor, axis=-1
+            )
+
+        dual_weight_tensor = K.minimum(
+            dual_weight_tensor, max_dual_weight_tensor
+        )
+
         channel_weight_tensor = K.cast(
             K.constant(channel_weights), dual_weight_tensor.dtype
         )
-        channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
-        channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
-        channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
-
+        for _ in range(3):
+            channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
         if expect_ensemble:
             channel_weight_tensor = K.expand_dims(
                 channel_weight_tensor, axis=-1
@@ -153,13 +180,15 @@ def dual_weighted_mse(channel_weights, function_name, expect_ensemble=True,
     return loss
 
 
-def dual_weighted_mse_1channel(channel_weight, channel_index, function_name,
-                               expect_ensemble=True, test_mode=False):
+def dual_weighted_mse_1channel(
+        channel_weight, channel_index, function_name, max_dual_weight=1e12,
+        expect_ensemble=True, test_mode=False):
     """Creates DWMSE loss function for one channel (target variable).
 
     :param channel_weight: Channel weight.
     :param channel_index: Channel index.
     :param function_name: See doc for `mean_squared_error`.
+    :param max_dual_weight: Max dual weight.
     :param expect_ensemble: Same.
     :param test_mode: Same.
     :return: loss: Loss function (defined below).
@@ -169,6 +198,7 @@ def dual_weighted_mse_1channel(channel_weight, channel_index, function_name,
     error_checking.assert_is_integer(channel_index)
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
+    error_checking.assert_is_greater(max_dual_weight, 0.)
     error_checking.assert_is_boolean(expect_ensemble)
     error_checking.assert_is_boolean(test_mode)
 
@@ -201,6 +231,8 @@ def dual_weighted_mse_1channel(channel_weight, channel_index, function_name,
             K.abs(relevant_target_tensor),
             K.abs(relevant_prediction_tensor)
         )
+        dual_weight_tensor = K.minimum(dual_weight_tensor, max_dual_weight)
+
         error_tensor = (
             channel_weight * dual_weight_tensor *
             (relevant_target_tensor - relevant_prediction_tensor) ** 2
