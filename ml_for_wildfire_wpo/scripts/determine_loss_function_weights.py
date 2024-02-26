@@ -97,7 +97,7 @@ def _increment_dwmse_one_field(fwi_table_xarray, field_name, extreme_threshold,
     data_matrix = canadian_fwi_utils.get_field(
         fwi_table_xarray=fwi_table_xarray, field_name=field_name
     )
-    data_matrix = numpy.minimum(data_matrix, extreme_threshold)
+    # data_matrix = numpy.minimum(data_matrix, extreme_threshold)
 
     real_data_values = data_matrix[numpy.invert(numpy.isnan(data_matrix))]
     numpy.random.shuffle(real_data_values)
@@ -107,6 +107,7 @@ def _increment_dwmse_one_field(fwi_table_xarray, field_name, extreme_threshold,
         numpy.absolute(climo_mean),
         numpy.absolute(real_data_values)
     )
+    sample_weights = numpy.minimum(sample_weights, extreme_threshold)
     error_values = sample_weights * (climo_mean - real_data_values) ** 2
 
     return numpy.mean(error_values), len(error_values)
@@ -215,7 +216,7 @@ def _run(input_dir_name, target_field_names,
         print((
             '{0:s} ... DWMSE = {1:.2f} ... climo mean = {2:.4f} ... '
             'extreme-value threshold = {3:.4f} ... '
-            'unnormalized weight = {4:.4f} ... normalized weight = {5:.4f}'
+            'unnormalized weight = {4:.4f} ... normalized weight = {5:.8f}'
         ).format(
             target_field_names[j],
             dwmse_by_field[j],
