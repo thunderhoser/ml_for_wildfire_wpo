@@ -243,28 +243,28 @@ def write_file(
 
     these_dim = (ROW_DIM, COLUMN_DIM, FIELD_DIM)
     dataset_object.createVariable(
-        TARGET_KEY, datatype=numpy.float32, dimensions=these_dim
+        TARGET_KEY, datatype=numpy.float64, dimensions=these_dim
     )
     dataset_object.variables[TARGET_KEY][:] = target_matrix
 
     dataset_object.createVariable(
-        PREDICTION_KEY, datatype=numpy.float32, dimensions=these_dim
+        PREDICTION_KEY, datatype=numpy.float64, dimensions=these_dim
     )
     dataset_object.variables[PREDICTION_KEY][:] = prediction_matrix
 
     these_dim = (ROW_DIM, COLUMN_DIM)
     dataset_object.createVariable(
-        WEIGHT_KEY, datatype=numpy.float32, dimensions=these_dim
+        WEIGHT_KEY, datatype=numpy.float64, dimensions=these_dim
     )
     dataset_object.variables[WEIGHT_KEY][:] = weight_matrix
 
     dataset_object.createVariable(
-        LATITUDE_KEY, datatype=numpy.float32, dimensions=ROW_DIM
+        LATITUDE_KEY, datatype=numpy.float64, dimensions=ROW_DIM
     )
     dataset_object.variables[LATITUDE_KEY][:] = grid_latitudes_deg_n
 
     dataset_object.createVariable(
-        LONGITUDE_KEY, datatype=numpy.float32, dimensions=COLUMN_DIM
+        LONGITUDE_KEY, datatype=numpy.float64, dimensions=COLUMN_DIM
     )
     dataset_object.variables[LONGITUDE_KEY][:] = grid_longitudes_deg_e
 

@@ -421,10 +421,22 @@ def _create_skip_connection(
         )(decoder_upconv_layer_object)
 
     for i in range(len(encoder_conv_layer_objects)):
-        this_function = _get_time_slicing_function(-1)
-        encoder_conv_layer_objects[i] = keras.layers.Lambda(
-            this_function
+        this_num_times = encoder_conv_layer_objects[i].shape[1]
+
+        encoder_conv_layer_objects[i] = keras.layers.Cropping3D(
+            cropping=((this_num_times - 1, 0), (0, 0), (0, 0)),
+            data_format='channels_last'
         )(encoder_conv_layer_objects[i])
+
+        encoder_conv_layer_objects[i] = keras.layers.Reshape(
+            target_shape=encoder_conv_layer_objects[i].shape[2:]
+        )(encoder_conv_layer_objects[i])
+
+        # this_function = _get_time_slicing_function(-1)
+        # encoder_conv_layer_objects[i] = keras.layers.Lambda(
+        #     this_function,
+        #     output_shape=encoder_conv_layer_objects[i].shape[1:]
+        # )(encoder_conv_layer_objects[i])
 
     this_name = 'skip_level{0:d}'.format(current_level_num)
     return keras.layers.Concatenate(

@@ -518,6 +518,7 @@ def _get_target_fields(
     :param desired_column_indices: length-N numpy array of indices.
     :param field_names: length-T list of field names.
     :param max_value_by_field: length-T numpy array with max value per field.
+        If you do not want to specify max values, make this None.
     :param norm_param_table_xarray: xarray table with normalization parameters.
         If you do not want normalization, make this None.
     :param use_quantile_norm: Boolean flag.  If True, will use quantile
@@ -551,6 +552,9 @@ def _get_target_fields(
     ], axis=-1)
 
     assert not numpy.any(numpy.isnan(data_matrix))
+
+    if max_value_by_field is None:
+        return data_matrix
 
     for j in range(len(field_names)):
         data_matrix[..., j] = numpy.minimum(
@@ -944,6 +948,7 @@ def _read_lagged_targets_1example(
             desired_row_indices=desired_row_indices,
             desired_column_indices=desired_column_indices,
             field_names=target_field_names,
+            max_value_by_field=None,
             norm_param_table_xarray=norm_param_table_xarray,
             use_quantile_norm=use_quantile_norm
         )
