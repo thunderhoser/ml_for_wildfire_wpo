@@ -143,12 +143,12 @@ NUM_UPCONV_LAYERS_WITH_DROPOUT = 3
 BATCH_SIZES = numpy.array([40, 60, 80, 100], dtype=int)
 DROPOUT_RATES = numpy.array([0.00, 0.05, 0.10, 0.15, 0.20])
 
-# Subbatch size is 10.
+# Subbatch size is 5.
 BATCH_SIZE_TO_NUM_GRAD_ACCUM_STEPS = {
-    40: 4,
-    60: 6,
-    80: 8,
-    100: 10
+    40: 8,
+    60: 12,
+    80: 16,
+    100: 20
 }
 
 
