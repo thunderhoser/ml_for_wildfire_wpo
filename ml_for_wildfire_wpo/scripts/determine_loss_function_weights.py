@@ -2,7 +2,7 @@
 
 There is one weight per target variable; the goal is to make every target
 variable have an equal contribution to the overall loss.  This script assumes
-that the loss function is dual-weighted mean squared error (DWMSE).
+that the loss function is MSE or dual-weighted MSE.
 """
 
 import argparse
@@ -21,6 +21,7 @@ FIRST_DATES_ARG_NAME = 'first_valid_date_strings'
 LAST_DATES_ARG_NAME = 'last_valid_date_strings'
 NORMALIZATION_FILE_ARG_NAME = 'input_normalization_file_name'
 QUANTILE_LEVEL_ARG_NAME = 'quantile_level'
+USE_DWMSE_ARG_NAME = 'use_dwmse'
 NUM_SAMPLE_VALUES_ARG_NAME = 'num_sample_values_per_file'
 
 INPUT_DIR_HELP_STRING = (
@@ -42,6 +43,10 @@ NORMALIZATION_FILE_HELP_STRING = (
 QUANTILE_LEVEL_HELP_STRING = (
     'Threshold quantile level.  Values above this level, for each target '
     'variable, will be considered too extreme and thus ignored.'
+)
+USE_DWMSE_HELP_STRING = (
+    'Boolean flag.  If 1, will use dual-weighted MSE.  If 0, will use vanilla '
+    'MSE.'
 )
 NUM_SAMPLE_VALUES_HELP_STRING = (
     'Number of sample values per file to use for computing weights.  This '
@@ -74,6 +79,10 @@ INPUT_ARG_PARSER.add_argument(
     help=QUANTILE_LEVEL_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + USE_DWMSE_ARG_NAME, type=int, required=True,
+    help=USE_DWMSE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + NUM_SAMPLE_VALUES_ARG_NAME, type=int, required=True,
     help=NUM_SAMPLE_VALUES_HELP_STRING
 )
@@ -97,7 +106,6 @@ def _increment_dwmse_one_field(fwi_table_xarray, field_name, extreme_threshold,
     data_matrix = canadian_fwi_utils.get_field(
         fwi_table_xarray=fwi_table_xarray, field_name=field_name
     )
-    # data_matrix = numpy.minimum(data_matrix, extreme_threshold)
 
     real_data_values = data_matrix[numpy.invert(numpy.isnan(data_matrix))]
     numpy.random.shuffle(real_data_values)
@@ -113,9 +121,37 @@ def _increment_dwmse_one_field(fwi_table_xarray, field_name, extreme_threshold,
     return numpy.mean(error_values), len(error_values)
 
 
+def _increment_mse_one_field(fwi_table_xarray, field_name, climo_mean,
+                             num_sample_values):
+    """Increments MSE for one field.
+
+    :param fwi_table_xarray: xarray table in format returned by
+        `canadian_fwi_io.read_file`.
+    :param field_name: Name of field.
+    :param climo_mean: Climatological mean for given field.
+    :param num_sample_values: Number of sample values to use from
+        `fwi_table_xarray`.
+    :return: new_mse: MSE for new data batch.
+    :return: new_num_values: Number of values in new data batch.
+    """
+
+    data_matrix = canadian_fwi_utils.get_field(
+        fwi_table_xarray=fwi_table_xarray, field_name=field_name
+    )
+
+    real_data_values = data_matrix[numpy.invert(numpy.isnan(data_matrix))]
+    numpy.random.shuffle(real_data_values)
+    real_data_values = real_data_values[:num_sample_values]
+
+    error_values = (climo_mean - real_data_values) ** 2
+
+    return numpy.mean(error_values), len(error_values)
+
+
 def _run(input_dir_name, target_field_names,
          first_date_strings, last_date_strings,
-         normalization_file_name, quantile_level, num_sample_values_per_file):
+         normalization_file_name, quantile_level, use_dwmse,
+         num_sample_values_per_file):
     """Determines weights for loss function.
 
     This is effectively the main method.
@@ -126,6 +162,7 @@ def _run(input_dir_name, target_field_names,
     :param last_date_strings: Same.
     :param normalization_file_name: Same.
     :param quantile_level: Same.
+    :param use_dwmse: Same.
     :param num_sample_values_per_file: Same.
     """
 
@@ -180,7 +217,7 @@ def _run(input_dir_name, target_field_names,
     ]
 
     num_files = len(target_file_names)
-    dwmse_by_field = numpy.full(num_fields, numpy.nan)
+    mean_loss_by_field = numpy.full(num_fields, numpy.nan)
     num_values_by_field = numpy.full(num_fields, 0, dtype=int)
 
     for i in range(num_files):
@@ -188,38 +225,47 @@ def _run(input_dir_name, target_field_names,
         fwi_table_xarray = canadian_fwi_io.read_file(target_file_names[i])
 
         for j in range(num_fields):
-            new_dwmse, new_num_values = _increment_dwmse_one_field(
-                fwi_table_xarray=fwi_table_xarray,
-                field_name=target_field_names[j],
-                extreme_threshold=extreme_threshold_by_field[j],
-                climo_mean=climo_mean_by_field[j],
-                num_sample_values=num_sample_values_per_file
-            )
+            if use_dwmse:
+                new_loss, new_num_values = _increment_dwmse_one_field(
+                    fwi_table_xarray=fwi_table_xarray,
+                    field_name=target_field_names[j],
+                    extreme_threshold=extreme_threshold_by_field[j],
+                    climo_mean=climo_mean_by_field[j],
+                    num_sample_values=num_sample_values_per_file
+                )
+            else:
+                new_loss, new_num_values = _increment_mse_one_field(
+                    fwi_table_xarray=fwi_table_xarray,
+                    field_name=target_field_names[j],
+                    climo_mean=climo_mean_by_field[j],
+                    num_sample_values=num_sample_values_per_file
+                )
 
             if num_values_by_field[j] == 0:
-                dwmse_by_field[j] = new_dwmse + 0.
+                mean_loss_by_field[j] = new_loss + 0.
             else:
-                these_means = numpy.array([dwmse_by_field[j], new_dwmse])
+                these_means = numpy.array([mean_loss_by_field[j], new_loss])
                 these_weights = numpy.array([
                     num_values_by_field[j], new_num_values
                 ])
-                dwmse_by_field[j] = numpy.average(
+                mean_loss_by_field[j] = numpy.average(
                     these_means, weights=these_weights
                 )
 
             num_values_by_field[j] += new_num_values
 
-    unnorm_weight_by_field = numpy.sum(dwmse_by_field) / dwmse_by_field
+    unnorm_weight_by_field = numpy.sum(mean_loss_by_field) / mean_loss_by_field
     weight_by_field = unnorm_weight_by_field / numpy.sum(unnorm_weight_by_field)
 
     for j in range(num_fields):
         print((
-            '{0:s} ... DWMSE = {1:.2f} ... climo mean = {2:.4f} ... '
-            'extreme-value threshold = {3:.4f} ... '
-            'unnormalized weight = {4:.4f} ... normalized weight = {5:.8f}'
+            '{0:s} ... {1:s} = {2:.2f} ... climo mean = {3:.4f} ... '
+            'extreme-value threshold = {4:.4f} ... '
+            'unnormalized weight = {5:.4f} ... normalized weight = {6:.8f}'
         ).format(
             target_field_names[j],
-            dwmse_by_field[j],
+            'DWMSE' if use_dwmse else 'MSE',
+            mean_loss_by_field[j],
             climo_mean_by_field[j],
             extreme_threshold_by_field[j],
             unnorm_weight_by_field[j],
@@ -239,6 +285,7 @@ if __name__ == '__main__':
             INPUT_ARG_OBJECT, NORMALIZATION_FILE_ARG_NAME
         ),
         quantile_level=getattr(INPUT_ARG_OBJECT, QUANTILE_LEVEL_ARG_NAME),
+        use_dwmse=bool(getattr(INPUT_ARG_OBJECT, USE_DWMSE_ARG_NAME)),
         num_sample_values_per_file=getattr(
             INPUT_ARG_OBJECT, NUM_SAMPLE_VALUES_ARG_NAME
         )
