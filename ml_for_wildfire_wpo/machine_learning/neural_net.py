@@ -1899,6 +1899,26 @@ def read_metafile(pickle_file_name):
     metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
     metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict
 
+    # TODO(thunderhoser): HACK to change target weights for 7-var models.
+    orig_strings = [
+        '0.00633568', '0.00029226', '0.00000163', '0.79002088', '0.00018185',
+        '0.04245499', '0.16071271'
+    ]
+    new_strings = [
+        '0.02562263', '0.00373885', '0.00008940', '0.60291427', '0.00251213',
+        '0.08761268', '0.27751004'
+    ]
+
+    for s_orig, s_new in zip(orig_strings, new_strings):
+        metadata_dict[LOSS_FUNCTION_KEY] = (
+            metadata_dict[LOSS_FUNCTION_KEY].replace(s_orig, s_new)
+        )
+
+        for i in range(len(metadata_dict[METRIC_FUNCTIONS_KEY])):
+            metadata_dict[METRIC_FUNCTIONS_KEY][i] = (
+                metadata_dict[METRIC_FUNCTIONS_KEY][i].replace(s_orig, s_new)
+            )
+
     missing_keys = list(set(METADATA_KEYS) - set(metadata_dict.keys()))
     if len(missing_keys) == 0:
         return metadata_dict
@@ -1925,6 +1945,7 @@ def read_model(hdf5_file_name):
     )
     metadata_dict = read_metafile(metafile_name)
 
+    print(metadata_dict[LOSS_FUNCTION_KEY])
     custom_object_dict = {
         'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
     }
