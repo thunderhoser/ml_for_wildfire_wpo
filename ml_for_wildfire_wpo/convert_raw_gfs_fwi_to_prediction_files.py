@@ -308,7 +308,9 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
         loss_function_string='keras.losses.mse',
         plateau_patience_epochs=10,
         plateau_learning_rate_multiplier=0.6,
-        early_stopping_patience_epochs=50
+        early_stopping_patience_epochs=50,
+        metric_function_strings=[],
+        optimizer_function_string='keras.optimizers.Nadam()'
     )
 
     # Write prediction file.
