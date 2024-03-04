@@ -1,0 +1,58 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_predictions_marshall_fire_subset"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpu"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=00:30:00
+#SBATCH --array=0-19
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_predictions_marshall_fire_subset_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment07_bigger-batches_2var"
+
+BATCH_SIZES=("040" "040" "040" "040" "040" "060" "060" "060" "060" "060" "080" "080" "080" "080" "080" "100" "100" "100" "100" "100")
+DROPOUT_RATES=("0.00" "0.05" "0.10" "0.15" "0.20" "0.00" "0.05" "0.10" "0.15" "0.20" "0.00" "0.05" "0.10" "0.15" "0.20" "0.00" "0.05" "0.10" "0.15" "0.20")
+
+batch_size=${BATCH_SIZES[$SLURM_ARRAY_TASK_ID]}
+dropout_rate=${DROPOUT_RATES[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_dropout-rate=${dropout_rate}"
+echo $model_dir_name
+
+INIT_DATE_STRINGS=("20211223" "20211224" "20211225" "20211226" "20211227" "20211228" "20211229" "20211230")
+i=1
+
+while [ $i -lt ${#INIT_DATE_STRINGS[@]} ]; do
+    init_date_string="${INIT_DATE_STRINGS[$i]}"
+    
+    python3 -u "${CODE_DIR_NAME}/plot_predictions.py" \
+    --input_prediction_dir_name="${model_dir_name}/validation" \
+    --field_names "fine_fuel_moisture_code" "buildup_index" \
+    --init_date_string="${init_date_string}" \
+    --output_dir_name="${model_dir_name}/validation/prediction_plots"
+    
+    i=$(( $i + 1 ))
+done
