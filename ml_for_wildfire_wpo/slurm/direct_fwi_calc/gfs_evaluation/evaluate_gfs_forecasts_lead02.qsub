@@ -47,4 +47,5 @@ python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
 --num_relia_bins_by_target 99 100 100 130 100 130 150 \
 --min_relia_bin_edge_by_target 0 0 0 0 0 0 0 \
 --max_relia_bin_edge_by_target 99 1000 2500 65 1000 130 150 \
+--per_grid_cell=0 \
 --output_file_name="${GFS_FORECAST_TARGET_DIR_NAME}/prediction_files/${lead_time_days}day_lead/ungridded_evaluation_20210101-20211210.nc"
