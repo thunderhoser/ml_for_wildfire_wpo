@@ -1,0 +1,54 @@
+#!/bin/bash
+
+#SBATCH --job-name="evaluate_neural_nets_gridded"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=08:00:00
+#SBATCH --array=0-19
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=evaluate_neural_nets_gridded_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment07_bigger-batches_7var/further_training_new_target_weights/further_training_reset_optimizer_state"
+
+BATCH_SIZES=("024" "024" "024" "024" "024" "032" "032" "032" "032" "032" "040" "040" "040" "040" "040" "048" "048" "048" "048" "048")
+DROPOUT_RATES=("0.00" "0.05" "0.10" "0.15" "0.20" "0.00" "0.05" "0.10" "0.15" "0.20" "0.00" "0.05" "0.10" "0.15" "0.20" "0.00" "0.05" "0.10" "0.15" "0.20")
+
+batch_size=${BATCH_SIZES[$SLURM_ARRAY_TASK_ID]}
+dropout_rate=${DROPOUT_RATES[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_dropout-rate=${dropout_rate}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
+--input_prediction_dir_name="${model_dir_name}/validation" \
+--init_date_limit_strings "20210101" "20211210" \
+--num_bootstrap_reps=1 \
+--target_field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" \
+--num_relia_bins_by_target 99 100 100 130 100 130 150 \
+--min_relia_bin_edge_by_target 0 0 0 0 0 0 0 \
+--max_relia_bin_edge_by_target 99 1000 2500 65 1000 130 150 \
+--per_grid_cell=1 \
+--output_file_name="${model_dir_name}/validation/gridded_evaluation.nc"
