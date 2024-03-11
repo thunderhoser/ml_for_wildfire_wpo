@@ -1,0 +1,56 @@
+#!/bin/bash
+
+#SBATCH --job-name="apply_neural_nets_marshall_fire"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=01:30:00
+#SBATCH --array=0-19
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=apply_neural_nets_marshall_fire_%A_%a.out
+
+module load cuda/12.1.0
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment07_bigger-batches_2var/further_training_reset_optimizer_state"
+
+GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
+TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
+
+BATCH_SIZES=("040" "040" "040" "040" "040" "060" "060" "060" "060" "060" "080" "080" "080" "080" "080" "100" "100" "100" "100" "100")
+DROPOUT_RATES=("0.00" "0.05" "0.10" "0.15" "0.20" "0.00" "0.05" "0.10" "0.15" "0.20" "0.00" "0.05" "0.10" "0.15" "0.20" "0.00" "0.05" "0.10" "0.15" "0.20")
+
+batch_size=${BATCH_SIZES[$SLURM_ARRAY_TASK_ID]}
+dropout_rate=${DROPOUT_RATES[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/batch-size=${batch_size}_dropout-rate=${dropout_rate}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/apply_neural_net.py" \
+--input_model_file_name="${model_dir_name}/model.keras" \
+--input_gfs_directory_name="${GFS_DIR_NAME}" \
+--input_target_dir_name="${TARGET_DIR_NAME}" \
+--input_gfs_fcst_target_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
+--init_date_limit_strings "20211223" "20220101" \
+--output_dir_name="${model_dir_name}/validation"
