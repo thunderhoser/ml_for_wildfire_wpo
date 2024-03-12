@@ -207,7 +207,7 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.L2_WEIGHT_KEY: 1e-6,
     chiu_net_pp_arch.USE_BATCH_NORM_KEY: True,
     chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 1,
-    chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
+    # chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
 }
 
 GFS_PRESSURE_LEVEL_COUNTS_AXIS1 = numpy.array([0, 1, 2], dtype=int)
@@ -255,7 +255,8 @@ def _run():
                         chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: these_dim_2d,
                         chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY:
                             None if numpy.any(these_dim_era5 == 0) else these_dim_era5,
-                        chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: these_dim_laglead
+                        chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: these_dim_laglead,
+                        chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
                     })
 
                     model_object = chiu_net_pp_arch.create_model(
