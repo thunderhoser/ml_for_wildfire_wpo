@@ -9,8 +9,8 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
-#SBATCH --time=01:00:00
-#SBATCH --array=0-35
+#SBATCH --time=60:00:00
+#SBATCH --array=0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,32,34
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
@@ -67,7 +67,7 @@ else
 fi
 
 template_file_name="${TEMPLATE_DIR_NAME}/num-gfs-pressure-levels=${num_gfs_pressure_levels}_num-gfs-2d-vars=${num_gfs_2d_variables}_num-era5-constants=${num_era5_variables}_num-gfs-target-leads=${num_gfs_target_lead_times}/model.keras"
-output_dir_name="${TOP_OUTPUT_DIR_NAME}/batch-size=${batch_size}_dropout-rate=${dropout_rate}"
+output_dir_name="${TOP_OUTPUT_DIR_NAME}/num-gfs-pressure-levels=${num_gfs_pressure_levels}_num-gfs-2d-vars=${num_gfs_2d_variables}_num-era5-constants=${num_era5_variables}_num-gfs-target-leads=${num_gfs_target_lead_times}"
 echo $output_dir_name
 
 if [ -z "${gfs_pressure_level_set_mb}" ]; then

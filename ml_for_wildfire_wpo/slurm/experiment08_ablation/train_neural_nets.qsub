@@ -67,7 +67,7 @@ else
 fi
 
 template_file_name="${TEMPLATE_DIR_NAME}/num-gfs-pressure-levels=${num_gfs_pressure_levels}_num-gfs-2d-vars=${num_gfs_2d_variables}_num-era5-constants=${num_era5_variables}_num-gfs-target-leads=${num_gfs_target_lead_times}/model.keras"
-output_dir_name="${TOP_OUTPUT_DIR_NAME}/batch-size=${batch_size}_dropout-rate=${dropout_rate}"
+output_dir_name="${TOP_OUTPUT_DIR_NAME}/num-gfs-pressure-levels=${num_gfs_pressure_levels}_num-gfs-2d-vars=${num_gfs_2d_variables}_num-era5-constants=${num_era5_variables}_num-gfs-target-leads=${num_gfs_target_lead_times}"
 echo $output_dir_name
 
 if [ -z "${gfs_pressure_level_set_mb}" ]; then
