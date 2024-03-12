@@ -88,7 +88,7 @@ def _run(template_file_name, output_dir_name,
         era5_constant_predictor_field_names = None
     elif (
             len(era5_constant_predictor_field_names) == 1 and
-            era5_constant_predictor_field_names[0] == ''
+            era5_constant_predictor_field_names[0] in ['', 'None']
     ):
         era5_constant_predictor_field_names = None
 

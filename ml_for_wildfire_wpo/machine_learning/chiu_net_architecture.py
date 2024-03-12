@@ -225,6 +225,10 @@ def check_args(option_dict):
 
             assert numpy.array_equal(input_dimensions_gfs_2d, these_dim)
 
+        num_grid_rows = input_dimensions_gfs_2d[0]
+        num_grid_columns = input_dimensions_gfs_2d[1]
+        num_gfs_lead_times = input_dimensions_gfs_2d[2]
+
     if input_dimensions_era5_constants is not None:
         error_checking.assert_is_numpy_array(
             input_dimensions_era5_constants,
