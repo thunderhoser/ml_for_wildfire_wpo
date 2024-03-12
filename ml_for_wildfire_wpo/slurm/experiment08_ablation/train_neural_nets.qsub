@@ -64,7 +64,20 @@ template_file_name="${TEMPLATE_DIR_NAME}/num-gfs-pressure-levels=${num_gfs_press
 output_dir_name="${TOP_OUTPUT_DIR_NAME}/batch-size=${batch_size}_dropout-rate=${dropout_rate}"
 echo $output_dir_name
 
+if [ -z "${gfs_pressure_level_set_mb}" ]; then
+    gfs_pressure_level_set_mb="-1"
+fi
+
+# if [ -z "${gfs_2d_variable_set}" ]; then
+#     gfs_2d_variable_set="None"
+# fi
+
+if [ -z "${era5_variable_set}" ]; then
+    era5_variable_set="None"
+fi
+
 if [ -z "${gfs_target_lead_set_days}" ]; then
+    gfs_target_lead_set_days="-1"
     GFS_FORECAST_TARGET_DIR_NAME=""
 fi
 
