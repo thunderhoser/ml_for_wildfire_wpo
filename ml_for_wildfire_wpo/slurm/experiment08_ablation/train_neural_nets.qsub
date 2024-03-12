@@ -61,9 +61,9 @@ num_era5_variables=`echo "$era5_variable_set" | wc -w`
 num_gfs_target_lead_times=`echo "$gfs_target_lead_set_days" | wc -w`
 
 if [ -z "${gfs_pressure_level_set_mb}" ]; then
-    num_gfs_2d_variables=$(( $num_gfs_variables - 5 ))
-else
     num_gfs_2d_variables=$(( $num_gfs_variables - 0 ))
+else
+    num_gfs_2d_variables=$(( $num_gfs_variables - 5 ))
 fi
 
 template_file_name="${TEMPLATE_DIR_NAME}/num-gfs-pressure-levels=${num_gfs_pressure_levels}_num-gfs-2d-vars=${num_gfs_2d_variables}_num-era5-constants=${num_era5_variables}_num-gfs-target-leads=${num_gfs_target_lead_times}/model.keras"
