@@ -254,8 +254,7 @@ def _run():
                         chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: these_dim_2d,
                         chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY:
                             None if numpy.any(these_dim_era5 == 0) else these_dim_era5,
-                        chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY:
-                            None if numpy.any(these_dim_laglead == 0) else these_dim_laglead
+                        chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: these_dim_laglead
                     })
 
                     model_object = chiu_net_pp_arch.create_model(
