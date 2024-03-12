@@ -249,12 +249,13 @@ def _run():
                     ], dtype=int)
 
                     option_dict.update({
-                        chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY: these_dim_3d,
+                        chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY:
+                            None if numpy.any(these_dim_3d == 0) else these_dim_3d,
                         chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: these_dim_2d,
                         chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY:
-                            these_dim_era5,
+                            None if numpy.any(these_dim_era5 == 0) else these_dim_era5,
                         chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY:
-                            these_dim_laglead
+                            None if numpy.any(these_dim_laglead == 0) else these_dim_laglead
                     })
 
                     model_object = chiu_net_pp_arch.create_model(
