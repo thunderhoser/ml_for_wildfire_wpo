@@ -1,0 +1,110 @@
+#!/bin/bash
+
+#SBATCH --job-name="train_neural_nets"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=60:00:00
+#SBATCH --array=0-35
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=train_neural_nets_%A_%a.out
+
+module load cuda/12.1.0
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment08_ablation/templates"
+TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment08_ablation"
+
+GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
+TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
+TARGET_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi/normalization_params_2019-2020.nc"
+ERA5_CONSTANT_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_constants.nc"
+ERA5_CONSTANT_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/normalization_params_era5_constants.nc"
+
+GFS_PRESSURE_LEVEL_SETS_MB=("" "" "" "" "" "" "900" "900" "900" "900" "900" "900" "700-900" "700-900" "700-900" "700-900" "700-900" "700-900" "" "" "" "" "" "" "900" "900" "900" "900" "900" "900" "700-900" "700-900" "700-900" "700-900" "700-900" "700-900")
+GFS_2D_VARIABLE_SETS=("temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres")
+ERA5_VARIABLE_SETS=("" "" "geopotential_m2_s02" "geopotential_m2_s02" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "" "" "geopotential_m2_s02" "geopotential_m2_s02" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "" "" "geopotential_m2_s02" "geopotential_m2_s02" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "" "" "geopotential_m2_s02" "geopotential_m2_s02" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "" "" "geopotential_m2_s02" "geopotential_m2_s02" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "" "" "geopotential_m2_s02" "geopotential_m2_s02" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres")
+GFS_TARGET_LEAD_SETS_DAYS=("" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2")
+
+gfs_pressure_level_set_mb=${GFS_PRESSURE_LEVEL_SETS_MB[$SLURM_ARRAY_TASK_ID]}
+gfs_2d_variable_set=${GFS_2D_VARIABLE_SETS[$SLURM_ARRAY_TASK_ID]}
+era5_variable_set=${ERA5_VARIABLE_SETS[$SLURM_ARRAY_TASK_ID]}
+gfs_target_lead_set_days=${GFS_TARGET_LEAD_SETS_DAYS[$SLURM_ARRAY_TASK_ID]}
+
+gfs_pressure_level_set_mb=$(echo $gfs_pressure_level_set_mb | tr "-" " ")
+gfs_2d_variable_set=$(echo $gfs_2d_variable_set | tr "-" " ")
+era5_variable_set=$(echo $era5_variable_set | tr "-" " ")
+gfs_target_lead_set_days=$(echo $gfs_target_lead_set_days | tr "-" " ")
+
+num_gfs_pressure_levels=`echo "$gfs_pressure_level_set_mb" | wc -w`
+num_gfs_2d_variables=`echo "$gfs_2d_variable_set" | wc -w`
+num_era5_variables=`echo "$era5_variable_set" | wc -w`
+num_gfs_target_lead_times=`echo "$gfs_target_lead_set_days" | wc -w`
+
+template_file_name="${TEMPLATE_DIR_NAME}/num-gfs-pressure-levels=${num_gfs_pressure_levels}_num-gfs-2d-vars=${num_gfs_2d_variables}_num-era5-constants=${num_era5_variables}_num-gfs-target-leads=${num_gfs_target_lead_times}/model.keras"
+output_dir_name="${TOP_OUTPUT_DIR_NAME}/batch-size=${batch_size}_dropout-rate=${dropout_rate}"
+echo $output_dir_name
+
+if [ -z "${gfs_target_lead_set_days}" ]; then
+    GFS_FORECAST_TARGET_DIR_NAME=""
+fi
+
+echo ${gfs_pressure_level_set_mb}
+echo ${gfs_2d_variable_set}
+echo ${era5_variable_set}
+echo ${gfs_target_lead_set_days}
+echo ${GFS_FORECAST_TARGET_DIR_NAME}
+
+python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
+--input_template_file_name="${template_file_name}" \
+--output_model_dir_name="${output_dir_name}" \
+--inner_latitude_limits_deg_n 17 73 \
+--inner_longitude_limits_deg_e 171 -65 \
+--outer_latitude_buffer_deg=5 \
+--outer_longitude_buffer_deg=5 \
+--gfs_predictor_field_names temperature_kelvins specific_humidity_kg_kg01 geopotential_height_m_asl u_wind_m_s01 v_wind_m_s01 ${gfs_2d_variable_set} \
+--gfs_pressure_levels_mb ${gfs_pressure_level_set_mb} \
+--gfs_predictor_lead_times_hours 0 48 \
+--gfs_normalization_file_name="" \
+--era5_constant_file_name="${ERA5_CONSTANT_FILE_NAME}" \
+--era5_normalization_file_name="${ERA5_CONSTANT_NORM_FILE_NAME}" \
+--era5_use_quantile_norm=1 \
+--era5_constant_predictor_field_names ${era5_variable_set} \
+--target_field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" \
+--target_lead_time_days=2 \
+--target_lag_times_days 1 2 3 \
+--gfs_forecast_target_lead_times_days ${gfs_target_lead_set_days} \
+--target_normalization_file_name="${TARGET_NORM_FILE_NAME}" \
+--targets_use_quantile_norm=1 \
+--num_examples_per_batch=8 \
+--sentinel_value=-10 \
+--gfs_dir_name_for_training="${GFS_DIR_NAME}" \
+--target_dir_name_for_training="${TARGET_DIR_NAME}" \
+--gfs_forecast_target_dir_name_for_training="${GFS_FORECAST_TARGET_DIR_NAME}" \
+--gfs_init_date_limit_strings_for_training "20190101" "20201210" \
+--gfs_dir_name_for_validation="${GFS_DIR_NAME}" \
+--target_dir_name_for_validation="${TARGET_DIR_NAME}" \
+--gfs_forecast_target_dir_name_for_validation="${GFS_FORECAST_TARGET_DIR_NAME}" \
+--gfs_init_date_limit_strings_for_validation "20210101" "20211210" \
+--num_epochs=1000 \
+--num_training_batches_per_epoch=24 \
+--num_validation_batches_per_epoch=6
