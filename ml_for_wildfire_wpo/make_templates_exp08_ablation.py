@@ -23,21 +23,22 @@ OUTPUT_DIR_NAME = (
     'experiment08_ablation/templates'
 )
 
-# TODO(thunderhoser): I still need to do the DSR fuckery in the loss function!
 CHANNEL_WEIGHTS = numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004])
 MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856])
 
-LOSS_FUNCTION = custom_losses.dual_weighted_mse(
+LOSS_FUNCTION = custom_losses.dual_weighted_mse_constrained_dsr(
     channel_weights=CHANNEL_WEIGHTS,
     max_dual_weight_by_channel=MAX_DUAL_WEIGHTS,
+    fwi_index=5,
     expect_ensemble=False,
     function_name='loss_dwmse'
 )
 
 LOSS_FUNCTION_STRING = (
-    'custom_losses.dual_weighted_mse('
+    'custom_losses.dual_weighted_mse_constrained_dsr('
     'channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), '
     'max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), '
+    'fwi_index=5, '
     'expect_ensemble=False, '
     'function_name="loss_dwmse")'
 )
@@ -49,49 +50,49 @@ METRIC_FUNCTIONS = [
     custom_metrics.max_prediction_unmasked(channel_index=3, expect_ensemble=False, function_name='isi_max_prediction'),
     custom_metrics.max_prediction_unmasked(channel_index=4, expect_ensemble=False, function_name='bui_max_prediction'),
     custom_metrics.max_prediction_unmasked(channel_index=5, expect_ensemble=False, function_name='fwi_max_prediction'),
-    custom_metrics.max_prediction_unmasked(channel_index=6, expect_ensemble=False, function_name='dsr_max_prediction'),
+    # custom_metrics.max_prediction_unmasked(channel_index=6, expect_ensemble=False, function_name='dsr_max_prediction'),
     custom_metrics.max_prediction_anywhere(channel_index=0, expect_ensemble=False, function_name='ffmc_max_prediction_anywhere'),
     custom_metrics.max_prediction_anywhere(channel_index=1, expect_ensemble=False, function_name='dmc_max_prediction_anywhere'),
     custom_metrics.max_prediction_anywhere(channel_index=2, expect_ensemble=False, function_name='dc_max_prediction_anywhere'),
     custom_metrics.max_prediction_anywhere(channel_index=3, expect_ensemble=False, function_name='isi_max_prediction_anywhere'),
     custom_metrics.max_prediction_anywhere(channel_index=4, expect_ensemble=False, function_name='bui_max_prediction_anywhere'),
     custom_metrics.max_prediction_anywhere(channel_index=5, expect_ensemble=False, function_name='fwi_max_prediction_anywhere'),
-    custom_metrics.max_prediction_anywhere(channel_index=6, expect_ensemble=False, function_name='dsr_max_prediction_anywhere'),
+    # custom_metrics.max_prediction_anywhere(channel_index=6, expect_ensemble=False, function_name='dsr_max_prediction_anywhere'),
     custom_metrics.mean_squared_error_unmasked(channel_index=0, expect_ensemble=False, function_name='ffmc_mse'),
     custom_metrics.mean_squared_error_unmasked(channel_index=1, expect_ensemble=False, function_name='dmc_mse'),
     custom_metrics.mean_squared_error_unmasked(channel_index=2, expect_ensemble=False, function_name='dc_mse'),
     custom_metrics.mean_squared_error_unmasked(channel_index=3, expect_ensemble=False, function_name='isi_mse'),
     custom_metrics.mean_squared_error_unmasked(channel_index=4, expect_ensemble=False, function_name='bui_mse'),
     custom_metrics.mean_squared_error_unmasked(channel_index=5, expect_ensemble=False, function_name='fwi_mse'),
-    custom_metrics.mean_squared_error_unmasked(channel_index=6, expect_ensemble=False, function_name='dsr_mse'),
+    # custom_metrics.mean_squared_error_unmasked(channel_index=6, expect_ensemble=False, function_name='dsr_mse'),
     custom_metrics.mean_squared_error_anywhere(channel_index=0, expect_ensemble=False, function_name='ffmc_mse_anywhere'),
     custom_metrics.mean_squared_error_anywhere(channel_index=1, expect_ensemble=False, function_name='dmc_mse_anywhere'),
     custom_metrics.mean_squared_error_anywhere(channel_index=2, expect_ensemble=False, function_name='dc_mse_anywhere'),
     custom_metrics.mean_squared_error_anywhere(channel_index=3, expect_ensemble=False, function_name='isi_mse_anywhere'),
     custom_metrics.mean_squared_error_anywhere(channel_index=4, expect_ensemble=False, function_name='bui_mse_anywhere'),
     custom_metrics.mean_squared_error_anywhere(channel_index=5, expect_ensemble=False, function_name='fwi_mse_anywhere'),
-    custom_metrics.mean_squared_error_anywhere(channel_index=6, expect_ensemble=False, function_name='dsr_mse_anywhere'),
+    # custom_metrics.mean_squared_error_anywhere(channel_index=6, expect_ensemble=False, function_name='dsr_mse_anywhere'),
     custom_metrics.dual_weighted_mse_unmasked(channel_index=0, expect_ensemble=False, function_name='ffmc_dwmse'),
     custom_metrics.dual_weighted_mse_unmasked(channel_index=1, expect_ensemble=False, function_name='dmc_dwmse'),
     custom_metrics.dual_weighted_mse_unmasked(channel_index=2, expect_ensemble=False, function_name='dc_dwmse'),
     custom_metrics.dual_weighted_mse_unmasked(channel_index=3, expect_ensemble=False, function_name='isi_dwmse'),
     custom_metrics.dual_weighted_mse_unmasked(channel_index=4, expect_ensemble=False, function_name='bui_dwmse'),
     custom_metrics.dual_weighted_mse_unmasked(channel_index=5, expect_ensemble=False, function_name='fwi_dwmse'),
-    custom_metrics.dual_weighted_mse_unmasked(channel_index=6, expect_ensemble=False, function_name='dsr_dwmse'),
+    # custom_metrics.dual_weighted_mse_unmasked(channel_index=6, expect_ensemble=False, function_name='dsr_dwmse'),
     custom_metrics.dual_weighted_mse_anywhere(channel_index=0, expect_ensemble=False, function_name='ffmc_dwmse_anywhere'),
     custom_metrics.dual_weighted_mse_anywhere(channel_index=1, expect_ensemble=False, function_name='dmc_dwmse_anywhere'),
     custom_metrics.dual_weighted_mse_anywhere(channel_index=2, expect_ensemble=False, function_name='dc_dwmse_anywhere'),
     custom_metrics.dual_weighted_mse_anywhere(channel_index=3, expect_ensemble=False, function_name='isi_dwmse_anywhere'),
     custom_metrics.dual_weighted_mse_anywhere(channel_index=4, expect_ensemble=False, function_name='bui_dwmse_anywhere'),
     custom_metrics.dual_weighted_mse_anywhere(channel_index=5, expect_ensemble=False, function_name='fwi_dwmse_anywhere'),
-    custom_metrics.dual_weighted_mse_anywhere(channel_index=6, expect_ensemble=False, function_name='dsr_dwmse_anywhere'),
+    # custom_metrics.dual_weighted_mse_anywhere(channel_index=6, expect_ensemble=False, function_name='dsr_dwmse_anywhere'),
     custom_losses.dual_weighted_mse_1channel(channel_index=0, channel_weight=0.02562263, max_dual_weight=96.4105, expect_ensemble=False, function_name='ffmc_dwmse_in_loss'),
     custom_losses.dual_weighted_mse_1channel(channel_index=1, channel_weight=0.00373885, max_dual_weight=303.9126, expect_ensemble=False, function_name='dmc_dwmse_in_loss'),
     custom_losses.dual_weighted_mse_1channel(channel_index=2, channel_weight=0.00008940, max_dual_weight=1741.9033, expect_ensemble=False, function_name='dc_dwmse_in_loss'),
     custom_losses.dual_weighted_mse_1channel(channel_index=3, channel_weight=0.60291427, max_dual_weight=23.1660, expect_ensemble=False, function_name='isi_dwmse_in_loss'),
     custom_losses.dual_weighted_mse_1channel(channel_index=4, channel_weight=0.00251213, max_dual_weight=361.6984, expect_ensemble=False, function_name='bui_dwmse_in_loss'),
     custom_losses.dual_weighted_mse_1channel(channel_index=5, channel_weight=0.08761268, max_dual_weight=61.3669, expect_ensemble=False, function_name='fwi_dwmse_in_loss'),
-    custom_losses.dual_weighted_mse_1channel(channel_index=6, channel_weight=0.27751004, max_dual_weight=40.1856, expect_ensemble=False, function_name='dsr_dwmse_in_loss')
+    # custom_losses.dual_weighted_mse_1channel(channel_index=6, channel_weight=0.27751004, max_dual_weight=40.1856, expect_ensemble=False, function_name='dsr_dwmse_in_loss')
 ]
 
 METRIC_FUNCTION_STRINGS = [
@@ -101,49 +102,49 @@ METRIC_FUNCTION_STRINGS = [
     'custom_metrics.max_prediction_unmasked(channel_index=3, expect_ensemble=False, function_name="isi_max_prediction")',
     'custom_metrics.max_prediction_unmasked(channel_index=4, expect_ensemble=False, function_name="bui_max_prediction")',
     'custom_metrics.max_prediction_unmasked(channel_index=5, expect_ensemble=False, function_name="fwi_max_prediction")',
-    'custom_metrics.max_prediction_unmasked(channel_index=6, expect_ensemble=False, function_name="dsr_max_prediction")',
+    # 'custom_metrics.max_prediction_unmasked(channel_index=6, expect_ensemble=False, function_name="dsr_max_prediction")',
     'custom_metrics.max_prediction_anywhere(channel_index=0, expect_ensemble=False, function_name="ffmc_max_prediction_anywhere")',
     'custom_metrics.max_prediction_anywhere(channel_index=1, expect_ensemble=False, function_name="dmc_max_prediction_anywhere")',
     'custom_metrics.max_prediction_anywhere(channel_index=2, expect_ensemble=False, function_name="dc_max_prediction_anywhere")',
     'custom_metrics.max_prediction_anywhere(channel_index=3, expect_ensemble=False, function_name="isi_max_prediction_anywhere")',
     'custom_metrics.max_prediction_anywhere(channel_index=4, expect_ensemble=False, function_name="bui_max_prediction_anywhere")',
     'custom_metrics.max_prediction_anywhere(channel_index=5, expect_ensemble=False, function_name="fwi_max_prediction_anywhere")',
-    'custom_metrics.max_prediction_anywhere(channel_index=6, expect_ensemble=False, function_name="dsr_max_prediction_anywhere")',
+    # 'custom_metrics.max_prediction_anywhere(channel_index=6, expect_ensemble=False, function_name="dsr_max_prediction_anywhere")',
     'custom_metrics.mean_squared_error_unmasked(channel_index=0, expect_ensemble=False, function_name="ffmc_mse")',
     'custom_metrics.mean_squared_error_unmasked(channel_index=1, expect_ensemble=False, function_name="dmc_mse")',
     'custom_metrics.mean_squared_error_unmasked(channel_index=2, expect_ensemble=False, function_name="dc_mse")',
     'custom_metrics.mean_squared_error_unmasked(channel_index=3, expect_ensemble=False, function_name="isi_mse")',
     'custom_metrics.mean_squared_error_unmasked(channel_index=4, expect_ensemble=False, function_name="bui_mse")',
     'custom_metrics.mean_squared_error_unmasked(channel_index=5, expect_ensemble=False, function_name="fwi_mse")',
-    'custom_metrics.mean_squared_error_unmasked(channel_index=6, expect_ensemble=False, function_name="dsr_mse")',
+    # 'custom_metrics.mean_squared_error_unmasked(channel_index=6, expect_ensemble=False, function_name="dsr_mse")',
     'custom_metrics.mean_squared_error_anywhere(channel_index=0, expect_ensemble=False, function_name="ffmc_mse_anywhere")',
     'custom_metrics.mean_squared_error_anywhere(channel_index=1, expect_ensemble=False, function_name="dmc_mse_anywhere")',
     'custom_metrics.mean_squared_error_anywhere(channel_index=2, expect_ensemble=False, function_name="dc_mse_anywhere")',
     'custom_metrics.mean_squared_error_anywhere(channel_index=3, expect_ensemble=False, function_name="isi_mse_anywhere")',
     'custom_metrics.mean_squared_error_anywhere(channel_index=4, expect_ensemble=False, function_name="bui_mse_anywhere")',
     'custom_metrics.mean_squared_error_anywhere(channel_index=5, expect_ensemble=False, function_name="fwi_mse_anywhere")',
-    'custom_metrics.mean_squared_error_anywhere(channel_index=6, expect_ensemble=False, function_name="dsr_mse_anywhere")',
+    # 'custom_metrics.mean_squared_error_anywhere(channel_index=6, expect_ensemble=False, function_name="dsr_mse_anywhere")',
     'custom_metrics.dual_weighted_mse_unmasked(channel_index=0, expect_ensemble=False, function_name="ffmc_dwmse")',
     'custom_metrics.dual_weighted_mse_unmasked(channel_index=1, expect_ensemble=False, function_name="dmc_dwmse")',
     'custom_metrics.dual_weighted_mse_unmasked(channel_index=2, expect_ensemble=False, function_name="dc_dwmse")',
     'custom_metrics.dual_weighted_mse_unmasked(channel_index=3, expect_ensemble=False, function_name="isi_dwmse")',
     'custom_metrics.dual_weighted_mse_unmasked(channel_index=4, expect_ensemble=False, function_name="bui_dwmse")',
     'custom_metrics.dual_weighted_mse_unmasked(channel_index=5, expect_ensemble=False, function_name="fwi_dwmse")',
-    'custom_metrics.dual_weighted_mse_unmasked(channel_index=6, expect_ensemble=False, function_name="dsr_dwmse")',
+    # 'custom_metrics.dual_weighted_mse_unmasked(channel_index=6, expect_ensemble=False, function_name="dsr_dwmse")',
     'custom_metrics.dual_weighted_mse_anywhere(channel_index=0, expect_ensemble=False, function_name="ffmc_dwmse_anywhere")',
     'custom_metrics.dual_weighted_mse_anywhere(channel_index=1, expect_ensemble=False, function_name="dmc_dwmse_anywhere")',
     'custom_metrics.dual_weighted_mse_anywhere(channel_index=2, expect_ensemble=False, function_name="dc_dwmse_anywhere")',
     'custom_metrics.dual_weighted_mse_anywhere(channel_index=3, expect_ensemble=False, function_name="isi_dwmse_anywhere")',
     'custom_metrics.dual_weighted_mse_anywhere(channel_index=4, expect_ensemble=False, function_name="bui_dwmse_anywhere")',
     'custom_metrics.dual_weighted_mse_anywhere(channel_index=5, expect_ensemble=False, function_name="fwi_dwmse_anywhere")',
-    'custom_metrics.dual_weighted_mse_anywhere(channel_index=6, expect_ensemble=False, function_name="dsr_dwmse_anywhere")',
+    # 'custom_metrics.dual_weighted_mse_anywhere(channel_index=6, expect_ensemble=False, function_name="dsr_dwmse_anywhere")',
     'custom_losses.dual_weighted_mse_1channel(channel_index=0, channel_weight=0.02562263, max_dual_weight=96.4105, expect_ensemble=False, function_name="ffmc_dwmse_in_loss")',
     'custom_losses.dual_weighted_mse_1channel(channel_index=1, channel_weight=0.00373885, max_dual_weight=303.9126, expect_ensemble=False, function_name="dmc_dwmse_in_loss")',
     'custom_losses.dual_weighted_mse_1channel(channel_index=2, channel_weight=0.00008940, max_dual_weight=1741.9033, expect_ensemble=False, function_name="dc_dwmse_in_loss")',
     'custom_losses.dual_weighted_mse_1channel(channel_index=3, channel_weight=0.60291427, max_dual_weight=23.1660, expect_ensemble=False, function_name="isi_dwmse_in_loss")',
     'custom_losses.dual_weighted_mse_1channel(channel_index=4, channel_weight=0.00251213, max_dual_weight=361.6984, expect_ensemble=False, function_name="bui_dwmse_in_loss")',
     'custom_losses.dual_weighted_mse_1channel(channel_index=5, channel_weight=0.08761268, max_dual_weight=61.3669, expect_ensemble=False, function_name="fwi_dwmse_in_loss")',
-    'custom_losses.dual_weighted_mse_1channel(channel_index=6, channel_weight=0.27751004, max_dual_weight=40.1856, expect_ensemble=False, function_name="dsr_dwmse_in_loss")'
+    # 'custom_losses.dual_weighted_mse_1channel(channel_index=6, channel_weight=0.27751004, max_dual_weight=40.1856, expect_ensemble=False, function_name="dsr_dwmse_in_loss")'
 ]
 
 NUM_CONV_LAYERS_PER_BLOCK = 1
@@ -220,10 +221,10 @@ def _run():
     This is effectively the main method.
     """
 
-    for i in range(GFS_PRESSURE_LEVEL_COUNTS_AXIS1):
-        for j in range(GFS_2D_VARIABLE_COUNTS_AXIS2):
-            for k in range(ERA5_VARIABLE_COUNTS_AXIS3):
-                for l in range(GFS_TARGET_LEAD_TIME_COUNTS_AXIS4):
+    for i in range(len(GFS_PRESSURE_LEVEL_COUNTS_AXIS1)):
+        for j in range(len(GFS_2D_VARIABLE_COUNTS_AXIS2)):
+            for k in range(len(ERA5_VARIABLE_COUNTS_AXIS3)):
+                for l in range(len(GFS_TARGET_LEAD_TIME_COUNTS_AXIS4)):
                     option_dict = copy.deepcopy(DEFAULT_OPTION_DICT)
 
                     these_dim_3d = numpy.array([
