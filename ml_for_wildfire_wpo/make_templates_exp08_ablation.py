@@ -151,6 +151,11 @@ NUM_CONV_LAYERS_PER_BLOCK = 1
 NUM_GFS_LEAD_TIMES = 2
 NUM_GRAD_ACCUM_STEPS = 3
 
+OPTIMIZER_FUNCTION = keras.optimizers.Nadam(gradient_accumulation_steps=3)
+OPTIMIZER_FUNCTION_STRING = (
+    'keras.optimizers.Nadam(gradient_accumulation_steps=3)'
+)
+
 DEFAULT_OPTION_DICT = {
     # chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY: numpy.array(
     #     [265, 537, 2, NUM_GFS_LEAD_TIMES, 5], dtype=int
@@ -201,13 +206,9 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.L1_WEIGHT_KEY: 0.,
     chiu_net_pp_arch.L2_WEIGHT_KEY: 1e-6,
     chiu_net_pp_arch.USE_BATCH_NORM_KEY: True,
-    chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 1
+    chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 1,
+    chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
 }
-
-OPTIMIZER_FUNCTION = keras.optimizers.Nadam(gradient_accumulation_steps=3)
-OPTIMIZER_FUNCTION_STRING = (
-    'keras.optimizers.Nadam(gradient_accumulation_steps=3)'
-)
 
 GFS_PRESSURE_LEVEL_COUNTS_AXIS1 = numpy.array([0, 1, 2], dtype=int)
 GFS_2D_VARIABLE_COUNTS_AXIS2 = numpy.array([5, 7], dtype=int)
