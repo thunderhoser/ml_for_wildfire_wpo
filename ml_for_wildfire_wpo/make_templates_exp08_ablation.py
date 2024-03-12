@@ -246,7 +246,7 @@ def _run():
                     these_dim_laglead = numpy.array([
                         265, 537,
                         3 + GFS_TARGET_LEAD_TIME_COUNTS_AXIS4[l],
-                        7
+                        6
                     ], dtype=int)
 
                     option_dict.update({
