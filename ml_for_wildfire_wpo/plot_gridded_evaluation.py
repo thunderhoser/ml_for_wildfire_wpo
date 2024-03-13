@@ -22,6 +22,7 @@ import regression_evaluation as regression_eval
 import neural_net
 import plotting_utils
 import gfs_plotting
+import fwi_plotting
 
 # TODO(thunderhoser): This script currently handles only regression, not
 # classification.
@@ -85,43 +86,64 @@ METRIC_NAME_TO_COLOUR_MAP_OBJECT = {
 METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING = {
     regression_eval.TARGET_STDEV_KEY: 'sequential',
     regression_eval.PREDICTION_STDEV_KEY: 'sequential',
-    regression_eval.TARGET_MEAN_KEY: 'sequential',
-    regression_eval.PREDICTION_MEAN_KEY: 'sequential',
+    regression_eval.TARGET_MEAN_KEY: 'native',
+    regression_eval.PREDICTION_MEAN_KEY: 'native',
     RMSE_KEY: 'sequential',
     regression_eval.MSE_BIAS_KEY: 'sequential',
     regression_eval.MSE_VARIANCE_KEY: 'sequential',
-    regression_eval.MSE_SKILL_SCORE_KEY: 'sequential',
+    regression_eval.MSE_SKILL_SCORE_KEY: 'diverging_weird',
     regression_eval.DWMSE_KEY: 'sequential',
-    regression_eval.DWMSE_SKILL_SCORE_KEY: 'sequential',
+    regression_eval.DWMSE_SKILL_SCORE_KEY: 'diverging_weird',
     regression_eval.KS_STATISTIC_KEY: 'sequential',
     regression_eval.KS_P_VALUE_KEY: 'sequential',
     regression_eval.MAE_KEY: 'sequential',
-    regression_eval.MAE_SKILL_SCORE_KEY: 'sequential',
+    regression_eval.MAE_SKILL_SCORE_KEY: 'diverging_weird',
     regression_eval.BIAS_KEY: 'diverging',
-    regression_eval.CORRELATION_KEY: 'sequential',
-    regression_eval.KGE_KEY: 'sequential',
+    regression_eval.CORRELATION_KEY: 'diverging',
+    regression_eval.KGE_KEY: 'diverging_weird',
     regression_eval.RELIABILITY_KEY: 'sequential'
 }
+
+NAN_COLOUR = numpy.full(3, 152. / 255)
 
 FIGURE_WIDTH_INCHES = 15
 FIGURE_HEIGHT_INCHES = 15
 FIGURE_RESOLUTION_DPI = 300
 
 INPUT_FILE_ARG_NAME = 'input_evaluation_file_name'
-MIN_COLOUR_PERCENTILE_ARG_NAME = 'min_colour_percentile'
-MAX_COLOUR_PERCENTILE_ARG_NAME = 'max_colour_percentile'
+METRICS_ARG_NAME = 'metric_names'
+MIN_PERCENTILES_ARG_NAME = 'min_colour_percentiles'
+MAX_PERCENTILES_ARG_NAME = 'max_colour_percentiles'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 INPUT_FILE_HELP_STRING = (
     'Path to input file (will be read by `regression_evaluation.read_file`).'
 )
-MIN_COLOUR_PERCENTILE_HELP_STRING = (
-    'Percentile (in range 0...100) used to determine minimum value in colour '
-    'bar.'
+METRICS_HELP_STRING = (
+    'List of metrics to plot.  Each metric must be in the following list:'
+    '\n{0:s}'
+).format(
+    str(list(METRIC_NAME_TO_VERBOSE.keys()))
 )
-MAX_COLOUR_PERCENTILE_HELP_STRING = (
-    'Percentile (in range 0...100) used to determine max value in colour bar.'
-)
+
+MIN_PERCENTILES_HELP_STRING = (
+    'List of minimum percentiles for each colour scheme (one per metric in the '
+    'list `{0:s}`).  For example, suppose that the second value in the list '
+    '`{0:s}` is "dual_weighted_mean_squared_error" and the second value in '
+    'this list is 1 -- then, for each target variable, the minimum value in '
+    'the colour scheme for DWMSE will be the 1st percentile over values in the '
+    'spatial grid.'
+).format(METRICS_ARG_NAME)
+
+MAX_PERCENTILES_HELP_STRING = (
+    'List of max percentiles for each colour scheme (one per metric in the '
+    'list `{0:s}`).  For example, suppose that the second value in the list '
+    '`{0:s}` is "dual_weighted_mean_squared_error" and the second value in '
+    'this list is 99 -- then, for each target variable, the max value in '
+    'the colour scheme for DWMSE will be the 99th percentile over values in the '
+    'spatial grid.'
+).format(METRICS_ARG_NAME)
+
 OUTPUT_DIR_HELP_STRING = (
     'Name of output directory (figures will be saved here).'
 )
@@ -132,12 +154,16 @@ INPUT_ARG_PARSER.add_argument(
     help=INPUT_FILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + MIN_COLOUR_PERCENTILE_ARG_NAME, type=float, required=True,
-    help=MIN_COLOUR_PERCENTILE_HELP_STRING
+    '--' + METRICS_ARG_NAME, type=str, nargs='+', required=True,
+    help=METRICS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + MAX_COLOUR_PERCENTILE_ARG_NAME, type=float, required=True,
-    help=MAX_COLOUR_PERCENTILE_HELP_STRING
+    '--' + MIN_PERCENTILES_ARG_NAME, type=float, nargs='+', required=True,
+    help=MIN_PERCENTILES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + MAX_PERCENTILES_ARG_NAME, type=float, nargs='+', required=True,
+    help=MAX_PERCENTILES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
@@ -174,6 +200,7 @@ def _plot_one_score(
     figure_object, axes_object = pyplot.subplots(
         1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
     )
+    colour_map_object.set_bad(NAN_COLOUR)
 
     is_longitude_positive_in_west = gfs_plotting.plot_field(
         data_matrix=score_matrix,
@@ -231,15 +258,16 @@ def _plot_one_score(
     pyplot.close(figure_object)
 
 
-def _run(input_file_name, min_colour_percentile, max_colour_percentile,
-         output_dir_name):
+def _run(input_file_name, metric_names, min_colour_percentiles,
+         max_colour_percentiles, output_dir_name):
     """Plots gridded model evaluation.
 
     This is effectively the main method.
 
     :param input_file_name: See documentation at top of file.
-    :param min_colour_percentile: Same.
-    :param max_colour_percentile: Same.
+    :param metric_names: Same.
+    :param min_colour_percentiles: Same.
+    :param max_colour_percentiles: Same.
     :param output_dir_name: Same.
     :raises: ValueError: if the input file contains ungridded, rather than
         gridded, evaluation.
@@ -250,10 +278,20 @@ def _run(input_file_name, min_colour_percentile, max_colour_percentile,
         directory_name=output_dir_name
     )
 
-    error_checking.assert_is_geq(min_colour_percentile, 0.)
-    error_checking.assert_is_leq(min_colour_percentile, 10.)
-    error_checking.assert_is_geq(max_colour_percentile, 90.)
-    error_checking.assert_is_leq(max_colour_percentile, 100.)
+    valid_metric_names = list(METRIC_NAME_TO_VERBOSE.keys())
+    assert all([m in valid_metric_names for m in metric_names])
+
+    num_metrics = len(metric_names)
+    error_checking.assert_is_numpy_array(
+        max_colour_percentiles,
+        exact_dimensions=numpy.array([num_metrics], dtype=int)
+    )
+
+    error_checking.assert_is_leq_numpy_array(max_colour_percentiles, 100.)
+    error_checking.assert_is_geq_numpy_array(min_colour_percentiles, 0.)
+    error_checking.assert_is_greater_numpy_array(
+        max_colour_percentiles - min_colour_percentiles, 0.
+    )
 
     # Do actual stuff.
     print('Reading data from: "{0:s}"...'.format(input_file_name))
@@ -287,88 +325,129 @@ def _run(input_file_name, min_colour_percentile, max_colour_percentile,
     etx = evaluation_table_xarray
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
+    # TODO(thunderhoser): This is a HACK.  I should store the weight matrix in
+    # the evaluation file.
+    mean_target_matrix = numpy.mean(
+        etx[regression_eval.TARGET_MEAN_KEY].values[:, :, 0, ...], axis=-1
+    )
+    mean_prediction_matrix = numpy.mean(
+        etx[regression_eval.PREDICTION_MEAN_KEY].values[:, :, 0, ...], axis=-1
+    )
+    mask_out_matrix = numpy.logical_and(
+        mean_target_matrix < TOLERANCE,
+        mean_prediction_matrix < TOLERANCE
+    )
+
     for k in range(num_target_fields):
-        for this_metric_name in list(METRIC_NAME_TO_VERBOSE.keys()):
-            if this_metric_name == RMSE_KEY:
+        for i in range(len(metric_names)):
+            if metric_names[i] == RMSE_KEY:
                 this_score_matrix = numpy.sqrt(numpy.nanmean(
                     etx[regression_eval.MSE_KEY].values[:, :, k, ...], axis=-1
                 ))
             else:
                 this_score_matrix = (
-                    etx[this_metric_name].values[:, :, k, ...] + 0.
+                    etx[metric_names[i]].values[:, :, k, ...] + 0.
                 )
                 if len(this_score_matrix.shape) > 2:
                     this_score_matrix = numpy.nanmean(
                         this_score_matrix, axis=-1
                     )
 
-            if this_metric_name in [
+            this_score_matrix[mask_out_matrix] = numpy.nan
+
+            if metric_names[i] in [
                     regression_eval.TARGET_MEAN_KEY,
                     regression_eval.PREDICTION_MEAN_KEY
             ]:
-                score_matrix_for_cnorm = numpy.stack([
+                first_matrix = numpy.nanmean(
                     etx[regression_eval.TARGET_MEAN_KEY].values[:, :, k, ...],
-                    etx[regression_eval.PREDICTION_MEAN_KEY].values[:, :, k, ...],
-                ], axis=-1)
-
-                score_matrix_for_cnorm = numpy.nanmean(
-                    score_matrix_for_cnorm, axis=-2
+                    axis=-1
                 )
-            elif this_metric_name in [
+                second_matrix = numpy.nanmean(
+                    etx[regression_eval.PREDICTION_MEAN_KEY].values[:, :, k, ...],
+                    axis=-1
+                )
+
+                first_matrix[mask_out_matrix] = numpy.nan
+                second_matrix[mask_out_matrix] = numpy.nan
+                score_matrix_for_cnorm = numpy.stack(
+                    [first_matrix, second_matrix], axis=-1
+                )
+            elif metric_names[i] in [
                     regression_eval.TARGET_STDEV_KEY,
                     regression_eval.PREDICTION_STDEV_KEY
             ]:
-                score_matrix_for_cnorm = numpy.stack([
+                first_matrix = numpy.nanmean(
                     etx[regression_eval.TARGET_STDEV_KEY].values[:, :, k, ...],
+                    axis=-1
+                )
+                second_matrix = numpy.nanmean(
                     etx[regression_eval.PREDICTION_STDEV_KEY].values[:, :, k, ...],
-                ], axis=-1)
+                    axis=-1
+                )
 
-                score_matrix_for_cnorm = numpy.nanmean(
-                    score_matrix_for_cnorm, axis=-2
+                first_matrix[mask_out_matrix] = numpy.nan
+                second_matrix[mask_out_matrix] = numpy.nan
+                score_matrix_for_cnorm = numpy.stack(
+                    [first_matrix, second_matrix], axis=-1
                 )
             else:
                 score_matrix_for_cnorm = this_score_matrix
 
             colour_norm_type_string = METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING[
-                this_metric_name
+                metric_names[i]
             ]
 
-            if colour_norm_type_string == 'sequential':
-                min_colour_value = numpy.nanpercentile(
-                    score_matrix_for_cnorm, min_colour_percentile
+            if colour_norm_type_string == 'native':
+                colour_map_object, colour_norm_object = (
+                    fwi_plotting.field_to_colour_scheme(target_field_names[k])
                 )
-                max_colour_value = numpy.nanpercentile(
-                    score_matrix_for_cnorm, max_colour_percentile
-                )
-            elif colour_norm_type_string == 'diverging':
-                max_colour_value = numpy.nanpercentile(
-                    numpy.absolute(score_matrix_for_cnorm),
-                    max_colour_percentile
-                )
-                min_colour_value = -1 * max_colour_value
             else:
-                max_colour_value = numpy.nanpercentile(
-                    score_matrix_for_cnorm, max_colour_percentile
+                colour_map_object = METRIC_NAME_TO_COLOUR_MAP_OBJECT[
+                    metric_names[i]
+                ]
+
+                if colour_norm_type_string == 'sequential':
+                    min_colour_value = numpy.nanpercentile(
+                        score_matrix_for_cnorm, min_colour_percentiles[i]
+                    )
+                    max_colour_value = numpy.nanpercentile(
+                        score_matrix_for_cnorm, max_colour_percentiles[i]
+                    )
+                elif colour_norm_type_string == 'diverging_weird':
+                    max_colour_value = numpy.nanpercentile(
+                        score_matrix_for_cnorm, max_colour_percentiles[i]
+                    )
+                    min_colour_value = -1 * max_colour_value
+                elif colour_norm_type_string == 'diverging':
+                    max_colour_value = numpy.nanpercentile(
+                        numpy.absolute(score_matrix_for_cnorm),
+                        max_colour_percentiles[i]
+                    )
+                    min_colour_value = -1 * max_colour_value
+                else:
+                    max_colour_value = numpy.nanpercentile(
+                        score_matrix_for_cnorm, max_colour_percentiles[i]
+                    )
+                    min_colour_value = -1 * max_colour_value
+
+                if numpy.isnan(max_colour_value):
+                    min_colour_value = 0.
+                    max_colour_value = 1.
+
+                max_colour_value = max([
+                    max_colour_value,
+                    min_colour_value + TOLERANCE
+                ])
+                colour_norm_object = pyplot.Normalize(
+                    vmin=min_colour_value, vmax=max_colour_value
                 )
-                min_colour_value = -1 * max_colour_value
-
-            if numpy.isnan(max_colour_value):
-                min_colour_value = 0.
-                max_colour_value = 1.
-
-            max_colour_value = max([
-                max_colour_value,
-                min_colour_value + TOLERANCE
-            ])
-            colour_norm_object = pyplot.Normalize(
-                vmin=min_colour_value, vmax=max_colour_value
-            )
 
             title_string = (
-                '{0:s}{1:s} for {2:s}\nMin/avg/max = {3:f}/{4:f}/{5:f}'
+                '{0:s}{1:s} for {2:s}\nMin/avg/max = {3:.2g}, {4:.2g}, {5:2g}'
             ).format(
-                METRIC_NAME_TO_VERBOSE[this_metric_name][0].upper(),
-                METRIC_NAME_TO_VERBOSE[this_metric_name][1:],
+                METRIC_NAME_TO_VERBOSE[metric_names[i]][0].upper(),
+                METRIC_NAME_TO_VERBOSE[metric_names[i]][1:],
                 TARGET_FIELD_NAME_TO_VERBOSE[target_field_names[k]],
                 numpy.nanmin(this_score_matrix),
                 numpy.nanmean(this_score_matrix),
@@ -378,7 +457,7 @@ def _run(input_file_name, min_colour_percentile, max_colour_percentile,
             output_file_name = '{0:s}/{1:s}_{2:s}.jpg'.format(
                 output_dir_name,
                 target_field_names[k].replace('_', '-'),
-                this_metric_name
+                metric_names[i]
             )
 
             _plot_one_score(
@@ -389,8 +468,7 @@ def _run(input_file_name, min_colour_percentile, max_colour_percentile,
                 etx.coords[regression_eval.LONGITUDE_DIM].values,
                 border_latitudes_deg_n=border_latitudes_deg_n,
                 border_longitudes_deg_e=border_longitudes_deg_e,
-                colour_map_object=
-                METRIC_NAME_TO_COLOUR_MAP_OBJECT[this_metric_name],
+                colour_map_object=colour_map_object,
                 colour_norm_object=colour_norm_object,
                 title_string=title_string,
                 output_file_name=output_file_name
@@ -402,11 +480,14 @@ if __name__ == '__main__':
 
     _run(
         input_file_name=getattr(INPUT_ARG_OBJECT, INPUT_FILE_ARG_NAME),
-        min_colour_percentile=getattr(
-            INPUT_ARG_OBJECT, MIN_COLOUR_PERCENTILE_ARG_NAME
+        metric_names=getattr(INPUT_ARG_OBJECT, METRICS_ARG_NAME),
+        min_colour_percentiles=numpy.array(
+            getattr(INPUT_ARG_OBJECT, MIN_PERCENTILES_ARG_NAME),
+            dtype=float
         ),
-        max_colour_percentile=getattr(
-            INPUT_ARG_OBJECT, MAX_COLOUR_PERCENTILE_ARG_NAME
+        max_colour_percentiles=numpy.array(
+            getattr(INPUT_ARG_OBJECT, MAX_PERCENTILES_ARG_NAME),
+            dtype=float
         ),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
