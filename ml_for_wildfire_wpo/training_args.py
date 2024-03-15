@@ -338,7 +338,7 @@ def add_input_args(parser_object):
     )
     parser_object.add_argument(
         '--' + PLATEAU_MULTIPLIER_ARG_NAME, type=float, required=False,
-        default=0.6, help=PLATEAU_MULTIPLIER_HELP_STRING
+        default=0.9, help=PLATEAU_MULTIPLIER_HELP_STRING
     )
     parser_object.add_argument(
         '--' + EARLY_STOPPING_PATIENCE_ARG_NAME, type=int, required=False,
