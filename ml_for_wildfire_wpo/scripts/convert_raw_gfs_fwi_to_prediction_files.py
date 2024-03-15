@@ -174,7 +174,7 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
     prediction_matrix = numpy.stack([
         gfs_daily_utils.get_field(
             daily_gfs_table_xarray=daily_gfs_table_xarray, field_name=f
-        ) for f in TARGET_FIELD_NAMES
+        )[..., 0] for f in TARGET_FIELD_NAMES
     ], axis=-1)
 
     # Create target matrix.
@@ -300,7 +300,9 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
         loss_function_string='keras.losses.mse',
         plateau_patience_epochs=10,
         plateau_learning_rate_multiplier=0.6,
-        early_stopping_patience_epochs=50
+        early_stopping_patience_epochs=50,
+        metric_function_strings=[],
+        optimizer_function_string='keras.optimizers.Nadam()'
     )
 
     # Write prediction file.

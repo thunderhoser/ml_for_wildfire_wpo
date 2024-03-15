@@ -1919,6 +1919,20 @@ def read_metafile(pickle_file_name):
                 metadata_dict[METRIC_FUNCTIONS_KEY][i].replace(s_orig, s_new)
             )
 
+    # # TODO(thunderhoser): HACK to change target weights for 2-var models.
+    # orig_strings = ['0.9571', '0.0429']
+    # new_strings = ['0.91064912', '0.08935088']
+    #
+    # for s_orig, s_new in zip(orig_strings, new_strings):
+    #     metadata_dict[LOSS_FUNCTION_KEY] = (
+    #         metadata_dict[LOSS_FUNCTION_KEY].replace(s_orig, s_new)
+    #     )
+    #
+    #     for i in range(len(metadata_dict[METRIC_FUNCTIONS_KEY])):
+    #         metadata_dict[METRIC_FUNCTIONS_KEY][i] = (
+    #             metadata_dict[METRIC_FUNCTIONS_KEY][i].replace(s_orig, s_new)
+    #         )
+
     missing_keys = list(set(METADATA_KEYS) - set(metadata_dict.keys()))
     if len(missing_keys) == 0:
         return metadata_dict

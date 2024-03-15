@@ -436,7 +436,7 @@ def _run(input_file_name, metric_names, min_colour_percentiles,
                 )
 
             title_string = (
-                '{0:s}{1:s} for {2:s}\nMin/avg/max = {3:.2g}, {4:.2g}, {5:2g}'
+                '{0:s}{1:s} for {2:s}\nMin/avg/max = {3:.2g}, {4:.2g}, {5:.2g}'
             ).format(
                 METRIC_NAME_TO_VERBOSE[metric_names[i]][0].upper(),
                 METRIC_NAME_TO_VERBOSE[metric_names[i]][1:],
