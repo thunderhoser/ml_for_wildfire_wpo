@@ -13,6 +13,7 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import time_conversion
 import prediction_io
+import canadian_fwi_utils
 import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
@@ -116,8 +117,6 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
         gfs_forecast_target_dir_name
     )
     print(SEPARATOR_STRING)
-
-    from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 
     target_field_names = copy.deepcopy(
         validation_option_dict[neural_net.TARGET_FIELDS_KEY]
