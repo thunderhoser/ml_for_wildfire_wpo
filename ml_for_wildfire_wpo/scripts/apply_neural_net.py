@@ -1,11 +1,11 @@
 """Applies trained neural net -- inference time!"""
 
-import argparse
 import copy
-
+import argparse
 import numpy
 from gewittergefahr.gg_utils import time_conversion
 from ml_for_wildfire_wpo.io import prediction_io
+from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 from ml_for_wildfire_wpo.machine_learning import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
@@ -110,8 +110,6 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     )
     print(SEPARATOR_STRING)
 
-    from ml_for_wildfire_wpo.utils import canadian_fwi_utils
-
     target_field_names = copy.deepcopy(
         validation_option_dict[neural_net.TARGET_FIELDS_KEY]
     )
@@ -186,7 +184,7 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             prediction_matrix=prediction_matrix[0, ...],
             grid_latitudes_deg_n=grid_latitudes_deg_n,
             grid_longitudes_deg_e=grid_longitudes_deg_e,
-            field_names=validation_option_dict[neural_net.TARGET_FIELDS_KEY],
+            field_names=target_field_names,
             init_date_string=this_init_date_string,
             model_file_name=model_file_name
         )
