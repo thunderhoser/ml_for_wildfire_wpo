@@ -1,6 +1,9 @@
 """Applies trained neural net -- inference time!"""
 
 import argparse
+import copy
+
+import numpy
 from gewittergefahr.gg_utils import time_conversion
 from ml_for_wildfire_wpo.io import prediction_io
 from ml_for_wildfire_wpo.machine_learning import neural_net
@@ -107,6 +110,26 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     )
     print(SEPARATOR_STRING)
 
+    from ml_for_wildfire_wpo.utils import canadian_fwi_utils
+
+    target_field_names = copy.deepcopy(
+        validation_option_dict[neural_net.TARGET_FIELDS_KEY]
+    )
+    constrain_dsr = (
+        canadian_fwi_utils.FWI_NAME in target_field_names and
+        canadian_fwi_utils.DSR_NAME not in target_field_names
+    )
+
+    if constrain_dsr:
+        target_field_names.append(canadian_fwi_utils.DSR_NAME)
+        fwi_index = target_field_names.index(canadian_fwi_utils.FWI_NAME)
+    else:
+        fwi_index = None
+
+    print('constrain_dsr = {0:d}'.format(
+        int(constrain_dsr)
+    ))
+
     for this_init_date_string in init_date_strings:
         try:
             data_dict = neural_net.create_data(
@@ -131,6 +154,24 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             num_examples_per_batch=NUM_EXAMPLES_PER_BATCH,
             verbose=True
         )
+
+        if constrain_dsr:
+            predicted_dsr_matrix = 0.0272 * numpy.power(
+                prediction_matrix[..., fwi_index], 1.77
+            )
+            prediction_matrix = numpy.concatenate([
+                prediction_matrix,
+                numpy.expand_dims(predicted_dsr_matrix, axis=-1)
+            ], axis=-1)
+
+            target_dsr_matrix = 0.0272 * numpy.power(
+                target_matrix_with_weights[..., fwi_index], 1.77
+            )
+            target_matrix_with_weights = numpy.concatenate([
+                target_matrix_with_weights[..., :-1],
+                numpy.expand_dims(target_dsr_matrix, axis=-1),
+                target_matrix_with_weights[..., [-1]]
+            ], axis=-1)
 
         output_file_name = prediction_io.find_file(
             directory_name=output_dir_name,
