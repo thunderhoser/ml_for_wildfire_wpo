@@ -19,7 +19,9 @@ import file_system_utils
 import error_checking
 import border_io
 import gfs_daily_io
+import era5_constant_io
 import gfs_daily_utils
+import era5_constant_utils
 import fwi_plotting
 import plotting_utils
 
@@ -37,6 +39,7 @@ INPUT_DIR_ARG_NAME = 'input_dir_name'
 FIELDS_ARG_NAME = 'field_names'
 INIT_DATE_ARG_NAME = 'init_date_string'
 LEAD_TIMES_ARG_NAME = 'lead_times_days'
+ERA5_CONSTANT_FILE_ARG_NAME = 'input_era5_constant_file_name'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -49,6 +52,10 @@ INIT_DATE_HELP_STRING = (
     'at 00Z).  Format should be "yyyymmdd".'
 )
 LEAD_TIMES_HELP_STRING = 'List of lead times.'
+ERA5_CONSTANT_FILE_HELP_STRING = (
+    'Path to file with ERA5 constants, including the land-sea mask.  Will be '
+    'read by `era5_constant_io.read_file`.'
+)
 OUTPUT_DIR_HELP_STRING = (
     'Name of output directory.  Figures will be saved here.'
 )
@@ -69,6 +76,10 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + LEAD_TIMES_ARG_NAME, type=int, nargs='+', required=True,
     help=LEAD_TIMES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + ERA5_CONSTANT_FILE_ARG_NAME, type=str, required=True,
+    help=ERA5_CONSTANT_FILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
@@ -163,7 +174,7 @@ def _plot_one_field(
 
 
 def _run(input_dir_name, field_names, init_date_string, lead_times_days,
-         output_dir_name):
+         era5_constant_file_name, output_dir_name):
     """Plots GFS-based FWI forecasts.
 
     This is effectively the main method.
@@ -172,6 +183,7 @@ def _run(input_dir_name, field_names, init_date_string, lead_times_days,
     :param field_names: Same.
     :param init_date_string: Same.
     :param lead_times_days: Same.
+    :param era5_constant_file_name: Same.
     :param output_dir_name: Same.
     """
 
@@ -191,6 +203,17 @@ def _run(input_dir_name, field_names, init_date_string, lead_times_days,
 
     # Do actual stuff.
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
+
+    print('Reading land-sea mask from: "{0:s}"...'.format(
+        era5_constant_file_name
+    ))
+    era5_constant_table_xarray = era5_constant_io.read_file(
+        era5_constant_file_name
+    )
+    mask_in_matrix = era5_constant_utils.get_field(
+        era5_constant_table_xarray=era5_constant_table_xarray,
+        field_name=era5_constant_utils.LAND_SEA_MASK_NAME
+    )
 
     daily_gfs_file_name = gfs_daily_io.find_file(
         directory_name=input_dir_name, init_date_string=init_date_string,
@@ -219,6 +242,7 @@ def _run(input_dir_name, field_names, init_date_string, lead_times_days,
             data_matrix = dgfst[gfs_daily_utils.DATA_KEY_2D].values[
                 day_index, ..., field_index
             ]
+            data_matrix[mask_in_matrix == 0] = numpy.nan
 
             title_string = (
                 '{0:s}{1:s}\nInit 00Z {2:s}, valid local noon {3:s}'
@@ -266,6 +290,9 @@ if __name__ == '__main__':
         init_date_string=getattr(INPUT_ARG_OBJECT, INIT_DATE_ARG_NAME),
         lead_times_days=numpy.array(
             getattr(INPUT_ARG_OBJECT, LEAD_TIMES_ARG_NAME), dtype=int
+        ),
+        era5_constant_file_name=getattr(
+            INPUT_ARG_OBJECT, ERA5_CONSTANT_FILE_ARG_NAME
         ),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
