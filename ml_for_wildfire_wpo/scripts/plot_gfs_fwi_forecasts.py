@@ -12,6 +12,7 @@ from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.io import border_io
 from ml_for_wildfire_wpo.io import gfs_daily_io
 from ml_for_wildfire_wpo.io import era5_constant_io
+from ml_for_wildfire_wpo.utils import misc_utils
 from ml_for_wildfire_wpo.utils import gfs_daily_utils
 from ml_for_wildfire_wpo.utils import era5_constant_utils
 from ml_for_wildfire_wpo.plotting import fwi_plotting
@@ -196,17 +197,6 @@ def _run(input_dir_name, field_names, init_date_string, lead_times_days,
     # Do actual stuff.
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
-    print('Reading land-sea mask from: "{0:s}"...'.format(
-        era5_constant_file_name
-    ))
-    era5_constant_table_xarray = era5_constant_io.read_file(
-        era5_constant_file_name
-    )
-    mask_in_matrix = era5_constant_utils.get_field(
-        era5_constant_table_xarray=era5_constant_table_xarray,
-        field_name=era5_constant_utils.LAND_SEA_MASK_NAME
-    )
-
     daily_gfs_file_name = gfs_daily_io.find_file(
         directory_name=input_dir_name, init_date_string=init_date_string,
         raise_error_if_missing=True
@@ -215,6 +205,45 @@ def _run(input_dir_name, field_names, init_date_string, lead_times_days,
     print('Reading data from: "{0:s}"...'.format(daily_gfs_file_name))
     daily_gfs_table_xarray = gfs_daily_io.read_file(daily_gfs_file_name)
     dgfst = daily_gfs_table_xarray
+
+    print('Reading land-sea mask from: "{0:s}"...'.format(
+        era5_constant_file_name
+    ))
+    era5_constant_table_xarray = era5_constant_io.read_file(
+        era5_constant_file_name
+    )
+    ect = era5_constant_table_xarray
+
+    desired_row_indices = misc_utils.desired_latitudes_to_rows(
+        grid_latitudes_deg_n=
+        ect.coords[era5_constant_utils.LATITUDE_DIM].values,
+        start_latitude_deg_n=
+        dgfst.coords[gfs_daily_utils.LATITUDE_DIM].values[0],
+        end_latitude_deg_n=
+        dgfst.coords[gfs_daily_utils.LATITUDE_DIM].values[-1]
+    )
+    desired_column_indices = misc_utils.desired_longitudes_to_columns(
+        grid_longitudes_deg_e=
+        ect.coords[era5_constant_utils.LONGITUDE_DIM].values,
+        start_longitude_deg_e=
+        dgfst.coords[gfs_daily_utils.LONGITUDE_DIM].values[0],
+        end_longitude_deg_e=
+        dgfst.coords[gfs_daily_utils.LONGITUDE_DIM].values[-1]
+    )
+
+    ect = era5_constant_utils.subset_by_row(
+        era5_constant_table_xarray=ect,
+        desired_row_indices=desired_row_indices
+    )
+    ect = era5_constant_utils.subset_by_column(
+        era5_constant_table_xarray=ect,
+        desired_column_indices=desired_column_indices
+    )
+    mask_out_matrix = era5_constant_utils.get_field(
+        era5_constant_table_xarray=ect,
+        field_name=era5_constant_utils.LAND_SEA_MASK_NAME
+    )
+    mask_out_matrix = numpy.invert(mask_out_matrix.astype(bool))
 
     for this_forecast_day in lead_times_days:
         day_index = numpy.where(
@@ -234,7 +263,7 @@ def _run(input_dir_name, field_names, init_date_string, lead_times_days,
             data_matrix = dgfst[gfs_daily_utils.DATA_KEY_2D].values[
                 day_index, ..., field_index
             ]
-            data_matrix[mask_in_matrix == 0] = numpy.nan
+            data_matrix[mask_out_matrix] = numpy.nan
 
             title_string = (
                 '{0:s}{1:s}\nInit 00Z {2:s}, valid local noon {3:s}'
