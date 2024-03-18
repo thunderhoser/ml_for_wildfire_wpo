@@ -1,0 +1,73 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_evaluation_ungridded"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=01:00:00
+#SBATCH --array=0-35
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_evaluation_ungridded_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment08_ablation/further_training_reset_optimizer_state/further_training_reset_optimizer_state"
+
+GFS_PRESSURE_LEVEL_SETS_MB=("" "" "" "" "" "" "900" "900" "900" "900" "900" "900" "700-900" "700-900" "700-900" "700-900" "700-900" "700-900" "" "" "" "" "" "" "900" "900" "900" "900" "900" "900" "700-900" "700-900" "700-900" "700-900" "700-900" "700-900")
+GFS_VARIABLE_SETS=("temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres" "temperature_kelvins-specific_humidity_kg_kg01-geopotential_height_m_asl-u_wind_m_s01-v_wind_m_s01-temperature_2m_agl_kelvins-specific_humidity_2m_agl_kg_kg01-u_wind_10m_agl_m_s01-v_wind_10m_agl_m_s01-accumulated_precip_metres-volumetric_soil_moisture_fraction_0to10cm-snow_depth_metres")
+ERA5_VARIABLE_SETS=("" "" "geopotential_m2_s02" "geopotential_m2_s02" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "" "" "geopotential_m2_s02" "geopotential_m2_s02" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "" "" "geopotential_m2_s02" "geopotential_m2_s02" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "" "" "geopotential_m2_s02" "geopotential_m2_s02" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "" "" "geopotential_m2_s02" "geopotential_m2_s02" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "" "" "geopotential_m2_s02" "geopotential_m2_s02" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres" "subgrid_orography_angle_sine-subgrid_orography_angle_cosine-subgrid_orography_angle_anisotropy-geopotential_m2_s02-subgrid_orography_angle_slope-filtered_subgrid_orography_stdev_metres-resolved_orography_stdev_metres")
+GFS_TARGET_LEAD_SETS_DAYS=("" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2" "" "1-2")
+
+gfs_pressure_level_set_mb=${GFS_PRESSURE_LEVEL_SETS_MB[$SLURM_ARRAY_TASK_ID]}
+gfs_variable_set=${GFS_VARIABLE_SETS[$SLURM_ARRAY_TASK_ID]}
+era5_variable_set=${ERA5_VARIABLE_SETS[$SLURM_ARRAY_TASK_ID]}
+gfs_target_lead_set_days=${GFS_TARGET_LEAD_SETS_DAYS[$SLURM_ARRAY_TASK_ID]}
+
+gfs_pressure_level_set_mb=$(echo $gfs_pressure_level_set_mb | tr "-" " ")
+gfs_variable_set=$(echo $gfs_variable_set | tr "-" " ")
+era5_variable_set=$(echo $era5_variable_set | tr "-" " ")
+gfs_target_lead_set_days=$(echo $gfs_target_lead_set_days | tr "-" " ")
+
+num_gfs_pressure_levels=`echo "$gfs_pressure_level_set_mb" | wc -w`
+num_gfs_variables=`echo "$gfs_variable_set" | wc -w`
+num_era5_variables=`echo "$era5_variable_set" | wc -w`
+num_gfs_target_lead_times=`echo "$gfs_target_lead_set_days" | wc -w`
+
+if [ -z "${gfs_pressure_level_set_mb}" ]; then
+    num_gfs_2d_variables=$(( $num_gfs_variables - 0 ))
+else
+    num_gfs_2d_variables=$(( $num_gfs_variables - 5 ))
+fi
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/num-gfs-pressure-levels=${num_gfs_pressure_levels}_num-gfs-2d-vars=${num_gfs_2d_variables}_num-era5-constants=${num_era5_variables}_num-gfs-target-leads=${num_gfs_target_lead_times}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/plot_ungridded_evaluation.py" \
+--input_eval_file_names "${model_dir_name}/validation/ungridded_evaluation.nc" \
+--line_styles "solid" \
+--line_colours "217_95_2" \
+--set_descriptions "model" \
+--plot_full_error_distributions=1 \
+--confidence_level=0.95 \
+--report_metrics_in_titles=1 \
+--output_dir_name="${model_dir_name}/validation/ungridded_evaluation"
