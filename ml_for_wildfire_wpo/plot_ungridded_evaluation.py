@@ -460,6 +460,13 @@ def _run(evaluation_file_names, line_styles, line_colour_strings,
         assert target_field_names == goptd[neural_net.TARGET_FIELDS_KEY]
         assert target_norm_file_name == goptd[neural_net.TARGET_NORM_FILE_KEY]
 
+    # TODO(thunderhoser): This is a HACK.
+    if (
+            canadian_fwi_utils.FWI_NAME in target_field_names and
+            canadian_fwi_utils.DSR_NAME not in target_field_names
+    ):
+        target_field_names.append(canadian_fwi_utils.DSR_NAME)
+
     print('Reading normalization params from: "{0:s}"...'.format(
         target_norm_file_name
     ))
