@@ -64,6 +64,7 @@ echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
 --input_evaluation_file_name="${model_dir_name}/validation/gridded_evaluation.nc" \
---min_colour_percentile=0.1 \
---max_colour_percentile=99.9 \
+--metric_names "target_standard_deviation" "prediction_standard_deviation" "target_mean" "prediction_mean" "root_mean_squared_error" "mse_bias" "mse_variance" "mse_skill_score" "dual_weighted_mean_squared_error" "dwmse_skill_score" "kolmogorov_smirnov_statistic" "kolmogorov_smirnov_p_value" "mean_absolute_error" "mae_skill_score" "bias" "correlation" "kling_gupta_efficiency" "reliability" \
+--min_colour_percentiles 0.1  0.1  0.0   0.0   0.1  0.1  0.1  0.0   0.1  0.0   0.1  0.1  0.1  0.0   0.1  0.0 0.0 0.1 \
+--max_colour_percentiles 99.5 99.5 100.0 100.0 99.5 99.5 99.5 100.0 99.0 100.0 99.9 99.9 99.5 100.0 99.5 100 100 99.5 \
 --output_dir_name="${model_dir_name}/validation/gridded_evaluation"
