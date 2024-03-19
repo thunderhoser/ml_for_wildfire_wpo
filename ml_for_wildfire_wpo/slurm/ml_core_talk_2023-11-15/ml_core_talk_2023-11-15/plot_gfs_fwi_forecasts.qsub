@@ -43,7 +43,7 @@ while ($i <= `expr $SLURM_ARRAY_TASK_ID` && $i <= $#INIT_DATE_STRINGS)
     
     python3 -u "${CODE_DIR_NAME}/plot_gfs_fwi_forecasts.py" \
     --input_dir_name="${INPUT_DIR_NAME}" \
-    --field_names "fine_fuel_moisture_code" \
+    --field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" \
     --init_date_string="${init_date_string}" \
     --input_era5_constant_file_name="${ERA5_CONSTANT_FILE_NAME}" \
     --lead_times_days 1 2 3 4 5 6 7 8 9 10 11 12 13 14 \
