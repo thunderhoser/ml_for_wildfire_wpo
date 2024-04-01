@@ -556,16 +556,24 @@ def dual_weighted_crps_constrained_dsr(
         #     elems=relevant_prediction_tensor
         # )
 
-        mean_prediction_diff_tensor = tensorflow.reduce_mean(
-            K.maximum(
-                K.abs(K.expand_dims(relevant_prediction_tensor, axis=-1)),
-                K.abs(K.expand_dims(relevant_prediction_tensor, axis=-2))
-            ) *
-            K.abs(
-                K.expand_dims(relevant_prediction_tensor, axis=-1) -
-                K.expand_dims(relevant_prediction_tensor, axis=-2)
+        # mean_prediction_diff_tensor = tensorflow.reduce_mean(
+        #     K.maximum(
+        #         K.abs(K.expand_dims(relevant_prediction_tensor, axis=-1)),
+        #         K.abs(K.expand_dims(relevant_prediction_tensor, axis=-2))
+        #     ) *
+        #     K.abs(
+        #         K.expand_dims(relevant_prediction_tensor, axis=-1) -
+        #         K.expand_dims(relevant_prediction_tensor, axis=-2)
+        #     ),
+        #     axis=(-2, -1)
+        # )
+
+        mean_prediction_diff_tensor = K.map_fn(
+            fn=lambda p: K.mean(
+                K.abs(K.expand_dims(p, axis=-1) - K.expand_dims(p, axis=-2)),
+                axis=(-2, -1)
             ),
-            axis=(-2, -1)
+            elems=relevant_prediction_tensor
         )
 
         # output_type = tensorflow.TensorSpec(
