@@ -342,7 +342,7 @@ def add_input_args(parser_object):
     )
     parser_object.add_argument(
         '--' + EARLY_STOPPING_PATIENCE_ARG_NAME, type=int, required=False,
-        default=50, help=EARLY_STOPPING_PATIENCE_HELP_STRING
+        default=100, help=EARLY_STOPPING_PATIENCE_HELP_STRING
     )
 
     return parser_object
