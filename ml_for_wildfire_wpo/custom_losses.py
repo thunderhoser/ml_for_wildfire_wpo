@@ -485,33 +485,15 @@ def dual_weighted_crps_constrained_dsr(
             dual_weight_tensor * absolute_error_tensor, axis=-1
         )
 
-        relevant_prediction_tensor = K_ops.swapaxes(
-            relevant_prediction_tensor, 0, 1
+        relevant_prediction_tensor = tensorflow.transpose(
+            relevant_prediction_tensor, perm=[1, 0, 2, 3, 4]
         )
         censored_relevant_prediction_tensor = K.minimum(
             relevant_prediction_tensor, max_dual_weight_tensor
         )
-        print('relevant_prediction_tensor.shape = {0:s}'.format(
-            str(relevant_prediction_tensor.shape)
-        ))
-        print('censored_relevant_prediction_tensor.shape = {0:s}'.format(
-            str(censored_relevant_prediction_tensor.shape)
-        ))
-
-        # mean_prediction_diff_tensor = tensorflow.vectorized_map(
-        #     fn=lambda p: K.mean(
-        #         K.maximum(
-        #             K.abs(K.expand_dims(p[1], axis=-1)),
-        #             K.abs(K.expand_dims(p[1], axis=-2))
-        #         ) *
-        #         K.abs(
-        #             K.expand_dims(p[0], axis=-1) -
-        #             K.expand_dims(p[0], axis=-2)
-        #         ),
-        #         axis=(-2, -1)
-        #     ),
-        #     elems=(relevant_prediction_tensor, censored_relevant_prediction_tensor)
-        # )
+        censored_relevant_prediction_tensor = K.maximum(
+            censored_relevant_prediction_tensor, -1 * max_dual_weight_tensor
+        )
 
         output_type = tensorflow.TensorSpec(
             shape=relevant_prediction_tensor.shape[1:-1],
@@ -536,36 +518,9 @@ def dual_weighted_crps_constrained_dsr(
             fn_output_signature=output_type
         )
 
-        # TODO: This will lead to wrong results but might be memory-efficient.
-        # mean_prediction_diff_tensor = tensorflow.scan(
-        #     fn=lambda p, q: K.mean(
-        #         K.maximum(
-        #             K.abs(K.expand_dims(q[1], axis=-1)),
-        #             K.abs(K.expand_dims(q[1], axis=-2))
-        #         ) *
-        #         K.abs(
-        #             K.expand_dims(q[0], axis=-1) -
-        #             K.expand_dims(q[0], axis=-2)
-        #         ),
-        #         axis=(-2, -1)
-        #     ),
-        #     elems=(relevant_prediction_tensor[0, ..., 0], [relevant_prediction_tensor, censored_relevant_prediction_tensor]),
-        #     parallel_iterations=1,
-        #     swap_memory=True,
-        #     initializer=relevant_prediction_tensor[0, ..., 0]
-        # )
-
-        print('First mean_prediction_diff_tensor.shape = {0:s}'.format(
-            str(mean_prediction_diff_tensor.shape)
-        ))
-
-        mean_prediction_diff_tensor = K_ops.swapaxes(
-            mean_prediction_diff_tensor, 0, 1
+        mean_prediction_diff_tensor = tensorflow.transpose(
+            mean_prediction_diff_tensor, perm=[1, 0, 2, 3]
         )
-        print('Second mean_prediction_diff_tensor.shape = {0:s}'.format(
-            str(mean_prediction_diff_tensor.shape)
-        ))
-
         error_tensor = channel_weight_tensor * (
             mean_prediction_error_tensor -
             0.5 * mean_prediction_diff_tensor
