@@ -82,7 +82,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --gfs_forecast_target_lead_times_days ${target_lead_time_set_days} \
 --target_normalization_file_name="${TARGET_NORM_FILE_NAME}" \
 --targets_use_quantile_norm=1 \
---num_examples_per_batch=2 \
+--num_examples_per_batch=1 \
 --sentinel_value=-10 \
 --gfs_dir_name_for_training="${GFS_DIR_NAME}" \
 --target_dir_name_for_training="${TARGET_DIR_NAME}" \
@@ -93,5 +93,5 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --gfs_forecast_target_dir_name_for_validation="${GFS_FORECAST_TARGET_DIR_NAME}" \
 --gfs_init_date_limit_strings_for_validation "20210101" "20211210" \
 --num_epochs=1000 \
---num_training_batches_per_epoch=96 \
---num_validation_batches_per_epoch=24
+--num_training_batches_per_epoch=192 \
+--num_validation_batches_per_epoch=48

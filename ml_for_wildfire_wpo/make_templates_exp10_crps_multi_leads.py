@@ -134,9 +134,9 @@ METRIC_FUNCTION_STRINGS = [
 NUM_CONV_LAYERS_PER_BLOCK = 1
 
 # TODO(thunderhoser): Make sure to adjust Slurm script for this!
-OPTIMIZER_FUNCTION = keras.optimizers.Nadam(gradient_accumulation_steps=12)
+OPTIMIZER_FUNCTION = keras.optimizers.Nadam(gradient_accumulation_steps=24)
 OPTIMIZER_FUNCTION_STRING = (
-    'keras.optimizers.Nadam(gradient_accumulation_steps=12)'
+    'keras.optimizers.Nadam(gradient_accumulation_steps=24)'
 )
 
 DEFAULT_OPTION_DICT = {
@@ -189,7 +189,7 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.L1_WEIGHT_KEY: 0.,
     chiu_net_pp_arch.L2_WEIGHT_KEY: 1e-6,
     chiu_net_pp_arch.USE_BATCH_NORM_KEY: True,
-    chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 50,
+    chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 25,
     # chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
 }
 
