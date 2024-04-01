@@ -537,10 +537,10 @@ def dual_weighted_crps_constrained_dsr(
         # )
 
         # TODO: This will lead to wrong results but might be memory-efficient.
-        init_tensor = tensorflow.zeros(
-            shape=relevant_prediction_tensor.shape[1:-1],
-            dtype=relevant_prediction_tensor.dtype
-        )
+        # init_tensor = tensorflow.zeros(
+        #     shape=relevant_prediction_tensor.shape[1:-1],
+        #     dtype=relevant_prediction_tensor.dtype
+        # )
 
         mean_prediction_diff_tensor = tensorflow.scan(
             fn=lambda p, q: K.mean(
