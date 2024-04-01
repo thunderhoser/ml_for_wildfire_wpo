@@ -389,6 +389,7 @@ def dual_weighted_mse_1channel(
     return loss
 
 
+@tensorflow.function
 def dual_weighted_crps_constrained_dsr(
         channel_weights, fwi_index, function_name,
         max_dual_weight_by_channel=None, test_mode=False):
