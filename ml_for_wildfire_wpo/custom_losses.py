@@ -538,14 +538,14 @@ def dual_weighted_crps_constrained_dsr(
 
         # TODO: This will lead to wrong results but might be memory-efficient.
         mean_prediction_diff_tensor = tensorflow.scan(
-            fn=lambda p: K.mean(
+            fn=lambda p, q: K.mean(
                 K.maximum(
-                    K.abs(K.expand_dims(p[1], axis=-1)),
-                    K.abs(K.expand_dims(p[1], axis=-2))
+                    K.abs(K.expand_dims(q, axis=-1)),
+                    K.abs(K.expand_dims(q, axis=-2))
                 ) *
                 K.abs(
-                    K.expand_dims(p[0], axis=-1) -
-                    K.expand_dims(p[0], axis=-2)
+                    K.expand_dims(p, axis=-1) -
+                    K.expand_dims(p, axis=-2)
                 ),
                 axis=(-2, -1)
             ),
