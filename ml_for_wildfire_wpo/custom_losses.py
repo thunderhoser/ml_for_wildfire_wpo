@@ -502,6 +502,7 @@ def dual_weighted_crps_constrained_dsr(
             ),
             elems=relevant_prediction_tensor
         )
+        print(mean_prediction_diff_tensor.shape)
 
         mean_prediction_diff_tensor = K_ops.swapaxes(mean_prediction_diff_tensor, 0, 1)
         print(mean_prediction_diff_tensor.shape)
