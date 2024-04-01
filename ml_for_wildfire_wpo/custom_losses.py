@@ -513,6 +513,11 @@ def dual_weighted_crps_constrained_dsr(
         #     elems=(relevant_prediction_tensor, censored_relevant_prediction_tensor)
         # )
 
+        output_type = tensorflow.TensorSpec(
+            shape=relevant_prediction_tensor.shape[1:-1],
+            dtype=relevant_prediction_tensor.dtype
+        )
+
         mean_prediction_diff_tensor = tensorflow.map_fn(
             fn=lambda p: K.mean(
                 K.maximum(
@@ -526,7 +531,8 @@ def dual_weighted_crps_constrained_dsr(
                 axis=(-2, -1)
             ),
             elems=(relevant_prediction_tensor, censored_relevant_prediction_tensor),
-            parallel_iterations=1
+            parallel_iterations=1,
+            fn_output_signature=output_type
         )
 
         print('First mean_prediction_diff_tensor.shape = {0:s}'.format(
