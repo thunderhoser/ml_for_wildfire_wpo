@@ -189,7 +189,7 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.L1_WEIGHT_KEY: 0.,
     chiu_net_pp_arch.L2_WEIGHT_KEY: 1e-6,
     chiu_net_pp_arch.USE_BATCH_NORM_KEY: True,
-    chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 25,
+    chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 50,
     # chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
 }
 
