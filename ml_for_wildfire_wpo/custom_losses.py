@@ -489,7 +489,12 @@ def dual_weighted_crps_constrained_dsr(
         censored_relevant_prediction_tensor = K.minimum(
             relevant_prediction_tensor, max_dual_weight_tensor
         )
-        print(relevant_prediction_tensor.shape)
+        print('relevant_prediction_tensor.shape = {0:s}'.format(
+            str(relevant_prediction_tensor.shape)
+        ))
+        print('censored_relevant_prediction_tensor.shape = {0:s}'.format(
+            str(censored_relevant_prediction_tensor.shape)
+        ))
 
         mean_prediction_diff_tensor = K.map_fn(
             fn=lambda p: K.mean(
@@ -506,9 +511,14 @@ def dual_weighted_crps_constrained_dsr(
             elems=(relevant_prediction_tensor, censored_relevant_prediction_tensor)
         )
 
-        print(mean_prediction_diff_tensor.shape)
+        print('First mean_prediction_diff_tensor.shape = {0:s}'.format(
+            str(mean_prediction_diff_tensor.shape)
+        ))
+
         mean_prediction_diff_tensor = K_ops.swapaxes(mean_prediction_diff_tensor[:, 0, ...], 0, 1)
-        print(mean_prediction_diff_tensor.shape)
+        print('Second mean_prediction_diff_tensor.shape = {0:s}'.format(
+            str(mean_prediction_diff_tensor.shape)
+        ))
 
         error_tensor = channel_weight_tensor * (
             mean_prediction_error_tensor -
