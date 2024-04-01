@@ -556,26 +556,41 @@ def dual_weighted_crps_constrained_dsr(
         #     elems=relevant_prediction_tensor
         # )
 
-        output_type = tensorflow.TensorSpec(
-            shape=relevant_prediction_tensor.shape[1:-1],
-            dtype=relevant_prediction_tensor.dtype
-        )
-
-        mean_prediction_diff_tensor = tensorflow.map_fn(
-            fn=lambda p: K.mean(
+        mean_prediction_diff_tensor = tensorflow.reduce_mean(
+            K.mean(
                 K.maximum(
-                    K.abs(K.expand_dims(p, axis=-1)),
-                    K.abs(K.expand_dims(p, axis=-2))
+                    K.abs(K.expand_dims(relevant_prediction_tensor, axis=-1)),
+                    K.abs(K.expand_dims(relevant_prediction_tensor, axis=-2))
                 ) *
                 K.abs(
-                    K.expand_dims(p, axis=-1) -
-                    K.expand_dims(p, axis=-2)
+                    K.expand_dims(relevant_prediction_tensor, axis=-1) -
+                    K.expand_dims(relevant_prediction_tensor, axis=-2)
                 ),
                 axis=(-2, -1)
             ),
-            elems=relevant_prediction_tensor,
-            fn_output_signature=output_type
+            axis=(-2, -1)
         )
+
+        # output_type = tensorflow.TensorSpec(
+        #     shape=relevant_prediction_tensor.shape[1:-1],
+        #     dtype=relevant_prediction_tensor.dtype
+        # )
+        #
+        # mean_prediction_diff_tensor = tensorflow.map_fn(
+        #     fn=lambda p: K.mean(
+        #         K.maximum(
+        #             K.abs(K.expand_dims(p, axis=-1)),
+        #             K.abs(K.expand_dims(p, axis=-2))
+        #         ) *
+        #         K.abs(
+        #             K.expand_dims(p, axis=-1) -
+        #             K.expand_dims(p, axis=-2)
+        #         ),
+        #         axis=(-2, -1)
+        #     ),
+        #     elems=relevant_prediction_tensor,
+        #     fn_output_signature=output_type
+        # )
 
         print('First mean_prediction_diff_tensor.shape = {0:s}'.format(
             str(mean_prediction_diff_tensor.shape)
