@@ -484,6 +484,8 @@ def dual_weighted_crps_constrained_dsr(
             dual_weight_tensor * absolute_error_tensor, axis=-1
         )
 
+        relevant_prediction_tensor = K.swapaxes(relevant_prediction_tensor, 0, 1)
+
         mean_prediction_diff_tensor = K.map_fn(
             fn=lambda p: K.mean(
                 K.maximum(
@@ -496,8 +498,10 @@ def dual_weighted_crps_constrained_dsr(
                 ),
                 axis=(-2, -1)
             ),
-            elems=prediction_tensor
+            elems=relevant_prediction_tensor
         )
+
+        mean_prediction_diff_tensor = K.swapaxes(mean_prediction_diff_tensor, 0, 1)
 
         error_tensor = channel_weight_tensor * (
             mean_prediction_error_tensor -
