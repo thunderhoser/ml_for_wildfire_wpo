@@ -537,20 +537,27 @@ def dual_weighted_crps_constrained_dsr(
         # )
 
         # TODO: This will lead to wrong results but might be memory-efficient.
+        init_tensor = tensorflow.zeros(
+            shape=relevant_prediction_tensor.shape[1:-1],
+            dtype=relevant_prediction_tensor.dtype
+        )
+
         mean_prediction_diff_tensor = tensorflow.scan(
             fn=lambda p, q: K.mean(
                 K.maximum(
-                    K.abs(K.expand_dims(q, axis=-1)),
-                    K.abs(K.expand_dims(q, axis=-2))
+                    K.abs(K.expand_dims(q[1], axis=-1)),
+                    K.abs(K.expand_dims(q[1], axis=-2))
                 ) *
                 K.abs(
-                    K.expand_dims(p, axis=-1) -
-                    K.expand_dims(p, axis=-2)
+                    K.expand_dims(q[0], axis=-1) -
+                    K.expand_dims(q[0], axis=-2)
                 ),
                 axis=(-2, -1)
             ),
-            elems=(relevant_prediction_tensor, censored_relevant_prediction_tensor),
-            parallel_iterations=1
+            elems=(init_tensor, [relevant_prediction_tensor, censored_relevant_prediction_tensor]),
+            parallel_iterations=1,
+            swap_memory=True,
+            initializer=init_tensor
         )
 
         print('First mean_prediction_diff_tensor.shape = {0:s}'.format(
