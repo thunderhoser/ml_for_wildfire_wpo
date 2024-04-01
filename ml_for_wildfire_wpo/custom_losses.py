@@ -561,7 +561,7 @@ def dual_weighted_crps_constrained_dsr(
             dtype=relevant_prediction_tensor.dtype
         )
 
-        mean_prediction_diff_tensor = K.map_fn(
+        mean_prediction_diff_tensor = tensorflow.map_fn(
             fn=lambda p: K.mean(
                 K.maximum(
                     K.abs(K.expand_dims(p, axis=-1)),
