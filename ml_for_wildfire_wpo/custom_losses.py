@@ -557,7 +557,7 @@ def dual_weighted_crps_constrained_dsr(
         # )
 
         output_type = tensorflow.TensorSpec(
-            shape=relevant_prediction_tensor.shape[:-1],
+            shape=relevant_prediction_tensor.shape[1:-1],
             dtype=relevant_prediction_tensor.dtype
         )
 
