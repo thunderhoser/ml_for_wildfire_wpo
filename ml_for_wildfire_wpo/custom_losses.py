@@ -389,7 +389,6 @@ def dual_weighted_mse_1channel(
     return loss
 
 
-@tensorflow.function
 def dual_weighted_crps_constrained_dsr(
         channel_weights, fwi_index, function_name,
         max_dual_weight_by_channel=None, test_mode=False):
@@ -403,22 +402,23 @@ def dual_weighted_crps_constrained_dsr(
     :return: loss: Loss function (defined below).
     """
 
-    # error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
-    # error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
-    # error_checking.assert_is_integer(fwi_index)
-    # error_checking.assert_is_geq(fwi_index, 0)
-    # error_checking.assert_is_string(function_name)
-    # error_checking.assert_is_boolean(test_mode)
-    #
-    # if max_dual_weight_by_channel is None:
-    #     max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
-    #
-    # error_checking.assert_is_numpy_array(
-    #     channel_weights,
-    #     exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
-    # )
-    # error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_integer(fwi_index)
+    error_checking.assert_is_geq(fwi_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(test_mode)
 
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    error_checking.assert_is_numpy_array(
+        channel_weights,
+        exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
+    )
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+
+    @tensorflow.function
     def loss(target_tensor, prediction_tensor):
         """Computes loss (dual-weighted CRPS).
 
