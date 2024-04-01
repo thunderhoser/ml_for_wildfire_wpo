@@ -513,30 +513,12 @@ def dual_weighted_crps_constrained_dsr(
         #     elems=(relevant_prediction_tensor, censored_relevant_prediction_tensor)
         # )
 
-        output_type = tensorflow.TensorSpec(
-            shape=relevant_prediction_tensor.shape[1:-1],
-            dtype=relevant_prediction_tensor.dtype
-        )
-
-        mean_prediction_diff_tensor = tensorflow.map_fn(
-            fn=lambda p: K.mean(
-                K.maximum(
-                    K.abs(K.expand_dims(p[1], axis=-1)),
-                    K.abs(K.expand_dims(p[1], axis=-2))
-                ) *
-                K.abs(
-                    K.expand_dims(p[0], axis=-1) -
-                    K.expand_dims(p[0], axis=-2)
-                ),
-                axis=(-2, -1)
-            ),
-            elems=(relevant_prediction_tensor, censored_relevant_prediction_tensor),
-            parallel_iterations=1,
-            swap_memory=True,
-            fn_output_signature=output_type
-        )
-
-        # mean_prediction_diff_tensor = tensorflow.scan(
+        # output_type = tensorflow.TensorSpec(
+        #     shape=relevant_prediction_tensor.shape[1:-1],
+        #     dtype=relevant_prediction_tensor.dtype
+        # )
+        #
+        # mean_prediction_diff_tensor = tensorflow.map_fn(
         #     fn=lambda p: K.mean(
         #         K.maximum(
         #             K.abs(K.expand_dims(p[1], axis=-1)),
@@ -550,8 +532,26 @@ def dual_weighted_crps_constrained_dsr(
         #     ),
         #     elems=(relevant_prediction_tensor, censored_relevant_prediction_tensor),
         #     parallel_iterations=1,
+        #     swap_memory=True,
         #     fn_output_signature=output_type
         # )
+
+        # TODO: This will lead to wrong results but might be memory-efficient.
+        mean_prediction_diff_tensor = tensorflow.scan(
+            fn=lambda p: K.mean(
+                K.maximum(
+                    K.abs(K.expand_dims(p[1], axis=-1)),
+                    K.abs(K.expand_dims(p[1], axis=-2))
+                ) *
+                K.abs(
+                    K.expand_dims(p[0], axis=-1) -
+                    K.expand_dims(p[0], axis=-2)
+                ),
+                axis=(-2, -1)
+            ),
+            elems=(relevant_prediction_tensor, censored_relevant_prediction_tensor),
+            parallel_iterations=1
+        )
 
         print('First mean_prediction_diff_tensor.shape = {0:s}'.format(
             str(mean_prediction_diff_tensor.shape)
