@@ -554,10 +554,10 @@ def dual_weighted_crps_constrained_dsr(
                 ),
                 axis=(-2, -1)
             ),
-            elems=(init_tensor, [relevant_prediction_tensor, censored_relevant_prediction_tensor]),
+            elems=(relevant_prediction_tensor.shape[1:-1], [relevant_prediction_tensor, censored_relevant_prediction_tensor]),
             parallel_iterations=1,
             swap_memory=True,
-            initializer=init_tensor
+            initializer=relevant_prediction_tensor.shape[1:-1]
         )
 
         print('First mean_prediction_diff_tensor.shape = {0:s}'.format(
