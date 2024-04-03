@@ -62,7 +62,7 @@ output_dir_name="${TOP_OUTPUT_DIR_NAME}/nn-lead-time-days=${nn_lead_times_days}_
 echo $output_dir_name
 
 # TODO(thunderhoser): The "while true" just restarts the job if it crashes.  However, in the future I need to be careful, if the input and output model files are not coming from the same place.  For example, if I were using an actual template and not an already-trained model, I would want the template as input for the first iteration through the loop, then the already-trained model as input for subsequent iterations.
-while True; do
+while true; do
     python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
     --input_template_file_name="${template_file_name}" \
     --output_model_dir_name="${output_dir_name}" \
