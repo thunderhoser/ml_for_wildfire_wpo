@@ -11,7 +11,7 @@
 ##SBATCH --ntasks=1
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
-#SBATCH --time=00:05:00
+#SBATCH --time=01:00:00
 #SBATCH --array=0,12,24,36,48,60,72,84,96,108,120,132,144,156,168,180,192,204,216,228,240,252,264,276,288,300,312,324,336
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
