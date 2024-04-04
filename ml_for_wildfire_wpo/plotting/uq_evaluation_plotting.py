@@ -113,12 +113,10 @@ def _plot_means_as_inset(
     inset_axes_object.set_ylim(y_min, y_max)
     inset_axes_object.set_xlim(left=0.)
 
-    for this_tick_object in inset_axes_object.xaxis.get_major_ticks():
-        this_tick_object.label.set_fontsize(INSET_FONT_SIZE)
-        this_tick_object.label.set_rotation('vertical')
-
-    for this_tick_object in inset_axes_object.yaxis.get_major_ticks():
-        this_tick_object.label.set_fontsize(INSET_FONT_SIZE)
+    inset_axes_object.tick_params(
+        axis='x', labelsize=INSET_FONT_SIZE, rotation=90.
+    )
+    inset_axes_object.tick_params(axis='y', labelsize=INSET_FONT_SIZE)
 
     if for_spread_skill_plot:
         anchor_arg = (0.5, -0.25)
@@ -287,7 +285,7 @@ def plot_spread_vs_skill(
 
     title_string = (
         'Spread vs. skill for {0:s}\n'
-        'SSREL = {1:.1f}; SSRAT = {2:.2f}'
+        'SSREL = {1:.2f}; SSRAT = {2:.2f}'
     ).format(
         FIELD_NAME_TO_TITLE[target_field_name],
         spread_skill_reliability,
@@ -374,7 +372,7 @@ def plot_discard_test(
     ).format(
         FIELD_NAME_TO_TITLE[target_field_name],
         100 * mono_fraction,
-        100 * discard_improvement
+        0.01 * discard_improvement
     )
 
     print(title_string)
