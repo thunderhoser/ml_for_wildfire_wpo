@@ -138,7 +138,7 @@ def read_file(netcdf_file_name):
         prediction_table_xarray[FIELD_NAME_KEY].values
     ]
 
-    if ENSEMBLE_MEMBER_DIM not in prediction_table_xarray.coords:
+    if ENSEMBLE_MEMBER_DIM not in prediction_table_xarray.dims:
         prediction_table_xarray = prediction_table_xarray.assign_coords({
             ENSEMBLE_MEMBER_DIM: numpy.array([0], dtype=int)
         })
