@@ -121,14 +121,10 @@ def _plot_means_as_inset(
     inset_axes_object.set_ylim(y_min, y_max)
     inset_axes_object.set_xlim(left=0.)
 
-    for this_tick_object in inset_axes_object.xaxis.get_major_ticks():
-        print(dir(this_tick_object))
-        print(dir(this_tick_object._label))
-        this_tick_object.label.set_fontsize(INSET_FONT_SIZE)
-        this_tick_object.label.set_rotation('vertical')
-
-    for this_tick_object in inset_axes_object.yaxis.get_major_ticks():
-        this_tick_object.label.set_fontsize(INSET_FONT_SIZE)
+    inset_axes_object.tick_params(
+        axis='x', labelsize=INSET_FONT_SIZE, rotation='vertical'
+    )
+    inset_axes_object.tick_params(axis='y', labelsize=INSET_FONT_SIZE)
 
     if for_spread_skill_plot:
         anchor_arg = (0.5, -0.25)
