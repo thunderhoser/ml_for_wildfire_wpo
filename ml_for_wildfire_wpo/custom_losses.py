@@ -5,7 +5,6 @@ import sys
 import numpy
 import tensorflow
 from tensorflow.keras import backend as K
-from tensorflow.keras import ops as K_ops
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))

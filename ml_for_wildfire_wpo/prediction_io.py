@@ -23,6 +23,7 @@ ROW_DIM = 'grid_row'
 COLUMN_DIM = 'grid_column'
 FIELD_DIM = 'field'
 FIELD_CHAR_DIM = 'field_char'
+ENSEMBLE_MEMBER_DIM = 'ensemble_member'
 
 MODEL_FILE_KEY = 'model_file_name'
 INIT_DATE_KEY = 'init_date_string'
@@ -144,6 +145,19 @@ def read_file(netcdf_file_name):
         prediction_table_xarray[FIELD_NAME_KEY].values
     ]
 
+    if ENSEMBLE_MEMBER_DIM not in prediction_table_xarray.coords:
+        prediction_table_xarray = prediction_table_xarray.assign_coords({
+            ENSEMBLE_MEMBER_DIM: numpy.array([0], dtype=int)
+        })
+
+        these_dim = (ROW_DIM, COLUMN_DIM, FIELD_DIM, ENSEMBLE_MEMBER_DIM)
+        these_data = numpy.expand_dims(
+            prediction_table_xarray[PREDICTION_KEY].values, axis=-1
+        )
+        prediction_table_xarray = prediction_table_xarray.assign({
+            PREDICTION_KEY: (these_dim, these_data)
+        })
+
     return prediction_table_xarray.assign({
         FIELD_NAME_KEY: (
             prediction_table_xarray[FIELD_NAME_KEY].dims,
@@ -161,12 +175,13 @@ def write_file(
     M = number of rows in grid
     N = number of columns in grid
     T = number of target fields
+    S = number of ensemble members
 
     :param netcdf_file_name: Path to output file.
     :param target_matrix_with_weights: M-by-N-by-(T + 1) numpy array, where
         target_matrix_with_weights[..., -1] contains weights and
         target_matrix_with_weights[..., :-1] contains target values.
-    :param prediction_matrix: M-by-N-by-T numpy array of predicted target
+    :param prediction_matrix: M-by-N-by-T-by-S numpy array of predicted target
         values.
     :param grid_latitudes_deg_n: length-M numpy array of latitudes (deg north).
     :param grid_longitudes_deg_e: length-N numpy array of longitudes (deg east).
@@ -195,8 +210,11 @@ def write_file(
     error_checking.assert_is_geq_numpy_array(weight_matrix, 0.)
     error_checking.assert_is_leq_numpy_array(weight_matrix, 1.)
 
+    error_checking.assert_is_numpy_array(prediction_matrix, num_dimensions=4)
+
+    ensemble_size = prediction_matrix.shape[3]
     expected_dim = numpy.array(
-        [num_grid_rows, num_grid_columns, num_fields], dtype=int
+        [num_grid_rows, num_grid_columns, num_fields, ensemble_size], dtype=int
     )
     error_checking.assert_is_numpy_array(
         prediction_matrix, exact_dimensions=expected_dim
@@ -247,6 +265,7 @@ def write_file(
     dataset_object.createDimension(COLUMN_DIM, num_grid_columns)
     dataset_object.createDimension(FIELD_DIM, num_fields)
     dataset_object.createDimension(FIELD_CHAR_DIM, num_field_chars)
+    dataset_object.createDimension(ENSEMBLE_MEMBER_DIM, ensemble_size)
 
     these_dim = (ROW_DIM, COLUMN_DIM, FIELD_DIM)
     dataset_object.createVariable(
@@ -254,6 +273,7 @@ def write_file(
     )
     dataset_object.variables[TARGET_KEY][:] = target_matrix
 
+    these_dim = (ROW_DIM, COLUMN_DIM, FIELD_DIM, ENSEMBLE_MEMBER_DIM)
     dataset_object.createVariable(
         PREDICTION_KEY, datatype=numpy.float64, dimensions=these_dim
     )

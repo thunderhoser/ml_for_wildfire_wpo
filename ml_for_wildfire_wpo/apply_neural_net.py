@@ -163,12 +163,12 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
 
         if constrain_dsr:
             predicted_dsr_matrix = 0.0272 * numpy.power(
-                prediction_matrix[..., fwi_index], 1.77
+                prediction_matrix[..., fwi_index, :], 1.77
             )
             prediction_matrix = numpy.concatenate([
                 prediction_matrix,
-                numpy.expand_dims(predicted_dsr_matrix, axis=-1)
-            ], axis=-1)
+                numpy.expand_dims(predicted_dsr_matrix, axis=-2)
+            ], axis=-2)
 
             target_dsr_matrix = 0.0272 * numpy.power(
                 target_matrix_with_weights[..., fwi_index], 1.77

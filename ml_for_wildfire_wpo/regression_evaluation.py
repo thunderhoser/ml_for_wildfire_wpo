@@ -840,7 +840,7 @@ def get_scores_with_bootstrapping(
             ..., these_indices
         ]
         prediction_matrix[i, ...] = tpt[prediction_io.PREDICTION_KEY].values[
-            ..., these_indices
+            ..., these_indices, :
         ]
 
     # TODO(thunderhoser): This is a HACK.  I should use the weight matrix to
