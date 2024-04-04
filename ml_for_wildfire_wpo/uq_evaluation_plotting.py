@@ -122,7 +122,7 @@ def _plot_means_as_inset(
     inset_axes_object.set_xlim(left=0.)
 
     inset_axes_object.tick_params(
-        axis='x', labelsize=INSET_FONT_SIZE, rotation='vertical'
+        axis='x', labelsize=INSET_FONT_SIZE, rotation=90.
     )
     inset_axes_object.tick_params(axis='y', labelsize=INSET_FONT_SIZE)
 
