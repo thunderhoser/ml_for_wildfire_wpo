@@ -241,10 +241,7 @@ def run_discard_test(
 
     # TODO(thunderhoser): This is a HACK.  I should use the weight matrix to
     # actually weight the various scores.
-    weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
     target_matrix[weight_matrix < 0.05] = 0.
-
-    weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
     prediction_matrix[weight_matrix < 0.05] = 0.
 
     # Set up the output table.
