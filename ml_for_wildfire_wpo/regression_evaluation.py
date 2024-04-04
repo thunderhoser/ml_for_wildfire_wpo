@@ -709,6 +709,79 @@ def confidence_interval_to_polygon(
     )))
 
 
+def read_inputs(prediction_file_names, target_field_names):
+    """Reads inputs (predictions and targets) from many files.
+
+    E = number of examples
+    M = number of rows in grid
+    N = number of columns in grid
+    T = number of target fields
+    S = number of ensemble members
+
+    :param prediction_file_names: 1-D list of paths to prediction files.  Each
+        file will be read by `prediction_io.read_file`.
+    :param target_field_names: length-T list of field names desired.
+    :return: target_matrix: E-by-M-by-N-by-T numpy array of target values.
+    :return: prediction_matrix: E-by-M-by-N-by-T-by-S numpy array of
+        predictions.
+    :return: weight_matrix: E-by-M-by-N numpy array of evaluation weights.
+    :return: model_file_name: Path to model that generated predictions.
+    """
+
+    error_checking.assert_is_string_list(prediction_file_names)
+    error_checking.assert_is_string_list(target_field_names)
+
+    num_times = len(prediction_file_names)
+    target_matrix = numpy.array([], dtype=float)
+    prediction_matrix = numpy.array([], dtype=float)
+    weight_matrix = numpy.array([], dtype=float)
+    model_file_name = None
+
+    for i in range(num_times):
+        print('Reading data from: "{0:s}"...'.format(prediction_file_names[i]))
+        this_prediction_table_xarray = prediction_io.read_file(
+            prediction_file_names[i]
+        )
+        tpt = this_prediction_table_xarray
+
+        if model_file_name is None:
+            these_dim = (
+                (num_times,) + tpt[prediction_io.TARGET_KEY].values.shape
+            )
+            target_matrix = numpy.full(these_dim, numpy.nan)
+
+            these_dim = (
+                (num_times,) + tpt[prediction_io.PREDICTION_KEY].values.shape
+            )
+            prediction_matrix = numpy.full(these_dim, numpy.nan)
+
+            these_dim = (
+                (num_times,) + tpt[prediction_io.WEIGHT_KEY].values.shape
+            )
+            weight_matrix = numpy.full(these_dim, numpy.nan)
+
+            model_file_name = copy.deepcopy(
+                tpt.attrs[prediction_io.MODEL_FILE_KEY]
+            )
+
+        weight_matrix[i, ...] = tpt[prediction_io.WEIGHT_KEY].values
+        # assert model_file_name == tpt.attrs[prediction_io.MODEL_FILE_KEY]
+
+        these_indices = numpy.array([
+            numpy.where(tpt[prediction_io.FIELD_NAME_KEY].values == f)[0][0]
+            for f in target_field_names
+        ], dtype=int)
+
+        target_matrix[i, ...] = (
+            tpt[prediction_io.TARGET_KEY].values[..., these_indices]
+        )
+        prediction_matrix[i, ...] = (
+            tpt[prediction_io.PREDICTION_KEY].values[..., these_indices, :]
+        )
+
+    return target_matrix, prediction_matrix, weight_matrix, model_file_name
+
+
 def get_scores_with_bootstrapping(
         prediction_file_names, num_bootstrap_reps,
         target_field_names, num_relia_bins_by_target,
@@ -742,9 +815,6 @@ def get_scores_with_bootstrapping(
     :return: result_table_xarray: xarray table with results (variable and
         dimension names should make the table self-explanatory).
     """
-
-    # TODO(thunderhoser): When I start training ensemble models, I will need to
-    # take the mean here.
 
     error_checking.assert_is_string_list(prediction_file_names)
     error_checking.assert_is_integer(num_bootstrap_reps)
@@ -799,56 +869,22 @@ def get_scores_with_bootstrapping(
                 min_relia_bin_edge_by_target[j]
             )
 
-    num_times = len(prediction_file_names)
-    target_matrix = numpy.array([], dtype=float)
-    prediction_matrix = numpy.array([], dtype=float)
-    weight_matrix = numpy.array([], dtype=float)
-    model_file_name = None
+    (
+        target_matrix, prediction_matrix, weight_matrix, model_file_name
+    ) = read_inputs(
+        prediction_file_names=prediction_file_names,
+        target_field_names=target_field_names
+    )
 
-    for i in range(num_times):
-        print('Reading data from: "{0:s}"...'.format(prediction_file_names[i]))
-        this_prediction_table_xarray = prediction_io.read_file(
-            prediction_file_names[i]
-        )
-        tpt = this_prediction_table_xarray
-
-        if model_file_name is None:
-            these_dim = (
-                (num_times,) + tpt[prediction_io.TARGET_KEY].values.shape
-            )
-            target_matrix = numpy.full(these_dim, numpy.nan)
-            prediction_matrix = numpy.full(these_dim, numpy.nan)
-
-            these_dim = (
-                (num_times,) + tpt[prediction_io.WEIGHT_KEY].values.shape
-            )
-            weight_matrix = numpy.full(these_dim, numpy.nan)
-
-            model_file_name = copy.deepcopy(
-                tpt.attrs[prediction_io.MODEL_FILE_KEY]
-            )
-
-        weight_matrix[i, ...] = tpt[prediction_io.WEIGHT_KEY].values
-        # assert model_file_name == tpt.attrs[prediction_io.MODEL_FILE_KEY]
-
-        these_indices = numpy.array([
-            numpy.where(tpt[prediction_io.FIELD_NAME_KEY].values == f)[0][0]
-            for f in target_field_names
-        ], dtype=int)
-
-        target_matrix[i, ...] = tpt[prediction_io.TARGET_KEY].values[
-            ..., these_indices
-        ]
-        prediction_matrix[i, ...] = tpt[prediction_io.PREDICTION_KEY].values[
-            ..., these_indices, :
-        ]
+    prediction_matrix = numpy.mean(prediction_matrix, axis=-1)
 
     # TODO(thunderhoser): This is a HACK.  I should use the weight matrix to
     # actually weight the various scores.
-    num_channels = target_matrix.shape[-1]
-    for k in range(num_channels):
-        target_matrix[..., k][weight_matrix < 0.05] = 0.
-        prediction_matrix[..., k][weight_matrix < 0.05] = 0.
+    weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
+    target_matrix[weight_matrix < 0.05] = 0.
+
+    # weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
+    prediction_matrix[weight_matrix < 0.05] = 0.
 
     model_metafile_name = neural_net.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=True
