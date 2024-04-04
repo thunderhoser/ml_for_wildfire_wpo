@@ -2130,12 +2130,13 @@ def apply_model(
     M = number of rows in grid
     N = number of columns in grid
     T = number of target fields
+    S = number of ensemble members
 
     :param model_object: Trained neural net (instance of `keras.models.Model`).
     :param predictor_matrices: See output doc for `data_generator`.
     :param num_examples_per_batch: Batch size.
     :param verbose: Boolean flag.  If True, will print progress messages.
-    :return: prediction_matrix: E-by-M-by-N-by-T numpy array of predicted
+    :return: prediction_matrix: E-by-M-by-N-by-T-by-S numpy array of predicted
         values.
     """
 
@@ -2175,7 +2176,7 @@ def apply_model(
     if verbose:
         print('Have applied model to all {0:d} examples!'.format(num_examples))
 
-    while len(prediction_matrix.shape) < 4:
+    while len(prediction_matrix.shape) < 5:
         prediction_matrix = numpy.expand_dims(prediction_matrix, axis=-1)
 
     return prediction_matrix

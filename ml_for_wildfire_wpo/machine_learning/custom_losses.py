@@ -476,21 +476,51 @@ def dual_weighted_crps_constrained_dsr(
             dual_weight_tensor * absolute_error_tensor, axis=-1
         )
 
-        mean_prediction_diff_tensor = K.map_fn(
+        relevant_prediction_tensor = tensorflow.transpose(
+            relevant_prediction_tensor, perm=[1, 0, 2, 3, 4]
+        )
+        censored_relevant_prediction_tensor = K.minimum(
+            K.abs(relevant_prediction_tensor), max_dual_weight_tensor
+        )
+
+        output_type = tensorflow.TensorSpec(
+            shape=relevant_prediction_tensor.shape[1:-1],
+            dtype=relevant_prediction_tensor.dtype
+        )
+
+        # TODO(thunderhoser): In a fresh Colab notebook (albeit one with
+        # Keras 2), map_fn works as expected.  It generates the intermediate
+        # tensors (where the last two axes have size S x S, S being the ensemble
+        # size) individually for each slice along the first axis, i.e., for each
+        # grid row.  After generating the intermediate tensors for one grid row,
+        # map_fn throws out the intermediate tensors, thus conserving memory.
+        # But when I run the code on Hera in Keras 3, map_fn generates the full
+        # intermediate tensor at once -- with dimensions M x E x N x T x S x S
+        # -- and crashes the memory.  I don't know what's causing this to happen
+        # -- maybe Keras 3, maybe something else in the environment, maybe
+        # something weird on Hera?  Anyways, this code works on Hera as long as
+        # I keep the ensemble size down to ~25.
+        mean_prediction_diff_tensor = tensorflow.map_fn(
             fn=lambda p: K.mean(
                 K.maximum(
-                    K.abs(K.expand_dims(K.minimum(p, max_dual_weight_tensor), axis=-1)),
-                    K.abs(K.expand_dims(K.minimum(p, max_dual_weight_tensor), axis=-2))
+                    K.abs(K.expand_dims(p[1], axis=-1)),
+                    K.abs(K.expand_dims(p[1], axis=-2))
                 ) *
                 K.abs(
-                    K.expand_dims(p, axis=-1) -
-                    K.expand_dims(p, axis=-2)
+                    K.expand_dims(p[0], axis=-1) -
+                    K.expand_dims(p[0], axis=-2)
                 ),
                 axis=(-2, -1)
             ),
-            elems=prediction_tensor
+            elems=(relevant_prediction_tensor, censored_relevant_prediction_tensor),
+            parallel_iterations=1,
+            swap_memory=True,
+            fn_output_signature=output_type
         )
 
+        mean_prediction_diff_tensor = tensorflow.transpose(
+            mean_prediction_diff_tensor, perm=[1, 0, 2, 3]
+        )
         error_tensor = channel_weight_tensor * (
             mean_prediction_error_tensor -
             0.5 * mean_prediction_diff_tensor
