@@ -93,14 +93,14 @@ def _run_discard_test_1field(
             numpy.diff(error_values) > 0
         )
         rtx[DISCARD_IMPROVEMENT_KEY].values[j] = numpy.mean(
-            numpy.diff(error_values)
+            numpy.diff(error_values) / numpy.diff(discard_fractions)
         )
     else:
         rtx[MONO_FRACTION_KEY].values[j] = numpy.mean(
             numpy.diff(error_values) < 0
         )
         rtx[DISCARD_IMPROVEMENT_KEY].values[j] = numpy.mean(
-            -1 * numpy.diff(error_values)
+            -1 * numpy.diff(error_values) / numpy.diff(discard_fractions)
         )
 
     result_table_xarray = rtx

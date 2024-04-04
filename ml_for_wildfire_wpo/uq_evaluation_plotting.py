@@ -376,7 +376,7 @@ def plot_discard_test(
 
     title_string = (
         'Discard test for {0:s}\n'
-        'MF = {1:.1f}%; DI = {2:.2f} per %'
+        'MF = {1:.1f}%; DI = {2:.2g} per %'
     ).format(
         FIELD_NAME_TO_TITLE[target_field_name],
         100 * mono_fraction,
