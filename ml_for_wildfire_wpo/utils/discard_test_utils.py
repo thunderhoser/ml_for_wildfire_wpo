@@ -53,7 +53,7 @@ def _run_discard_test_1field(
     num_fractions = len(discard_fractions)
     rtx = result_table_xarray
 
-    uncertainty_matrix = uncertainty_function(prediction_matrix[..., j, :])
+    uncertainty_matrix = uncertainty_function(prediction_matrix)
     deterministic_pred_matrix = numpy.mean(prediction_matrix, axis=-1)
     mask_matrix = numpy.full(uncertainty_matrix.shape, True, dtype=bool)
 
