@@ -293,7 +293,7 @@ def plot_spread_vs_skill(
 
     title_string = (
         'Spread vs. skill for {0:s}\n'
-        'SSREL = {1:.1f}; SSRAT = {2:.2f}'
+        'SSREL = {1:.2f}; SSRAT = {2:.2f}'
     ).format(
         FIELD_NAME_TO_TITLE[target_field_name],
         spread_skill_reliability,
@@ -380,7 +380,7 @@ def plot_discard_test(
     ).format(
         FIELD_NAME_TO_TITLE[target_field_name],
         100 * mono_fraction,
-        100 * discard_improvement
+        0.01 * discard_improvement
     )
 
     print(title_string)

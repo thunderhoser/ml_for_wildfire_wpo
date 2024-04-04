@@ -130,8 +130,8 @@ def get_spread_vs_skill(
 
     # TODO(thunderhoser): This is a HACK.  I should use the weight matrix to
     # actually weight the various scores.
-    target_matrix[weight_matrix < 0.05] = 0.
-    prediction_matrix[weight_matrix < 0.05] = 0.
+    target_matrix[weight_matrix < 0.05] = numpy.nan
+    prediction_matrix[weight_matrix < 0.05] = numpy.nan
 
     # Set up the output table.
     num_grid_rows = target_matrix.shape[1]
@@ -217,8 +217,8 @@ def get_spread_vs_skill(
     ])
 
     # Do actual stuff.
-    mean_prediction_matrix = numpy.mean(prediction_matrix, axis=-1)
-    prediction_stdev_matrix = numpy.std(prediction_matrix, axis=-1, ddof=1)
+    mean_prediction_matrix = numpy.nanmean(prediction_matrix, axis=-1)
+    prediction_stdev_matrix = numpy.nanstd(prediction_matrix, axis=-1, ddof=1)
     squared_error_matrix = (mean_prediction_matrix - target_matrix) ** 2
 
     rtx = result_table_xarray
@@ -228,10 +228,10 @@ def get_spread_vs_skill(
             this_min_edge = min_bin_edge_by_target[k] + 0.
             this_max_edge = max_bin_edge_by_target[k] + 0.
         else:
-            this_min_edge = numpy.percentile(
+            this_min_edge = numpy.nanpercentile(
                 prediction_matrix[..., k], min_bin_edge_prctile_by_target[k]
             )
-            this_max_edge = numpy.percentile(
+            this_max_edge = numpy.nanpercentile(
                 prediction_matrix[..., k], max_bin_edge_prctile_by_target[k]
             )
 
@@ -248,17 +248,19 @@ def get_spread_vs_skill(
                 rtx[BIN_EDGE_PREDICTION_STDEV_KEY].values[k, m + 1]
             )
 
-            rtx[MEAN_PREDICTION_STDEV_KEY].values[k, m] = numpy.sqrt(numpy.mean(
-                prediction_stdev_matrix[..., k][this_flag_matrix] ** 2
-            ))
-            rtx[RMSE_KEY].values[k, m] = numpy.sqrt(numpy.mean(
+            rtx[MEAN_PREDICTION_STDEV_KEY].values[k, m] = numpy.sqrt(
+                numpy.nanmean(
+                    prediction_stdev_matrix[..., k][this_flag_matrix] ** 2
+                )
+            )
+            rtx[RMSE_KEY].values[k, m] = numpy.sqrt(numpy.nanmean(
                 squared_error_matrix[..., k][this_flag_matrix]
             ))
             rtx[EXAMPLE_COUNT_KEY].values[k, m] = numpy.sum(this_flag_matrix)
-            rtx[MEAN_DETERMINISTIC_PRED_KEY].values[k, m] = numpy.mean(
+            rtx[MEAN_DETERMINISTIC_PRED_KEY].values[k, m] = numpy.nanmean(
                 mean_prediction_matrix[..., k][this_flag_matrix]
             )
-            rtx[MEAN_TARGET_KEY].values[k, m] = numpy.mean(
+            rtx[MEAN_TARGET_KEY].values[k, m] = numpy.nanmean(
                 target_matrix[..., k][this_flag_matrix]
             )
 
@@ -272,8 +274,8 @@ def get_spread_vs_skill(
         )
 
         rtx[SSRAT_KEY].values[k] = (
-            numpy.sqrt(numpy.mean(prediction_stdev_matrix[..., k] ** 2)) /
-            numpy.sqrt(numpy.mean(squared_error_matrix[..., k]))
+            numpy.sqrt(numpy.nanmean(prediction_stdev_matrix[..., k] ** 2)) /
+            numpy.sqrt(numpy.nanmean(squared_error_matrix[..., k]))
         )
 
     result_table_xarray = rtx

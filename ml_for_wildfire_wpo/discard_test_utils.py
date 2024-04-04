@@ -62,24 +62,24 @@ def _run_discard_test_1field(
     rtx = result_table_xarray
 
     uncertainty_matrix = uncertainty_function(prediction_matrix)
-    deterministic_pred_matrix = numpy.mean(prediction_matrix, axis=-1)
-    mask_matrix = numpy.full(uncertainty_matrix.shape, True, dtype=bool)
+    deterministic_pred_matrix = numpy.nanmean(prediction_matrix, axis=-1)
+    mask_matrix = numpy.invert(numpy.isnan(uncertainty_matrix))
 
     for k in range(num_fractions):
         this_percentile_level = 100 * (1 - discard_fractions[k])
         this_inverted_mask_matrix = (
             uncertainty_matrix >
-            numpy.percentile(uncertainty_matrix, this_percentile_level)
+            numpy.nanpercentile(uncertainty_matrix, this_percentile_level)
         )
         mask_matrix[this_inverted_mask_matrix] = False
 
-        rtx[MEAN_UNCERTAINTY_KEY].values[j, k] = numpy.mean(
+        rtx[MEAN_UNCERTAINTY_KEY].values[j, k] = numpy.nanmean(
             uncertainty_matrix[mask_matrix]
         )
-        rtx[MEAN_DETERMINISTIC_PRED_KEY].values[j, k] = numpy.mean(
+        rtx[MEAN_DETERMINISTIC_PRED_KEY].values[j, k] = numpy.nanmean(
             deterministic_pred_matrix[mask_matrix]
         )
-        rtx[MEAN_TARGET_KEY].values[j, k] = numpy.mean(
+        rtx[MEAN_TARGET_KEY].values[j, k] = numpy.nanmean(
             target_matrix[mask_matrix]
         )
         rtx[DETERMINISTIC_ERROR_KEY].values[j, k] = error_function(
@@ -127,7 +127,7 @@ def get_stdev_uncertainty_func_1field():
         :return: stdev_matrix: E-by-M-by-N numpy array of standard deviations.
         """
 
-        return numpy.std(prediction_matrix, axis=-1, ddof=1)
+        return numpy.nanstd(prediction_matrix, axis=-1, ddof=1)
 
     return uncertainty_function
 
@@ -159,7 +159,7 @@ def get_rmse_error_func_1field():
         squared_errors = (
             target_matrix[mask_matrix] - deterministic_pred_matrix[mask_matrix]
         ) ** 2
-        return numpy.sqrt(numpy.mean(squared_errors))
+        return numpy.sqrt(numpy.nanmean(squared_errors))
 
     return error_function
 
@@ -241,8 +241,8 @@ def run_discard_test(
 
     # TODO(thunderhoser): This is a HACK.  I should use the weight matrix to
     # actually weight the various scores.
-    target_matrix[weight_matrix < 0.05] = 0.
-    prediction_matrix[weight_matrix < 0.05] = 0.
+    target_matrix[weight_matrix < 0.05] = numpy.nan
+    prediction_matrix[weight_matrix < 0.05] = numpy.nan
 
     # Set up the output table.
     num_target_fields = len(target_field_names)

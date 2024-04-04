@@ -112,6 +112,14 @@ def _compute_pit_histogram_1field(
     prediction_matrix_2d = numpy.reshape(
         prediction_matrix, (num_scalar_examples, ensemble_size)
     )
+
+    real_indices = numpy.where(
+        numpy.invert(numpy.isnan(target_values_1d))
+    )[0]
+    target_values_1d = target_values_1d[real_indices]
+    prediction_matrix_2d = prediction_matrix_2d[real_indices, :]
+
+    num_scalar_examples = len(target_values_1d)
     pit_values = numpy.full(num_scalar_examples, numpy.nan)
 
     for i in range(num_scalar_examples):
@@ -207,8 +215,8 @@ def compute_pit_histograms(prediction_file_names, target_field_names, num_bins):
 
     # TODO(thunderhoser): This is a HACK.  I should use the weight matrix to
     # actually weight the various scores.
-    target_matrix[weight_matrix < 0.05] = 0.
-    prediction_matrix[weight_matrix < 0.05] = 0.
+    target_matrix[weight_matrix < 0.05] = numpy.nan
+    prediction_matrix[weight_matrix < 0.05] = numpy.nan
 
     # Set up the output table.
     num_target_fields = len(target_field_names)
@@ -244,7 +252,8 @@ def compute_pit_histograms(prediction_file_names, target_field_names, num_bins):
     bin_centers = (bin_edges[1:] + bin_edges[:-1]) / 2
     metadata_dict = {
         FIELD_DIM: target_field_names,
-        BIN_CENTER_DIM: bin_centers
+        BIN_CENTER_DIM: bin_centers,
+        BIN_EDGE_DIM: bin_edges
     }
 
     result_table_xarray = xarray.Dataset(
