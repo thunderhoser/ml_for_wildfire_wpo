@@ -71,16 +71,17 @@ def _run_discard_test_1field(
             uncertainty_matrix >
             numpy.percentile(uncertainty_matrix, this_percentile_level)
         )
-        mask_matrix[this_inverted_mask_matrix] = False
+        mask_matrix[this_inverted_mask_matrix == True] = False
+        print(numpy.mean(mask_matrix))
 
         rtx[MEAN_UNCERTAINTY_KEY].values[j, k] = numpy.mean(
-            uncertainty_matrix[mask_matrix]
+            uncertainty_matrix[mask_matrix == True]
         )
         rtx[MEAN_DETERMINISTIC_PRED_KEY].values[j, k] = numpy.mean(
-            deterministic_pred_matrix[mask_matrix]
+            deterministic_pred_matrix[mask_matrix == True]
         )
         rtx[MEAN_TARGET_KEY].values[j, k] = numpy.mean(
-            target_matrix[mask_matrix]
+            target_matrix[mask_matrix == True]
         )
         rtx[DETERMINISTIC_ERROR_KEY].values[j, k] = error_function(
             target_matrix, deterministic_pred_matrix, mask_matrix
@@ -157,7 +158,8 @@ def get_rmse_error_func_1field():
         """
 
         squared_errors = (
-            target_matrix[mask_matrix] - deterministic_pred_matrix[mask_matrix]
+            target_matrix[mask_matrix == True] -
+            deterministic_pred_matrix[mask_matrix == True]
         ) ** 2
         return numpy.sqrt(numpy.mean(squared_errors))
 
