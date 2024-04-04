@@ -229,10 +229,12 @@ def get_spread_vs_skill(
             this_max_edge = max_bin_edge_by_target[k] + 0.
         else:
             this_min_edge = numpy.nanpercentile(
-                prediction_matrix[..., k], min_bin_edge_prctile_by_target[k]
+                prediction_stdev_matrix[..., k],
+                min_bin_edge_prctile_by_target[k]
             )
             this_max_edge = numpy.nanpercentile(
-                prediction_matrix[..., k], max_bin_edge_prctile_by_target[k]
+                prediction_stdev_matrix[..., k],
+                max_bin_edge_prctile_by_target[k]
             )
 
         rtx[BIN_EDGE_PREDICTION_STDEV_KEY].values[k, :] = numpy.linspace(
