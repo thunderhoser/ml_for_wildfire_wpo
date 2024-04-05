@@ -731,7 +731,7 @@ def _get_scores_one_replicate(
                 ) = _get_rel_curve_one_scalar(
                     target_values=numpy.ravel(full_target_matrix[..., k]),
                     predicted_values=numpy.ravel(full_prediction_matrix[..., k]),
-                    weights=numpy.ravel(full_weight_matrix[..., k]),
+                    weights=numpy.ravel(full_weight_matrix),
                     num_bins=num_bins,
                     min_bin_edge=min_bin_edge,
                     max_bin_edge=max_bin_edge,
@@ -745,7 +745,7 @@ def _get_scores_one_replicate(
                 ) = _get_rel_curve_one_scalar(
                     target_values=numpy.ravel(full_target_matrix[..., k]),
                     predicted_values=numpy.ravel(full_prediction_matrix[..., k]),
-                    weights=numpy.ravel(full_weight_matrix[..., k]),
+                    weights=numpy.ravel(full_weight_matrix),
                     num_bins=num_bins,
                     min_bin_edge=min_bin_edge,
                     max_bin_edge=max_bin_edge,
