@@ -6,6 +6,8 @@ from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.utils import regression_evaluation as regression_eval
 
+TOLERANCE = 1e-6
+
 FIELD_DIM = 'field'
 DISCARD_FRACTION_DIM = 'discard_fraction'
 
