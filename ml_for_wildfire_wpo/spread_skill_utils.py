@@ -14,6 +14,8 @@ import file_system_utils
 import error_checking
 import regression_evaluation as regression_eval
 
+TOLERANCE = 1e-6
+
 BIN_DIM = 'spread_bin'
 BIN_EDGE_DIM = 'spread_bin_edge'
 LATITUDE_DIM = 'grid_row'
@@ -216,6 +218,10 @@ def get_spread_vs_skill(
                 prediction_stdev_matrix[..., k] <
                 rtx[BIN_EDGE_PREDICTION_STDEV_KEY].values[k, m + 1]
             )
+
+            if numpy.sum(weight_matrix[this_flag_matrix]) < TOLERANCE:
+                rtx[EXAMPLE_COUNT_KEY].values[k, m] = 0.
+                continue
 
             rtx[MEAN_PREDICTION_STDEV_KEY].values[k, m] = numpy.sqrt(
                 numpy.average(

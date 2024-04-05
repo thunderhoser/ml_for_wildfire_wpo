@@ -76,6 +76,9 @@ def _run_discard_test_1field(
         )
         weight_matrix[mask_out_matrix] = 0.
 
+        if numpy.sum(weight_matrix) < TOLERANCE:
+            continue
+
         rtx[MEAN_UNCERTAINTY_KEY].values[j, k] = numpy.average(
             uncertainty_matrix, weights=weight_matrix
         )
@@ -92,17 +95,17 @@ def _run_discard_test_1field(
     error_values = rtx[DETERMINISTIC_ERROR_KEY].values[j]
 
     if is_error_pos_oriented:
-        rtx[MONO_FRACTION_KEY].values[j] = numpy.mean(
+        rtx[MONO_FRACTION_KEY].values[j] = numpy.nanmean(
             numpy.diff(error_values) > 0
         )
-        rtx[DISCARD_IMPROVEMENT_KEY].values[j] = numpy.mean(
+        rtx[DISCARD_IMPROVEMENT_KEY].values[j] = numpy.nanmean(
             numpy.diff(error_values) / numpy.diff(discard_fractions)
         )
     else:
-        rtx[MONO_FRACTION_KEY].values[j] = numpy.mean(
+        rtx[MONO_FRACTION_KEY].values[j] = numpy.nanmean(
             numpy.diff(error_values) < 0
         )
-        rtx[DISCARD_IMPROVEMENT_KEY].values[j] = numpy.mean(
+        rtx[DISCARD_IMPROVEMENT_KEY].values[j] = numpy.nanmean(
             -1 * numpy.diff(error_values) / numpy.diff(discard_fractions)
         )
 
