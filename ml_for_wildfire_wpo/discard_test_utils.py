@@ -33,9 +33,9 @@ UNCERTAINTY_FUNCTION_KEY = 'uncertainty_function_name'
 
 
 def _run_discard_test_1field(
-        target_matrix, prediction_matrix, result_table_xarray, field_index,
-        discard_fractions, uncertainty_function, error_function,
-        is_error_pos_oriented):
+        target_matrix, prediction_matrix, orig_weight_matrix,
+        result_table_xarray, field_index, discard_fractions,
+        uncertainty_function, error_function, is_error_pos_oriented):
     """Runs discard test for one target field.
 
     E = number of examples
@@ -45,6 +45,9 @@ def _run_discard_test_1field(
 
     :param target_matrix: E-by-M-by-N numpy array of target values.
     :param prediction_matrix: E-by-M-by-N-by-S numpy array of predictions.
+    :param orig_weight_matrix: E-by-M-by-N numpy array of original evaluation
+        weights.  The evaluation weights will change during the discard test,
+        but this variable will be unchanged.
     :param result_table_xarray: Same as output from `run_discard_test`.  Results
         from this method will be stored in the table.
     :param field_index: Field index.  If `field_index == j`, this means we are
@@ -62,28 +65,28 @@ def _run_discard_test_1field(
     rtx = result_table_xarray
 
     uncertainty_matrix = uncertainty_function(prediction_matrix)
-    deterministic_pred_matrix = numpy.nanmean(prediction_matrix, axis=-1)
-    mask_matrix = numpy.invert(numpy.isnan(uncertainty_matrix))
+    deterministic_pred_matrix = numpy.mean(prediction_matrix, axis=-1)
+    weight_matrix = orig_weight_matrix + 0.
 
     for k in range(num_fractions):
         this_percentile_level = 100 * (1 - discard_fractions[k])
-        this_inverted_mask_matrix = (
+        mask_out_matrix = (
             uncertainty_matrix >
-            numpy.nanpercentile(uncertainty_matrix, this_percentile_level)
+            numpy.percentile(uncertainty_matrix, this_percentile_level)
         )
-        mask_matrix[this_inverted_mask_matrix] = False
+        weight_matrix[mask_out_matrix] = 0.
 
-        rtx[MEAN_UNCERTAINTY_KEY].values[j, k] = numpy.nanmean(
-            uncertainty_matrix[mask_matrix]
+        rtx[MEAN_UNCERTAINTY_KEY].values[j, k] = numpy.average(
+            uncertainty_matrix, weights=weight_matrix
         )
-        rtx[MEAN_DETERMINISTIC_PRED_KEY].values[j, k] = numpy.nanmean(
-            deterministic_pred_matrix[mask_matrix]
+        rtx[MEAN_DETERMINISTIC_PRED_KEY].values[j, k] = numpy.average(
+            deterministic_pred_matrix, weights=weight_matrix
         )
-        rtx[MEAN_TARGET_KEY].values[j, k] = numpy.nanmean(
-            target_matrix[mask_matrix]
+        rtx[MEAN_TARGET_KEY].values[j, k] = numpy.average(
+            target_matrix, weights=weight_matrix
         )
         rtx[DETERMINISTIC_ERROR_KEY].values[j, k] = error_function(
-            target_matrix, deterministic_pred_matrix, mask_matrix
+            target_matrix, deterministic_pred_matrix, weight_matrix
         )
 
     error_values = rtx[DETERMINISTIC_ERROR_KEY].values[j]
@@ -127,7 +130,7 @@ def get_stdev_uncertainty_func_1field():
         :return: stdev_matrix: E-by-M-by-N numpy array of standard deviations.
         """
 
-        return numpy.nanstd(prediction_matrix, axis=-1, ddof=1)
+        return numpy.std(prediction_matrix, axis=-1, ddof=1)
 
     return uncertainty_function
 
@@ -140,7 +143,7 @@ def get_rmse_error_func_1field():
     :return: error_function: Function handle.
     """
 
-    def error_function(target_matrix, deterministic_pred_matrix, mask_matrix):
+    def error_function(target_matrix, deterministic_pred_matrix, weight_matrix):
         """Computes RMSE of deterministic prediction for each example/pixel.
 
         E = number of examples
@@ -150,16 +153,15 @@ def get_rmse_error_func_1field():
         :param target_matrix: E-by-M-by-N numpy array of target values.
         :param deterministic_pred_matrix: E-by-M-by-N numpy array of
             deterministic predictions.
-        :param mask_matrix: E-by-M-by-N numpy array of Boolean flags, with True
-            indicating points to use in the evaluation and False indicating
-            points to ignore (because they have already been discarded).
+        :param weight_matrix: E-by-M-by-N numpy array of evaluation weights.
         :return: rmse_matrix: E-by-M-by-N numpy array of RMSE values.
         """
 
-        squared_errors = (
-            target_matrix[mask_matrix] - deterministic_pred_matrix[mask_matrix]
-        ) ** 2
-        return numpy.sqrt(numpy.nanmean(squared_errors))
+        squared_error_matrix = (target_matrix - deterministic_pred_matrix) ** 2
+
+        return numpy.sqrt(
+            numpy.average(squared_error_matrix, weights=weight_matrix)
+        )
 
     return error_function
 
@@ -189,9 +191,7 @@ def run_discard_test(
     Input: target_matrix: E-by-M-by-N numpy array of target values.
     Input: deterministic_pred_matrix: E-by-M-by-N numpy array of deterministic
         predictions.
-    Input: mask_matrix: E-by-M-by-N numpy array of Boolean flags, with True
-        indicating points to use in the evaluation and False indicating points
-        to ignore (because they have already been discarded).
+    Input: weight_matrix: E-by-M-by-N numpy array of evaluation weights.
     Output: error_value: Scalar value of error metric.
 
     :param error_function_string: String description of error function (used for
@@ -236,13 +236,9 @@ def run_discard_test(
         target_matrix, prediction_matrix, weight_matrix, model_file_name
     ) = regression_eval.read_inputs(
         prediction_file_names=prediction_file_names,
-        target_field_names=target_field_names
+        target_field_names=target_field_names,
+        mask_pixel_if_weight_below=-1.
     )
-
-    # TODO(thunderhoser): This is a HACK.  I should use the weight matrix to
-    # actually weight the various scores.
-    target_matrix[weight_matrix < 0.05] = numpy.nan
-    prediction_matrix[weight_matrix < 0.05] = numpy.nan
 
     # Set up the output table.
     num_target_fields = len(target_field_names)
@@ -298,6 +294,7 @@ def run_discard_test(
         result_table_xarray = _run_discard_test_1field(
             target_matrix=target_matrix[..., j],
             prediction_matrix=prediction_matrix[..., j, :],
+            orig_weight_matrix=weight_matrix,
             result_table_xarray=result_table_xarray,
             field_index=j,
             discard_fractions=discard_fractions,

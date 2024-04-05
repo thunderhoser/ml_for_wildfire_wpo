@@ -84,7 +84,8 @@ def _get_low_mid_hi_bins(bin_edges):
 
 
 def _compute_pit_histogram_1field(
-        target_matrix, prediction_matrix, result_table_xarray, field_index):
+        target_matrix, prediction_matrix, weight_matrix, result_table_xarray,
+        field_index):
     """Computes PIT histogram for one target field.
 
     E = number of examples
@@ -94,6 +95,7 @@ def _compute_pit_histogram_1field(
 
     :param target_matrix: E-by-M-by-N numpy array of target values.
     :param prediction_matrix: E-by-M-by-N-by-S numpy array of predictions.
+    :param weight_matrix: E-by-M-by-N numpy array of evaluation weights.
     :param result_table_xarray: Same as output from `run_discard_test`.  Results
         from this method will be stored in the table.
     :param field_index: Field index.  If `field_index == j`, this means we are
@@ -109,18 +111,12 @@ def _compute_pit_histogram_1field(
     ensemble_size = prediction_matrix.shape[-1]
 
     target_values_1d = numpy.ravel(target_matrix)
+    weight_values_1d = numpy.ravel(weight_matrix)
     prediction_matrix_2d = numpy.reshape(
         prediction_matrix, (num_scalar_examples, ensemble_size)
     )
 
-    real_indices = numpy.where(
-        numpy.invert(numpy.isnan(target_values_1d))
-    )[0]
-    target_values_1d = target_values_1d[real_indices]
-    prediction_matrix_2d = prediction_matrix_2d[real_indices, :]
-
-    num_scalar_examples = len(target_values_1d)
-    pit_values = numpy.full(num_scalar_examples, numpy.nan)
+    pit_values_1d = numpy.full(num_scalar_examples, numpy.nan)
 
     for i in range(num_scalar_examples):
         if numpy.mod(i, 10000) == 0:
@@ -130,7 +126,7 @@ def _compute_pit_histogram_1field(
                 i, num_scalar_examples
             ))
 
-        pit_values[i] = 0.01 * percentileofscore(
+        pit_values_1d[i] = 0.01 * percentileofscore(
             a=prediction_matrix_2d[i, :], score=target_values_1d[i], kind='mean'
         )
 
@@ -143,20 +139,24 @@ def _compute_pit_histogram_1field(
 
     bin_edges = numpy.linspace(0, 1, num=num_bins + 1, dtype=float)
     example_to_bin = numpy.digitize(
-        x=pit_values, bins=bin_edges, right=False
+        x=pit_values_1d, bins=bin_edges, right=False
     ) - 1
     example_to_bin = numpy.maximum(example_to_bin, 0)
     example_to_bin = numpy.minimum(example_to_bin, num_bins - 1)
 
-    used_bin_indices, used_bin_counts = numpy.unique(
-        example_to_bin, return_counts=True
-    )
-    bin_counts = numpy.full(num_bins, 0, dtype=int)
+    used_bin_indices = numpy.unique(example_to_bin)
+    used_bin_counts = numpy.full(len(used_bin_indices), numpy.nan)
+
+    for k in range(len(used_bin_indices)):
+        these_indices = numpy.where(example_to_bin == used_bin_indices[k])[0]
+        used_bin_counts[k] = numpy.sum(weight_values_1d[these_indices])
+
+    bin_counts = numpy.full(num_bins, 0, dtype=float)
     bin_counts[used_bin_indices] = used_bin_counts
 
     result_table_xarray[EXAMPLE_COUNT_KEY].values[j, :] = bin_counts
 
-    bin_frequencies = bin_counts.astype(float) / num_scalar_examples
+    bin_frequencies = bin_counts / numpy.sum(bin_counts)
     perfect_bin_frequency = 1. / num_bins
 
     result_table_xarray[PIT_DEVIATION_KEY].values[j] = numpy.sqrt(numpy.mean(
@@ -210,13 +210,9 @@ def compute_pit_histograms(prediction_file_names, target_field_names, num_bins):
         target_matrix, prediction_matrix, weight_matrix, model_file_name
     ) = regression_eval.read_inputs(
         prediction_file_names=prediction_file_names,
-        target_field_names=target_field_names
+        target_field_names=target_field_names,
+        mask_pixel_if_weight_below=-1.
     )
-
-    # TODO(thunderhoser): This is a HACK.  I should use the weight matrix to
-    # actually weight the various scores.
-    target_matrix[weight_matrix < 0.05] = numpy.nan
-    prediction_matrix[weight_matrix < 0.05] = numpy.nan
 
     # Set up the output table.
     num_target_fields = len(target_field_names)
@@ -244,7 +240,7 @@ def compute_pit_histograms(prediction_file_names, target_field_names, num_bins):
     these_dim_keys = (FIELD_DIM, BIN_CENTER_DIM)
     main_data_dict.update({
         EXAMPLE_COUNT_KEY: (
-            these_dim_keys, numpy.full(these_dimensions, -1, dtype=int)
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         )
     })
 
@@ -269,6 +265,7 @@ def compute_pit_histograms(prediction_file_names, target_field_names, num_bins):
         result_table_xarray = _compute_pit_histogram_1field(
             target_matrix=target_matrix[..., j],
             prediction_matrix=prediction_matrix[..., j, :],
+            weight_matrix=weight_matrix,
             result_table_xarray=result_table_xarray,
             field_index=j
         )
