@@ -52,35 +52,67 @@ MODEL_FILE_KEY = 'model_file_name'
 PREDICTION_FILES_KEY = 'prediction_file_names'
 
 
-def _get_mse_one_scalar(target_values, predicted_values, per_grid_cell):
+def __weighted_stdev(data_values, weights):
+    """Computes weighted standard deviation.
+
+    :param data_values: numpy array of data values.
+    :param weights: numpy array of weights with the same shape as `data_values`.
+    :return: weighted_stdev: Weighted standard deviation (scalar).
+    """
+
+    weighted_mean = numpy.average(data_values, weights=weights)
+    weighted_variance = numpy.average(
+        (data_values - weighted_mean) ** 2, weights=weights
+    )
+
+    # With all weights being 1, this factor would be N / (N - 1).  This helps
+    # convert population stdev to sample stdev.
+    correction_factor = (
+        numpy.sum(weights) /
+        (numpy.sum(weights) - numpy.mean(weights))
+    )
+
+    return numpy.sqrt(correction_factor * weighted_variance)
+
+
+def _get_mse_one_scalar(target_values, predicted_values, per_grid_cell,
+                        weights=None):
     """Computes mean squared error (MSE) for one scalar target variable.
 
-    E = number of examples
-
-    :param target_values: length-E numpy array of target (actual) values.
-    :param predicted_values: length-E numpy array of predicted values.
+    :param target_values: numpy array of target (actual) values.
+    :param predicted_values: numpy array of predicted values with the same shape
+        as `target_values`.
     :param per_grid_cell: Boolean flag.  If True, will compute a separate set of
         scores at each grid cell.  If False, will compute one set of scores for
         the whole domain.
+    :param weights: [used only if `per_grid_cell is None`]
+        numpy array of evaluation weights with the same shape as
+        `target_values`.
     :return: mse_total: Total MSE.
     :return: mse_bias: Bias component.
     :return: mse_variance: Variance component.
     """
 
     if per_grid_cell:
-        mse_total = numpy.nanmean(
+        mse_total = numpy.mean(
             (target_values - predicted_values) ** 2, axis=0
         )
-        mse_bias = numpy.nanmean(target_values - predicted_values, axis=0) ** 2
+        mse_bias = numpy.mean(target_values - predicted_values, axis=0) ** 2
     else:
-        mse_total = numpy.nanmean((target_values - predicted_values) ** 2)
-        mse_bias = numpy.nanmean(target_values - predicted_values) ** 2
+        mse_total = numpy.average(
+            (target_values - predicted_values) ** 2,
+            weights=weights
+        )
+        mse_bias = numpy.average(
+            target_values - predicted_values,
+            weights=weights
+        ) ** 2
 
     return mse_total, mse_bias, mse_total - mse_bias
 
 
 def _get_mse_ss_one_scalar(target_values, predicted_values, per_grid_cell,
-                           mean_training_target_value):
+                           mean_training_target_value, weights=None):
     """Computes MSE skill score for one scalar target variable.
 
     :param target_values: See doc for `_get_mse_one_scalar`.
@@ -88,48 +120,56 @@ def _get_mse_ss_one_scalar(target_values, predicted_values, per_grid_cell,
     :param per_grid_cell: Same.
     :param mean_training_target_value: Mean target value over all training
         examples.
+    :param weights: See doc for `_get_mse_one_scalar`.
     :return: mse_skill_score: Self-explanatory.
     """
 
     mse_actual = _get_mse_one_scalar(
         target_values=target_values,
         predicted_values=predicted_values,
-        per_grid_cell=per_grid_cell
+        per_grid_cell=per_grid_cell,
+        weights=weights
     )[0]
     mse_climo = _get_mse_one_scalar(
         target_values=target_values,
         predicted_values=mean_training_target_value,
-        per_grid_cell=per_grid_cell
+        per_grid_cell=per_grid_cell,
+        weights=weights
     )[0]
 
     return (mse_climo - mse_actual) / mse_climo
 
 
-def _get_dwmse_one_scalar(target_values, predicted_values, per_grid_cell):
+def _get_dwmse_one_scalar(target_values, predicted_values, per_grid_cell,
+                          weights=None):
     """Computes dual-weighted MSE (DWMSE) for one scalar target variable.
 
     :param target_values: See doc for `_get_mse_one_scalar`.
     :param predicted_values: Same.
     :param per_grid_cell: Same.
+    :param weights: Same.
     :return: dwmse: Self-explanatory.
     """
 
-    weights = numpy.maximum(
+    dual_weights = numpy.maximum(
         numpy.absolute(target_values),
         numpy.absolute(predicted_values)
     )
 
     if per_grid_cell:
-        return numpy.nanmean(
-            weights * (target_values - predicted_values) ** 2,
+        return numpy.mean(
+            dual_weights * (target_values - predicted_values) ** 2,
             axis=0
         )
 
-    return numpy.nanmean(weights * (target_values - predicted_values) ** 2)
+    return numpy.average(
+        dual_weights * (target_values - predicted_values) ** 2,
+        weights=weights
+    )
 
 
 def _get_dwmse_ss_one_scalar(target_values, predicted_values, per_grid_cell,
-                             mean_training_target_value):
+                             mean_training_target_value, weights=None):
     """Computes DWMSE skill score for one scalar target variable.
 
     :param target_values: See doc for `_get_dwmse_one_scalar`.
@@ -137,114 +177,138 @@ def _get_dwmse_ss_one_scalar(target_values, predicted_values, per_grid_cell,
     :param per_grid_cell: Same.
     :param mean_training_target_value: Mean target value over all training
         examples.
+    :param weights: See doc for `_get_dwmse_one_scalar`.
     :return: dwmse_skill_score: Self-explanatory.
     """
 
     dwmse_actual = _get_dwmse_one_scalar(
         target_values=target_values,
         predicted_values=predicted_values,
-        per_grid_cell=per_grid_cell
+        per_grid_cell=per_grid_cell,
+        weights=weights
     )
     dwmse_climo = _get_dwmse_one_scalar(
         target_values=target_values,
         predicted_values=numpy.array([mean_training_target_value]),
-        per_grid_cell=per_grid_cell
+        per_grid_cell=per_grid_cell,
+        weights=weights
     )
 
     return (dwmse_climo - dwmse_actual) / dwmse_climo
 
 
-def _get_mae_one_scalar(target_values, predicted_values, per_grid_cell):
+def _get_mae_one_scalar(target_values, predicted_values, per_grid_cell,
+                        weights=None):
     """Computes mean absolute error (MAE) for one scalar target variable.
 
     :param target_values: See doc for `_get_mse_one_scalar`.
     :param predicted_values: Same.
     :param per_grid_cell: Same.
+    :param weights: Same.
     :return: mean_absolute_error: Self-explanatory.
     """
 
     if per_grid_cell:
-        return numpy.nanmean(
-            numpy.abs(target_values - predicted_values),
+        return numpy.mean(
+            numpy.absolute(target_values - predicted_values),
             axis=0
         )
 
-    return numpy.nanmean(numpy.abs(target_values - predicted_values))
+    return numpy.average(
+        numpy.absolute(target_values - predicted_values),
+        weights=weights
+    )
 
 
 def _get_mae_ss_one_scalar(target_values, predicted_values, per_grid_cell,
-                           mean_training_target_value):
+                           mean_training_target_value, weights=None):
     """Computes MAE skill score for one scalar target variable.
 
     :param target_values: See doc for `_get_mse_one_scalar`.
     :param predicted_values: Same.
     :param per_grid_cell: Same.
     :param mean_training_target_value: See doc for `_get_mse_ss_one_scalar`.
+    :param weights: See doc for `_get_mse_one_scalar`.
     :return: mae_skill_score: Self-explanatory.
     """
 
     mae_actual = _get_mae_one_scalar(
         target_values=target_values,
         predicted_values=predicted_values,
-        per_grid_cell=per_grid_cell
+        per_grid_cell=per_grid_cell,
+        weights=weights
     )
     mae_climo = _get_mae_one_scalar(
         target_values=target_values,
         predicted_values=mean_training_target_value,
-        per_grid_cell=per_grid_cell
+        per_grid_cell=per_grid_cell,
+        weights=weights
     )
 
     return (mae_climo - mae_actual) / mae_climo
 
 
-def _get_bias_one_scalar(target_values, predicted_values, per_grid_cell):
+def _get_bias_one_scalar(target_values, predicted_values, per_grid_cell,
+                         weights=None):
     """Computes bias (mean signed error) for one scalar target variable.
 
     :param target_values: See doc for `_get_mse_one_scalar`.
     :param predicted_values: Same.
     :param per_grid_cell: Same.
+    :param weights: Same.
     :return: bias: Self-explanatory.
     """
 
     if per_grid_cell:
-        return numpy.nanmean(predicted_values - target_values, axis=0)
+        return numpy.mean(predicted_values - target_values, axis=0)
 
-    return numpy.nanmean(predicted_values - target_values)
+    return numpy.average(
+        predicted_values - target_values,
+        weights=weights
+    )
 
 
-def _get_correlation_one_scalar(target_values, predicted_values, per_grid_cell):
+def _get_correlation_one_scalar(target_values, predicted_values, per_grid_cell,
+                                weights=None):
     """Computes Pearson correlation for one scalar target variable.
 
     :param target_values: See doc for `_get_mse_one_scalar`.
     :param predicted_values: Same.
     :param per_grid_cell: Same.
+    :param weights: Same.
     :return: correlation: Self-explanatory.
     """
 
     if per_grid_cell:
-        numerator = numpy.nansum(
-            (target_values - numpy.nanmean(target_values)) *
-            (predicted_values - numpy.nanmean(predicted_values)),
+        numerator = numpy.sum(
+            (target_values - numpy.mean(target_values)) *
+            (predicted_values - numpy.mean(predicted_values)),
             axis=0
         )
-        sum_squared_target_diffs = numpy.nansum(
-            (target_values - numpy.nanmean(target_values)) ** 2,
+        sum_squared_target_diffs = numpy.sum(
+            (target_values - numpy.mean(target_values)) ** 2,
             axis=0
         )
-        sum_squared_prediction_diffs = numpy.nansum(
-            (predicted_values - numpy.nanmean(predicted_values)) ** 2,
+        sum_squared_prediction_diffs = numpy.sum(
+            (predicted_values - numpy.mean(predicted_values)) ** 2,
             axis=0
         )
     else:
-        numerator = numpy.nansum(
-            (target_values - numpy.nanmean(target_values)) *
-            (predicted_values - numpy.nanmean(predicted_values))
+        mean_target = numpy.average(target_values, weights=weights)
+        mean_prediction = numpy.average(predicted_values, weights=weights)
+
+        numerator = numpy.sum(weights) * numpy.average(
+            (target_values - mean_target) *
+            (predicted_values - mean_prediction),
+            weights=weights
         )
-        sum_squared_target_diffs = numpy.nansum(
-            (target_values - numpy.nanmean(target_values)) ** 2
+        sum_squared_target_diffs = numpy.sum(weights) * numpy.average(
+            (target_values - mean_target) ** 2,
+            weights=weights
         )
-        sum_squared_prediction_diffs = numpy.nansum(
-            (predicted_values - numpy.nanmean(predicted_values)) ** 2
+        sum_squared_prediction_diffs = numpy.sum(weights) * numpy.average(
+            (predicted_values - mean_prediction) ** 2,
+            weights=weights
         )
 
     correlation = (
@@ -255,31 +319,38 @@ def _get_correlation_one_scalar(target_values, predicted_values, per_grid_cell):
     return correlation
 
 
-def _get_kge_one_scalar(target_values, predicted_values, per_grid_cell):
+def _get_kge_one_scalar(target_values, predicted_values, per_grid_cell,
+                        weights=None):
     """Computes KGE (Kling-Gupta efficiency) for one scalar target variable.
 
     :param target_values: See doc for `_get_mse_one_scalar`.
     :param predicted_values: Same.
     :param per_grid_cell: Same.
+    :param weights: Same.
     :return: kge: Self-explanatory.
     """
 
     correlation = _get_correlation_one_scalar(
         target_values=target_values,
         predicted_values=predicted_values,
-        per_grid_cell=per_grid_cell
+        per_grid_cell=per_grid_cell,
+        weights=weights
     )
 
     if per_grid_cell:
-        mean_target_value = numpy.nanmean(target_values, axis=0)
-        mean_predicted_value = numpy.nanmean(predicted_values, axis=0)
-        stdev_target_value = numpy.nanstd(target_values, ddof=1, axis=0)
-        stdev_predicted_value = numpy.nanstd(predicted_values, ddof=1, axis=0)
+        mean_target_value = numpy.mean(target_values, axis=0)
+        mean_predicted_value = numpy.mean(predicted_values, axis=0)
+        stdev_target_value = numpy.std(target_values, ddof=1, axis=0)
+        stdev_predicted_value = numpy.std(predicted_values, ddof=1, axis=0)
     else:
-        mean_target_value = numpy.nanmean(target_values)
-        mean_predicted_value = numpy.nanmean(predicted_values)
-        stdev_target_value = numpy.nanstd(target_values, ddof=1)
-        stdev_predicted_value = numpy.nanstd(predicted_values, ddof=1)
+        mean_target_value = numpy.average(target_values, weights=weights)
+        mean_predicted_value = numpy.average(predicted_values, weights=weights)
+        stdev_target_value = __weighted_stdev(
+            data_values=target_values, weights=weights
+        )
+        stdev_predicted_value = __weighted_stdev(
+            data_values=predicted_values, weights=weights
+        )
 
     variance_bias = (
         (stdev_predicted_value / mean_predicted_value) *
@@ -297,14 +368,15 @@ def _get_kge_one_scalar(target_values, predicted_values, per_grid_cell):
 
 
 def _get_rel_curve_one_scalar(
-        target_values, predicted_values, num_bins, min_bin_edge, max_bin_edge,
-        invert=False):
+        target_values, predicted_values, weights,
+        num_bins, min_bin_edge, max_bin_edge, invert=False):
     """Computes reliability curve for one scalar target variable.
 
     B = number of bins
 
     :param target_values: See doc for `_get_mse_one_scalar`.
     :param predicted_values: Same.
+    :param weights: Same.
     :param num_bins: Number of bins (points in curve).
     :param min_bin_edge: Value at lower edge of first bin.
     :param max_bin_edge: Value at upper edge of last bin.
@@ -321,39 +393,34 @@ def _get_rel_curve_one_scalar(
     # max_bin_edge = max([max_bin_edge, numpy.finfo(float).eps])
     # min_bin_edge = min([min_bin_edge, 0.])
 
-    real_indices = numpy.where(numpy.invert(numpy.logical_or(
-        target_values,
-        predicted_values
-    )))[0]
-
-    real_target_values = target_values[real_indices]
-    real_predicted_values = predicted_values[real_indices]
-
     bin_index_by_example = histograms.create_histogram(
-        input_values=real_target_values if invert else real_predicted_values,
+        input_values=target_values if invert else predicted_values,
         num_bins=num_bins, min_value=min_bin_edge, max_value=max_bin_edge
     )[0]
 
     mean_predictions = numpy.full(num_bins, numpy.nan)
     mean_observations = numpy.full(num_bins, numpy.nan)
-    example_counts = numpy.full(num_bins, -1, dtype=int)
+    example_counts = numpy.full(num_bins, numpy.nan)
 
     for i in range(num_bins):
         these_example_indices = numpy.where(bin_index_by_example == i)[0]
 
-        example_counts[i] = len(these_example_indices)
-        mean_predictions[i] = numpy.mean(
-            real_predicted_values[these_example_indices]
+        example_counts[i] = numpy.sum(weights[these_example_indices])
+        mean_predictions[i] = numpy.average(
+            predicted_values[these_example_indices],
+            weights=weights[these_example_indices]
         )
-        mean_observations[i] = numpy.mean(
-            real_target_values[these_example_indices]
+        mean_observations[i] = numpy.average(
+            target_values[these_example_indices],
+            weights=weights[these_example_indices]
         )
 
     return mean_predictions, mean_observations, example_counts
 
 
 def _get_scores_one_replicate(
-        result_table_xarray, full_target_matrix, full_prediction_matrix,
+        result_table_xarray,
+        full_target_matrix, full_prediction_matrix, full_weight_matrix,
         replicate_index, example_indices_in_replicate,
         mean_training_target_values, num_relia_bins_by_target,
         min_relia_bin_edge_by_target, max_relia_bin_edge_by_target,
@@ -371,6 +438,7 @@ def _get_scores_one_replicate(
     :param full_target_matrix: E-by-M-by-N-by-T numpy array of correct values.
     :param full_prediction_matrix: E-by-M-by-N-by-T numpy array of predicted
         values.
+    :param full_weight_matrix: E-by-M-by-N numpy array of evaluation weights.
     :param replicate_index: Index of current bootstrap replicate.
     :param example_indices_in_replicate: 1-D numpy array with indices of
         examples in this bootstrap replicate.
@@ -394,47 +462,58 @@ def _get_scores_one_replicate(
     prediction_matrix = full_prediction_matrix[
         example_indices_in_replicate, ...
     ]
+    weight_matrix = full_weight_matrix[example_indices_in_replicate, ...]
+
+    num_target_fields = len(mean_training_target_values)
 
     if per_grid_cell:
-        t[TARGET_STDEV_KEY].values[..., rep_idx] = numpy.nanstd(
+        t[TARGET_STDEV_KEY].values[..., rep_idx] = numpy.std(
             target_matrix, ddof=1, axis=0
         )
-        t[PREDICTION_STDEV_KEY].values[..., rep_idx] = numpy.nanstd(
+        t[PREDICTION_STDEV_KEY].values[..., rep_idx] = numpy.std(
             prediction_matrix, ddof=1, axis=0
         )
-        t[TARGET_MEAN_KEY].values[..., rep_idx] = numpy.nanmean(
+        t[TARGET_MEAN_KEY].values[..., rep_idx] = numpy.mean(
             target_matrix, axis=0
         )
-        t[PREDICTION_MEAN_KEY].values[..., rep_idx] = numpy.nanmean(
+        t[PREDICTION_MEAN_KEY].values[..., rep_idx] = numpy.mean(
             prediction_matrix, axis=0
         )
     else:
-        t[TARGET_STDEV_KEY].values[:, rep_idx] = numpy.nanstd(
-            target_matrix, ddof=1, axis=(0, 1, 2)
-        )
-        t[PREDICTION_STDEV_KEY].values[:, rep_idx] = numpy.nanstd(
-            prediction_matrix, ddof=1, axis=(0, 1, 2)
-        )
-        t[TARGET_MEAN_KEY].values[:, rep_idx] = numpy.nanmean(
-            target_matrix, axis=(0, 1, 2)
-        )
-        t[PREDICTION_MEAN_KEY].values[:, rep_idx] = numpy.nanmean(
-            prediction_matrix, axis=(0, 1, 2)
-        )
+        t[TARGET_STDEV_KEY].values[:, rep_idx] = numpy.array([
+            __weighted_stdev(
+                data_values=target_matrix[..., k], weights=weight_matrix
+            )
+            for k in range(num_target_fields)
+        ])
 
-    num_target_fields = len(mean_training_target_values)
+        t[PREDICTION_STDEV_KEY].values[:, rep_idx] = numpy.array([
+            __weighted_stdev(
+                data_values=prediction_matrix[..., k], weights=weight_matrix
+            )
+            for k in range(num_target_fields)
+        ])
+
+        t[TARGET_MEAN_KEY].values[:, rep_idx] = numpy.average(
+            target_matrix, weights=weight_matrix, axis=(0, 1, 2)
+        )
+        t[PREDICTION_MEAN_KEY].values[:, rep_idx] = numpy.average(
+            prediction_matrix, weights=weight_matrix, axis=(0, 1, 2)
+        )
 
     for k in range(num_target_fields):
         t[MAE_KEY].values[..., k, rep_idx] = _get_mae_one_scalar(
             target_values=target_matrix[..., k],
             predicted_values=prediction_matrix[..., k],
-            per_grid_cell=per_grid_cell
+            per_grid_cell=per_grid_cell,
+            weights=weight_matrix
         )
         t[MAE_SKILL_SCORE_KEY].values[..., k, rep_idx] = _get_mae_ss_one_scalar(
             target_values=target_matrix[..., k],
             predicted_values=prediction_matrix[..., k],
             mean_training_target_value=mean_training_target_values[k],
-            per_grid_cell=per_grid_cell
+            per_grid_cell=per_grid_cell,
+            weights=weight_matrix
         )
 
         (
@@ -444,44 +523,51 @@ def _get_scores_one_replicate(
         ) = _get_mse_one_scalar(
             target_values=target_matrix[..., k],
             predicted_values=prediction_matrix[..., k],
-            per_grid_cell=per_grid_cell
+            per_grid_cell=per_grid_cell,
+            weights=weight_matrix
         )
 
         t[MSE_SKILL_SCORE_KEY].values[..., k, rep_idx] = _get_mse_ss_one_scalar(
             target_values=target_matrix[..., k],
             predicted_values=prediction_matrix[..., k],
             mean_training_target_value=mean_training_target_values[k],
-            per_grid_cell=per_grid_cell
+            per_grid_cell=per_grid_cell,
+            weights=weight_matrix
         )
         t[DWMSE_KEY].values[..., k, rep_idx] = _get_dwmse_one_scalar(
             target_values=target_matrix[..., k],
             predicted_values=prediction_matrix[..., k],
-            per_grid_cell=per_grid_cell
+            per_grid_cell=per_grid_cell,
+            weights=weight_matrix
         )
         t[DWMSE_SKILL_SCORE_KEY].values[..., k, rep_idx] = (
             _get_dwmse_ss_one_scalar(
                 target_values=target_matrix[..., k],
                 predicted_values=prediction_matrix[..., k],
                 mean_training_target_value=mean_training_target_values[k],
-                per_grid_cell=per_grid_cell
+                per_grid_cell=per_grid_cell,
+                weights=weight_matrix
             )
         )
         t[BIAS_KEY].values[..., k, rep_idx] = _get_bias_one_scalar(
             target_values=target_matrix[..., k],
             predicted_values=prediction_matrix[..., k],
-            per_grid_cell=per_grid_cell
+            per_grid_cell=per_grid_cell,
+            weights=weight_matrix
         )
         t[CORRELATION_KEY].values[..., k, rep_idx] = (
             _get_correlation_one_scalar(
                 target_values=target_matrix[..., k],
                 predicted_values=prediction_matrix[..., k],
-                per_grid_cell=per_grid_cell
+                per_grid_cell=per_grid_cell,
+                weights=weight_matrix
             )
         )
         t[KGE_KEY].values[..., k, rep_idx] = _get_kge_one_scalar(
             target_values=target_matrix[..., k],
             predicted_values=prediction_matrix[..., k],
-            per_grid_cell=per_grid_cell
+            per_grid_cell=per_grid_cell,
+            weights=weight_matrix
         )
 
         if num_examples == 0:
@@ -491,11 +577,11 @@ def _get_scores_one_replicate(
             min_bin_edge = min_relia_bin_edge_by_target[k] + 0.
             max_bin_edge = max_relia_bin_edge_by_target[k] + 0.
         else:
-            min_bin_edge = numpy.nanpercentile(
+            min_bin_edge = numpy.percentile(
                 prediction_matrix[..., k],
                 min_relia_bin_edge_prctile_by_target[k]
             )
-            max_bin_edge = numpy.nanpercentile(
+            max_bin_edge = numpy.percentile(
                 prediction_matrix[..., k],
                 max_relia_bin_edge_prctile_by_target[k]
             )
@@ -522,6 +608,7 @@ def _get_scores_one_replicate(
                     ) = _get_rel_curve_one_scalar(
                         target_values=target_matrix[:, i, j, k],
                         predicted_values=prediction_matrix[:, i, j, k],
+                        weights=numpy.ones_like(prediction_matrix[:, i, j, k]),
                         num_bins=num_bins,
                         min_bin_edge=min_bin_edge,
                         max_bin_edge=max_bin_edge,
@@ -529,8 +616,7 @@ def _get_scores_one_replicate(
                     )
 
                     these_squared_diffs = (
-                        t[RELIABILITY_X_KEY].values[i, j, k, :num_bins, rep_idx]
-                        -
+                        t[RELIABILITY_X_KEY].values[i, j, k, :num_bins, rep_idx] -
                         t[RELIABILITY_Y_KEY].values[i, j, k, :num_bins, rep_idx]
                     ) ** 2
 
@@ -547,6 +633,7 @@ def _get_scores_one_replicate(
                         ) = _get_rel_curve_one_scalar(
                             target_values=full_target_matrix[:, i, j, k],
                             predicted_values=full_prediction_matrix[:, i, j, k],
+                            weights=numpy.ones_like(full_prediction_matrix[:, i, j, k]),
                             num_bins=num_bins,
                             min_bin_edge=min_bin_edge,
                             max_bin_edge=max_bin_edge,
@@ -560,6 +647,7 @@ def _get_scores_one_replicate(
                         ) = _get_rel_curve_one_scalar(
                             target_values=full_target_matrix[:, i, j, k],
                             predicted_values=full_prediction_matrix[:, i, j, k],
+                            weights=numpy.ones_like(full_prediction_matrix[:, i, j, k]),
                             num_bins=num_bins,
                             min_bin_edge=min_bin_edge,
                             max_bin_edge=max_bin_edge,
@@ -567,17 +655,12 @@ def _get_scores_one_replicate(
                         )
 
                     if rep_idx == 0 and full_target_matrix.size > 0:
-                        real_indices = numpy.where(numpy.invert(numpy.logical_or(
-                            numpy.isnan(full_target_matrix[:, i, j, k]),
-                            numpy.isnan(full_prediction_matrix[:, i, j, k])
-                        )))[0]
-
                         (
                             t[KS_STATISTIC_KEY].values[i, j, k],
                             t[KS_P_VALUE_KEY].values[i, j, k]
                         ) = ks_2samp(
-                            full_target_matrix[real_indices, i, j, k],
-                            full_prediction_matrix[real_indices, i, j, k],
+                            full_target_matrix[:, i, j, k],
+                            full_prediction_matrix[:, i, j, k],
                             alternative='two-sided',
                             mode='auto'
                         )
@@ -589,6 +672,7 @@ def _get_scores_one_replicate(
             ) = _get_rel_curve_one_scalar(
                 target_values=numpy.ravel(target_matrix[..., k]),
                 predicted_values=numpy.ravel(prediction_matrix[..., k]),
+                weights=numpy.ravel(weight_matrix),
                 num_bins=num_bins,
                 min_bin_edge=min_bin_edge,
                 max_bin_edge=max_bin_edge,
@@ -612,8 +696,8 @@ def _get_scores_one_replicate(
                     t[RELIABILITY_COUNT_KEY].values[k, :num_bins]
                 ) = _get_rel_curve_one_scalar(
                     target_values=numpy.ravel(full_target_matrix[..., k]),
-                    predicted_values=
-                    numpy.ravel(full_prediction_matrix[..., k]),
+                    predicted_values=numpy.ravel(full_prediction_matrix[..., k]),
+                    weights=numpy.ravel(full_weight_matrix[..., k]),
                     num_bins=num_bins,
                     min_bin_edge=min_bin_edge,
                     max_bin_edge=max_bin_edge,
@@ -626,8 +710,8 @@ def _get_scores_one_replicate(
                     t[INV_RELIABILITY_COUNT_KEY].values[k, :num_bins]
                 ) = _get_rel_curve_one_scalar(
                     target_values=numpy.ravel(full_target_matrix[..., k]),
-                    predicted_values=
-                    numpy.ravel(full_prediction_matrix[..., k]),
+                    predicted_values=numpy.ravel(full_prediction_matrix[..., k]),
+                    weights=numpy.ravel(full_weight_matrix[..., k]),
                     num_bins=num_bins,
                     min_bin_edge=min_bin_edge,
                     max_bin_edge=max_bin_edge,
@@ -635,17 +719,12 @@ def _get_scores_one_replicate(
                 )
 
             if rep_idx == 0 and full_target_matrix.size > 0:
-                real_indices = numpy.where(numpy.invert(numpy.logical_or(
-                    numpy.isnan(numpy.ravel(full_target_matrix[..., k])),
-                    numpy.isnan(numpy.ravel(full_prediction_matrix[..., k]))
-                )))[0]
-
                 (
                     t[KS_STATISTIC_KEY].values[k],
                     t[KS_P_VALUE_KEY].values[k]
                 ) = ks_2samp(
-                    numpy.ravel(full_target_matrix[..., k])[real_indices],
-                    numpy.ravel(full_prediction_matrix[..., k])[real_indices],
+                    numpy.ravel(full_target_matrix[..., k]),
+                    numpy.ravel(full_prediction_matrix[..., k]),
                     alternative='two-sided',
                     mode='auto'
                 )
@@ -756,10 +835,6 @@ def read_inputs(prediction_file_names, target_field_names,
 
     # TODO(thunderhoser): Put this in prediction_io.py and allow it to return
     # grid coords as well (for use in, e.g., plot_predictions.py).
-
-    # TODO(thunderhoser): I still need to use the weight matrix properly --
-    # i.e., use the continuous weights to weight each pixel, rather than just
-    # masking below a threshold.
 
     error_checking.assert_is_string_list(prediction_file_names)
     error_checking.assert_is_string_list(target_field_names)
@@ -905,9 +980,12 @@ def get_scores_with_bootstrapping(
                 min_relia_bin_edge_by_target[j]
             )
 
-    target_matrix, prediction_matrix, _, model_file_name = read_inputs(
+    (
+        target_matrix, prediction_matrix, weight_matrix, model_file_name
+    ) = read_inputs(
         prediction_file_names=prediction_file_names,
-        target_field_names=target_field_names
+        target_field_names=target_field_names,
+        mask_pixel_if_weight_below=-1.
     )
     prediction_matrix = numpy.mean(prediction_matrix, axis=-1)
 
@@ -1056,13 +1134,13 @@ def get_scores_with_bootstrapping(
             these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         ),
         RELIABILITY_COUNT_KEY: (
-            these_dim_keys, numpy.full(these_dimensions, 0, dtype=int)
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         ),
         INV_RELIABILITY_BIN_CENTER_KEY: (
             these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         ),
         INV_RELIABILITY_COUNT_KEY: (
-            these_dim_keys, numpy.full(these_dimensions, 0, dtype=int)
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         )
     }
     main_data_dict.update(new_dict)
@@ -1139,6 +1217,7 @@ def get_scores_with_bootstrapping(
             result_table_xarray=result_table_xarray,
             full_target_matrix=target_matrix,
             full_prediction_matrix=prediction_matrix,
+            full_weight_matrix=weight_matrix,
             replicate_index=i,
             example_indices_in_replicate=these_indices,
             mean_training_target_values=mean_training_target_values,

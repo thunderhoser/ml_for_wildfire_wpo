@@ -4,7 +4,6 @@ import numpy
 import xarray
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
-from ml_for_wildfire_wpo.io import prediction_io
 from ml_for_wildfire_wpo.utils import regression_evaluation as regression_eval
 
 BIN_DIM = 'spread_bin'
@@ -29,8 +28,7 @@ PREDICTION_FILES_KEY = 'prediction_file_names'
 def get_spread_vs_skill(
         prediction_file_names, target_field_names,
         num_bins_by_target, min_bin_edge_by_target, max_bin_edge_by_target,
-        min_bin_edge_prctile_by_target, max_bin_edge_prctile_by_target,
-        per_grid_cell):
+        min_bin_edge_prctile_by_target, max_bin_edge_prctile_by_target):
     """Computes spread-skill relationship for multiple target fields.
 
     T = number of target fields
@@ -50,9 +48,6 @@ def get_spread_vs_skill(
         If you instead want to specify raw values, make this argument None and
         use `min_bin_edge_by_target`.
     :param max_bin_edge_prctile_by_target: Same as above but for max.
-    :param per_grid_cell: Boolean flag.  If True, will compute a separate set of
-        scores at each grid cell.  If False, will compute one set of scores for
-        the whole domain.
     :return: result_table_xarray: xarray table with results (variable and
         dimension names should make the table self-explanatory).
     """
@@ -60,10 +55,6 @@ def get_spread_vs_skill(
     # Check input args.
     error_checking.assert_is_string_list(prediction_file_names)
     error_checking.assert_is_string_list(target_field_names)
-    error_checking.assert_is_boolean(per_grid_cell)
-
-    # TODO(thunderhoser): Allow this argument to be True -- or just get rid of it.
-    assert per_grid_cell == False
 
     num_target_fields = len(target_field_names)
     expected_dim = numpy.array([num_target_fields], dtype=int)
@@ -114,23 +105,16 @@ def get_spread_vs_skill(
 
     # Read the data.
     (
-        target_matrix, prediction_matrix, _, model_file_name
+        target_matrix, prediction_matrix, weight_matrix, model_file_name
     ) = regression_eval.read_inputs(
         prediction_file_names=prediction_file_names,
-        target_field_names=target_field_names
+        target_field_names=target_field_names,
+        mask_pixel_if_weight_below=-1.
     )
 
     # Set up the output table.
-    num_grid_rows = target_matrix.shape[1]
-    num_grid_columns = target_matrix.shape[2]
-
-    if per_grid_cell:
-        orig_dimensions = (num_grid_rows, num_grid_columns, num_target_fields)
-        orig_dim_keys = (LATITUDE_DIM, LONGITUDE_DIM, FIELD_DIM)
-    else:
-        orig_dimensions = (num_target_fields,)
-        orig_dim_keys = (FIELD_DIM,)
-
+    orig_dimensions = (num_target_fields,)
+    orig_dim_keys = (FIELD_DIM,)
     main_data_dict = {
         SSREL_KEY: (
             orig_dim_keys, numpy.full(orig_dimensions, numpy.nan)
@@ -142,7 +126,6 @@ def get_spread_vs_skill(
 
     these_dimensions = orig_dimensions + (numpy.max(num_bins_by_target),)
     these_dim_keys = orig_dim_keys + (BIN_DIM,)
-
     main_data_dict.update({
         MEAN_PREDICTION_STDEV_KEY: (
             these_dim_keys, numpy.full(these_dimensions, numpy.nan)
@@ -151,7 +134,7 @@ def get_spread_vs_skill(
             these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         ),
         EXAMPLE_COUNT_KEY: (
-            these_dim_keys, numpy.full(these_dimensions, -1, dtype=int)
+            these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         ),
         MEAN_DETERMINISTIC_PRED_KEY: (
             these_dim_keys, numpy.full(these_dimensions, numpy.nan)
@@ -184,17 +167,6 @@ def get_spread_vs_skill(
         BIN_EDGE_DIM: bin_edge_indices
     }
 
-    if per_grid_cell:
-        this_prediction_table_xarray = prediction_io.read_file(
-            prediction_file_names[0]
-        )
-        tpt = this_prediction_table_xarray
-
-        metadata_dict.update({
-            LATITUDE_DIM: tpt[prediction_io.LATITUDE_KEY].values,
-            LONGITUDE_DIM: tpt[prediction_io.LONGITUDE_KEY].values
-        })
-
     result_table_xarray = xarray.Dataset(
         data_vars=main_data_dict, coords=metadata_dict
     )
@@ -204,9 +176,9 @@ def get_spread_vs_skill(
     ])
 
     # Do actual stuff.
-    mean_prediction_matrix = numpy.nanmean(prediction_matrix, axis=-1)
-    prediction_stdev_matrix = numpy.nanstd(prediction_matrix, axis=-1, ddof=1)
-    squared_error_matrix = (mean_prediction_matrix - target_matrix) ** 2
+    deterministic_pred_matrix = numpy.mean(prediction_matrix, axis=-1)
+    prediction_stdev_matrix = numpy.std(prediction_matrix, axis=-1, ddof=1)
+    squared_error_matrix = (deterministic_pred_matrix - target_matrix) ** 2
 
     rtx = result_table_xarray
 
@@ -215,11 +187,11 @@ def get_spread_vs_skill(
             this_min_edge = min_bin_edge_by_target[k] + 0.
             this_max_edge = max_bin_edge_by_target[k] + 0.
         else:
-            this_min_edge = numpy.nanpercentile(
+            this_min_edge = numpy.percentile(
                 prediction_stdev_matrix[..., k],
                 min_bin_edge_prctile_by_target[k]
             )
-            this_max_edge = numpy.nanpercentile(
+            this_max_edge = numpy.percentile(
                 prediction_stdev_matrix[..., k],
                 max_bin_edge_prctile_by_target[k]
             )
@@ -238,19 +210,27 @@ def get_spread_vs_skill(
             )
 
             rtx[MEAN_PREDICTION_STDEV_KEY].values[k, m] = numpy.sqrt(
-                numpy.nanmean(
-                    prediction_stdev_matrix[..., k][this_flag_matrix] ** 2
+                numpy.average(
+                    prediction_stdev_matrix[..., k][this_flag_matrix] ** 2,
+                    weights=weight_matrix[this_flag_matrix]
                 )
             )
-            rtx[RMSE_KEY].values[k, m] = numpy.sqrt(numpy.nanmean(
-                squared_error_matrix[..., k][this_flag_matrix]
-            ))
-            rtx[EXAMPLE_COUNT_KEY].values[k, m] = numpy.sum(this_flag_matrix)
-            rtx[MEAN_DETERMINISTIC_PRED_KEY].values[k, m] = numpy.nanmean(
-                mean_prediction_matrix[..., k][this_flag_matrix]
+            rtx[RMSE_KEY].values[k, m] = numpy.sqrt(
+                numpy.average(
+                    squared_error_matrix[..., k][this_flag_matrix],
+                    weights=weight_matrix[this_flag_matrix]
+                )
             )
-            rtx[MEAN_TARGET_KEY].values[k, m] = numpy.nanmean(
-                target_matrix[..., k][this_flag_matrix]
+            rtx[EXAMPLE_COUNT_KEY].values[k, m] = numpy.sum(
+                weight_matrix[this_flag_matrix]
+            )
+            rtx[MEAN_DETERMINISTIC_PRED_KEY].values[k, m] = numpy.average(
+                deterministic_pred_matrix[..., k][this_flag_matrix],
+                weights=weight_matrix[this_flag_matrix]
+            )
+            rtx[MEAN_TARGET_KEY].values[k, m] = numpy.average(
+                target_matrix[..., k][this_flag_matrix],
+                weights=weight_matrix[this_flag_matrix]
             )
 
         these_diffs = numpy.absolute(
@@ -262,10 +242,15 @@ def get_spread_vs_skill(
             these_diffs, weights=rtx[EXAMPLE_COUNT_KEY].values[k, :]
         )
 
-        rtx[SSRAT_KEY].values[k] = (
-            numpy.sqrt(numpy.nanmean(prediction_stdev_matrix[..., k] ** 2)) /
-            numpy.sqrt(numpy.nanmean(squared_error_matrix[..., k]))
-        )
+        this_numerator = numpy.sqrt(numpy.average(
+            prediction_stdev_matrix[..., k] ** 2,
+            weights=weight_matrix
+        ))
+        this_denominator = numpy.sqrt(numpy.average(
+            squared_error_matrix[..., k],
+            weights=weight_matrix
+        ))
+        rtx[SSRAT_KEY].values[k] = this_numerator / this_denominator
 
     result_table_xarray = rtx
     return result_table_xarray

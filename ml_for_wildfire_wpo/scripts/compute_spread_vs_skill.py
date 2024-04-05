@@ -152,8 +152,7 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
         min_bin_edge_by_target=min_bin_edge_by_target,
         max_bin_edge_by_target=max_bin_edge_by_target,
         min_bin_edge_prctile_by_target=min_bin_edge_prctile_by_target,
-        max_bin_edge_prctile_by_target=max_bin_edge_prctile_by_target,
-        per_grid_cell=False
+        max_bin_edge_prctile_by_target=max_bin_edge_prctile_by_target
     )
     print(SEPARATOR_STRING)
 
