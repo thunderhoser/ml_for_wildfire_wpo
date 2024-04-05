@@ -9,7 +9,7 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
-#SBATCH --time=84:00:00
+#SBATCH --time=24:00:00
 #SBATCH --array=0-9
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
@@ -31,8 +31,8 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
-TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment10_crps_multi_lead_times"
-TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment10_crps_multi_lead_times"
+TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment10_crps_multi_lead_times/further_training_reset_optimizer_state/further_training_reset_optimizer_state/further_training_reset_optimizer_state"
+TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment10_crps_multi_lead_times/further_training_reset_optimizer_state/further_training_reset_optimizer_state/further_training_reset_optimizer_state/further_training_reset_optimizer_state"
 
 GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
 TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
@@ -57,14 +57,20 @@ target_lag_time_set_days=$(echo $target_lag_time_set_days | tr "-" " ")
 target_lead_time_set_days=$(echo $target_lead_time_set_days | tr "-" " ")
 gfs_lead_time_set_hours=$(echo $gfs_lead_time_set_hours | tr "-" " ")
 
-template_file_name="${TEMPLATE_DIR_NAME}/nn-lead-time-days=${nn_lead_times_days}_random-seed-index=${random_seed_index}/model.keras"
 output_dir_name="${TOP_OUTPUT_DIR_NAME}/nn-lead-time-days=${nn_lead_times_days}_random-seed-index=${random_seed_index}"
 echo $output_dir_name
 
-# TODO(thunderhoser): The "while true" just restarts the job if it crashes.  However, in the future I need to be careful, if the input and output model files are not coming from the same place.  For example, if I were using an actual template and not an already-trained model, I would want the template as input for the first iteration through the loop, then the already-trained model as input for subsequent iterations.
+i=0
+
 while true; do
+    if [ $i == 0 ]; then
+        input_model_file_name="${TEMPLATE_DIR_NAME}/nn-lead-time-days=${nn_lead_times_days}_random-seed-index=${random_seed_index}/model.keras"
+    else
+        input_model_file_name="${TOP_OUTPUT_DIR_NAME}/nn-lead-time-days=${nn_lead_times_days}_random-seed-index=${random_seed_index}/model.keras"
+    fi
+
     python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
-    --input_template_file_name="${template_file_name}" \
+    --input_template_file_name="${input_model_file_name}" \
     --output_model_dir_name="${output_dir_name}" \
     --inner_latitude_limits_deg_n 17 73 \
     --inner_longitude_limits_deg_e 171 -65 \
@@ -97,4 +103,6 @@ while true; do
     --num_epochs=1000 \
     --num_training_batches_per_epoch=192 \
     --num_validation_batches_per_epoch=48
+    
+    i=$(( $i + 1 ))
 done
