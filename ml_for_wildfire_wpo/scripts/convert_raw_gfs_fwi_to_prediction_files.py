@@ -17,10 +17,11 @@ from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 from ml_for_wildfire_wpo.utils import era5_constant_utils
 from ml_for_wildfire_wpo.machine_learning import neural_net
 
-DATE_FORMAT = gfs_daily_io.DATE_FORMAT
-
 DAYS_TO_SECONDS = 86400
 DEGREES_TO_RADIANS = numpy.pi / 180.
+DATE_FORMAT = gfs_daily_io.DATE_FORMAT
+
+MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 
 TARGET_FIELD_NAMES = canadian_fwi_utils.ALL_FIELD_NAMES
 
@@ -271,7 +272,10 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
         repeats=len(era5ct.coords[era5_constant_utils.LONGITUDE_DIM].values)
     )
 
-    weight_matrix = latitude_cosine_matrix * (land_mask_matrix > 0.05)
+    weight_matrix = (
+        latitude_cosine_matrix *
+        (land_mask_matrix > MASK_PIXEL_IF_WEIGHT_BELOW)
+    )
 
     # Create fake neural-net metafile.
     generator_option_dict = {

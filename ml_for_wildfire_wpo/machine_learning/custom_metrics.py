@@ -3,6 +3,8 @@
 from tensorflow.keras import backend as K
 from gewittergefahr.gg_utils import error_checking
 
+MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
+
 
 def max_prediction_anywhere(channel_index, function_name, expect_ensemble=True,
                             test_mode=False):
@@ -54,7 +56,7 @@ def max_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
                             test_mode=False):
     """Creates metric to return max unmasked prediction.
 
-    "Unmasked" = at grid cell with weight >= 0.05
+    "Unmasked" = at grid cell with weight >= MASK_PIXEL_IF_WEIGHT_BELOW
 
     :param channel_index: See doc for `max_prediction_anywhere`.
     :param function_name: Same.
@@ -79,7 +81,10 @@ def max_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
 
         # Output shape: E x M x N
         weight_tensor = target_tensor[..., -1]
-        mask_tensor = K.cast(weight_tensor >= 0.05, prediction_tensor.dtype)
+        mask_tensor = K.cast(
+            weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW,
+            prediction_tensor.dtype
+        )
 
         if not expect_ensemble:
             # Input shapes for multiplication: E x M x N and E x M x N
@@ -195,7 +200,10 @@ def mean_squared_error_unmasked(channel_index, function_name,
             (relevant_target_tensor - relevant_prediction_tensor) ** 2
         )
 
-        mask_tensor = K.cast(weight_tensor >= 0.05, prediction_tensor.dtype)
+        mask_tensor = K.cast(
+            weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW,
+            prediction_tensor.dtype
+        )
         # return K.sum(squared_error_tensor * mask_tensor) / K.sum(mask_tensor)
         return (
             K.sum(mask_tensor * squared_error_tensor) /
@@ -314,7 +322,10 @@ def dual_weighted_mse_unmasked(channel_index, function_name,
             (relevant_target_tensor - relevant_prediction_tensor) ** 2
         )
 
-        mask_tensor = K.cast(weight_tensor >= 0.05, prediction_tensor.dtype)
+        mask_tensor = K.cast(
+            weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW,
+            prediction_tensor.dtype
+        )
         # return K.sum(error_tensor * mask_tensor) / K.sum(mask_tensor)
         return (
             K.sum(mask_tensor * error_tensor) /

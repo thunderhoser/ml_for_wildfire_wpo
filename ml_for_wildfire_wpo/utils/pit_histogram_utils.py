@@ -199,16 +199,11 @@ def compute_pit_histograms(prediction_file_names, target_field_names, num_bins):
 
     # Read the data.
     (
-        target_matrix, prediction_matrix, weight_matrix, model_file_name
+        target_matrix, prediction_matrix, _, model_file_name
     ) = regression_eval.read_inputs(
         prediction_file_names=prediction_file_names,
         target_field_names=target_field_names
     )
-
-    # TODO(thunderhoser): This is a HACK.  I should use the weight matrix to
-    # actually weight the various scores.
-    target_matrix[weight_matrix < 0.05] = numpy.nan
-    prediction_matrix[weight_matrix < 0.05] = numpy.nan
 
     # Set up the output table.
     num_target_fields = len(target_field_names)

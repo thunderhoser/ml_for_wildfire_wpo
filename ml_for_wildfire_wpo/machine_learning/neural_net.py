@@ -30,6 +30,8 @@ GRID_SPACING_DEG = 0.25
 DEGREES_TO_RADIANS = numpy.pi / 180.
 DAYS_TO_SECONDS = 86400
 
+MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
+
 INNER_LATITUDE_LIMITS_KEY = 'inner_latitude_limits_deg_n'
 INNER_LONGITUDE_LIMITS_KEY = 'inner_longitude_limits_deg_e'
 OUTER_LATITUDE_BUFFER_KEY = 'outer_latitude_buffer_deg'
@@ -597,7 +599,10 @@ def _create_weight_matrix(
         era5_constant_table_xarray=ect,
         field_name=era5_constant_utils.LAND_SEA_MASK_NAME
     )
-    weight_matrix = latitude_cosine_matrix * (land_mask_matrix > 0.05)
+    weight_matrix = (
+        latitude_cosine_matrix *
+        (land_mask_matrix >= MASK_PIXEL_IF_WEIGHT_BELOW)
+    )
 
     return _pad_inner_to_outer_domain(
         data_matrix=weight_matrix,

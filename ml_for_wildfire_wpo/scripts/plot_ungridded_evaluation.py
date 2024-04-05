@@ -10,7 +10,6 @@ import matplotlib.patches
 from matplotlib import pyplot
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
-from ml_for_wildfire_wpo.io import prediction_io
 from ml_for_wildfire_wpo.io import canadian_fwi_io
 from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 from ml_for_wildfire_wpo.utils import regression_evaluation as regression_eval
@@ -558,30 +557,23 @@ def _run(evaluation_file_names, line_styles, line_colour_strings,
             print('Reading data from: "{0:s}"...'.format(
                 prediction_file_names[j]
             ))
-            this_prediction_table_xarray = prediction_io.read_file(
-                prediction_file_names[j]
+
+            this_target_matrix, this_prediction_matrix = (
+                regression_eval.read_inputs(
+                    prediction_file_names=[prediction_file_names[j]],
+                    target_field_names=target_field_names
+                )[:2]
             )
-            tpt = this_prediction_table_xarray
+            this_prediction_matrix = numpy.nanmean(
+                this_prediction_matrix, axis=-1
+            )
 
             if error_matrix.size == 0:
-                these_dim = (
-                    (num_times,) + tpt[prediction_io.TARGET_KEY].values.shape
+                error_matrix = numpy.full(
+                    (num_times,) + this_target_matrix.shape, numpy.nan
                 )
-                error_matrix = numpy.full(these_dim, numpy.nan)
 
-            these_indices = numpy.array([
-                numpy.where(tpt[prediction_io.FIELD_NAME_KEY].values == f)[0][0]
-                for f in target_field_names
-            ], dtype=int)
-
-            error_matrix[j, ...] = (
-                tpt[prediction_io.PREDICTION_KEY].values[..., these_indices] -
-                tpt[prediction_io.TARGET_KEY].values[..., these_indices]
-            )
-
-            weight_matrix = tpt[prediction_io.WEIGHT_KEY].values
-            for k in range(num_target_fields):
-                error_matrix[j, ..., k][weight_matrix < 0.05] = numpy.nan
+            error_matrix[j, ...] = this_prediction_matrix - this_target_matrix
 
         for k in range(num_target_fields):
             error_values = numpy.ravel(error_matrix[..., k])
