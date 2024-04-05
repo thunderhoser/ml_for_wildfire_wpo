@@ -14,6 +14,8 @@ import file_system_utils
 import error_checking
 import regression_evaluation as regression_eval
 
+TOLERANCE = 1e-6
+
 FIELD_DIM = 'field'
 DISCARD_FRACTION_DIM = 'discard_fraction'
 
