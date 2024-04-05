@@ -22,6 +22,8 @@ import neural_net
 
 # TODO(thunderhoser): Allow multiple lead times.
 
+TOLERANCE = 1e-6
+
 RELIABILITY_BIN_DIM = 'reliability_bin'
 BOOTSTRAP_REP_DIM = 'bootstrap_replicate'
 LATITUDE_DIM = 'grid_row'
@@ -68,6 +70,9 @@ def __weighted_stdev(data_values, weights):
     :return: weighted_stdev: Weighted standard deviation (scalar).
     """
 
+    if numpy.sum(weights) < TOLERANCE:
+        return numpy.nan
+
     weighted_mean = numpy.average(data_values, weights=weights)
     weighted_variance = numpy.average(
         (data_values - weighted_mean) ** 2, weights=weights
@@ -107,6 +112,9 @@ def _get_mse_one_scalar(target_values, predicted_values, per_grid_cell,
         )
         mse_bias = numpy.mean(target_values - predicted_values, axis=0) ** 2
     else:
+        if numpy.sum(weights) < TOLERANCE:
+            return numpy.nan
+
         mse_total = numpy.average(
             (target_values - predicted_values) ** 2,
             weights=weights
@@ -170,6 +178,9 @@ def _get_dwmse_one_scalar(target_values, predicted_values, per_grid_cell,
             axis=0
         )
 
+    if numpy.sum(weights) < TOLERANCE:
+        return numpy.nan
+
     return numpy.average(
         dual_weights * (target_values - predicted_values) ** 2,
         weights=weights
@@ -222,6 +233,9 @@ def _get_mae_one_scalar(target_values, predicted_values, per_grid_cell,
             axis=0
         )
 
+    if numpy.sum(weights) < TOLERANCE:
+        return numpy.nan
+
     return numpy.average(
         numpy.absolute(target_values - predicted_values),
         weights=weights
@@ -270,6 +284,9 @@ def _get_bias_one_scalar(target_values, predicted_values, per_grid_cell,
     if per_grid_cell:
         return numpy.mean(predicted_values - target_values, axis=0)
 
+    if numpy.sum(weights) < TOLERANCE:
+        return numpy.nan
+
     return numpy.average(
         predicted_values - target_values,
         weights=weights
@@ -302,6 +319,9 @@ def _get_correlation_one_scalar(target_values, predicted_values, per_grid_cell,
             axis=0
         )
     else:
+        if numpy.sum(weights) < TOLERANCE:
+            return numpy.nan
+
         mean_target = numpy.average(target_values, weights=weights)
         mean_prediction = numpy.average(predicted_values, weights=weights)
 
@@ -351,6 +371,9 @@ def _get_kge_one_scalar(target_values, predicted_values, per_grid_cell,
         stdev_target_value = numpy.std(target_values, ddof=1, axis=0)
         stdev_predicted_value = numpy.std(predicted_values, ddof=1, axis=0)
     else:
+        if numpy.sum(weights) < TOLERANCE:
+            return numpy.nan
+
         mean_target_value = numpy.average(target_values, weights=weights)
         mean_predicted_value = numpy.average(predicted_values, weights=weights)
         stdev_target_value = __weighted_stdev(
@@ -412,6 +435,10 @@ def _get_rel_curve_one_scalar(
 
     for i in range(num_bins):
         these_example_indices = numpy.where(bin_index_by_example == i)[0]
+
+        if numpy.sum(weights[these_example_indices]) < TOLERANCE:
+            example_counts[i] = 0.
+            continue
 
         example_counts[i] = numpy.sum(weights[these_example_indices])
         mean_predictions[i] = numpy.average(
@@ -502,12 +529,19 @@ def _get_scores_one_replicate(
             for k in range(num_target_fields)
         ])
 
-        t[TARGET_MEAN_KEY].values[:, rep_idx] = numpy.average(
-            target_matrix, weights=weight_matrix, axis=(0, 1, 2)
-        )
-        t[PREDICTION_MEAN_KEY].values[:, rep_idx] = numpy.average(
-            prediction_matrix, weights=weight_matrix, axis=(0, 1, 2)
-        )
+        t[TARGET_MEAN_KEY].values[:, rep_idx] = numpy.array([
+            numpy.average(
+                target_matrix[..., k], weights=weight_matrix
+            )
+            for k in range(num_target_fields)
+        ])
+
+        t[PREDICTION_MEAN_KEY].values[:, rep_idx] = numpy.array([
+            numpy.average(
+                prediction_matrix[..., k], weights=weight_matrix
+            )
+            for k in range(num_target_fields)
+        ])
 
     for k in range(num_target_fields):
         t[MAE_KEY].values[..., k, rep_idx] = _get_mae_one_scalar(
