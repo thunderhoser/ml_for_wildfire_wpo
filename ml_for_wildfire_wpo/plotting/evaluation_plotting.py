@@ -240,11 +240,12 @@ def plot_inset_histogram(
     expected_dim = numpy.array([num_bins], dtype=int)
 
     # error_checking.assert_is_integer_numpy_array(bin_counts)
-    error_checking.assert_is_geq_numpy_array(bin_counts, 0.)
+    error_checking.assert_is_geq_numpy_array(bin_counts, 0., allow_nan=True)
     error_checking.assert_is_numpy_array(
         bin_counts, exact_dimensions=expected_dim
     )
 
+    bin_counts[numpy.isnan(bin_counts)] = 0.
     bin_frequencies = bin_counts.astype(float) / numpy.sum(bin_counts)
 
     if has_predictions:
@@ -356,7 +357,9 @@ def plot_attributes_diagram(
 
     if plot_prediction_histogram:
         # error_checking.assert_is_integer_numpy_array(example_counts)
-        error_checking.assert_is_geq_numpy_array(example_counts, 0.)
+        error_checking.assert_is_geq_numpy_array(
+            example_counts, 0., allow_nan=True
+        )
         error_checking.assert_is_numpy_array(
             example_counts, exact_dimensions=expected_dim
         )
@@ -376,7 +379,9 @@ def plot_attributes_diagram(
         )
 
         # error_checking.assert_is_integer_numpy_array(inv_example_counts)
-        error_checking.assert_is_geq_numpy_array(inv_example_counts, 0.)
+        error_checking.assert_is_geq_numpy_array(
+            example_counts, 0., allow_nan=True
+        )
         error_checking.assert_is_numpy_array(
             inv_example_counts, exact_dimensions=expected_dim
         )
