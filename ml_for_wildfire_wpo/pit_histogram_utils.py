@@ -134,11 +134,6 @@ def _compute_pit_histogram_1field(
             a=prediction_matrix_2d[i, :], score=target_values_1d[i], kind='mean'
         )
 
-    print(numpy.percentile(
-        pit_values,
-        numpy.linspace(0, 100, num=101, dtype=float)
-    ))
-
     print('Computed PIT value for all {0:d} scalar examples!'.format(
         num_scalar_examples
     ))

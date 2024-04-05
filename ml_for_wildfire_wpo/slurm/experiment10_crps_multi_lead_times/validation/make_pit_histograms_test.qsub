@@ -50,5 +50,5 @@ python3 -u "${CODE_DIR_NAME}/make_pit_histograms.py" \
 --input_prediction_dir_name="${model_dir_name}/validation" \
 --init_date_limit_strings "20210101" "20210131" \
 --target_field_names "fine_fuel_moisture_code" \
---num_bins=100 \
+--num_bins=25 \
 --output_file_name="${model_dir_name}/validation_test/pit_histograms.nc"
