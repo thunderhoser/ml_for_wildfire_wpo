@@ -247,8 +247,8 @@ def plot_inset_histogram(
     num_bins = len(bin_centers)
     expected_dim = numpy.array([num_bins], dtype=int)
 
-    error_checking.assert_is_integer_numpy_array(bin_counts)
-    error_checking.assert_is_geq_numpy_array(bin_counts, 0)
+    # error_checking.assert_is_integer_numpy_array(bin_counts)
+    error_checking.assert_is_geq_numpy_array(bin_counts, 0.)
     error_checking.assert_is_numpy_array(
         bin_counts, exact_dimensions=expected_dim
     )
@@ -363,8 +363,8 @@ def plot_attributes_diagram(
     plot_prediction_histogram = example_counts is not None
 
     if plot_prediction_histogram:
-        error_checking.assert_is_integer_numpy_array(example_counts)
-        error_checking.assert_is_geq_numpy_array(example_counts, 0)
+        # error_checking.assert_is_integer_numpy_array(example_counts)
+        error_checking.assert_is_geq_numpy_array(example_counts, 0.)
         error_checking.assert_is_numpy_array(
             example_counts, exact_dimensions=expected_dim
         )
@@ -374,7 +374,7 @@ def plot_attributes_diagram(
     if max_value_to_plot == min_value_to_plot:
         max_value_to_plot = min_value_to_plot + 1.
 
-    plot_obs_histogram = not(
+    plot_obs_histogram = not (
         inv_mean_observations is None and inv_example_counts is None
     )
 
@@ -383,8 +383,8 @@ def plot_attributes_diagram(
             inv_mean_observations, exact_dimensions=expected_dim
         )
 
-        error_checking.assert_is_integer_numpy_array(inv_example_counts)
-        error_checking.assert_is_geq_numpy_array(inv_example_counts, 0)
+        # error_checking.assert_is_integer_numpy_array(inv_example_counts)
+        error_checking.assert_is_geq_numpy_array(inv_example_counts, 0.)
         error_checking.assert_is_numpy_array(
             inv_example_counts, exact_dimensions=expected_dim
         )
