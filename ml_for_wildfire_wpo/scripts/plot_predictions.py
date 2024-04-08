@@ -23,6 +23,16 @@ DAYS_TO_SECONDS = 86400
 DATE_FORMAT = '%Y%m%d'
 DATE_FORMAT_FOR_TITLE = '%Y-%m-%d'
 
+FIELD_NAME_TO_FANCY = {
+    canadian_fwi_utils.FFMC_NAME: 'FFMC',
+    canadian_fwi_utils.DMC_NAME: 'DMC',
+    canadian_fwi_utils.DC_NAME: 'DC',
+    canadian_fwi_utils.BUI_NAME: 'BUI',
+    canadian_fwi_utils.ISI_NAME: 'ISI',
+    canadian_fwi_utils.FWI_NAME: 'FWI',
+    canadian_fwi_utils.DSR_NAME: 'DSR'
+}
+
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 
 DIFF_COLOUR_MAP_OBJECT = pyplot.get_cmap('seismic')
@@ -151,7 +161,7 @@ def _find_lead_time(prediction_file_name_by_model):
 
 def _plot_predictions_one_model(
         prediction_file_name, field_names, init_date_string, lead_time_days,
-        max_diff_value_by_field, max_diff_percentile_by_field,
+        max_diff_value_by_field,
         border_latitudes_deg_n, border_longitudes_deg_e,
         model_description_string, fancy_model_description_string,
         plot_actual, output_dir_name):
@@ -165,7 +175,6 @@ def _plot_predictions_one_model(
     :param init_date_string: Initialization date (format "yyyymmdd").
     :param lead_time_days: Lead time.
     :param max_diff_value_by_field: See documentation at top of this script.
-    :param max_diff_percentile_by_field: Same.
     :param border_latitudes_deg_n: length-P numpy array of latitudes (deg
         north).
     :param border_longitudes_deg_e: length-P numpy array of longitudes (deg
@@ -188,9 +197,7 @@ def _plot_predictions_one_model(
     ptx = prediction_table_xarray
 
     for j in range(len(field_names)):
-        this_field_name_fancy = fwi_plotting.FIELD_NAME_TO_FANCY[
-            field_names[j]
-        ]
+        this_field_name_fancy = FIELD_NAME_TO_FANCY[field_names[j]]
         field_index = numpy.where(
             ptx[prediction_io.FIELD_NAME_KEY].values == field_names[j]
         )[0][0]
@@ -275,21 +282,13 @@ def _plot_predictions_one_model(
             model_description_string
         )
 
-        diff_matrix = prediction_matrix - target_matrix
-        if max_diff_value_by_field is None:
-            this_max_value = numpy.nanpercentile(
-                numpy.absolute(diff_matrix),
-                max_diff_percentile_by_field[j]
-            )
-        else:
-            this_max_value = max_diff_value_by_field[j] + 0.
-
         colour_norm_object = pyplot.Normalize(
-            vmin=-1 * this_max_value, vmax=this_max_value
+            vmin=-1 * max_diff_value_by_field[j],
+            vmax=max_diff_value_by_field[j]
         )
 
         _plot_one_diff_field(
-            diff_matrix=diff_matrix,
+            diff_matrix=prediction_matrix - target_matrix,
             grid_latitudes_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
             grid_longitudes_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
             border_latitudes_deg_n=border_latitudes_deg_n,
@@ -589,6 +588,40 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
 
     lead_time_days = _find_lead_time(prediction_file_name_by_model)
 
+    if max_diff_value_by_field is None:
+        max_diff_value_by_field = numpy.full(num_fields, numpy.nan)
+
+        for j in range(num_fields):
+            this_field_diff_matrices = [None] * num_models
+
+            for i in range(num_models):
+                ptx = prediction_io.read_file(prediction_file_name_by_model[i])
+                field_index = numpy.where(
+                    ptx[prediction_io.FIELD_NAME_KEY].values == field_names[j]
+                )[0][0]
+
+                this_pred_matrix = numpy.mean(
+                    ptx[prediction_io.PREDICTION_KEY].values[..., field_index, :],
+                    axis=-1
+                )
+                this_target_matrix = (
+                    ptx[prediction_io.TARGET_KEY].values[..., field_index]
+                )
+                this_weight_matrix = ptx[prediction_io.WEIGHT_KEY].values
+
+                this_pred_matrix[
+                    this_weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW
+                ] = numpy.nan
+
+                this_field_diff_matrices[i] = (
+                    this_pred_matrix - this_target_matrix
+                )
+
+            max_diff_value_by_field[j] = numpy.nanpercentile(
+                numpy.stack(this_field_diff_matrices, axis=-1),
+                max_diff_percentile_by_field[j]
+            )
+
     for i in range(num_models):
         _plot_predictions_one_model(
             prediction_file_name=prediction_file_name_by_model[i],
@@ -596,7 +629,6 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
             init_date_string=init_date_string,
             lead_time_days=lead_time_days,
             max_diff_value_by_field=max_diff_value_by_field,
-            max_diff_percentile_by_field=max_diff_percentile_by_field,
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
             model_description_string=description_string_by_model[i],
