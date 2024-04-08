@@ -280,7 +280,8 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
     # Create fake neural-net metafile.
     generator_option_dict = {
         neural_net.TARGET_FIELDS_KEY: TARGET_FIELD_NAMES,
-        neural_net.TARGET_NORM_FILE_KEY: target_norm_file_name
+        neural_net.TARGET_NORM_FILE_KEY: target_norm_file_name,
+        neural_net.TARGET_LEAD_TIME_KEY: lead_time_days
     }
 
     fake_model_file_name = '{0:s}/fake_model_{1:s}/model.h5'.format(
@@ -323,7 +324,7 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
             (target_matrix, numpy.expand_dims(weight_matrix, axis=-1)),
             axis=-1
         ),
-        prediction_matrix=prediction_matrix,
+        prediction_matrix=numpy.expand_dims(prediction_matrix, axis=-1),
         grid_latitudes_deg_n=
         era5ct.coords[era5_constant_utils.LATITUDE_DIM].values,
         grid_longitudes_deg_e=

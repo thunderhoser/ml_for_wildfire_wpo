@@ -8,6 +8,7 @@ from matplotlib import pyplot
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from gewittergefahr.gg_utils import file_system_utils
+from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.io import border_io
 from ml_for_wildfire_wpo.io import prediction_io
 from ml_for_wildfire_wpo.utils import canadian_fwi_utils
@@ -27,14 +28,23 @@ FIGURE_WIDTH_INCHES = 15
 FIGURE_HEIGHT_INCHES = 15
 FIGURE_RESOLUTION_DPI = 300
 
-INPUT_DIR_ARG_NAME = 'input_prediction_dir_name'
+INPUT_DIRS_ARG_NAME = 'input_prediction_dir_name_by_model'
+MODEL_DESCRIPTIONS_ARG_NAME = 'description_string_by_model'
 FIELDS_ARG_NAME = 'field_names'
 INIT_DATE_ARG_NAME = 'init_date_string'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
-INPUT_DIR_HELP_STRING = (
-    'Name of input directory.  Files therein will be found by '
-    '`prediction_io.find_file` and read by `prediction_io.read_file`.'
+INPUT_DIRS_HELP_STRING = (
+    'List of paths to input directories, one per model.  Files in each '
+    'directory will be found by `prediction_io.find_file` and read by '
+    '`prediction_io.read_file`.'
+)
+MODEL_DESCRIPTIONS_HELP_STRING = (
+    'List of model descriptions, to be used in figure titles.  The list must '
+    'be space-separated.  Within each list item, underscores will be replaced '
+    'by spaces.  This list must have the same length as {0:s}.'
+).format(
+    INPUT_DIRS_ARG_NAME
 )
 FIELDS_HELP_STRING = 'List of fields to plot.'
 INIT_DATE_HELP_STRING = (
@@ -47,8 +57,12 @@ OUTPUT_DIR_HELP_STRING = (
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
-    '--' + INPUT_DIR_ARG_NAME, type=str, required=True,
-    help=INPUT_DIR_HELP_STRING
+    '--' + INPUT_DIRS_ARG_NAME, type=str, nargs='+', required=True,
+    help=INPUT_DIRS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + MODEL_DESCRIPTIONS_ARG_NAME, type=str, nargs='+', required=True,
+    help=INPUT_DIRS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + FIELDS_ARG_NAME, type=str, nargs='+', required=True,
@@ -62,6 +76,181 @@ INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
+
+
+def _find_lead_time(prediction_file_name_by_model):
+    """Finds lead time (must be the same for all models).
+
+    :param prediction_file_name_by_model: See documentation at top of this
+        script.
+    :return: lead_time_days: Lead time.
+    """
+
+    num_models = len(prediction_file_name_by_model)
+    lead_time_days = None
+
+    for i in range(num_models):
+        prediction_table_xarray = prediction_io.read_file(
+            prediction_file_name_by_model[i]
+        )
+        model_file_name = (
+            prediction_table_xarray.attrs[prediction_io.MODEL_FILE_KEY]
+        )
+        model_metafile_name = neural_net.find_metafile(
+            model_file_name=model_file_name, raise_error_if_missing=True
+        )
+
+        print('Reading model metadata from: "{0:s}"...'.format(
+            model_metafile_name
+        ))
+        mmd = neural_net.read_metafile(model_metafile_name)
+        training_option_dict = mmd[neural_net.TRAINING_OPTIONS_KEY]
+
+        if neural_net.TARGET_LEAD_TIME_KEY not in training_option_dict:
+            continue
+
+        this_lead_time_days = (
+            training_option_dict[neural_net.TARGET_LEAD_TIME_KEY]
+        )
+        if lead_time_days is None:
+            lead_time_days = this_lead_time_days + 0
+            continue
+
+        assert lead_time_days == this_lead_time_days
+
+    return lead_time_days
+
+
+def _plot_predictions_one_model(
+        prediction_file_name, field_names, init_date_string, lead_time_days,
+        border_latitudes_deg_n, border_longitudes_deg_e,
+        model_description_string, fancy_model_description_string,
+        plot_actual, output_dir_name):
+    """Plots all predictions (i.e., all predicted fields) for one model.
+
+    P = number of points in borders
+
+    :param prediction_file_name: Path to input file (will be read by
+        `prediction_io.read_file`).
+    :param field_names: 1-D list of target fields.
+    :param init_date_string: Initialization date (format "yyyymmdd").
+    :param lead_time_days: Lead time.
+    :param border_latitudes_deg_n: length-P numpy array of latitudes (deg
+        north).
+    :param border_longitudes_deg_e: length-P numpy array of longitudes (deg
+        east).
+    :param model_description_string: Model description for use in file name.
+    :param fancy_model_description_string: Model description for use in figure
+        title.
+    :param plot_actual: Boolean flag.  If True, will plot actual (target)
+        fields.
+    :param output_dir_name: Path to output directory.  Figures will be saved
+        here.
+    """
+
+    init_date_unix_sec = time_conversion.string_to_unix_sec(
+        init_date_string, DATE_FORMAT
+    )
+
+    print('Reading data from: "{0:s}"...'.format(prediction_file_name))
+    prediction_table_xarray = prediction_io.read_file(prediction_file_name)
+    ptx = prediction_table_xarray
+
+    for this_field_name in field_names:
+        this_field_name_fancy = fwi_plotting.FIELD_NAME_TO_FANCY[
+            this_field_name
+        ]
+        field_index = numpy.where(
+            ptx[prediction_io.FIELD_NAME_KEY].values == this_field_name
+        )[0][0]
+
+        prediction_matrix = numpy.mean(
+            ptx[prediction_io.PREDICTION_KEY].values[..., field_index, :],
+            axis=-1
+        )
+        target_matrix = (
+            ptx[prediction_io.TARGET_KEY].values[..., field_index]
+        )
+        weight_matrix = ptx[prediction_io.WEIGHT_KEY].values
+
+        prediction_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = (
+            numpy.nan
+        )
+        target_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = numpy.nan
+
+        title_string = (
+            'Predicted {0:s} from {1:s}\n'
+            'Init 00Z {2:s}, valid local noon {3:s}'
+        ).format(
+            this_field_name_fancy,
+            fancy_model_description_string,
+            time_conversion.unix_sec_to_string(
+                init_date_unix_sec, DATE_FORMAT_FOR_TITLE
+            ),
+            time_conversion.unix_sec_to_string(
+                init_date_unix_sec + lead_time_days * DAYS_TO_SECONDS,
+                DATE_FORMAT_FOR_TITLE
+            )
+        )
+
+        valid_date_string = time_conversion.unix_sec_to_string(
+            init_date_unix_sec + lead_time_days * DAYS_TO_SECONDS,
+            DATE_FORMAT
+        )
+
+        output_file_name = (
+            '{0:s}/valid={1:s}_{2:s}_init={3:s}_{4:s}.jpg'
+        ).format(
+            output_dir_name,
+            valid_date_string,
+            this_field_name.replace('_', '-'),
+            init_date_string,
+            model_description_string
+        )
+
+        _plot_one_field(
+            data_matrix=prediction_matrix,
+            grid_latitudes_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
+            grid_longitudes_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            field_name=this_field_name,
+            title_string=title_string,
+            output_file_name=output_file_name
+        )
+
+        if not plot_actual:
+            continue
+
+        title_string = (
+            'Actual {0:s}\n'
+            'Valid local noon {1:s}'
+        ).format(
+            this_field_name_fancy,
+            time_conversion.unix_sec_to_string(
+                init_date_unix_sec + lead_time_days * DAYS_TO_SECONDS,
+                DATE_FORMAT_FOR_TITLE
+            )
+        )
+
+        output_file_name = (
+            '{0:s}/valid={1:s}_{2:s}_actual.jpg'
+        ).format(
+            output_dir_name,
+            valid_date_string,
+            this_field_name.replace('_', '-')
+        )
+
+        _plot_one_field(
+            data_matrix=target_matrix,
+            grid_latitudes_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
+            grid_longitudes_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            field_name=this_field_name,
+            title_string=title_string,
+            output_file_name=output_file_name
+        )
 
 
 def _plot_one_field(
@@ -150,137 +339,65 @@ def _plot_one_field(
     pyplot.close(figure_object)
 
 
-def _run(prediction_dir_name, field_names, init_date_string, output_dir_name):
+def _run(prediction_dir_name_by_model, description_string_by_model,
+         field_names, init_date_string, output_dir_name):
     """Plots NN-based predictions and targets (actual values).
 
     This is effectively the main method.
 
-    :param prediction_dir_name: See documentation at top of file.
+    :param prediction_dir_name_by_model: See documentation at top of file.
+    :param description_string_by_model: Same.
     :param field_names: Same.
     :param init_date_string: Same.
     :param output_dir_name: Same.
     """
 
     # Check input args.
-    file_system_utils.mkdir_recursive_if_necessary(
-        directory_name=output_dir_name
+    num_models = len(prediction_dir_name_by_model)
+    error_checking.assert_is_numpy_array(
+        numpy.array(description_string_by_model),
+        exact_dimensions=numpy.array([num_models], dtype=int)
     )
+
+    fancy_description_string_by_model = [
+        d.replace('_', ' ') for d in description_string_by_model
+    ]
+    description_string_by_model = [
+        d.lower().replace('_', '-') for d in description_string_by_model
+    ]
 
     assert all([f in canadian_fwi_utils.ALL_FIELD_NAMES for f in field_names])
 
-    init_date_unix_sec = time_conversion.string_to_unix_sec(
-        init_date_string, DATE_FORMAT
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=output_dir_name
     )
 
     # Do actual stuff.
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
-    prediction_file_name = prediction_io.find_file(
-        directory_name=prediction_dir_name, init_date_string=init_date_string,
-        raise_error_if_missing=True
-    )
-
-    print('Reading data from: "{0:s}"...'.format(prediction_file_name))
-    prediction_table_xarray = prediction_io.read_file(prediction_file_name)
-    ptx = prediction_table_xarray
-
-    model_file_name = ptx.attrs[prediction_io.MODEL_FILE_KEY]
-    model_metafile_name = neural_net.find_metafile(
-        model_file_name=model_file_name, raise_error_if_missing=True
-    )
-
-    print('Reading model metadata from: "{0:s}"...'.format(model_metafile_name))
-    model_metadata_dict = neural_net.read_metafile(model_metafile_name)
-    training_option_dict = model_metadata_dict[neural_net.TRAINING_OPTIONS_KEY]
-    lead_time_days = training_option_dict[neural_net.TARGET_LEAD_TIME_KEY]
-
-    for this_field_name in field_names:
-        this_field_name_fancy = fwi_plotting.FIELD_NAME_TO_FANCY[
-            this_field_name
-        ]
-        field_index = numpy.where(
-            ptx[prediction_io.FIELD_NAME_KEY].values == this_field_name
-        )[0][0]
-
-        prediction_matrix = numpy.mean(
-            ptx[prediction_io.PREDICTION_KEY].values[..., field_index, :],
-            axis=-1
+    prediction_file_name_by_model = [
+        prediction_io.find_file(
+            directory_name=d,
+            init_date_string=init_date_string,
+            raise_error_if_missing=True
         )
-        target_matrix = (
-            ptx[prediction_io.TARGET_KEY].values[..., field_index]
-        )
-        weight_matrix = ptx[prediction_io.WEIGHT_KEY].values
+        for d in prediction_dir_name_by_model
+    ]
 
-        prediction_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = (
-            numpy.nan
-        )
-        target_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = numpy.nan
+    lead_time_days = _find_lead_time(prediction_file_name_by_model)
 
-        title_string = (
-            'Predicted {0:s}\nInit 00Z {1:s}, valid local noon {2:s}'
-        ).format(
-            this_field_name_fancy,
-            time_conversion.unix_sec_to_string(
-                init_date_unix_sec, DATE_FORMAT_FOR_TITLE
-            ),
-            time_conversion.unix_sec_to_string(
-                init_date_unix_sec + lead_time_days * DAYS_TO_SECONDS,
-                DATE_FORMAT_FOR_TITLE
-            )
-        )
-
-        valid_date_string = time_conversion.unix_sec_to_string(
-            init_date_unix_sec + lead_time_days * DAYS_TO_SECONDS,
-            DATE_FORMAT
-        )
-
-        output_file_name = (
-            '{0:s}/valid={1:s}_init={2:s}_{3:s}_predicted.jpg'
-        ).format(
-            output_dir_name,
-            valid_date_string,
-            init_date_string,
-            this_field_name.replace('_', '-')
-        )
-
-        _plot_one_field(
-            data_matrix=prediction_matrix,
-            grid_latitudes_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
-            grid_longitudes_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+    for i in range(num_models):
+        _plot_predictions_one_model(
+            prediction_file_name=prediction_file_name_by_model[i],
+            field_names=field_names,
+            init_date_string=init_date_string,
+            lead_time_days=lead_time_days,
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
-            field_name=this_field_name,
-            title_string=title_string,
-            output_file_name=output_file_name
-        )
-
-        title_string = (
-            'Actual {0:s}\nValid local noon {1:s}'
-        ).format(
-            this_field_name_fancy,
-            time_conversion.unix_sec_to_string(
-                init_date_unix_sec + lead_time_days * DAYS_TO_SECONDS,
-                DATE_FORMAT_FOR_TITLE
-            )
-        )
-
-        output_file_name = (
-            '{0:s}/valid={1:s}_{2:s}_actual.jpg'
-        ).format(
-            output_dir_name,
-            valid_date_string,
-            this_field_name.replace('_', '-')
-        )
-
-        _plot_one_field(
-            data_matrix=target_matrix,
-            grid_latitudes_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
-            grid_longitudes_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
-            border_latitudes_deg_n=border_latitudes_deg_n,
-            border_longitudes_deg_e=border_longitudes_deg_e,
-            field_name=this_field_name,
-            title_string=title_string,
-            output_file_name=output_file_name
+            model_description_string=description_string_by_model[i],
+            fancy_model_description_string=fancy_description_string_by_model[i],
+            plot_actual=i == 0,
+            output_dir_name=output_dir_name
         )
 
 
@@ -288,7 +405,12 @@ if __name__ == '__main__':
     INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
 
     _run(
-        prediction_dir_name=getattr(INPUT_ARG_OBJECT, INPUT_DIR_ARG_NAME),
+        prediction_dir_name_by_model=getattr(
+            INPUT_ARG_OBJECT, INPUT_DIRS_ARG_NAME
+        ),
+        description_string_by_model=getattr(
+            INPUT_ARG_OBJECT, MODEL_DESCRIPTIONS_ARG_NAME
+        ),
         field_names=getattr(INPUT_ARG_OBJECT, FIELDS_ARG_NAME),
         init_date_string=getattr(INPUT_ARG_OBJECT, INIT_DATE_ARG_NAME),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
