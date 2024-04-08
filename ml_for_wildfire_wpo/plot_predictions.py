@@ -25,6 +25,7 @@ import fwi_plotting
 import plotting_utils
 
 TOLERANCE = 1e-6
+SENTINEL_VALUE = -1e6
 
 DAYS_TO_SECONDS = 86400
 DATE_FORMAT = '%Y%m%d'
@@ -32,6 +33,7 @@ DATE_FORMAT_FOR_TITLE = '%Y-%m-%d'
 
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 
+DIFF_COLOUR_MAP_OBJECT = pyplot.get_cmap('seismic')
 FIGURE_WIDTH_INCHES = 15
 FIGURE_HEIGHT_INCHES = 15
 FIGURE_RESOLUTION_DPI = 300
@@ -40,6 +42,8 @@ INPUT_DIRS_ARG_NAME = 'input_prediction_dir_name_by_model'
 MODEL_DESCRIPTIONS_ARG_NAME = 'description_string_by_model'
 FIELDS_ARG_NAME = 'field_names'
 INIT_DATE_ARG_NAME = 'init_date_string'
+MAX_VALUES_ARG_NAME = 'max_diff_value_by_field'
+MAX_PERCENTILES_ARG_NAME = 'max_diff_prctile_by_field'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 INPUT_DIRS_HELP_STRING = (
@@ -58,6 +62,21 @@ FIELDS_HELP_STRING = 'List of fields to plot.'
 INIT_DATE_HELP_STRING = (
     'Initialization date (i.e., model-run date, where the model is always run '
     'at 00Z).  Format should be "yyyymmdd".'
+)
+MAX_VALUES_HELP_STRING = (
+    'List of max absolute diff values in colour bar.  This list must have the '
+    'same length as {0:s}.  If you instead want max absolute diffs to be '
+    'percentiles over the data, leave this argument alone and use {1:s}.'
+).format(
+    FIELDS_ARG_NAME, MAX_PERCENTILES_ARG_NAME
+)
+MAX_PERCENTILES_HELP_STRING = (
+    'List of percentile levels (from 0...100) used to determine max absolute '
+    'diff in colour bar.  This list must have the same length as {0:s}.  If '
+    'you instead want to specify raw values, leave this argument alone and use '
+    '{1:s}.'
+).format(
+    FIELDS_ARG_NAME, MAX_VALUES_ARG_NAME
 )
 OUTPUT_DIR_HELP_STRING = (
     'Name of output directory.  Figures will be saved here.'
@@ -79,6 +98,15 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + INIT_DATE_ARG_NAME, type=str, required=True,
     help=INIT_DATE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + MAX_VALUES_ARG_NAME, type=float, nargs='+', required=False,
+    default=[SENTINEL_VALUE - 1], help=MAX_VALUES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + MAX_PERCENTILES_ARG_NAME, type=float, nargs='+',
+    required=False, default=[SENTINEL_VALUE - 1],
+    help=MAX_PERCENTILES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
@@ -131,6 +159,7 @@ def _find_lead_time(prediction_file_name_by_model):
 
 def _plot_predictions_one_model(
         prediction_file_name, field_names, init_date_string, lead_time_days,
+        max_diff_value_by_field, max_diff_percentile_by_field,
         border_latitudes_deg_n, border_longitudes_deg_e,
         model_description_string, fancy_model_description_string,
         plot_actual, output_dir_name):
@@ -143,6 +172,8 @@ def _plot_predictions_one_model(
     :param field_names: 1-D list of target fields.
     :param init_date_string: Initialization date (format "yyyymmdd").
     :param lead_time_days: Lead time.
+    :param max_diff_value_by_field: See documentation at top of this script.
+    :param max_diff_percentile_by_field: Same.
     :param border_latitudes_deg_n: length-P numpy array of latitudes (deg
         north).
     :param border_longitudes_deg_e: length-P numpy array of longitudes (deg
@@ -164,12 +195,12 @@ def _plot_predictions_one_model(
     prediction_table_xarray = prediction_io.read_file(prediction_file_name)
     ptx = prediction_table_xarray
 
-    for this_field_name in field_names:
+    for j in range(len(field_names)):
         this_field_name_fancy = fwi_plotting.FIELD_NAME_TO_FANCY[
-            this_field_name
+            field_names[j]
         ]
         field_index = numpy.where(
-            ptx[prediction_io.FIELD_NAME_KEY].values == this_field_name
+            ptx[prediction_io.FIELD_NAME_KEY].values == field_names[j]
         )[0][0]
 
         prediction_matrix = numpy.mean(
@@ -211,7 +242,7 @@ def _plot_predictions_one_model(
         ).format(
             output_dir_name,
             valid_date_string,
-            this_field_name.replace('_', '-'),
+            field_names[j].replace('_', '-'),
             init_date_string,
             model_description_string
         )
@@ -222,7 +253,57 @@ def _plot_predictions_one_model(
             grid_longitudes_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
-            field_name=this_field_name,
+            field_name=field_names[j],
+            title_string=title_string,
+            output_file_name=output_file_name
+        )
+
+        title_string = (
+            '{0:s} errors from {1:s}\n'
+            'Init 00Z {2:s}, valid local noon {3:s}'
+        ).format(
+            this_field_name_fancy,
+            fancy_model_description_string,
+            time_conversion.unix_sec_to_string(
+                init_date_unix_sec, DATE_FORMAT_FOR_TITLE
+            ),
+            time_conversion.unix_sec_to_string(
+                init_date_unix_sec + lead_time_days * DAYS_TO_SECONDS,
+                DATE_FORMAT_FOR_TITLE
+            )
+        )
+
+        output_file_name = (
+            '{0:s}/valid={1:s}_{2:s}_init={3:s}_{4:s}_diffs.jpg'
+        ).format(
+            output_dir_name,
+            valid_date_string,
+            field_names[j].replace('_', '-'),
+            init_date_string,
+            model_description_string
+        )
+
+        diff_matrix = prediction_matrix - target_matrix
+        if max_diff_value_by_field is None:
+            this_max_value = numpy.nanpercentile(
+                numpy.absolute(diff_matrix),
+                max_diff_percentile_by_field[j]
+            )
+        else:
+            this_max_value = max_diff_value_by_field[j] + 0.
+
+        colour_norm_object = pyplot.Normalize(
+            vmin=-1 * this_max_value, vmax=this_max_value
+        )
+
+        _plot_one_diff_field(
+            diff_matrix=diff_matrix,
+            grid_latitudes_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
+            grid_longitudes_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            colour_map_object=DIFF_COLOUR_MAP_OBJECT,
+            colour_norm_object=colour_norm_object,
             title_string=title_string,
             output_file_name=output_file_name
         )
@@ -246,7 +327,7 @@ def _plot_predictions_one_model(
         ).format(
             output_dir_name,
             valid_date_string,
-            this_field_name.replace('_', '-')
+            field_names[j].replace('_', '-')
         )
 
         _plot_one_field(
@@ -255,10 +336,95 @@ def _plot_predictions_one_model(
             grid_longitudes_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
-            field_name=this_field_name,
+            field_name=field_names[j],
             title_string=title_string,
             output_file_name=output_file_name
         )
+
+
+def _plot_one_diff_field(
+        diff_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
+        border_latitudes_deg_n, border_longitudes_deg_e,
+        colour_map_object, colour_norm_object, title_string, output_file_name):
+    """Plots one diff field.
+
+    M = number of rows in grid
+    N = number of columns in grid
+
+    :param diff_matrix: M-by-N numpy array of differences (predicted minus
+        actual).
+    :param grid_latitudes_deg_n: See documentation for `_plot_one_field`.
+    :param grid_longitudes_deg_e: Same.
+    :param border_latitudes_deg_n: Same.
+    :param border_longitudes_deg_e: Same.
+    :param colour_map_object: Colour scheme (instance of
+        `matplotlib.colors.ListedColormap` or similar).
+    :param colour_norm_object: Colour-normalizer, used to map from physical
+        values to colours (instance of `matplotlib.colors.BoundaryNorm` or
+        similar).
+    :param title_string: See documentation for `_plot_one_field`.
+    :param output_file_name: Same.
+    """
+
+    figure_object, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    is_longitude_positive_in_west = fwi_plotting.plot_field(
+        data_matrix=diff_matrix,
+        grid_latitudes_deg_n=grid_latitudes_deg_n,
+        grid_longitudes_deg_e=grid_longitudes_deg_e,
+        colour_map_object=colour_map_object,
+        colour_norm_object=colour_norm_object,
+        axes_object=axes_object,
+        plot_colour_bar=True
+    )
+
+    if is_longitude_positive_in_west:
+        border_longitudes_deg_e = lng_conversion.convert_lng_positive_in_west(
+            border_longitudes_deg_e
+        )
+        grid_longitudes_deg_e = lng_conversion.convert_lng_positive_in_west(
+            grid_longitudes_deg_e
+        )
+    else:
+        border_longitudes_deg_e = lng_conversion.convert_lng_negative_in_west(
+            border_longitudes_deg_e
+        )
+        grid_longitudes_deg_e = lng_conversion.convert_lng_negative_in_west(
+            grid_longitudes_deg_e
+        )
+
+    plotting_utils.plot_borders(
+        border_latitudes_deg_n=border_latitudes_deg_n,
+        border_longitudes_deg_e=border_longitudes_deg_e,
+        axes_object=axes_object,
+        line_colour=numpy.full(3, 0.)
+    )
+    plotting_utils.plot_grid_lines(
+        plot_latitudes_deg_n=grid_latitudes_deg_n,
+        plot_longitudes_deg_e=grid_longitudes_deg_e,
+        axes_object=axes_object,
+        meridian_spacing_deg=20.,
+        parallel_spacing_deg=10.
+    )
+
+    axes_object.set_xlim(
+        numpy.min(grid_longitudes_deg_e),
+        numpy.max(grid_longitudes_deg_e)
+    )
+    axes_object.set_ylim(
+        numpy.min(grid_latitudes_deg_n),
+        numpy.max(grid_latitudes_deg_n)
+    )
+    axes_object.set_title(title_string)
+
+    print('Saving figure to: "{0:s}"...'.format(output_file_name))
+    figure_object.savefig(
+        output_file_name, dpi=FIGURE_RESOLUTION_DPI,
+        pad_inches=0, bbox_inches='tight'
+    )
+    pyplot.close(figure_object)
 
 
 def _plot_one_field(
@@ -348,7 +514,8 @@ def _plot_one_field(
 
 
 def _run(prediction_dir_name_by_model, description_string_by_model,
-         field_names, init_date_string, output_dir_name):
+         field_names, init_date_string, max_diff_value_by_field,
+         max_diff_percentile_by_field, output_dir_name):
     """Plots NN-based predictions and targets (actual values).
 
     This is effectively the main method.
@@ -357,10 +524,46 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
     :param description_string_by_model: Same.
     :param field_names: Same.
     :param init_date_string: Same.
+    :param max_diff_value_by_field: Same.
+    :param max_diff_percentile_by_field: Same.
     :param output_dir_name: Same.
     """
 
-    # Check input args.
+    # Check input args for colour scheme.
+    if (
+            (len(max_diff_value_by_field) == 1 and
+             max_diff_value_by_field[0] <= SENTINEL_VALUE)
+    ):
+        max_diff_value_by_field = None
+
+    if (
+            (len(max_diff_percentile_by_field) == 1 and
+             max_diff_percentile_by_field[0] <= SENTINEL_VALUE)
+    ):
+        max_diff_percentile_by_field = None
+
+    num_fields = len(field_names)
+    expected_dim = numpy.array([num_fields], dtype=int)
+
+    if max_diff_value_by_field is None:
+        error_checking.assert_is_numpy_array(
+            max_diff_percentile_by_field, exact_dimensions=expected_dim
+        )
+        error_checking.assert_is_geq_numpy_array(
+            max_diff_percentile_by_field, 90.
+        )
+        error_checking.assert_is_leq_numpy_array(
+            max_diff_percentile_by_field, 100.
+        )
+    else:
+        error_checking.assert_is_numpy_array(
+            max_diff_value_by_field, exact_dimensions=expected_dim
+        )
+        error_checking.assert_is_greater_numpy_array(
+            max_diff_value_by_field, 0.
+        )
+
+    # Check other input args.
     num_models = len(prediction_dir_name_by_model)
     error_checking.assert_is_numpy_array(
         numpy.array(description_string_by_model),
@@ -400,6 +603,8 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
             field_names=field_names,
             init_date_string=init_date_string,
             lead_time_days=lead_time_days,
+            max_diff_value_by_field=max_diff_value_by_field,
+            max_diff_percentile_by_field=max_diff_percentile_by_field,
             border_latitudes_deg_n=border_latitudes_deg_n,
             border_longitudes_deg_e=border_longitudes_deg_e,
             model_description_string=description_string_by_model[i],
@@ -421,5 +626,11 @@ if __name__ == '__main__':
         ),
         field_names=getattr(INPUT_ARG_OBJECT, FIELDS_ARG_NAME),
         init_date_string=getattr(INPUT_ARG_OBJECT, INIT_DATE_ARG_NAME),
+        max_diff_value_by_field=numpy.array(
+            getattr(INPUT_ARG_OBJECT, MAX_VALUES_ARG_NAME), dtype=float
+        ),
+        max_diff_percentile_by_field=numpy.array(
+            getattr(INPUT_ARG_OBJECT, MAX_PERCENTILES_ARG_NAME), dtype=float
+        ),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )

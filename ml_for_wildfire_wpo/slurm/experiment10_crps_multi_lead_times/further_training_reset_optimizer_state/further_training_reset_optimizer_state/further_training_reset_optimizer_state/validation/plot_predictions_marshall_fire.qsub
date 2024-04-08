@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_predictions_marshall_fire_subset"
+#SBATCH --job-name="plot_predictions_marshall_fire"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="gpu"
@@ -18,7 +18,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_predictions_marshall_fire_subset_%A_%a.out
+#SBATCH --output=plot_predictions_marshall_fire_%A_%a.out
 
 conda init
 conda activate base
@@ -53,9 +53,11 @@ while [ $i -lt ${#INIT_DATE_STRINGS[@]} ]; do
     init_date_string="${INIT_DATE_STRINGS[$i]}"
     
     python3 -u "${CODE_DIR_NAME}/plot_predictions.py" \
-    --input_prediction_dir_name="${model_dir_name}/validation" \
+    --input_prediction_dir_name_by_model "${model_dir_name}/validation" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/02day_lead" \
+    --description_string_by_model "NN" "GFS" \
     --field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" \
     --init_date_string="${init_date_string}" \
+    --max_diff_prctile_by_field 99.9 99.9 99.9 99.9 99.9 99.9 99.9 \
     --output_dir_name="${model_dir_name}/validation/prediction_plots"
     
     i=$(( $i + 1 ))
