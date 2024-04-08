@@ -314,7 +314,7 @@ def _run(eval_file_name_by_period, description_string_by_period,
     )
 
     # Read data.
-    evaluation_tables_xarray = [xarray.Dataset() * num_periods]
+    evaluation_tables_xarray = [xarray.Dataset()] * num_periods
 
     for i in range(num_periods):
         print('Reading data from: "{0:s}"...'.format(
