@@ -53,7 +53,7 @@ while [ $i -lt ${#INIT_DATE_STRINGS[@]} ]; do
     init_date_string="${INIT_DATE_STRINGS[$i]}"
     
     python3 -u "${CODE_DIR_NAME}/plot_predictions.py" \
-    --input_prediction_dir_name_by_model "${model_dir_name}/validation" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/02day_lead" \
+    --input_prediction_dir_name_by_model "${model_dir_name}/validation" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/${nn_lead_times_days}day_lead" \
     --description_string_by_model "NN" "GFS" \
     --field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" \
     --init_date_string="${init_date_string}" \
