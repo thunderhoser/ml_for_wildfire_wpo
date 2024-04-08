@@ -41,26 +41,21 @@ LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "11" "12" "13
 INIT_DATE_STRINGS=("20211211" "20211212" "20211213" "20211214" "20211215" "20211216" "20211217" "20211218" "20211219" "20211220" "20211221" "20211222" "20211223" "20211224" "20211225" "20211226" "20211227" "20211228" "20211229" "20211230" "20211231")
 i=$SLURM_ARRAY_TASK_ID
 
-while [ $i -lt ${#INIT_DATE_STRINGS[@]} ] && [ $i -lt $(( $SLURM_ARRAY_TASK_ID + 12 )) ]; do
-    init_date_string="${INIT_DATE_STRINGS[$i]}"
-    j=0
+j=0
+
+while [ $j -lt ${#LEAD_TIMES_DAYS[@]} ]; do
+    lead_time_days="${LEAD_TIMES_DAYS[$j]}"
     
-    while [ $j -lt ${#LEAD_TIMES_DAYS[@]} ]; do
-        lead_time_days="${LEAD_TIMES_DAYS[$j]}"
-        
-        python3 -u "${CODE_DIR_NAME}/convert_raw_gfs_fwi_to_prediction_files.py" \
-        --input_daily_gfs_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
-        --input_canadian_fwi_dir_name="${TARGET_DIR_NAME}" \
-        --input_era5_constant_file_name="${ERA5_CONSTANT_FILE_NAME}" \
-        --input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
-        --init_date_string="${init_date_string}" \
-        --lead_time_days=${lead_time_days} \
-        --latitude_limits_deg_n 17 73 \
-        --longitude_limits_deg_e 171 -65 \
-        --output_prediction_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}/prediction_files/${lead_time_days}day_lead"
-        
-        j=$(( $j + 1 ))
-    done
+    python3 -u "${CODE_DIR_NAME}/convert_raw_gfs_fwi_to_prediction_files.py" \
+    --input_daily_gfs_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
+    --input_canadian_fwi_dir_name="${TARGET_DIR_NAME}" \
+    --input_era5_constant_file_name="${ERA5_CONSTANT_FILE_NAME}" \
+    --input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
+    --init_date_string="${INIT_DATE_STRINGS[$i]}" \
+    --lead_time_days=${lead_time_days} \
+    --latitude_limits_deg_n 17 73 \
+    --longitude_limits_deg_e 171 -65 \
+    --output_prediction_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}/prediction_files/${lead_time_days}day_lead"
     
-    i=$(( $i + 1 ))
+    j=$(( $j + 1 ))
 done
