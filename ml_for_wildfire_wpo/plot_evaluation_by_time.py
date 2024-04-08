@@ -299,12 +299,12 @@ def _plot_one_set_of_metrics_1field(
     if plotting_bias_on_main_axes:
         main_axes_object.plot(
             main_axes_object.get_xlim(), numpy.full(2, 0.),
-            linestyle='solid', linewidth=4, color=numpy.full(3, 0.)
+            linestyle='dashed', linewidth=4, color=numpy.full(3, 0.)
         )
     if plotting_bias_on_aux_axes:
         aux_axes_object.plot(
             aux_axes_object.get_xlim(), numpy.full(2, 0.),
-            linestyle='solid', linewidth=4, color=numpy.full(3, 0.)
+            linestyle='dashed', linewidth=4, color=numpy.full(3, 0.)
         )
 
     print('Saving figure to: "{0:s}"...'.format(output_file_name))
