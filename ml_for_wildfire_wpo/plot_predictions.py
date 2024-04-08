@@ -24,10 +24,12 @@ import fwi_plotting
 import plotting_utils
 
 TOLERANCE = 1e-6
+
+DAYS_TO_SECONDS = 86400
 DATE_FORMAT = '%Y%m%d'
 DATE_FORMAT_FOR_TITLE = '%Y-%m-%d'
 
-DAYS_TO_SECONDS = 86400
+MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 
 FIGURE_WIDTH_INCHES = 15
 FIGURE_HEIGHT_INCHES = 15
@@ -208,16 +210,19 @@ def _run(prediction_dir_name, field_names, init_date_string, output_dir_name):
             ptx[prediction_io.FIELD_NAME_KEY].values == this_field_name
         )[0][0]
 
-        prediction_matrix = (
-            ptx[prediction_io.PREDICTION_KEY].values[..., field_index]
+        prediction_matrix = numpy.mean(
+            ptx[prediction_io.PREDICTION_KEY].values[..., field_index, :],
+            axis=-1
         )
         target_matrix = (
             ptx[prediction_io.TARGET_KEY].values[..., field_index]
         )
         weight_matrix = ptx[prediction_io.WEIGHT_KEY].values
 
-        prediction_matrix[weight_matrix < 0.05] = numpy.nan
-        target_matrix[weight_matrix < 0.05] = numpy.nan
+        prediction_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = (
+            numpy.nan
+        )
+        target_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = numpy.nan
 
         title_string = (
             'Predicted {0:s}\nInit 00Z {1:s}, valid local noon {2:s}'
