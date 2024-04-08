@@ -202,8 +202,9 @@ def _run(prediction_dir_name, field_names, init_date_string, output_dir_name):
             ptx[prediction_io.FIELD_NAME_KEY].values == this_field_name
         )[0][0]
 
-        prediction_matrix = (
-            ptx[prediction_io.PREDICTION_KEY].values[..., field_index]
+        prediction_matrix = numpy.mean(
+            ptx[prediction_io.PREDICTION_KEY].values[..., field_index, :],
+            axis=-1
         )
         target_matrix = (
             ptx[prediction_io.TARGET_KEY].values[..., field_index]
