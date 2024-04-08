@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_pit_histograms"
+#SBATCH --job-name="plot_discard_test"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="gpuwf"
@@ -18,7 +18,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_pit_histograms_%A_%a.out
+#SBATCH --output=plot_discard_test_%A_%a.out
 
 conda init
 conda activate base
@@ -31,7 +31,7 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
-TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment10_crps_multi_lead_times/further_training_reset_optimizer_state/further_training_reset_optimizer_state/further_training_reset_optimizer_state/further_training_reset_optimizer_state/further_training_reset_optimizer_state/further_training_reset_optimizer_state"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment10_crps_multi_lead_times/further_training_reset_optimizer_state/further_training_reset_optimizer_state/further_training_reset_optimizer_state"
 
 GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
 TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
@@ -46,6 +46,6 @@ random_seed_index=${RANDOM_SEED_INDICES[$SLURM_ARRAY_TASK_ID]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/nn-lead-time-days=${nn_lead_times_days}_random-seed-index=${random_seed_index}"
 echo $model_dir_name
 
-python3 -u "${CODE_DIR_NAME}/plot_pit_histograms.py" \
---input_file_name="${model_dir_name}/validation/pit_histograms.nc" \
---output_dir_name="${model_dir_name}/validation/pit_histograms"
+python3 -u "${CODE_DIR_NAME}/plot_discard_test.py" \
+--input_file_name="${model_dir_name}/validation/discard_test.nc" \
+--output_dir_name="${model_dir_name}/validation/discard_test"
