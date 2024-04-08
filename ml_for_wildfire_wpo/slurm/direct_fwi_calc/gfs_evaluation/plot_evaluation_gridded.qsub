@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="convert_gfs_fwi_to_prediction_files"
+#SBATCH --job-name="plot_evaluation_gridded"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="gpuwf"
@@ -12,13 +12,13 @@
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
 #SBATCH --time=01:00:00
-#SBATCH --array=0-20
+#SBATCH --array=0-13
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=convert_gfs_fwi_to_prediction_files_%A_%a.out
+#SBATCH --output=plot_evaluation_gridded_%A_%a.out
 
 conda init
 conda activate base
@@ -37,25 +37,11 @@ TARGET_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wp
 ERA5_CONSTANT_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_constants.nc"
 
 LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "11" "12" "13" "14")
+lead_time_days="${LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}"
 
-INIT_DATE_STRINGS=("20211211" "20211212" "20211213" "20211214" "20211215" "20211216" "20211217" "20211218" "20211219" "20211220" "20211221" "20211222" "20211223" "20211224" "20211225" "20211226" "20211227" "20211228" "20211229" "20211230" "20211231")
-i=$SLURM_ARRAY_TASK_ID
-
-j=0
-
-while [ $j -lt ${#LEAD_TIMES_DAYS[@]} ]; do
-    lead_time_days="${LEAD_TIMES_DAYS[$j]}"
-    
-    python3 -u "${CODE_DIR_NAME}/convert_raw_gfs_fwi_to_prediction_files.py" \
-    --input_daily_gfs_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
-    --input_canadian_fwi_dir_name="${TARGET_DIR_NAME}" \
-    --input_era5_constant_file_name="${ERA5_CONSTANT_FILE_NAME}" \
-    --input_target_norm_file_name="${TARGET_NORM_FILE_NAME}" \
-    --init_date_string="${INIT_DATE_STRINGS[$i]}" \
-    --lead_time_days=${lead_time_days} \
-    --latitude_limits_deg_n 17 73 \
-    --longitude_limits_deg_e 171 -65 \
-    --output_prediction_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}/prediction_files/${lead_time_days}day_lead"
-    
-    j=$(( $j + 1 ))
-done
+python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
+--input_evaluation_file_name="${GFS_FORECAST_TARGET_DIR_NAME}/prediction_files/${lead_time_days}day_lead/gridded_evaluation_20210101-20211210.nc" \
+--metric_names "target_standard_deviation" "prediction_standard_deviation" "target_mean" "prediction_mean" "root_mean_squared_error" "mse_bias" "mse_variance" "mse_skill_score" "dual_weighted_mean_squared_error" "dwmse_skill_score" "kolmogorov_smirnov_statistic" "kolmogorov_smirnov_p_value" "mean_absolute_error" "mae_skill_score" "bias" "correlation" "kling_gupta_efficiency" "reliability" \
+--min_colour_percentiles 0.1  0.1  0.0   0.0   0.1  0.1  0.1  0.0   0.1  0.0   0.1  0.1  0.1  0.0   0.1  0.0 0.0 0.1 \
+--max_colour_percentiles 99.5 99.5 100.0 100.0 99.5 99.5 99.5 100.0 99.0 100.0 99.9 99.9 99.5 100.0 99.5 100 100 99.5 \
+--output_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}/prediction_files/${lead_time_days}day_lead/gridded_evaluation_20210101-20211210"
