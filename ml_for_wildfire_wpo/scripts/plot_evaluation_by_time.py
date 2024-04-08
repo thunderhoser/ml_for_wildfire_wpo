@@ -11,6 +11,7 @@ import matplotlib.patches
 from matplotlib import pyplot
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
+from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 from ml_for_wildfire_wpo.utils import regression_evaluation as regression_eval
 
 DEFAULT_FONT_SIZE = 30
@@ -23,6 +24,16 @@ pyplot.rc('legend', fontsize=DEFAULT_FONT_SIZE)
 pyplot.rc('figure', titlesize=DEFAULT_FONT_SIZE)
 
 # TODO(thunderhoser): Add UQ-evaluation files to the mix.
+
+FIELD_NAME_TO_FANCY = {
+    canadian_fwi_utils.FFMC_NAME: 'FFMC',
+    canadian_fwi_utils.DMC_NAME: 'DMC',
+    canadian_fwi_utils.DC_NAME: 'DC',
+    canadian_fwi_utils.BUI_NAME: 'BUI',
+    canadian_fwi_utils.ISI_NAME: 'ISI',
+    canadian_fwi_utils.FWI_NAME: 'FWI',
+    canadian_fwi_utils.DSR_NAME: 'DSR'
+}
 
 MARKER_TYPE = 'o'
 MARKER_SIZE = 16
@@ -120,7 +131,7 @@ def _plot_one_set_of_metrics_1field(
         metric_matrix, metric_names,
         num_examples_by_period, description_string_by_period,
         line_colour_by_metric, line_style_by_metric, main_axis_flag_by_metric,
-        main_y_label_string, aux_y_label_string,
+        main_y_label_string, aux_y_label_string, title_string,
         confidence_level, output_file_name):
     """Plots one set of metrics.
 
@@ -140,6 +151,7 @@ def _plot_one_set_of_metrics_1field(
         (right) y-axis.
     :param main_y_label_string: y-axis label for main (left) axis.
     :param aux_y_label_string: y-axis label for auxiliary (right) axis.
+    :param title_string: Figure title.
     :param confidence_level: Confidence level for bootstrapping.
     :param output_file_name: Path to output file.
     """
@@ -152,6 +164,14 @@ def _plot_one_set_of_metrics_1field(
         1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
     )
 
+    plotting_bias_on_main_axes = any([
+        'bias' in mn.lower()
+        for mn in numpy.array(metric_names)[main_axis_flag_by_metric]
+    ])
+    plotting_bias_on_aux_axes = any([
+        'bias' in mn.lower()
+        for mn in numpy.array(metric_names)[main_axis_flag_by_metric == False]
+    ])
     x_values = numpy.linspace(0, num_periods - 1, num=num_periods, dtype=float)
 
     if numpy.any(main_axis_flag_by_metric == False):
@@ -234,10 +254,8 @@ def _plot_one_set_of_metrics_1field(
     main_axes_object.set_zorder(histogram_axes_object.get_zorder() + 2)
     main_axes_object.patch.set_visible(False)
 
-    y_values = numpy.maximum(numpy.log10(num_examples_by_period), 0.)
-
     this_handle = histogram_axes_object.bar(
-        x=x_values, height=y_values,
+        x=x_values, height=num_examples_by_period,
         width=1.,
         color=HISTOGRAM_FACE_COLOUR,
         edgecolor=HISTOGRAM_EDGE_COLOUR,
@@ -259,8 +277,8 @@ def _plot_one_set_of_metrics_1field(
     ))
     main_axes_object.legend(
         legend_handles, legend_strings,
-        loc='lower center',
-        bbox_to_anchor=(0.5, 1),
+        loc='upper center',
+        bbox_to_anchor=(0.5, -0.1),
         fancybox=True,
         shadow=True,
         ncol=num_legend_columns
@@ -268,6 +286,18 @@ def _plot_one_set_of_metrics_1field(
 
     main_axes_object.set_xticks(x_values)
     main_axes_object.set_xticklabels(description_string_by_period, rotation=90.)
+    main_axes_object.set_title(title_string)
+
+    if plotting_bias_on_main_axes:
+        main_axes_object.plot(
+            main_axes_object.get_xlim(), numpy.full(2, 0.),
+            linestyle='solid', linewidth=4, color=numpy.full(3, 0.)
+        )
+    if plotting_bias_on_aux_axes:
+        aux_axes_object.plot(
+            aux_axes_object.get_xlim(), numpy.full(2, 0.),
+            linestyle='solid', linewidth=4, color=numpy.full(3, 0.)
+        )
 
     print('Saving figure to: "{0:s}"...'.format(output_file_name))
     figure_object.savefig(
@@ -306,7 +336,7 @@ def _run(eval_file_name_by_period, description_string_by_period,
     )
 
     # Read data.
-    evaluation_tables_xarray = [xarray.Dataset() * num_periods]
+    evaluation_tables_xarray = [xarray.Dataset()] * num_periods
 
     for i in range(num_periods):
         print('Reading data from: "{0:s}"...'.format(
@@ -369,6 +399,9 @@ def _run(eval_file_name_by_period, description_string_by_period,
             main_y_label_string='Mean',
             aux_y_label_string='Stdev',
             confidence_level=confidence_level,
+            title_string='Actual and predicted climo for {0:s}'.format(
+                FIELD_NAME_TO_FANCY[target_field_names[k]]
+            ),
             output_file_name='{0:s}/means_and_stdevs_{1:s}.jpg'.format(
                 output_dir_name,
                 target_field_names[k].replace('_', '-')
@@ -400,6 +433,9 @@ def _run(eval_file_name_by_period, description_string_by_period,
             main_y_label_string='Dual-weighted MSE',
             aux_y_label_string='Reliability',
             confidence_level=confidence_level,
+            title_string='DWMSE and reliability for {0:s}'.format(
+                FIELD_NAME_TO_FANCY[target_field_names[k]]
+            ),
             output_file_name='{0:s}/dwmse_reliability_{1:s}.jpg'.format(
                 output_dir_name,
                 target_field_names[k].replace('_', '-')
@@ -440,6 +476,9 @@ def _run(eval_file_name_by_period, description_string_by_period,
             main_y_label_string='MAE or RMSE',
             aux_y_label_string='Bias',
             confidence_level=confidence_level,
+            title_string='Basic metrics for {0:s}'.format(
+                FIELD_NAME_TO_FANCY[target_field_names[k]]
+            ),
             output_file_name='{0:s}/mae_bias_rmse_{1:s}.jpg'.format(
                 output_dir_name,
                 target_field_names[k].replace('_', '-')
@@ -493,6 +532,9 @@ def _run(eval_file_name_by_period, description_string_by_period,
             main_y_label_string='Metric',
             aux_y_label_string='',
             confidence_level=confidence_level,
+            title_string='Skill scores for {0:s}'.format(
+                FIELD_NAME_TO_FANCY[target_field_names[k]]
+            ),
             output_file_name='{0:s}/skill_scores_{1:s}.jpg'.format(
                 output_dir_name,
                 target_field_names[k].replace('_', '-')

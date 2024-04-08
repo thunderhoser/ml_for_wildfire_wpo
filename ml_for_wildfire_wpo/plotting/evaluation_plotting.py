@@ -380,7 +380,7 @@ def plot_attributes_diagram(
 
         # error_checking.assert_is_integer_numpy_array(inv_example_counts)
         error_checking.assert_is_geq_numpy_array(
-            example_counts, 0., allow_nan=True
+            inv_example_counts, 0., allow_nan=True
         )
         error_checking.assert_is_numpy_array(
             inv_example_counts, exact_dimensions=expected_dim
