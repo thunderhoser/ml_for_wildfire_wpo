@@ -624,6 +624,7 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
                 this_field_diff_matrices[i] = (
                     this_pred_matrix - this_target_matrix
                 )
+                print(this_field_diff_matrices[i].shape)
 
             max_diff_value_by_field[j] = numpy.nanpercentile(
                 numpy.stack(this_field_diff_matrices, axis=-1),
