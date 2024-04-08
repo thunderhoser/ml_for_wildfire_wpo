@@ -229,12 +229,17 @@ def _run(prediction_dir_name, field_names, init_date_string, output_dir_name):
             )
         )
 
+        valid_date_string = time_conversion.unix_sec_to_string(
+            init_date_unix_sec + lead_time_days * DAYS_TO_SECONDS,
+            DATE_FORMAT
+        )
+
         output_file_name = (
-            '{0:s}/init={1:s}_forecast={2:02d}days_{3:s}_predicted.jpg'
+            '{0:s}/valid={1:s}_init={2:s}_{3:s}_predicted.jpg'
         ).format(
             output_dir_name,
+            valid_date_string,
             init_date_string,
-            lead_time_days,
             this_field_name.replace('_', '-')
         )
 
@@ -260,11 +265,10 @@ def _run(prediction_dir_name, field_names, init_date_string, output_dir_name):
         )
 
         output_file_name = (
-            '{0:s}/init={1:s}_forecast={2:02d}days_{3:s}_actual.jpg'
+            '{0:s}/valid={1:s}_{2:s}_actual.jpg'
         ).format(
             output_dir_name,
-            init_date_string,
-            lead_time_days,
+            valid_date_string,
             this_field_name.replace('_', '-')
         )
 
