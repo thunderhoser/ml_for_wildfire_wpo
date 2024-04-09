@@ -24,6 +24,7 @@ TARGET_NORM_FILE_ARG_NAME = 'target_normalization_file_name'
 TARGETS_USE_QUANTILE_NORM_ARG_NAME = 'targets_use_quantile_norm'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
+DO_RESIDUAL_PRED_ARG_NAME = 'do_residual_prediction'
 
 GFS_TRAINING_DIR_ARG_NAME = 'gfs_dir_name_for_training'
 TARGET_TRAINING_DIR_ARG_NAME = 'target_dir_name_for_training'
@@ -129,6 +130,11 @@ TARGETS_USE_QUANTILE_NORM_HELP_STRING = (
 BATCH_SIZE_HELP_STRING = 'Number of data examples per batch.'
 SENTINEL_VALUE_HELP_STRING = (
     'All NaN predictors will be replaced with this value.'
+)
+DO_RESIDUAL_PRED_HELP_STRING = (
+    'Boolean flag.  If 1, the NN predicts only the residual, with the baseline '
+    '(most recent lagged target fields) being added at the end.  If 0, the NN '
+    'just predicts the raw target fields like a normal robot.'
 )
 
 GFS_TRAINING_DIR_HELP_STRING = (
@@ -283,6 +289,10 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + SENTINEL_VALUE_ARG_NAME, type=float,
         required=True, help=SENTINEL_VALUE_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + DO_RESIDUAL_PRED_ARG_NAME, type=int, required=False, default=0,
+        help=DO_RESIDUAL_PRED_HELP_STRING
     )
 
     parser_object.add_argument(
