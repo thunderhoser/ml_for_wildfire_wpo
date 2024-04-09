@@ -57,6 +57,7 @@ TARGET_NORM_FILE_KEY = 'target_normalization_file_name'
 TARGETS_USE_QUANTILE_NORM_KEY = 'targets_use_quantile_norm'
 BATCH_SIZE_KEY = 'num_examples_per_batch'
 SENTINEL_VALUE_KEY = 'sentinel_value'
+DO_RESIDUAL_PREDICTION_KEY = 'do_residual_prediction'
 
 DEFAULT_GENERATOR_OPTION_DICT = {
     INNER_LATITUDE_LIMITS_KEY: numpy.array([17, 73], dtype=float),
@@ -267,6 +268,7 @@ def _check_generator_args(option_dict):
     # error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 8)
 
     error_checking.assert_is_not_nan(option_dict[SENTINEL_VALUE_KEY])
+    error_checking.assert_is_boolean(option_dict[DO_RESIDUAL_PREDICTION_KEY])
 
     return option_dict
 
@@ -1018,6 +1020,11 @@ def data_generator(option_dict):
     option_dict["num_examples_per_batch"]: Number of data examples per batch,
         usually just called "batch size".
     option_dict["sentinel_value"]: All NaN will be replaced with this value.
+    option_dict["do_residual_prediction"]: Boolean flag.  If True, the neural
+        net does residual prediction -- i.e., it predicts the FWI fields'
+        difference between the most recent lag time and the target time.
+        If False, the neural net does basic prediction, without using the
+        residual.
 
     :return: predictor_matrices: List with the following items.  Some items may
         be missing.
@@ -1030,6 +1037,8 @@ def data_generator(option_dict):
         predictors.
     predictor_matrices[3]: E-by-M-by-N-by-l-by-T numpy array of lag/lead-target
         predictors.
+    predictor_matrices[4]: E-by-M-by-N-by-T numpy array of baseline values for
+        residual prediction.
 
     :return: target_matrix: E-by-M-by-N-by-(T + 1) numpy array, where
         target_matrix[..., 0] through target_matrix[..., -2] contain values of
@@ -1075,6 +1084,7 @@ def data_generator(option_dict):
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
+    do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
 
     if gfs_normalization_file_name is None:
         gfs_norm_param_table_xarray = None
@@ -1166,6 +1176,7 @@ def data_generator(option_dict):
         gfs_predictor_matrix_3d = None
         gfs_predictor_matrix_2d = None
         laglead_target_predictor_matrix = None
+        baseline_prediction_matrix = None
         target_matrix = None
         num_examples_in_memory = 0
 
@@ -1208,6 +1219,28 @@ def data_generator(option_dict):
                 norm_param_table_xarray=target_norm_param_table_xarray,
                 use_quantile_norm=targets_use_quantile_norm
             )
+
+            if do_residual_prediction:
+                (
+                    this_baseline_prediction_matrix, _, _
+                ) = _read_lagged_targets_1example(
+                    gfs_init_date_string=gfs_io.file_name_to_date(
+                        gfs_file_names[gfs_file_index]
+                    ),
+                    target_dir_name=target_dir_name,
+                    target_lag_times_days=numpy.array(
+                        [numpy.min(target_lag_times_days)]
+                    ),
+                    desired_row_indices=desired_target_row_indices,
+                    desired_column_indices=desired_target_column_indices,
+                    latitude_limits_deg_n=inner_latitude_limits_deg_n,
+                    longitude_limits_deg_e=inner_longitude_limits_deg_e,
+                    target_field_names=target_field_names,
+                    norm_param_table_xarray=None,
+                    use_quantile_norm=targets_use_quantile_norm
+                )
+            else:
+                this_baseline_prediction_matrix = None
 
             if gfs_forecast_target_dir_name is not None:
                 (
@@ -1280,6 +1313,18 @@ def data_generator(option_dict):
                     this_gfs_predictor_matrix_2d
                 )
 
+            if this_baseline_prediction_matrix is not None:
+                if baseline_prediction_matrix is None:
+                    these_dim = (
+                        (num_examples_per_batch,) +
+                        this_baseline_prediction_matrix.shape
+                    )
+                    baseline_prediction_matrix = numpy.full(these_dim, numpy.nan)
+
+                baseline_prediction_matrix[num_examples_in_memory, ...] = (
+                    this_baseline_prediction_matrix
+                )
+
             if laglead_target_predictor_matrix is None:
                 these_dim = (
                     (num_examples_per_batch,) +
@@ -1327,6 +1372,29 @@ def data_generator(option_dict):
             gfs_predictor_matrix_2d[
                 numpy.isnan(gfs_predictor_matrix_2d)
             ] = sentinel_value
+
+        if baseline_prediction_matrix is not None:
+            print((
+                'Shape of baseline prediction matrix and NaN fraction: '
+                '{0:s}, {1:.4f}'
+            ).format(
+                str(baseline_prediction_matrix.shape),
+                numpy.mean(numpy.isnan(baseline_prediction_matrix))
+            ))
+
+            baseline_prediction_matrix = _pad_inner_to_outer_domain(
+                data_matrix=baseline_prediction_matrix,
+                outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+                outer_longitude_buffer_deg=outer_longitude_buffer_deg,
+                is_example_axis_present=True, fill_value=sentinel_value
+            )
+
+            baseline_prediction_matrix = baseline_prediction_matrix[..., 0, :]
+            print((
+                'Shape of baseline prediction matrix after padding: {0:s}'
+            ).format(
+                str(baseline_prediction_matrix.shape)
+            ))
 
         print((
             'Shape of lag/lead-target predictor matrix and NaN fraction: '
@@ -1380,6 +1448,11 @@ def data_generator(option_dict):
             predictor_matrices.update({
                 'lagged_target_inputs':
                     laglead_target_predictor_matrix.astype('float32')
+            })
+        if baseline_prediction_matrix is not None:
+            baseline_prediction_matrix.update({
+                'predn_baseline_inputs':
+                    baseline_prediction_matrix.astype('float32')
             })
 
         print((
