@@ -217,7 +217,8 @@ def _get_2d_conv_block(
             num_columns_per_stride=1,
             num_filters=num_filters,
             padding_type_string=architecture_utils.YES_PADDING_STRING,
-            weight_regularizer=regularizer_object
+            weight_regularizer=regularizer_object,
+            layer_name=this_name
         )
 
         if do_time_distributed_conv:
@@ -225,12 +226,32 @@ def _get_2d_conv_block(
                 current_layer_object, name=this_name
             )(this_input_layer_object)
         else:
-            current_layer_object(this_input_layer_object)
+            current_layer_object = current_layer_object(this_input_layer_object)
 
         if i == num_conv_layers - 1 and do_residual:
-            this_name = '{0:s}_residual'.format(basic_layer_name, i)
+            if input_layer_object.shape[-1] != num_filters:
+                this_name = '{0:s}_preresidual_conv'.format(basic_layer_name)
+                new_layer_object = architecture_utils.get_2d_conv_layer(
+                    num_kernel_rows=filter_size_px,
+                    num_kernel_columns=filter_size_px,
+                    num_rows_per_stride=1,
+                    num_columns_per_stride=1,
+                    num_filters=num_filters,
+                    padding_type_string=architecture_utils.YES_PADDING_STRING,
+                    weight_regularizer=regularizer_object,
+                    layer_name=this_name
+                )
+
+                if do_time_distributed_conv:
+                    new_layer_object = keras.layers.TimeDistributed(
+                        new_layer_object, name=this_name
+                    )(input_layer_object)
+                else:
+                    new_layer_object = new_layer_object(input_layer_object)
+
+            this_name = '{0:s}_residual'.format(basic_layer_name)
             current_layer_object = keras.layers.Add(name=this_name)([
-                current_layer_object, input_layer_object
+                current_layer_object, new_layer_object
             ])
 
         this_name = '{0:s}_activ{1:d}'.format(basic_layer_name, i)
@@ -257,10 +278,8 @@ def _get_2d_conv_block(
 
 
 def _get_3d_conv_block(
-        input_layer_object, do_residual,
-        num_conv_layers, filter_size_px, num_filters,
-        regularizer_object,
-        activation_function_name, activation_function_alpha,
+        input_layer_object, do_residual, num_conv_layers, filter_size_px,
+        regularizer_object, activation_function_name, activation_function_alpha,
         dropout_rates, use_batch_norm, basic_layer_name):
     """Creates convolutional block for data with 2 spatial dimensions.
 
@@ -268,7 +287,6 @@ def _get_3d_conv_block(
     :param do_residual: See documentation for `_get_3d_conv_block`.
     :param num_conv_layers: Same.
     :param filter_size_px: Same.
-    :param num_filters: Same.
     :param regularizer_object: Same.
     :param activation_function_name: Same.
     :param activation_function_alpha: Same.
@@ -297,6 +315,7 @@ def _get_3d_conv_block(
     # Do actual stuff.
     current_layer_object = None
     num_time_steps = input_layer_object.shape[-2]
+    num_filters = input_layer_object.shape[-1]
 
     for i in range(num_conv_layers):
         this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
@@ -336,7 +355,7 @@ def _get_3d_conv_block(
             )(current_layer_object)
 
         if i == num_conv_layers - 1 and do_residual:
-            this_name = '{0:s}_preresidual_avg'.format(basic_layer_name, i)
+            this_name = '{0:s}_preresidual_avg'.format(basic_layer_name)
             this_layer_object = architecture_utils.get_3d_pooling_layer(
                 num_rows_in_window=1,
                 num_columns_in_window=1,
@@ -358,7 +377,7 @@ def _get_3d_conv_block(
                 target_shape=new_dims, name=this_name
             )(this_layer_object)
 
-            this_name = '{0:s}_residual'.format(basic_layer_name, i)
+            this_name = '{0:s}_residual'.format(basic_layer_name)
             current_layer_object = keras.layers.Add(name=this_name)([
                 current_layer_object, this_layer_object
             ])
@@ -648,7 +667,6 @@ def create_model(option_dict, loss_function, metric_list):
                 do_residual=use_residual_blocks,
                 num_conv_layers=gfs_fcst_num_conv_layers,
                 filter_size_px=1,
-                num_filters=gfs_encoder_num_channels_by_level[i],
                 regularizer_object=regularizer_object,
                 activation_function_name=inner_activ_function_name,
                 activation_function_alpha=inner_activ_function_alpha,
@@ -731,7 +749,6 @@ def create_model(option_dict, loss_function, metric_list):
                 do_residual=use_residual_blocks,
                 num_conv_layers=lagtgt_fcst_num_conv_layers,
                 filter_size_px=1,
-                num_filters=lagtgt_encoder_num_channels_by_level[i],
                 regularizer_object=regularizer_object,
                 activation_function_name=inner_activ_function_name,
                 activation_function_alpha=inner_activ_function_alpha,
