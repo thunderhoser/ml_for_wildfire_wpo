@@ -236,7 +236,9 @@ def _get_2d_conv_block(
             current_layer_object = current_layer_object(this_input_layer_object)
 
         if i == num_conv_layers - 1 and do_residual:
-            if input_layer_object.shape[-1] != num_filters:
+            if input_layer_object.shape[-1] == num_filters:
+                new_layer_object = input_layer_object
+            else:
                 this_name = '{0:s}_preresidual_conv'.format(basic_layer_name)
                 new_layer_object = architecture_utils.get_2d_conv_layer(
                     num_kernel_rows=filter_size_px,
