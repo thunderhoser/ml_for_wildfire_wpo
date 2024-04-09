@@ -22,6 +22,7 @@ GFS_3D_DIMENSIONS_KEY = chiu_net_arch.GFS_3D_DIMENSIONS_KEY
 GFS_2D_DIMENSIONS_KEY = chiu_net_arch.GFS_2D_DIMENSIONS_KEY
 ERA5_CONST_DIMENSIONS_KEY = chiu_net_arch.ERA5_CONST_DIMENSIONS_KEY
 LAGTGT_DIMENSIONS_KEY = chiu_net_arch.LAGTGT_DIMENSIONS_KEY
+PREDN_BASELINE_DIMENSIONS_KEY = 'input_dimensions_predn_baseline'
 
 GFS_FC_MODULE_NUM_CONV_LAYERS_KEY = (
     chiu_net_arch.GFS_FC_MODULE_NUM_CONV_LAYERS_KEY
@@ -180,6 +181,14 @@ def create_model(option_dict, loss_function, metric_list):
     input_dimensions_gfs_2d = option_dict[GFS_2D_DIMENSIONS_KEY]
     input_dimensions_era5 = option_dict[ERA5_CONST_DIMENSIONS_KEY]
     input_dimensions_lagged_target = option_dict[LAGTGT_DIMENSIONS_KEY]
+    input_dimensions_predn_baseline = option_dict[PREDN_BASELINE_DIMENSIONS_KEY]
+
+    if input_dimensions_predn_baseline is not None:
+        these_indices = numpy.array([0, 1, 3], dtype=int)
+        assert numpy.array_equal(
+            input_dimensions_predn_baseline,
+            input_dimensions_lagged_target[these_indices]
+        )
 
     gfs_fcst_num_conv_layers = option_dict[GFS_FC_MODULE_NUM_CONV_LAYERS_KEY]
     gfs_fcst_dropout_rates = option_dict[GFS_FC_MODULE_DROPOUT_RATES_KEY]
@@ -288,6 +297,14 @@ def create_model(option_dict, loss_function, metric_list):
     layer_object_lagged_target = keras.layers.Permute(
         dims=(3, 1, 2, 4), name='lagged_targets_put-time-first'
     )(input_layer_object_lagged_target)
+
+    if input_dimensions_predn_baseline is None:
+        input_layer_object_predn_baseline = None
+    else:
+        input_layer_object_predn_baseline = keras.layers.Input(
+            shape=tuple(input_dimensions_predn_baseline.tolist()),
+            name='predn_baseline_inputs'
+        )
 
     num_target_lag_times = input_dimensions_lagged_target[-2]
     num_target_fields = input_dimensions_lagged_target[-1]
@@ -719,7 +736,9 @@ def create_model(option_dict, loss_function, metric_list):
             num_padding_rows = num_desired_rows - num_upconv_rows
 
             num_upconv_columns = this_layer_object.shape[2]
-            num_desired_columns = last_conv_layer_matrix[i_new, 0].shape[2]
+            num_desired_columns = (
+                last_conv_layer_matrix[i_new, 0].shape[2]
+            )
             num_padding_columns = num_desired_columns - num_upconv_columns
 
             if num_padding_rows + num_padding_columns > 0:
@@ -831,13 +850,6 @@ def create_model(option_dict, loss_function, metric_list):
         weight_regularizer=regularizer_object, layer_name='last_conv'
     )(last_conv_layer_matrix[0, -1])
 
-    output_layer_object = architecture_utils.get_activation_layer(
-        activation_function_string=output_activ_function_name,
-        alpha_for_relu=output_activ_function_alpha,
-        alpha_for_elu=output_activ_function_alpha,
-        layer_name='last_conv_activation'
-    )(output_layer_object)
-
     if ensemble_size > 1:
         new_dims = (
             input_dimensions_lagged_target[0],
@@ -849,10 +861,37 @@ def create_model(option_dict, loss_function, metric_list):
             target_shape=new_dims, name='reshape_predictions'
         )(output_layer_object)
 
+    if input_layer_object_predn_baseline is not None:
+        if ensemble_size > 1:
+            new_dims = (
+                input_dimensions_predn_baseline[0],
+                input_dimensions_predn_baseline[1],
+                input_dimensions_predn_baseline[2],
+                1
+            )
+
+            layer_object_predn_baseline = keras.layers.Reshape(
+                target_shape=new_dims, name='reshape_predn_baseline'
+            )(input_layer_object_predn_baseline)
+        else:
+            layer_object_predn_baseline = input_layer_object_predn_baseline
+
+        output_layer_object = keras.layers.Add(name='last_conv_add_baseline')([
+            output_layer_object, layer_object_predn_baseline
+        ])
+
+    output_layer_object = architecture_utils.get_activation_layer(
+        activation_function_string=output_activ_function_name,
+        alpha_for_relu=output_activ_function_alpha,
+        alpha_for_elu=output_activ_function_alpha,
+        layer_name='last_conv_activation'
+    )(output_layer_object)
+
     input_layer_objects = [
         l for l in [
             input_layer_object_gfs_3d, input_layer_object_gfs_2d,
-            input_layer_object_era5, input_layer_object_lagged_target
+            input_layer_object_era5, input_layer_object_lagged_target,
+            input_layer_object_predn_baseline
         ] if l is not None
     ]
     model_object = keras.models.Model(
