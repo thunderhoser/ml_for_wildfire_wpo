@@ -16,6 +16,7 @@ GFS_2D_DIMENSIONS_KEY = chiu_net_arch.GFS_2D_DIMENSIONS_KEY
 ERA5_CONST_DIMENSIONS_KEY = chiu_net_arch.ERA5_CONST_DIMENSIONS_KEY
 LAGTGT_DIMENSIONS_KEY = chiu_net_arch.LAGTGT_DIMENSIONS_KEY
 PREDN_BASELINE_DIMENSIONS_KEY = 'input_dimensions_predn_baseline'
+USE_RESIDUAL_BLOCKS_KEY = 'use_residual_blocks'
 
 GFS_FC_MODULE_NUM_CONV_LAYERS_KEY = (
     chiu_net_arch.GFS_FC_MODULE_NUM_CONV_LAYERS_KEY
@@ -132,8 +133,10 @@ def _create_skip_connection(input_layer_objects, num_output_channels,
         )
 
         input_layer_objects[j] = architecture_utils.get_2d_conv_layer(
-            num_kernel_rows=3, num_kernel_columns=3,
-            num_rows_per_stride=1, num_columns_per_stride=1,
+            num_kernel_rows=1,
+            num_kernel_columns=1,
+            num_rows_per_stride=1,
+            num_columns_per_stride=1,
             num_filters=desired_input_channel_counts[j],
             padding_type_string=architecture_utils.YES_PADDING_STRING,
             weight_regularizer=regularizer_object,
@@ -144,6 +147,272 @@ def _create_skip_connection(input_layer_objects, num_output_channels,
     return keras.layers.Concatenate(axis=-1, name=this_name)(
         input_layer_objects
     )
+
+
+def _get_2d_conv_block(
+        input_layer_object, do_residual,
+        num_conv_layers, filter_size_px, num_filters, do_time_distributed_conv,
+        regularizer_object,
+        activation_function_name, activation_function_alpha,
+        dropout_rates, use_batch_norm, basic_layer_name):
+    """Creates convolutional block for data with 2 spatial dimensions.
+
+    L = number of conv layers
+
+    :param input_layer_object: Input layer to block.
+    :param do_residual: Boolean flag.  If True (False), this will be a residual
+        (basic convolutional) block.
+    :param num_conv_layers: Number of conv layers in block.
+    :param filter_size_px: Filter size for conv layers.  The same filter size
+        will be used in both dimensions, and the same filter size will be used
+        for every conv layer.
+    :param num_filters: Number of filters -- same for every conv layer.
+    :param do_time_distributed_conv: Boolean flag.  If True (False), will do
+        time-distributed (basic) convolution.
+    :param regularizer_object: Regularizer for conv layers (instance of
+        `keras.regularizers.l1_l2` or similar).
+    :param activation_function_name: Name of activation function -- same for
+        every conv layer.  Must be accepted by
+        `architecture_utils.check_activation_function`.
+    :param activation_function_alpha: Alpha (slope parameter) for activation
+        function -- same for every conv layer.  Applies only to ReLU and eLU.
+    :param dropout_rates: Dropout rates for conv layers.  This can be a scalar
+        (applied to every conv layer) or length-L numpy array.
+    :param use_batch_norm: Boolean flag.  If True, will use batch normalization.
+    :param basic_layer_name: Basic layer name.  Each layer name will be made
+        unique by adding a suffix.
+    :return: output_layer_object: Output layer from block.
+    """
+
+    # Process input args.
+    if do_residual:
+        num_conv_layers = max([num_conv_layers, 2])
+
+    try:
+        _ = len(dropout_rates)
+    except:
+        dropout_rates = numpy.full(num_conv_layers, dropout_rates)
+
+    if len(dropout_rates) < num_conv_layers:
+        dropout_rates = numpy.concatenate([
+            dropout_rates, dropout_rates[[-1]]
+        ])
+
+    assert len(dropout_rates) == num_conv_layers
+
+    # Do actual stuff.
+    current_layer_object = None
+
+    for i in range(num_conv_layers):
+        if i == 0:
+            this_input_layer_object = input_layer_object
+        else:
+            this_input_layer_object = current_layer_object
+
+        this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
+        current_layer_object = architecture_utils.get_2d_conv_layer(
+            num_kernel_rows=filter_size_px,
+            num_kernel_columns=filter_size_px,
+            num_rows_per_stride=1,
+            num_columns_per_stride=1,
+            num_filters=num_filters,
+            padding_type_string=architecture_utils.YES_PADDING_STRING,
+            weight_regularizer=regularizer_object
+        )
+
+        if do_time_distributed_conv:
+            current_layer_object = keras.layers.TimeDistributed(
+                current_layer_object, name=this_name
+            )(this_input_layer_object)
+        else:
+            current_layer_object(this_input_layer_object)
+
+        if i == num_conv_layers - 1 and do_residual:
+            this_name = '{0:s}_residual'.format(basic_layer_name, i)
+            current_layer_object = keras.layers.Add(name=this_name)([
+                current_layer_object, input_layer_object
+            ])
+
+        this_name = '{0:s}_activ{1:d}'.format(basic_layer_name, i)
+        current_layer_object = architecture_utils.get_activation_layer(
+            activation_function_string=activation_function_name,
+            alpha_for_relu=activation_function_alpha,
+            alpha_for_elu=activation_function_alpha,
+            layer_name=this_name
+        )(current_layer_object)
+
+        if dropout_rates[i] > 0:
+            this_name = '{0:s}_dropout{1:d}'.format(basic_layer_name, i)
+            current_layer_object = architecture_utils.get_dropout_layer(
+                dropout_fraction=dropout_rates[i], layer_name=this_name
+            )(current_layer_object)
+
+        if use_batch_norm:
+            this_name = '{0:s}_bn{1:d}'.format(basic_layer_name, i)
+            current_layer_object = architecture_utils.get_batch_norm_layer(
+                layer_name=this_name
+            )(current_layer_object)
+
+    return current_layer_object
+
+
+def _get_3d_conv_block(
+        input_layer_object, do_residual,
+        num_conv_layers, filter_size_px, num_filters,
+        regularizer_object,
+        activation_function_name, activation_function_alpha,
+        dropout_rates, use_batch_norm, basic_layer_name):
+    """Creates convolutional block for data with 2 spatial dimensions.
+
+    :param input_layer_object: Input layer to block (with 3 spatial dims).
+    :param do_residual: See documentation for `_get_3d_conv_block`.
+    :param num_conv_layers: Same.
+    :param filter_size_px: Same.
+    :param num_filters: Same.
+    :param regularizer_object: Same.
+    :param activation_function_name: Same.
+    :param activation_function_alpha: Same.
+    :param dropout_rates: Same.
+    :param use_batch_norm: Same.
+    :param basic_layer_name: Same.
+    :return: output_layer_object: Output layer from block (with 2 spatial dims).
+    """
+
+    # Process input args.
+    if do_residual:
+        num_conv_layers = max([num_conv_layers, 2])
+
+    try:
+        _ = len(dropout_rates)
+    except:
+        dropout_rates = numpy.full(num_conv_layers, dropout_rates)
+
+    if len(dropout_rates) < num_conv_layers:
+        dropout_rates = numpy.concatenate([
+            dropout_rates, dropout_rates[[-1]]
+        ])
+
+    assert len(dropout_rates) == num_conv_layers
+
+    # Do actual stuff.
+    current_layer_object = None
+    num_time_steps = input_layer_object.shape[-2]
+
+    for i in range(num_conv_layers):
+        this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
+
+        if i == 0:
+            current_layer_object = architecture_utils.get_3d_conv_layer(
+                num_kernel_rows=filter_size_px,
+                num_kernel_columns=filter_size_px,
+                num_kernel_heights=num_time_steps,
+                num_rows_per_stride=1,
+                num_columns_per_stride=1,
+                num_heights_per_stride=1,
+                num_filters=num_filters,
+                padding_type_string=architecture_utils.NO_PADDING_STRING,
+                weight_regularizer=regularizer_object,
+                layer_name=this_name
+            )(input_layer_object)
+
+            new_dims = (
+                current_layer_object.shape[1:3] +
+                (current_layer_object.shape[-1],)
+            )
+
+            this_name = '{0:s}_remove-time-dim'.format(basic_layer_name)
+            current_layer_object = keras.layers.Reshape(
+                target_shape=new_dims, name=this_name
+            )(current_layer_object)
+        else:
+            current_layer_object = architecture_utils.get_2d_conv_layer(
+                num_kernel_rows=filter_size_px,
+                num_kernel_columns=filter_size_px,
+                num_rows_per_stride=1,
+                num_columns_per_stride=1,
+                num_filters=num_filters,
+                padding_type_string=architecture_utils.YES_PADDING_STRING,
+                weight_regularizer=regularizer_object
+            )(current_layer_object)
+
+        if i == num_conv_layers - 1 and do_residual:
+            this_name = '{0:s}_preresidual_avg'.format(basic_layer_name, i)
+            this_layer_object = architecture_utils.get_3d_pooling_layer(
+                num_rows_in_window=1,
+                num_columns_in_window=1,
+                num_heights_in_window=num_time_steps,
+                num_rows_per_stride=1,
+                num_columns_per_stride=1,
+                num_heights_per_stride=num_time_steps,
+                pooling_type_string=architecture_utils.MEAN_POOLING_STRING,
+                layer_name=this_name
+            )(input_layer_object)
+
+            new_dims = (
+                this_layer_object.shape[1:3] +
+                (this_layer_object.shape[-1],)
+            )
+
+            this_name = '{0:s}_preresidual_squeeze'.format(basic_layer_name)
+            this_layer_object = keras.layers.Reshape(
+                target_shape=new_dims, name=this_name
+            )(this_layer_object)
+
+            this_name = '{0:s}_residual'.format(basic_layer_name, i)
+            current_layer_object = keras.layers.Add(name=this_name)([
+                current_layer_object, this_layer_object
+            ])
+
+        this_name = '{0:s}_activ{1:d}'.format(basic_layer_name, i)
+        current_layer_object = architecture_utils.get_activation_layer(
+            activation_function_string=activation_function_name,
+            alpha_for_relu=activation_function_alpha,
+            alpha_for_elu=activation_function_alpha,
+            layer_name=this_name
+        )(current_layer_object)
+
+        if dropout_rates[i] > 0:
+            this_name = '{0:s}_dropout{1:d}'.format(basic_layer_name, i)
+            current_layer_object = architecture_utils.get_dropout_layer(
+                dropout_fraction=dropout_rates[i], layer_name=this_name
+            )(current_layer_object)
+
+        if use_batch_norm:
+            this_name = '{0:s}_bn{1:d}'.format(basic_layer_name, i)
+            current_layer_object = architecture_utils.get_batch_norm_layer(
+                layer_name=this_name
+            )(current_layer_object)
+
+    return current_layer_object
+
+
+def _pad_2d_layer(source_layer_object, target_layer_object, padding_layer_name):
+    """Pads layer with 2 spatial dimensions.
+
+    :param source_layer_object: Source layer.
+    :param target_layer_object: Target layer.  The source layer will be padded,
+        if necessary, to have the same dimensions as the target layer.
+    :param padding_layer_name: Name of padding layer.
+    :return: source_layer_object: Same as input, except maybe with different
+        spatial dimensions.
+    """
+
+    num_source_rows = source_layer_object.shape[1]
+    num_target_rows = target_layer_object.shape[1]
+    num_padding_rows = num_target_rows - num_source_rows
+
+    num_source_columns = source_layer_object.shape[2]
+    num_target_columns = target_layer_object.shape[2]
+    num_padding_columns = num_target_columns - num_source_columns
+
+    if num_padding_rows + num_padding_columns > 0:
+        padding_arg = ((0, num_padding_rows), (0, num_padding_columns))
+
+        return keras.layers.ZeroPadding2D(
+            padding=padding_arg, name=padding_layer_name
+        )(source_layer_object)
+
+    return source_layer_object
 
 
 def create_model(option_dict, loss_function, metric_list):
@@ -175,6 +444,7 @@ def create_model(option_dict, loss_function, metric_list):
     input_dimensions_era5 = option_dict[ERA5_CONST_DIMENSIONS_KEY]
     input_dimensions_lagged_target = option_dict[LAGTGT_DIMENSIONS_KEY]
     input_dimensions_predn_baseline = option_dict[PREDN_BASELINE_DIMENSIONS_KEY]
+    use_residual_blocks = option_dict[USE_RESIDUAL_BLOCKS_KEY]
 
     if input_dimensions_predn_baseline is not None:
         these_indices = numpy.array([0, 1, 3], dtype=int)
@@ -347,66 +617,46 @@ def create_model(option_dict, loss_function, metric_list):
     gfs_encoder_pooling_layer_objects = [None] * num_levels
 
     for i in range(num_levels + 1):
-        for j in range(gfs_encoder_num_conv_layers_by_level[i]):
-            if j == 0:
-                if i == 0:
-                    this_input_layer_object = layer_object_gfs
-                else:
-                    this_input_layer_object = (
-                        gfs_encoder_pooling_layer_objects[i - 1]
-                    )
-            else:
-                this_input_layer_object = gfs_encoder_conv_layer_objects[i]
+        if i == 0:
+            this_input_layer_object = layer_object_gfs
+        else:
+            this_input_layer_object = gfs_encoder_pooling_layer_objects[i - 1]
 
-            this_name = 'gfs_encoder_level{0:d}_conv{1:d}'.format(i, j)
-            this_conv_layer_object = architecture_utils.get_2d_conv_layer(
-                num_kernel_rows=3, num_kernel_columns=3,
-                num_rows_per_stride=1, num_columns_per_stride=1,
-                num_filters=gfs_encoder_num_channels_by_level[i],
-                padding_type_string=architecture_utils.YES_PADDING_STRING,
-                weight_regularizer=regularizer_object
-            )
-            gfs_encoder_conv_layer_objects[i] = keras.layers.TimeDistributed(
-                this_conv_layer_object, name=this_name
-            )(this_input_layer_object)
-
-            this_name = 'gfs_encoder_level{0:d}_conv{1:d}_activation'.format(
-                i, j
-            )
-            gfs_encoder_conv_layer_objects[i] = (
-                architecture_utils.get_activation_layer(
-                    activation_function_string=inner_activ_function_name,
-                    alpha_for_relu=inner_activ_function_alpha,
-                    alpha_for_elu=inner_activ_function_alpha,
-                    layer_name=this_name
-                )(gfs_encoder_conv_layer_objects[i])
-            )
-
-            if gfs_encoder_dropout_rate_by_level[i] > 0:
-                this_name = 'gfs_encoder_level{0:d}_conv{1:d}_dropout'.format(
-                    i, j
-                )
-                gfs_encoder_conv_layer_objects[i] = (
-                    architecture_utils.get_dropout_layer(
-                        dropout_fraction=gfs_encoder_dropout_rate_by_level[i],
-                        layer_name=this_name
-                    )(gfs_encoder_conv_layer_objects[i])
-                )
-
-            if use_batch_normalization:
-                this_name = 'gfs_encoder_level{0:d}_conv{1:d}_bn'.format(i, j)
-                gfs_encoder_conv_layer_objects[i] = (
-                    architecture_utils.get_batch_norm_layer(
-                        layer_name=this_name
-                    )(gfs_encoder_conv_layer_objects[i])
-                )
+        gfs_encoder_conv_layer_objects[i] = _get_2d_conv_block(
+            input_layer_object=this_input_layer_object,
+            do_residual=use_residual_blocks,
+            num_conv_layers=gfs_encoder_num_conv_layers_by_level[i],
+            filter_size_px=3,
+            num_filters=gfs_encoder_num_channels_by_level[i],
+            do_time_distributed_conv=True,
+            regularizer_object=regularizer_object,
+            activation_function_name=inner_activ_function_name,
+            activation_function_alpha=inner_activ_function_alpha,
+            dropout_rates=gfs_encoder_dropout_rate_by_level[i],
+            use_batch_norm=use_batch_normalization,
+            basic_layer_name='gfs_encoder_level{0:d}'.format(i)
+        )
 
         this_name = 'gfs_fcst_level{0:d}_put-time-last'.format(i)
         gfs_fcst_module_layer_objects[i] = keras.layers.Permute(
             dims=(2, 3, 1, 4), name=this_name
         )(gfs_encoder_conv_layer_objects[i])
 
-        if not gfs_fcst_use_3d_conv:
+        if gfs_fcst_use_3d_conv:
+            gfs_fcst_module_layer_objects[i] = _get_3d_conv_block(
+                input_layer_object=gfs_fcst_module_layer_objects[i],
+                do_residual=use_residual_blocks,
+                num_conv_layers=gfs_fcst_num_conv_layers,
+                filter_size_px=1,
+                num_filters=gfs_encoder_num_channels_by_level[i],
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=gfs_fcst_dropout_rates,
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='gfs_fcst_level{0:d}'.format(i)
+            )
+        else:
             orig_dims = gfs_fcst_module_layer_objects[i].shape
             new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
 
@@ -415,78 +665,20 @@ def create_model(option_dict, loss_function, metric_list):
                 target_shape=new_dims, name=this_name
             )(gfs_fcst_module_layer_objects[i])
 
-        for j in range(gfs_fcst_num_conv_layers):
-            this_name = 'gfs_fcst_level{0:d}_conv{1:d}'.format(i, j)
-
-            if gfs_fcst_use_3d_conv:
-                if j == 0:
-                    gfs_fcst_module_layer_objects[i] = (
-                        architecture_utils.get_3d_conv_layer(
-                            num_kernel_rows=1, num_kernel_columns=1,
-                            num_kernel_heights=num_gfs_lead_times,
-                            num_rows_per_stride=1, num_columns_per_stride=1,
-                            num_heights_per_stride=1,
-                            num_filters=gfs_encoder_num_channels_by_level[i],
-                            padding_type_string=
-                            architecture_utils.NO_PADDING_STRING,
-                            weight_regularizer=regularizer_object,
-                            layer_name=this_name
-                        )(gfs_fcst_module_layer_objects[i])
-                    )
-
-                    new_dims = (
-                        gfs_fcst_module_layer_objects[i].shape[1:3] +
-                        (gfs_fcst_module_layer_objects[i].shape[-1],)
-                    )
-
-                    this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
-                    gfs_fcst_module_layer_objects[i] = keras.layers.Reshape(
-                        target_shape=new_dims, name=this_name
-                    )(gfs_fcst_module_layer_objects[i])
-                else:
-                    gfs_fcst_module_layer_objects[i] = (
-                        architecture_utils.get_2d_conv_layer(
-                            num_kernel_rows=3, num_kernel_columns=3,
-                            num_rows_per_stride=1, num_columns_per_stride=1,
-                            num_filters=gfs_encoder_num_channels_by_level[i],
-                            padding_type_string=
-                            architecture_utils.YES_PADDING_STRING,
-                            weight_regularizer=regularizer_object,
-                            layer_name=this_name
-                        )(gfs_fcst_module_layer_objects[i])
-                    )
-            else:
-                gfs_fcst_module_layer_objects[i] = architecture_utils.get_2d_conv_layer(
-                    num_kernel_rows=3, num_kernel_columns=3,
-                    num_rows_per_stride=1, num_columns_per_stride=1,
-                    num_filters=gfs_encoder_num_channels_by_level[i],
-                    padding_type_string=architecture_utils.YES_PADDING_STRING,
-                    weight_regularizer=regularizer_object,
-                    layer_name=this_name
-                )(gfs_fcst_module_layer_objects[i])
-
-            this_name = 'gfs_fcst_level{0:d}_conv{1:d}_activation'.format(i, j)
-            gfs_fcst_module_layer_objects[i] = architecture_utils.get_activation_layer(
-                activation_function_string=inner_activ_function_name,
-                alpha_for_relu=inner_activ_function_alpha,
-                alpha_for_elu=inner_activ_function_alpha,
-                layer_name=this_name
-            )(gfs_fcst_module_layer_objects[i])
-
-            if gfs_fcst_dropout_rates[j] > 0:
-                this_name = 'gfs_fcst_level{0:d}_conv{1:d}_dropout'.format(i, j)
-                gfs_fcst_module_layer_objects[i] = architecture_utils.get_dropout_layer(
-                    dropout_fraction=gfs_fcst_dropout_rates[j],
-                    layer_name=this_name
-                )(gfs_fcst_module_layer_objects[i])
-
-            if use_batch_normalization:
-                this_name = 'gfs_fcst_level{0:d}_conv{1:d}_bn'.format(i, j)
-                gfs_fcst_module_layer_objects[i] = (
-                    architecture_utils.get_batch_norm_layer(
-                        layer_name=this_name
-                    )(gfs_fcst_module_layer_objects[i])
-                )
+            gfs_fcst_module_layer_objects[i] = _get_2d_conv_block(
+                input_layer_object=gfs_fcst_module_layer_objects[i],
+                do_residual=use_residual_blocks,
+                num_conv_layers=gfs_fcst_num_conv_layers,
+                filter_size_px=1,
+                num_filters=gfs_encoder_num_channels_by_level[i],
+                do_time_distributed_conv=False,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=gfs_fcst_dropout_rates,
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='gfs_fcst_level{0:d}'.format(i)
+            )
 
         if i == num_levels:
             break
@@ -506,70 +698,48 @@ def create_model(option_dict, loss_function, metric_list):
     lagtgt_encoder_pooling_layer_objects = [None] * num_levels
 
     for i in range(num_levels + 1):
-        for j in range(lagtgt_encoder_num_conv_layers_by_level[i]):
-            if j == 0:
-                if i == 0:
-                    this_input_layer_object = layer_object_lagged_target
-                else:
-                    this_input_layer_object = (
-                        lagtgt_encoder_pooling_layer_objects[i - 1]
-                    )
-            else:
-                this_input_layer_object = lagtgt_encoder_conv_layer_objects[i]
-
-            this_name = 'lagtgt_encoder_level{0:d}_conv{1:d}'.format(i, j)
-            this_conv_layer_object = architecture_utils.get_2d_conv_layer(
-                num_kernel_rows=3, num_kernel_columns=3,
-                num_rows_per_stride=1, num_columns_per_stride=1,
-                num_filters=lagtgt_encoder_num_channels_by_level[i],
-                padding_type_string=architecture_utils.YES_PADDING_STRING,
-                weight_regularizer=regularizer_object
-            )
-            lagtgt_encoder_conv_layer_objects[i] = keras.layers.TimeDistributed(
-                this_conv_layer_object, name=this_name
-            )(this_input_layer_object)
-
-            this_name = 'lagtgt_encoder_level{0:d}_conv{1:d}_activation'.format(
-                i, j
-            )
-            lagtgt_encoder_conv_layer_objects[i] = (
-                architecture_utils.get_activation_layer(
-                    activation_function_string=inner_activ_function_name,
-                    alpha_for_relu=inner_activ_function_alpha,
-                    alpha_for_elu=inner_activ_function_alpha,
-                    layer_name=this_name
-                )(lagtgt_encoder_conv_layer_objects[i])
+        if i == 0:
+            this_input_layer_object = layer_object_lagged_target
+        else:
+            this_input_layer_object = (
+                lagtgt_encoder_pooling_layer_objects[i - 1]
             )
 
-            if lagtgt_encoder_dropout_rate_by_level[i] > 0:
-                this_name = (
-                    'lagtgt_encoder_level{0:d}_conv{1:d}_dropout'
-                ).format(i, j)
-
-                lagtgt_encoder_conv_layer_objects[i] = (
-                    architecture_utils.get_dropout_layer(
-                        dropout_fraction=
-                        lagtgt_encoder_dropout_rate_by_level[i],
-                        layer_name=this_name
-                    )(lagtgt_encoder_conv_layer_objects[i])
-                )
-
-            if use_batch_normalization:
-                this_name = 'lagtgt_encoder_level{0:d}_conv{1:d}_bn'.format(
-                    i, j
-                )
-                lagtgt_encoder_conv_layer_objects[i] = (
-                    architecture_utils.get_batch_norm_layer(
-                        layer_name=this_name
-                    )(lagtgt_encoder_conv_layer_objects[i])
-                )
+        lagtgt_encoder_conv_layer_objects[i] = _get_2d_conv_block(
+            input_layer_object=this_input_layer_object,
+            do_residual=use_residual_blocks,
+            num_conv_layers=lagtgt_encoder_num_conv_layers_by_level[i],
+            filter_size_px=3,
+            num_filters=lagtgt_encoder_num_channels_by_level[i],
+            do_time_distributed_conv=True,
+            regularizer_object=regularizer_object,
+            activation_function_name=inner_activ_function_name,
+            activation_function_alpha=inner_activ_function_alpha,
+            dropout_rates=lagtgt_encoder_dropout_rate_by_level[i],
+            use_batch_norm=use_batch_normalization,
+            basic_layer_name='lagtgt_encoder_level{0:d}'.format(i)
+        )
 
         this_name = 'lagtgt_fcst_level{0:d}_put-time-last'.format(i)
         lagtgt_fcst_module_layer_objects[i] = keras.layers.Permute(
             dims=(2, 3, 1, 4), name=this_name
         )(lagtgt_encoder_conv_layer_objects[i])
 
-        if not lagtgt_fcst_use_3d_conv:
+        if lagtgt_fcst_use_3d_conv:
+            lagtgt_fcst_module_layer_objects[i] = _get_3d_conv_block(
+                input_layer_object=lagtgt_fcst_module_layer_objects[i],
+                do_residual=use_residual_blocks,
+                num_conv_layers=lagtgt_fcst_num_conv_layers,
+                filter_size_px=1,
+                num_filters=lagtgt_encoder_num_channels_by_level[i],
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=lagtgt_fcst_dropout_rates,
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='lagtgt_fcst_level{0:d}'.format(i)
+            )
+        else:
             orig_dims = lagtgt_fcst_module_layer_objects[i].shape
             new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
 
@@ -578,84 +748,20 @@ def create_model(option_dict, loss_function, metric_list):
                 target_shape=new_dims, name=this_name
             )(lagtgt_fcst_module_layer_objects[i])
 
-        for j in range(lagtgt_fcst_num_conv_layers):
-            this_name = 'lagtgt_fcst_level{0:d}_conv{1:d}'.format(i, j)
-
-            if lagtgt_fcst_use_3d_conv:
-                if j == 0:
-                    lagtgt_fcst_module_layer_objects[i] = (
-                        architecture_utils.get_3d_conv_layer(
-                            num_kernel_rows=1, num_kernel_columns=1,
-                            num_kernel_heights=num_target_lag_times,
-                            num_rows_per_stride=1, num_columns_per_stride=1,
-                            num_heights_per_stride=1,
-                            num_filters=lagtgt_encoder_num_channels_by_level[i],
-                            padding_type_string=
-                            architecture_utils.NO_PADDING_STRING,
-                            weight_regularizer=regularizer_object,
-                            layer_name=this_name
-                        )(lagtgt_fcst_module_layer_objects[i])
-                    )
-
-                    new_dims = (
-                        lagtgt_fcst_module_layer_objects[i].shape[1:3] +
-                        (lagtgt_fcst_module_layer_objects[i].shape[-1],)
-                    )
-
-                    this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
-                    lagtgt_fcst_module_layer_objects[i] = keras.layers.Reshape(
-                        target_shape=new_dims, name=this_name
-                    )(lagtgt_fcst_module_layer_objects[i])
-                else:
-                    lagtgt_fcst_module_layer_objects[i] = (
-                        architecture_utils.get_2d_conv_layer(
-                            num_kernel_rows=3, num_kernel_columns=3,
-                            num_rows_per_stride=1, num_columns_per_stride=1,
-                            num_filters=lagtgt_encoder_num_channels_by_level[i],
-                            padding_type_string=
-                            architecture_utils.YES_PADDING_STRING,
-                            weight_regularizer=regularizer_object,
-                            layer_name=this_name
-                        )(lagtgt_fcst_module_layer_objects[i])
-                    )
-            else:
-                lagtgt_fcst_module_layer_objects[i] = (
-                    architecture_utils.get_2d_conv_layer(
-                        num_kernel_rows=3, num_kernel_columns=3,
-                        num_rows_per_stride=1, num_columns_per_stride=1,
-                        num_filters=lagtgt_encoder_num_channels_by_level[i],
-                        padding_type_string=architecture_utils.YES_PADDING_STRING,
-                        weight_regularizer=regularizer_object,
-                        layer_name=this_name
-                    )(lagtgt_fcst_module_layer_objects[i])
-                )
-
-            this_name = 'lagtgt_fcst_level{0:d}_conv{1:d}_activation'.format(i, j)
-            lagtgt_fcst_module_layer_objects[i] = (
-                architecture_utils.get_activation_layer(
-                    activation_function_string=inner_activ_function_name,
-                    alpha_for_relu=inner_activ_function_alpha,
-                    alpha_for_elu=inner_activ_function_alpha,
-                    layer_name=this_name
-                )(lagtgt_fcst_module_layer_objects[i])
+            lagtgt_fcst_module_layer_objects[i] = _get_2d_conv_block(
+                input_layer_object=lagtgt_fcst_module_layer_objects[i],
+                do_residual=use_residual_blocks,
+                num_conv_layers=lagtgt_fcst_num_conv_layers,
+                filter_size_px=1,
+                num_filters=lagtgt_encoder_num_channels_by_level[i],
+                do_time_distributed_conv=False,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=lagtgt_fcst_dropout_rates,
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='lagtgt_fcst_level{0:d}'.format(i)
             )
-
-            if lagtgt_fcst_dropout_rates[j] > 0:
-                this_name = 'lagtgt_fcst_level{0:d}_conv{1:d}_dropout'.format(i, j)
-                lagtgt_fcst_module_layer_objects[i] = (
-                    architecture_utils.get_dropout_layer(
-                        dropout_fraction=lagtgt_fcst_dropout_rates[j],
-                        layer_name=this_name
-                    )(lagtgt_fcst_module_layer_objects[i])
-                )
-
-            if use_batch_normalization:
-                this_name = 'lagtgt_fcst_level{0:d}_conv{1:d}_bn'.format(i, j)
-                lagtgt_fcst_module_layer_objects[i] = (
-                    architecture_utils.get_batch_norm_layer(
-                        layer_name=this_name
-                    )(lagtgt_fcst_module_layer_objects[i])
-                )
 
         if i == num_levels:
             break
@@ -691,57 +797,36 @@ def create_model(option_dict, loss_function, metric_list):
             i_new -= 1
             j += 1
 
+            this_name = 'block{0:d}-{1:d}_upsampling'.format(i_new, j)
+            this_layer_object = keras.layers.UpSampling2D(
+                size=(2, 2), name=this_name
+            )(last_conv_layer_matrix[i_new + 1, j - 1])
+
+            _pad_2d_layer(
+                source_layer_object=this_layer_object,
+                target_layer_object=last_conv_layer_matrix[i_new, 0],
+                padding_layer_name='block{0:d}-{1:d}_padding'.format(i_new, j)
+            )
+
             this_num_channels = int(numpy.round(
                 0.5 * decoder_num_channels_by_level[i_new]
             ))
 
-            this_name = 'block{0:d}-{1:d}_upconv'.format(i_new, j)
-            this_layer_object = architecture_utils.get_2d_conv_layer(
-                num_kernel_rows=3, num_kernel_columns=3,
-                num_rows_per_stride=1, num_columns_per_stride=1,
+            last_conv_layer_matrix[i_new, j] = _get_2d_conv_block(
+                input_layer_object=this_layer_object,
+                do_residual=use_residual_blocks,
+                num_conv_layers=1,
+                filter_size_px=3,
                 num_filters=this_num_channels,
-                padding_type_string=architecture_utils.YES_PADDING_STRING,
-                weight_regularizer=regularizer_object, layer_name=this_name
-            )(last_conv_layer_matrix[i_new + 1, j - 1])
-
-            this_name = 'block{0:d}-{1:d}_upsampling'.format(i_new, j)
-            this_layer_object = keras.layers.UpSampling2D(
-                size=(2, 2), name=this_name
-            )(this_layer_object)
-
-            this_name = 'block{0:d}-{1:d}_upconv_activation'.format(i_new, j)
-            this_layer_object = architecture_utils.get_activation_layer(
-                activation_function_string=inner_activ_function_name,
-                alpha_for_relu=inner_activ_function_alpha,
-                alpha_for_elu=inner_activ_function_alpha,
-                layer_name=this_name
-            )(this_layer_object)
-
-            if upsampling_dropout_rate_by_level[i_new] > 0:
-                this_name = 'block{0:d}-{1:d}_upconv_dropout'.format(i_new, j)
-                this_layer_object = architecture_utils.get_dropout_layer(
-                    dropout_fraction=upsampling_dropout_rate_by_level[i_new],
-                    layer_name=this_name
-                )(this_layer_object)
-
-            num_upconv_rows = this_layer_object.shape[1]
-            num_desired_rows = last_conv_layer_matrix[i_new, 0].shape[1]
-            num_padding_rows = num_desired_rows - num_upconv_rows
-
-            num_upconv_columns = this_layer_object.shape[2]
-            num_desired_columns = (
-                last_conv_layer_matrix[i_new, 0].shape[2]
+                do_time_distributed_conv=False,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=upsampling_dropout_rate_by_level[i_new],
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='block{0:d}-{1:d}_up'.format(i_new, j)
             )
-            num_padding_columns = num_desired_columns - num_upconv_columns
 
-            if num_padding_rows + num_padding_columns > 0:
-                padding_arg = ((0, num_padding_rows), (0, num_padding_columns))
-
-                this_layer_object = keras.layers.ZeroPadding2D(
-                    padding=padding_arg
-                )(this_layer_object)
-
-            last_conv_layer_matrix[i_new, j] = this_layer_object
             last_conv_layer_matrix[i_new, j] = _create_skip_connection(
                 input_layer_objects=
                 last_conv_layer_matrix[i_new, :(j + 1)].tolist(),
@@ -750,98 +835,55 @@ def create_model(option_dict, loss_function, metric_list):
                 regularizer_object=regularizer_object
             )
 
-            for k in range(decoder_num_conv_layers_by_level[i_new]):
-                if k > 0:
-                    this_name = 'block{0:d}-{1:d}_skipconv{2:d}'.format(
-                        i_new, j, k
-                    )
-
-                    last_conv_layer_matrix[i_new, j] = (
-                        architecture_utils.get_2d_conv_layer(
-                            num_kernel_rows=3, num_kernel_columns=3,
-                            num_rows_per_stride=1, num_columns_per_stride=1,
-                            num_filters=decoder_num_channels_by_level[i_new],
-                            padding_type_string=
-                            architecture_utils.YES_PADDING_STRING,
-                            weight_regularizer=regularizer_object,
-                            layer_name=this_name
-                        )(last_conv_layer_matrix[i_new, j])
-                    )
-
-                this_name = 'block{0:d}-{1:d}_skipconv{2:d}_activation'.format(
-                    i_new, j, k
-                )
-
-                last_conv_layer_matrix[i_new, j] = (
-                    architecture_utils.get_activation_layer(
-                        activation_function_string=inner_activ_function_name,
-                        alpha_for_relu=inner_activ_function_alpha,
-                        alpha_for_elu=inner_activ_function_alpha,
-                        layer_name=this_name
-                    )(last_conv_layer_matrix[i_new, j])
-                )
-
-                if skip_dropout_rate_by_level[i_new] > 0:
-                    this_name = 'block{0:d}-{1:d}_skipconv{2:d}_dropout'.format(
-                        i_new, j, k
-                    )
-
-                    last_conv_layer_matrix[i_new, j] = (
-                        architecture_utils.get_dropout_layer(
-                            dropout_fraction=skip_dropout_rate_by_level[i_new],
-                            layer_name=this_name
-                        )(last_conv_layer_matrix[i_new, j])
-                    )
-
-                if use_batch_normalization:
-                    this_name = 'block{0:d}-{1:d}_skipconv{2:d}_bn'.format(
-                        i_new, j, k
-                    )
-
-                    last_conv_layer_matrix[i_new, j] = (
-                        architecture_utils.get_batch_norm_layer(
-                            layer_name=this_name
-                        )(last_conv_layer_matrix[i_new, j])
-                    )
+            last_conv_layer_matrix[i_new, j] = _get_2d_conv_block(
+                input_layer_object=last_conv_layer_matrix[i_new, j],
+                do_residual=use_residual_blocks,
+                num_conv_layers=decoder_num_conv_layers_by_level[i_new],
+                filter_size_px=3,
+                num_filters=decoder_num_channels_by_level[i_new],
+                do_time_distributed_conv=False,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=skip_dropout_rate_by_level[i_new],
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='block{0:d}-{1:d}_skip'.format(i_new, j)
+            )
 
     if include_penultimate_conv:
-        last_conv_layer_matrix[0, -1] = architecture_utils.get_2d_conv_layer(
-            num_kernel_rows=3, num_kernel_columns=3,
-            num_rows_per_stride=1, num_columns_per_stride=1,
+        last_conv_layer_matrix[0, -1] = _get_2d_conv_block(
+            input_layer_object=last_conv_layer_matrix[0, -1],
+            do_residual=use_residual_blocks,
+            num_conv_layers=1,
+            filter_size_px=3,
             num_filters=2 * num_target_fields * ensemble_size,
-            padding_type_string=architecture_utils.YES_PADDING_STRING,
-            weight_regularizer=regularizer_object, layer_name='penultimate_conv'
-        )(last_conv_layer_matrix[0, -1])
+            do_time_distributed_conv=False,
+            regularizer_object=regularizer_object,
+            activation_function_name=inner_activ_function_name,
+            activation_function_alpha=inner_activ_function_alpha,
+            dropout_rates=penultimate_conv_dropout_rate,
+            use_batch_norm=use_batch_normalization,
+            basic_layer_name='penultimate'
+        )
 
-        last_conv_layer_matrix[0, -1] = architecture_utils.get_activation_layer(
-            activation_function_string=inner_activ_function_name,
-            alpha_for_relu=inner_activ_function_alpha,
-            alpha_for_elu=inner_activ_function_alpha,
-            layer_name='penultimate_conv_activation'
-        )(last_conv_layer_matrix[0, -1])
-
-        if penultimate_conv_dropout_rate > 0:
-            last_conv_layer_matrix[0, -1] = (
-                architecture_utils.get_dropout_layer(
-                    dropout_fraction=penultimate_conv_dropout_rate,
-                    layer_name='penultimate_conv_dropout'
-                )(last_conv_layer_matrix[0, -1])
-            )
-
-        if use_batch_normalization:
-            last_conv_layer_matrix[0, -1] = (
-                architecture_utils.get_batch_norm_layer(
-                    layer_name='penultimate_conv_bn'
-                )(last_conv_layer_matrix[0, -1])
-            )
-
-    output_layer_object = architecture_utils.get_2d_conv_layer(
-        num_kernel_rows=1, num_kernel_columns=1,
-        num_rows_per_stride=1, num_columns_per_stride=1,
+    output_layer_object = _get_2d_conv_block(
+        input_layer_object=last_conv_layer_matrix[0, -1],
+        do_residual=use_residual_blocks,
+        num_conv_layers=1,
+        filter_size_px=1,
         num_filters=num_target_fields * ensemble_size,
-        padding_type_string=architecture_utils.YES_PADDING_STRING,
-        weight_regularizer=regularizer_object, layer_name='last_conv'
-    )(last_conv_layer_matrix[0, -1])
+        do_time_distributed_conv=False,
+        regularizer_object=regularizer_object,
+        activation_function_name=(
+            output_activ_function_name
+            if input_layer_object_predn_baseline is None
+            else None
+        ),
+        activation_function_alpha=output_activ_function_alpha,
+        dropout_rates=-1.,
+        use_batch_norm=False,
+        basic_layer_name='output'
+    )
 
     if ensemble_size > 1:
         new_dims = (
@@ -851,7 +893,7 @@ def create_model(option_dict, loss_function, metric_list):
             ensemble_size
         )
         output_layer_object = keras.layers.Reshape(
-            target_shape=new_dims, name='reshape_predictions'
+            target_shape=new_dims, name='reshape_output'
         )(output_layer_object)
 
     if input_layer_object_predn_baseline is not None:
@@ -869,16 +911,16 @@ def create_model(option_dict, loss_function, metric_list):
         else:
             layer_object_predn_baseline = input_layer_object_predn_baseline
 
-        output_layer_object = keras.layers.Add(name='last_conv_add_baseline')([
+        output_layer_object = keras.layers.Add(name='output_add_baseline')([
             output_layer_object, layer_object_predn_baseline
         ])
 
-    output_layer_object = architecture_utils.get_activation_layer(
-        activation_function_string=output_activ_function_name,
-        alpha_for_relu=output_activ_function_alpha,
-        alpha_for_elu=output_activ_function_alpha,
-        layer_name='last_conv_activation'
-    )(output_layer_object)
+        output_layer_object = architecture_utils.get_activation_layer(
+            activation_function_string=output_activ_function_name,
+            alpha_for_relu=output_activ_function_alpha,
+            alpha_for_elu=output_activ_function_alpha,
+            layer_name='output_activation'
+        )(output_layer_object)
 
     input_layer_objects = [
         l for l in [

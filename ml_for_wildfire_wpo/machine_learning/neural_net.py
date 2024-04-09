@@ -1450,7 +1450,7 @@ def data_generator(option_dict):
                     laglead_target_predictor_matrix.astype('float32')
             })
         if baseline_prediction_matrix is not None:
-            baseline_prediction_matrix.update({
+            predictor_matrices.update({
                 'predn_baseline_inputs':
                     baseline_prediction_matrix.astype('float32')
             })
