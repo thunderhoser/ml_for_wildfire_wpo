@@ -263,13 +263,14 @@ def _get_2d_conv_block(
                 current_layer_object, new_layer_object
             ])
 
-        this_name = '{0:s}_activ{1:d}'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_activation_layer(
-            activation_function_string=activation_function_name,
-            alpha_for_relu=activation_function_alpha,
-            alpha_for_elu=activation_function_alpha,
-            layer_name=this_name
-        )(current_layer_object)
+        if activation_function_name is not None:
+            this_name = '{0:s}_activ{1:d}'.format(basic_layer_name, i)
+            current_layer_object = architecture_utils.get_activation_layer(
+                activation_function_string=activation_function_name,
+                alpha_for_relu=activation_function_alpha,
+                alpha_for_elu=activation_function_alpha,
+                layer_name=this_name
+            )(current_layer_object)
 
         if dropout_rates[i] > 0:
             this_name = '{0:s}_dropout{1:d}'.format(basic_layer_name, i)
