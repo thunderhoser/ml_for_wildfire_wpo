@@ -826,7 +826,7 @@ def create_model(option_dict, loss_function, metric_list):
                 size=(2, 2), name=this_name
             )(last_conv_layer_matrix[i_new + 1, j - 1])
 
-            _pad_2d_layer(
+            this_layer_object = _pad_2d_layer(
                 source_layer_object=this_layer_object,
                 target_layer_object=last_conv_layer_matrix[i_new, 0],
                 padding_layer_name='block{0:d}-{1:d}_padding'.format(i_new, j)
