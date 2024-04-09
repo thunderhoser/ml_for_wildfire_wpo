@@ -592,7 +592,7 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
         max_diff_value_by_field = numpy.full(num_fields, numpy.nan)
 
         for j in range(num_fields):
-            this_field_diff_matrices = [None] * num_models
+            this_field_diff_values = [None] * num_models
 
             for i in range(num_models):
                 ptx = prediction_io.read_file(prediction_file_name_by_model[i])
@@ -613,12 +613,12 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
                     this_weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW
                 ] = numpy.nan
 
-                this_field_diff_matrices[i] = (
+                this_field_diff_values[i] = numpy.ravel(
                     this_pred_matrix - this_target_matrix
                 )
 
             max_diff_value_by_field[j] = numpy.nanpercentile(
-                numpy.stack(this_field_diff_matrices, axis=-1),
+                numpy.concatenate(this_field_diff_values),
                 max_diff_percentile_by_field[j]
             )
 

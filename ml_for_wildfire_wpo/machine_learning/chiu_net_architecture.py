@@ -121,7 +121,7 @@ def check_args(option_dict):
         make this None.
     option_dict["input_dimensions_lagged_targets"]: numpy array with input
         dimensions for lagged targets.  Array elements should be [num_rows,
-        num_columns, num_lag_times, 1].
+        num_columns, num_lag_times, num_target_fields].
     option_dict["gfs_forecast_module_num_conv_layers"]: Number of conv layers in
         forecasting module applied to GFS data.
     option_dict["lagged_target_forecast_module_num_conv_layers"]: Same as

@@ -1532,6 +1532,7 @@ def create_data(option_dict, init_date_string):
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
+    do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
 
     if gfs_normalization_file_name is None:
         gfs_norm_param_table_xarray = None
@@ -1654,6 +1655,28 @@ def create_data(option_dict, init_date_string):
         use_quantile_norm=targets_use_quantile_norm
     )
 
+    if do_residual_prediction:
+        baseline_prediction_matrix, _, _ = _read_lagged_targets_1example(
+            gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_name),
+            target_dir_name=target_dir_name,
+            target_lag_times_days=numpy.array(
+                [numpy.min(target_lag_times_days)]
+            ),
+            desired_row_indices=desired_target_row_indices,
+            desired_column_indices=desired_target_column_indices,
+            latitude_limits_deg_n=inner_latitude_limits_deg_n,
+            longitude_limits_deg_e=inner_longitude_limits_deg_e,
+            target_field_names=target_field_names,
+            norm_param_table_xarray=None,
+            use_quantile_norm=targets_use_quantile_norm
+        )
+
+        baseline_prediction_matrix = numpy.expand_dims(
+            baseline_prediction_matrix, axis=0
+        )
+    else:
+        baseline_prediction_matrix = None
+
     if gfs_forecast_target_dir_name is not None:
         new_matrix = _read_gfs_forecast_targets_1example(
             daily_gfs_dir_name=gfs_forecast_target_dir_name,
@@ -1720,6 +1743,27 @@ def create_data(option_dict, init_date_string):
             numpy.isnan(gfs_predictor_matrix_2d)
         ] = sentinel_value
 
+    if baseline_prediction_matrix is not None:
+        print((
+            'Shape of baseline prediction matrix and NaN fraction: '
+            '{0:s}, {1:.4f}'
+        ).format(
+            str(baseline_prediction_matrix.shape),
+            numpy.mean(numpy.isnan(baseline_prediction_matrix))
+        ))
+
+        baseline_prediction_matrix = _pad_inner_to_outer_domain(
+            data_matrix=baseline_prediction_matrix,
+            outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+            outer_longitude_buffer_deg=outer_longitude_buffer_deg,
+            is_example_axis_present=True, fill_value=sentinel_value
+        )
+        baseline_prediction_matrix = baseline_prediction_matrix[..., 0, :]
+
+        print('Shape of baseline prediction matrix after padding: {0:s}'.format(
+            str(baseline_prediction_matrix.shape)
+        ))
+
     print((
         'Shape of lag/lead-target predictor matrix and NaN fraction: '
         '{0:s}, {1:.4f}'
@@ -1758,7 +1802,8 @@ def create_data(option_dict, init_date_string):
     predictor_matrices = [
         m for m in [
             gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
-            era5_constant_matrix, laglead_target_predictor_matrix
+            era5_constant_matrix, laglead_target_predictor_matrix,
+            baseline_prediction_matrix
         ]
         if m is not None
     ]
@@ -1973,6 +2018,10 @@ def read_metafile(pickle_file_name):
         else:
             training_option_dict[TARGET_FIELDS_KEY] = []
             validation_option_dict[TARGET_FIELDS_KEY] = []
+
+    if DO_RESIDUAL_PREDICTION_KEY not in training_option_dict:
+        training_option_dict[DO_RESIDUAL_PREDICTION_KEY] = False
+        validation_option_dict[DO_RESIDUAL_PREDICTION_KEY] = False
 
     metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
     metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict
