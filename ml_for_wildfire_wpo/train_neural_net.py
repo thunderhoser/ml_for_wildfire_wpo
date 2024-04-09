@@ -28,7 +28,7 @@ def _run(template_file_name, output_dir_name,
          target_field_names, target_lead_time_days, target_lag_times_days,
          gfs_forecast_target_lead_times_days, target_normalization_file_name,
          targets_use_quantile_norm,
-         num_examples_per_batch, sentinel_value,
+         num_examples_per_batch, sentinel_value, do_residual_prediction,
          gfs_dir_name_for_training, target_dir_name_for_training,
          gfs_forecast_target_dir_name_for_training,
          init_date_limit_strings_for_training,
@@ -66,6 +66,7 @@ def _run(template_file_name, output_dir_name,
     :param targets_use_quantile_norm: Same.
     :param num_examples_per_batch: Same.
     :param sentinel_value: Same.
+    :param do_residual_prediction: Same.
     :param gfs_dir_name_for_training: Same.
     :param target_dir_name_for_training: Same.
     :param gfs_forecast_target_dir_name_for_training: Same.
@@ -140,6 +141,7 @@ def _run(template_file_name, output_dir_name,
         neural_net.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
         neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
         neural_net.SENTINEL_VALUE_KEY: sentinel_value,
+        neural_net.DO_RESIDUAL_PREDICTION_KEY: do_residual_prediction,
         neural_net.INIT_DATE_LIMITS_KEY: init_date_limit_strings_for_training,
         neural_net.GFS_DIRECTORY_KEY: gfs_dir_name_for_training,
         neural_net.TARGET_DIRECTORY_KEY: target_dir_name_for_training,
@@ -273,6 +275,9 @@ if __name__ == '__main__':
         sentinel_value=getattr(
             INPUT_ARG_OBJECT, training_args.SENTINEL_VALUE_ARG_NAME
         ),
+        do_residual_prediction=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.DO_RESIDUAL_PRED_ARG_NAME
+        )),
         gfs_dir_name_for_training=getattr(
             INPUT_ARG_OBJECT, training_args.GFS_TRAINING_DIR_ARG_NAME
         ),
