@@ -1,0 +1,64 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_predictions_marshall_fire"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpu"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=00:30:00
+#SBATCH --array=0-9
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_predictions_marshall_fire_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment11_residual_output"
+
+GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
+TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
+
+NN_LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10")
+RANDOM_SEED_INDICES=("1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "2" "2" "2" "2" "2" "2" "2" "2" "2" "2" "3" "3" "3" "3" "3" "3" "3" "3" "3" "3" "4" "4" "4" "4" "4" "4" "4" "4" "4" "4" "5" "5" "5" "5" "5" "5" "5" "5" "5" "5")
+
+nn_lead_times_days=${NN_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}
+random_seed_index=${RANDOM_SEED_INDICES[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/nn-lead-time-days=${nn_lead_times_days}_random-seed-index=${random_seed_index}"
+echo $model_dir_name
+
+INIT_DATE_STRINGS=("20211215" "20211216" "20211217" "20211218" "20211219" "20211220" "20211221" "20211222" "20211223" "20211224" "20211225" "20211226" "20211227" "20211228" "20211229" "20211230")
+i=1
+
+while [ $i -lt ${#INIT_DATE_STRINGS[@]} ]; do
+    init_date_string="${INIT_DATE_STRINGS[$i]}"
+    
+    python3 -u "${CODE_DIR_NAME}/plot_predictions.py" \
+    --input_prediction_dir_name_by_model "${model_dir_name}/validation" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/${nn_lead_times_days}day_lead" \
+    --description_string_by_model "NN" "GFS" \
+    --field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" \
+    --init_date_string="${init_date_string}" \
+    --max_diff_prctile_by_field 99.9 99.9 99.9 99.9 99.9 99.9 99.9 \
+    --output_dir_name="${model_dir_name}/validation/prediction_plots"
+    
+    i=$(( $i + 1 ))
+done
