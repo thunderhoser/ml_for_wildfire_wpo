@@ -11,7 +11,6 @@
 #SBATCH --exclusive
 #SBATCH --time=24:00:00
 #SBATCH --array=0-9
-#SBATCH --begin=2024-04-11T00:35:00
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
