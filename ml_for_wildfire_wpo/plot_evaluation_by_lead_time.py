@@ -203,6 +203,11 @@ def _plot_one_metric(
             FIELD_NAME_TO_FANCY[FIRST_TARGET_FIELD_NAMES[i]]
         ))
 
+    for i in range(len(FIRST_TARGET_FIELD_NAMES)):
+        j = numpy.where(
+            numpy.array(target_field_names) == FIRST_TARGET_FIELD_NAMES[i]
+        )[0][0]
+
         this_handle = axes_object.plot(
             lead_times_days,
             numpy.mean(baseline_metric_matrix[:, j, ...], axis=-1),
@@ -281,6 +286,11 @@ def _plot_one_metric(
             FIELD_NAME_TO_FANCY[SECOND_TARGET_FIELD_NAMES[i]]
         ))
 
+    for i in range(len(FIRST_TARGET_FIELD_NAMES)):
+        j = numpy.where(
+            numpy.array(target_field_names) == FIRST_TARGET_FIELD_NAMES[i]
+        )[0][0]
+
         this_handle = axes_object.plot(
             lead_times_days,
             numpy.mean(baseline_metric_matrix[:, j, ...], axis=-1),
@@ -301,6 +311,7 @@ def _plot_one_metric(
         ))
 
     axes_object.set_ylabel(metric_name)
+    axes_object.set_xlabel('Lead time (days)')
     axes_object.set_xlim([
         numpy.min(lead_times_days) - 0.5,
         numpy.max(lead_times_days) + 0.5
