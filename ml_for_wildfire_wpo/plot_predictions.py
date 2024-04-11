@@ -251,6 +251,12 @@ def _plot_predictions_one_model(
         )
         weight_matrix[bad_flag_matrix] = -1.
 
+        bad_flag_matrix = numpy.logical_and(
+            latitude_matrix_deg_n > 59.5,
+            longitude_matrix_deg_e < 192.
+        )
+        weight_matrix[bad_flag_matrix] = -1.
+
         # full_prediction_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = (
         #     numpy.nan
         # )
@@ -330,6 +336,9 @@ def _plot_predictions_one_model(
 
             this_prediction_matrix = numpy.percentile(
                 full_prediction_matrix, this_percentile, axis=-1
+            )
+            this_prediction_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = (
+                numpy.nan
             )
 
             _plot_one_field(
@@ -717,6 +726,12 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
                 bad_flag_matrix = numpy.logical_and(
                     latitude_matrix_deg_n > 49.,
                     longitude_matrix_deg_e > 220.
+                )
+                this_weight_matrix[bad_flag_matrix] = -1.
+
+                bad_flag_matrix = numpy.logical_and(
+                    latitude_matrix_deg_n > 59.5,
+                    longitude_matrix_deg_e < 192.
                 )
                 this_weight_matrix[bad_flag_matrix] = -1.
 
