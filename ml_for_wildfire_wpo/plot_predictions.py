@@ -13,6 +13,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import grids
 import time_conversion
 import longitude_conversion as lng_conversion
 import file_system_utils
@@ -23,6 +24,9 @@ import canadian_fwi_utils
 import neural_net
 import fwi_plotting
 import plotting_utils
+
+# TODO(thunderhoser): The ensemble_percentile stuff is HACKY.  I need to make
+# this code nicer.
 
 TOLERANCE = 1e-6
 SENTINEL_VALUE = -1e6
@@ -50,6 +54,7 @@ FIGURE_RESOLUTION_DPI = 300
 
 INPUT_DIRS_ARG_NAME = 'input_prediction_dir_name_by_model'
 MODEL_DESCRIPTIONS_ARG_NAME = 'description_string_by_model'
+ENSEMBLE_PERCENTILES_ARG_NAME = 'ensemble_percentiles'
 FIELDS_ARG_NAME = 'field_names'
 INIT_DATE_ARG_NAME = 'init_date_string'
 MAX_VALUES_ARG_NAME = 'max_diff_value_by_field'
@@ -67,6 +72,12 @@ MODEL_DESCRIPTIONS_HELP_STRING = (
     'by spaces.  This list must have the same length as {0:s}.'
 ).format(
     INPUT_DIRS_ARG_NAME
+)
+ENSEMBLE_PERCENTILES_HELP_STRING = (
+    '1-D list of percentiles (ranging from 0...100).  For every model that '
+    'outputs an ensemble, this script will plot the given percentiles of the '
+    'ensemble distribution.  If you just want to plot the ensemble mean, leave '
+    'this argument alone.'
 )
 FIELDS_HELP_STRING = 'List of fields to plot.'
 INIT_DATE_HELP_STRING = (
@@ -100,6 +111,10 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + MODEL_DESCRIPTIONS_ARG_NAME, type=str, nargs='+', required=True,
     help=INPUT_DIRS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + ENSEMBLE_PERCENTILES_ARG_NAME, type=float, nargs='+', required=False,
+    default=[-1], help=ENSEMBLE_PERCENTILES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + FIELDS_ARG_NAME, type=str, nargs='+', required=True,
@@ -168,8 +183,8 @@ def _find_lead_time(prediction_file_name_by_model):
 
 
 def _plot_predictions_one_model(
-        prediction_file_name, field_names, init_date_string, lead_time_days,
-        max_diff_value_by_field,
+        prediction_file_name, field_names, ensemble_percentiles,
+        init_date_string, lead_time_days, max_diff_value_by_field,
         border_latitudes_deg_n, border_longitudes_deg_e,
         model_description_string, fancy_model_description_string,
         plot_actual, output_dir_name):
@@ -180,6 +195,7 @@ def _plot_predictions_one_model(
     :param prediction_file_name: Path to input file (will be read by
         `prediction_io.read_file`).
     :param field_names: 1-D list of target fields.
+    :param ensemble_percentiles: See documentation at top of this script.
     :param init_date_string: Initialization date (format "yyyymmdd").
     :param lead_time_days: Lead time.
     :param max_diff_value_by_field: See documentation at top of this script.
@@ -210,16 +226,35 @@ def _plot_predictions_one_model(
             ptx[prediction_io.FIELD_NAME_KEY].values == field_names[j]
         )[0][0]
 
-        prediction_matrix = numpy.mean(
-            ptx[prediction_io.PREDICTION_KEY].values[..., field_index, :],
-            axis=-1
+        full_prediction_matrix = (
+            ptx[prediction_io.PREDICTION_KEY].values[..., field_index, :]
         )
+        mean_prediction_matrix = numpy.mean(full_prediction_matrix, axis=-1)
         target_matrix = (
             ptx[prediction_io.TARGET_KEY].values[..., field_index]
         )
         weight_matrix = ptx[prediction_io.WEIGHT_KEY].values
 
-        prediction_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = (
+        # TODO(thunderhoser): Hack to get rid of Canada.
+        (
+            latitude_matrix_deg_n, longitude_matrix_deg_e
+        ) = grids.latlng_vectors_to_matrices(
+            unique_latitudes_deg=ptx[prediction_io.LATITUDE_KEY].values,
+            unique_longitudes_deg=lng_conversion.convert_lng_positive_in_west(
+                ptx[prediction_io.LONGITUDE_KEY].values
+            )
+        )
+
+        bad_flag_matrix = numpy.logical_and(
+            latitude_matrix_deg_n > 49.,
+            longitude_matrix_deg_e > 220.
+        )
+        weight_matrix[bad_flag_matrix] = -1.
+
+        # full_prediction_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = (
+        #     numpy.nan
+        # )
+        mean_prediction_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = (
             numpy.nan
         )
         target_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = numpy.nan
@@ -255,7 +290,7 @@ def _plot_predictions_one_model(
         )
 
         _plot_one_field(
-            data_matrix=prediction_matrix,
+            data_matrix=mean_prediction_matrix,
             grid_latitudes_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
             grid_longitudes_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
             border_latitudes_deg_n=border_latitudes_deg_n,
@@ -264,6 +299,49 @@ def _plot_predictions_one_model(
             title_string=title_string,
             output_file_name=output_file_name
         )
+
+        for this_percentile in ensemble_percentiles:
+            title_string = (
+                '{0:.1f}th-percentile {1:s} from {2:s}\n'
+                'Init 00Z {3:s}, valid local noon {4:s}'
+            ).format(
+                this_percentile,
+                this_field_name_fancy,
+                fancy_model_description_string,
+                time_conversion.unix_sec_to_string(
+                    init_date_unix_sec, DATE_FORMAT_FOR_TITLE
+                ),
+                time_conversion.unix_sec_to_string(
+                    init_date_unix_sec + lead_time_days * DAYS_TO_SECONDS,
+                    DATE_FORMAT_FOR_TITLE
+                )
+            )
+
+            output_file_name = (
+                '{0:s}/valid={1:s}_{2:s}_init={3:s}_{4:s}_percentile{5:05.1f}.jpg'
+            ).format(
+                output_dir_name,
+                valid_date_string,
+                field_names[j].replace('_', '-'),
+                init_date_string,
+                model_description_string,
+                this_percentile
+            )
+
+            this_prediction_matrix = numpy.percentile(
+                full_prediction_matrix, this_percentile, axis=-1
+            )
+
+            _plot_one_field(
+                data_matrix=this_prediction_matrix,
+                grid_latitudes_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
+                grid_longitudes_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
+                border_latitudes_deg_n=border_latitudes_deg_n,
+                border_longitudes_deg_e=border_longitudes_deg_e,
+                field_name=field_names[j],
+                title_string=title_string,
+                output_file_name=output_file_name
+            )
 
         title_string = (
             '{0:s} errors from {1:s}\n'
@@ -296,7 +374,7 @@ def _plot_predictions_one_model(
         )
 
         _plot_one_diff_field(
-            diff_matrix=prediction_matrix - target_matrix,
+            diff_matrix=mean_prediction_matrix - target_matrix,
             grid_latitudes_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
             grid_longitudes_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
             border_latitudes_deg_n=border_latitudes_deg_n,
@@ -513,14 +591,16 @@ def _plot_one_field(
 
 
 def _run(prediction_dir_name_by_model, description_string_by_model,
-         field_names, init_date_string, max_diff_value_by_field,
-         max_diff_percentile_by_field, output_dir_name):
+         ensemble_percentiles, field_names, init_date_string,
+         max_diff_value_by_field, max_diff_percentile_by_field,
+         output_dir_name):
     """Plots NN-based predictions and targets (actual values).
 
     This is effectively the main method.
 
     :param prediction_dir_name_by_model: See documentation at top of file.
     :param description_string_by_model: Same.
+    :param ensemble_percentiles: Same.
     :param field_names: Same.
     :param init_date_string: Same.
     :param max_diff_value_by_field: Same.
@@ -563,6 +643,13 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
         )
 
     # Check other input args.
+    if len(ensemble_percentiles) == 1 and ensemble_percentiles[0] < 0:
+        ensemble_percentiles = None
+
+    if ensemble_percentiles is not None:
+        error_checking.assert_is_geq_numpy_array(ensemble_percentiles, 0.)
+        error_checking.assert_is_leq_numpy_array(ensemble_percentiles, 100.)
+
     num_models = len(prediction_dir_name_by_model)
     error_checking.assert_is_numpy_array(
         numpy.array(description_string_by_model),
@@ -617,6 +704,22 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
                 )
                 this_weight_matrix = ptx[prediction_io.WEIGHT_KEY].values
 
+                # TODO(thunderhoser): Hack to get rid of Canada.
+                (
+                    latitude_matrix_deg_n, longitude_matrix_deg_e
+                ) = grids.latlng_vectors_to_matrices(
+                    unique_latitudes_deg=ptx[prediction_io.LATITUDE_KEY].values,
+                    unique_longitudes_deg=lng_conversion.convert_lng_positive_in_west(
+                        ptx[prediction_io.LONGITUDE_KEY].values
+                    )
+                )
+
+                bad_flag_matrix = numpy.logical_and(
+                    latitude_matrix_deg_n > 49.,
+                    longitude_matrix_deg_e > 220.
+                )
+                this_weight_matrix[bad_flag_matrix] = -1.
+
                 this_pred_matrix[
                     this_weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW
                 ] = numpy.nan
@@ -634,6 +737,7 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
         _plot_predictions_one_model(
             prediction_file_name=prediction_file_name_by_model[i],
             field_names=field_names,
+            ensemble_percentiles=ensemble_percentiles,
             init_date_string=init_date_string,
             lead_time_days=lead_time_days,
             max_diff_value_by_field=max_diff_value_by_field,
@@ -655,6 +759,10 @@ if __name__ == '__main__':
         ),
         description_string_by_model=getattr(
             INPUT_ARG_OBJECT, MODEL_DESCRIPTIONS_ARG_NAME
+        ),
+        ensemble_percentiles=numpy.array(
+            getattr(INPUT_ARG_OBJECT, MODEL_DESCRIPTIONS_ARG_NAME),
+            dtype=float
         ),
         field_names=getattr(INPUT_ARG_OBJECT, FIELDS_ARG_NAME),
         init_date_string=getattr(INPUT_ARG_OBJECT, INIT_DATE_ARG_NAME),
