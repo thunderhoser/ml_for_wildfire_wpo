@@ -286,9 +286,9 @@ def _plot_one_metric(
             FIELD_NAME_TO_FANCY[SECOND_TARGET_FIELD_NAMES[i]]
         ))
 
-    for i in range(len(FIRST_TARGET_FIELD_NAMES)):
+    for i in range(len(SECOND_TARGET_FIELD_NAMES)):
         j = numpy.where(
-            numpy.array(target_field_names) == FIRST_TARGET_FIELD_NAMES[i]
+            numpy.array(target_field_names) == SECOND_TARGET_FIELD_NAMES[i]
         )[0][0]
 
         this_handle = axes_object.plot(
