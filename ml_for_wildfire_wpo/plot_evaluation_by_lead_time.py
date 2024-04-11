@@ -473,6 +473,10 @@ def _run(model_eval_file_name_by_lead, baseline_eval_file_name_by_lead,
             for etx in baseline_eval_tables_xarray
         ], axis=0)
 
+        if this_metric_name == regression_eval.MSE_KEY:
+            model_metric_matrix = numpy.sqrt(model_metric_matrix)
+            baseline_metric_matrix = numpy.sqrt(baseline_metric_matrix)
+
         _plot_one_metric(
             model_metric_matrix=model_metric_matrix,
             baseline_metric_matrix=baseline_metric_matrix,
