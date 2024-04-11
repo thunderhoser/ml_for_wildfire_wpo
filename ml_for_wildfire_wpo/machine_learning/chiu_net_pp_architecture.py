@@ -229,7 +229,9 @@ def _get_2d_conv_block(
             current_layer_object = current_layer_object(this_input_layer_object)
 
         if i == num_conv_layers - 1 and do_residual:
-            if input_layer_object.shape[-1] != num_filters:
+            if input_layer_object.shape[-1] == num_filters:
+                new_layer_object = input_layer_object
+            else:
                 this_name = '{0:s}_preresidual_conv'.format(basic_layer_name)
                 new_layer_object = architecture_utils.get_2d_conv_layer(
                     num_kernel_rows=filter_size_px,
@@ -254,13 +256,14 @@ def _get_2d_conv_block(
                 current_layer_object, new_layer_object
             ])
 
-        this_name = '{0:s}_activ{1:d}'.format(basic_layer_name, i)
-        current_layer_object = architecture_utils.get_activation_layer(
-            activation_function_string=activation_function_name,
-            alpha_for_relu=activation_function_alpha,
-            alpha_for_elu=activation_function_alpha,
-            layer_name=this_name
-        )(current_layer_object)
+        if activation_function_name is not None:
+            this_name = '{0:s}_activ{1:d}'.format(basic_layer_name, i)
+            current_layer_object = architecture_utils.get_activation_layer(
+                activation_function_string=activation_function_name,
+                alpha_for_relu=activation_function_alpha,
+                alpha_for_elu=activation_function_alpha,
+                layer_name=this_name
+            )(current_layer_object)
 
         if dropout_rates[i] > 0:
             this_name = '{0:s}_dropout{1:d}'.format(basic_layer_name, i)
@@ -819,7 +822,7 @@ def create_model(option_dict, loss_function, metric_list):
                 size=(2, 2), name=this_name
             )(last_conv_layer_matrix[i_new + 1, j - 1])
 
-            _pad_2d_layer(
+            this_layer_object = _pad_2d_layer(
                 source_layer_object=this_layer_object,
                 target_layer_object=last_conv_layer_matrix[i_new, 0],
                 padding_layer_name='block{0:d}-{1:d}_padding'.format(i_new, j)
