@@ -761,7 +761,7 @@ if __name__ == '__main__':
             INPUT_ARG_OBJECT, MODEL_DESCRIPTIONS_ARG_NAME
         ),
         ensemble_percentiles=numpy.array(
-            getattr(INPUT_ARG_OBJECT, MODEL_DESCRIPTIONS_ARG_NAME),
+            getattr(INPUT_ARG_OBJECT, ENSEMBLE_PERCENTILES_ARG_NAME),
             dtype=float
         ),
         field_names=getattr(INPUT_ARG_OBJECT, FIELDS_ARG_NAME),
