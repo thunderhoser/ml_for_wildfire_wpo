@@ -63,7 +63,8 @@ FIRST_TARGET_FIELD_NAMES = [
 SECOND_TARGET_FIELD_NAMES = [
     canadian_fwi_utils.FFMC_NAME,
     canadian_fwi_utils.ISI_NAME,
-    canadian_fwi_utils.FWI_NAME
+    canadian_fwi_utils.DSR_NAME
+    # canadian_fwi_utils.FWI_NAME
 ]
 
 METRIC_NAME_TO_FANCY_VERBOSE = {
