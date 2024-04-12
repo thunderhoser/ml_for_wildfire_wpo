@@ -739,7 +739,7 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
                 this_weight_matrix[bad_flag_matrix] = -1.
 
                 bad_flag_matrix = latitude_matrix_deg_n < 23.5
-                weight_matrix[bad_flag_matrix] = -1.
+                this_weight_matrix[bad_flag_matrix] = -1.
 
                 this_pred_matrix[
                     this_weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW
