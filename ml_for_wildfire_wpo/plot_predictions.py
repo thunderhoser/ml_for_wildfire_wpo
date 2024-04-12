@@ -246,8 +246,8 @@ def _plot_predictions_one_model(
         )
 
         bad_flag_matrix = numpy.logical_and(
-            latitude_matrix_deg_n > 49.,
-            longitude_matrix_deg_e > 220.
+            latitude_matrix_deg_n > 50.,
+            longitude_matrix_deg_e > 221.
         )
         weight_matrix[bad_flag_matrix] = -1.
 
@@ -727,8 +727,8 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
                 )
 
                 bad_flag_matrix = numpy.logical_and(
-                    latitude_matrix_deg_n > 49.,
-                    longitude_matrix_deg_e > 220.
+                    latitude_matrix_deg_n > 50.,
+                    longitude_matrix_deg_e > 221.
                 )
                 this_weight_matrix[bad_flag_matrix] = -1.
 
