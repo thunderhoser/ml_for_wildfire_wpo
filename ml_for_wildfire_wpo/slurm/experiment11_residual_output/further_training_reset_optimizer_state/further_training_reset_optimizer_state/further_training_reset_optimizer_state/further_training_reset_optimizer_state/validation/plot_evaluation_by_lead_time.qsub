@@ -1,0 +1,41 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_evaluation_by_lead_time"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=02:00:00
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_evaluation_by_lead_time_%A.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment11_residual_output/further_training_reset_optimizer_state/further_training_reset_optimizer_state/further_training_reset_optimizer_state/further_training_reset_optimizer_state"
+
+python3 -u "${CODE_DIR_NAME}/plot_evaluation_by_lead_time.py" \
+--model_eval_file_name_by_lead "${TOP_MODEL_DIR_NAME}/nn-lead-time-days=01_random-seed-index=1/validation/ungridded_evaluation.nc" "${TOP_MODEL_DIR_NAME}/nn-lead-time-days=02_random-seed-index=1/validation/ungridded_evaluation.nc" "${TOP_MODEL_DIR_NAME}/nn-lead-time-days=03_random-seed-index=1/validation/ungridded_evaluation.nc" "${TOP_MODEL_DIR_NAME}/nn-lead-time-days=04_random-seed-index=1/validation/ungridded_evaluation.nc" "${TOP_MODEL_DIR_NAME}/nn-lead-time-days=05_random-seed-index=1/validation/ungridded_evaluation.nc" "${TOP_MODEL_DIR_NAME}/nn-lead-time-days=06_random-seed-index=1/validation/ungridded_evaluation.nc" "${TOP_MODEL_DIR_NAME}/nn-lead-time-days=07_random-seed-index=1/validation/ungridded_evaluation.nc" "${TOP_MODEL_DIR_NAME}/nn-lead-time-days=08_random-seed-index=1/validation/ungridded_evaluation.nc" "${TOP_MODEL_DIR_NAME}/nn-lead-time-days=09_random-seed-index=1/validation/ungridded_evaluation.nc" "${TOP_MODEL_DIR_NAME}/nn-lead-time-days=10_random-seed-index=1/validation/ungridded_evaluation.nc" \
+--baseline_eval_file_name_by_lead "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/01day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/02day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/03day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/04day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/05day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/06day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/07day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/08day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/09day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/10day_lead/ungridded_evaluation_20210101-20211210.nc" \
+--lead_times_days 1 2 3 4 5 6 7 8 9 10 \
+--model_description_string="NN" \
+--baseline_description_string="GFS" \
+--output_dir_name="${TOP_MODEL_DIR_NAME}/validation_by_lead_time"

@@ -1,0 +1,64 @@
+#!/bin/bash
+
+#SBATCH --job-name="evaluate_neural_nets_ungridded"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=02:00:00
+#SBATCH --array=0-119
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=evaluate_neural_nets_ungridded_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment12_residual_everything/further_training_reset_optimizer_state"
+
+GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
+TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
+
+NN_LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "01" "02" "03" "04" "05" "06" "07" "08" "09" "10")
+RANDOM_SEED_INDICES=("1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1")
+FIRST_INIT_DATE_STRINGS=("20210101" "20210101" "20210101" "20210101" "20210101" "20210101" "20210101" "20210101" "20210101" "20210101" "20210201" "20210201" "20210201" "20210201" "20210201" "20210201" "20210201" "20210201" "20210201" "20210201" "20210301" "20210301" "20210301" "20210301" "20210301" "20210301" "20210301" "20210301" "20210301" "20210301" "20210401" "20210401" "20210401" "20210401" "20210401" "20210401" "20210401" "20210401" "20210401" "20210401" "20210501" "20210501" "20210501" "20210501" "20210501" "20210501" "20210501" "20210501" "20210501" "20210501" "20210601" "20210601" "20210601" "20210601" "20210601" "20210601" "20210601" "20210601" "20210601" "20210601" "20210701" "20210701" "20210701" "20210701" "20210701" "20210701" "20210701" "20210701" "20210701" "20210701" "20210801" "20210801" "20210801" "20210801" "20210801" "20210801" "20210801" "20210801" "20210801" "20210801" "20210901" "20210901" "20210901" "20210901" "20210901" "20210901" "20210901" "20210901" "20210901" "20210901" "20211001" "20211001" "20211001" "20211001" "20211001" "20211001" "20211001" "20211001" "20211001" "20211001" "20211101" "20211101" "20211101" "20211101" "20211101" "20211101" "20211101" "20211101" "20211101" "20211101" "20211201" "20211201" "20211201" "20211201" "20211201" "20211201" "20211201" "20211201" "20211201" "20211201")
+LAST_INIT_DATE_STRINGS=("20210131" "20210131" "20210131" "20210131" "20210131" "20210131" "20210131" "20210131" "20210131" "20210131" "20210228" "20210228" "20210228" "20210228" "20210228" "20210228" "20210228" "20210228" "20210228" "20210228" "20210331" "20210331" "20210331" "20210331" "20210331" "20210331" "20210331" "20210331" "20210331" "20210331" "20210430" "20210430" "20210430" "20210430" "20210430" "20210430" "20210430" "20210430" "20210430" "20210430" "20210531" "20210531" "20210531" "20210531" "20210531" "20210531" "20210531" "20210531" "20210531" "20210531" "20210630" "20210630" "20210630" "20210630" "20210630" "20210630" "20210630" "20210630" "20210630" "20210630" "20210731" "20210731" "20210731" "20210731" "20210731" "20210731" "20210731" "20210731" "20210731" "20210731" "20210831" "20210831" "20210831" "20210831" "20210831" "20210831" "20210831" "20210831" "20210831" "20210831" "20210930" "20210930" "20210930" "20210930" "20210930" "20210930" "20210930" "20210930" "20210930" "20210930" "20211031" "20211031" "20211031" "20211031" "20211031" "20211031" "20211031" "20211031" "20211031" "20211031" "20211130" "20211130" "20211130" "20211130" "20211130" "20211130" "20211130" "20211130" "20211130" "20211130" "20211231" "20211231" "20211231" "20211231" "20211231" "20211231" "20211231" "20211231" "20211231" "20211231")
+MONTH_STRINGS=("jan" "jan" "jan" "jan" "jan" "jan" "jan" "jan" "jan" "jan" "feb" "feb" "feb" "feb" "feb" "feb" "feb" "feb" "feb" "feb" "mar" "mar" "mar" "mar" "mar" "mar" "mar" "mar" "mar" "mar" "apr" "apr" "apr" "apr" "apr" "apr" "apr" "apr" "apr" "apr" "may" "may" "may" "may" "may" "may" "may" "may" "may" "may" "jun" "jun" "jun" "jun" "jun" "jun" "jun" "jun" "jun" "jun" "jul" "jul" "jul" "jul" "jul" "jul" "jul" "jul" "jul" "jul" "aug" "aug" "aug" "aug" "aug" "aug" "aug" "aug" "aug" "aug" "sep" "sep" "sep" "sep" "sep" "sep" "sep" "sep" "sep" "sep" "oct" "oct" "oct" "oct" "oct" "oct" "oct" "oct" "oct" "oct" "nov" "nov" "nov" "nov" "nov" "nov" "nov" "nov" "nov" "nov" "dec" "dec" "dec" "dec" "dec" "dec" "dec" "dec" "dec" "dec")
+
+nn_lead_times_days=${NN_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}
+random_seed_index=${RANDOM_SEED_INDICES[$SLURM_ARRAY_TASK_ID]}
+first_init_date_string=${FIRST_INIT_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}
+last_init_date_string=${LAST_INIT_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}
+month_string=${MONTH_STRINGS[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/nn-lead-time-days=${nn_lead_times_days}_random-seed-index=${random_seed_index}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
+--input_prediction_dir_name="${model_dir_name}/validation" \
+--init_date_limit_strings "${first_init_date_string}" "${last_init_date_string}" \
+--num_bootstrap_reps=1 \
+--target_field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" \
+--num_relia_bins_by_target 99 100 100 130 100 130 150 \
+--min_relia_bin_edge_by_target 0 0 0 0 0 0 0 \
+--max_relia_bin_edge_by_target 99 1000 2500 65 1000 130 150 \
+--per_grid_cell=0 \
+--output_file_name="${model_dir_name}/validation/monthly/ungridded_evaluation_${month_string}.nc"
