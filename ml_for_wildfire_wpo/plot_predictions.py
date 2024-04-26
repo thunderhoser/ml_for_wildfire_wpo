@@ -656,9 +656,9 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
 
     # Check other input args.
     if len(ensemble_percentiles) == 1 and ensemble_percentiles[0] < 0:
-        ensemble_percentiles = None
+        ensemble_percentiles = numpy.array([])
 
-    if ensemble_percentiles is not None:
+    if len(ensemble_percentiles) > 0:
         error_checking.assert_is_geq_numpy_array(ensemble_percentiles, 0.)
         error_checking.assert_is_leq_numpy_array(ensemble_percentiles, 100.)
 
