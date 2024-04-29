@@ -49,6 +49,7 @@ L1_WEIGHT_KEY = 'l1_weight'
 L2_WEIGHT_KEY = 'l2_weight'
 USE_BATCH_NORM_KEY = 'use_batch_normalization'
 ENSEMBLE_SIZE_KEY = 'ensemble_size'
+USE_EVIDENTIAL_KEY = 'use_evidential_nn'
 
 OPTIMIZER_FUNCTION_KEY = 'optimizer_function'
 
@@ -78,7 +79,8 @@ DEFAULT_ARCHITECTURE_OPTION_DICT = {
     OUTPUT_ACTIV_FUNCTION_ALPHA_KEY: 0.,
     L1_WEIGHT_KEY: 0.,
     L2_WEIGHT_KEY: 0.001,
-    USE_BATCH_NORM_KEY: True
+    USE_BATCH_NORM_KEY: True,
+    USE_EVIDENTIAL_KEY: False
 }
 
 
