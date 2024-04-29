@@ -395,6 +395,10 @@ def check_args(option_dict):
     error_checking.assert_is_integer(option_dict[ENSEMBLE_SIZE_KEY])
     error_checking.assert_is_greater(option_dict[ENSEMBLE_SIZE_KEY], 0)
 
+    error_checking.assert_is_boolean(option_dict[USE_EVIDENTIAL_KEY])
+    if option_dict[USE_EVIDENTIAL_KEY]:
+        option_dict[OUTPUT_ACTIV_FUNCTION_KEY] = None
+
     return option_dict
 
 
@@ -528,6 +532,7 @@ def create_model(option_dict, loss_function, metric_list):
     l2_weight = option_dict[L2_WEIGHT_KEY]
     use_batch_normalization = option_dict[USE_BATCH_NORM_KEY]
     ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
+    assert not option_dict[USE_EVIDENTIAL_KEY]
 
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
     num_gfs_lead_times = None
