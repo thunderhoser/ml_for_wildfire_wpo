@@ -15,7 +15,7 @@ MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 
 
 def max_prediction_anywhere(channel_index, function_name, expect_ensemble=True,
-                            test_mode=False):
+                            is_nn_evidential=False, test_mode=False):
     """Creates metric to return max prediction anywhere.
 
     "Anywhere" = at masked or unmasked grid cell
@@ -26,6 +26,8 @@ def max_prediction_anywhere(channel_index, function_name, expect_ensemble=True,
     :param expect_ensemble: Boolean flag.  If True, will expect
         prediction_tensor to have dimensions E x M x N x T x S.  If False, will
         expect prediction_tensor to have dimensions E x M x N x T.
+    :param is_nn_evidential: Boolean flag.  If True, will expect evidential NN,
+        where prediction_tensor has dimensions E x M x N x T x 4.
     :param test_mode: Leave this alone.
     :return: metric: Metric function (defined below).
     """
@@ -34,7 +36,9 @@ def max_prediction_anywhere(channel_index, function_name, expect_ensemble=True,
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
     error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
 
     def metric(target_tensor, prediction_tensor):
         """Computes metric (max prediction anywhere).
@@ -50,9 +54,14 @@ def max_prediction_anywhere(channel_index, function_name, expect_ensemble=True,
             target_tensor[..., -1] contains weights.
         :param prediction_tensor: Tensor of predicted values.  If
             expect_ensemble == True, will expect dimensions E x M x N x T x S.
+            Otherwise, if is_nn_evidential == True, will expect dimensions
+            E x M x N x T x 4.
             Otherwise, will expect E x M x N x T.
         :return: metric: Max prediction.
         """
+
+        if is_nn_evidential:
+            return K.max(prediction_tensor[:, :, :, channel_index, 0])
 
         return K.max(prediction_tensor[:, :, :, channel_index, ...])
 
@@ -61,7 +70,7 @@ def max_prediction_anywhere(channel_index, function_name, expect_ensemble=True,
 
 
 def max_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
-                            test_mode=False):
+                            is_nn_evidential=False, test_mode=False):
     """Creates metric to return max unmasked prediction.
 
     "Unmasked" = at grid cell with weight >= MASK_PIXEL_IF_WEIGHT_BELOW
@@ -69,6 +78,7 @@ def max_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
     :param channel_index: See doc for `max_prediction_anywhere`.
     :param function_name: Same.
     :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
     :param test_mode: Same.
     :return: metric: Metric function (defined below).
     """
@@ -77,7 +87,9 @@ def max_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
     error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
 
     def metric(target_tensor, prediction_tensor):
         """Computes metric (max unmasked prediction).
@@ -93,6 +105,13 @@ def max_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
             weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW,
             prediction_tensor.dtype
         )
+
+        if is_nn_evidential:
+            # Input shapes for multiplication: E x M x N and E x M x N
+            return K.max(
+                prediction_tensor[:, :, :, channel_index, 0] *
+                mask_tensor
+            )
 
         if not expect_ensemble:
             # Input shapes for multiplication: E x M x N and E x M x N
@@ -111,8 +130,9 @@ def max_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
     return metric
 
 
-def mean_squared_error_anywhere(channel_index, function_name,
-                                expect_ensemble=True, test_mode=False):
+def mean_squared_error_anywhere(
+        channel_index, function_name,
+        expect_ensemble=True, is_nn_evidential=False, test_mode=False):
     """Creates function to return mean squared error (MSE) anywhere.
 
     "Anywhere" = over masked and unmasked grid cells
@@ -120,6 +140,7 @@ def mean_squared_error_anywhere(channel_index, function_name,
     :param channel_index: See doc for `max_prediction_anywhere`.
     :param function_name: Same.
     :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
     :param test_mode: Same.
     :return: metric: Metric function (defined below).
     """
@@ -128,7 +149,9 @@ def mean_squared_error_anywhere(channel_index, function_name,
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
     error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
 
     def metric(target_tensor, prediction_tensor):
         """Computes metric (MSE anywhere).
@@ -140,7 +163,12 @@ def mean_squared_error_anywhere(channel_index, function_name,
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        if expect_ensemble:
+        if is_nn_evidential:
+            relevant_target_tensor = target_tensor[..., channel_index]
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index, 0]
+            )
+        elif expect_ensemble:
             relevant_target_tensor = K.expand_dims(
                 target_tensor[..., channel_index], axis=-1
             )
@@ -162,13 +190,15 @@ def mean_squared_error_anywhere(channel_index, function_name,
     return metric
 
 
-def mean_squared_error_unmasked(channel_index, function_name,
-                                expect_ensemble=True, test_mode=False):
+def mean_squared_error_unmasked(
+        channel_index, function_name,
+        expect_ensemble=True, is_nn_evidential=False, test_mode=False):
     """Creates function to return MSE at unmasked grid cells.
 
     :param channel_index: See doc for `max_prediction_anywhere`.
     :param function_name: Same.
     :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
     :param test_mode: Same.
     :return: metric: Metric function (defined below).
     """
@@ -177,7 +207,9 @@ def mean_squared_error_unmasked(channel_index, function_name,
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
     error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
 
     def metric(target_tensor, prediction_tensor):
         """Computes metric (MSE at unmasked grid cells).
@@ -189,7 +221,13 @@ def mean_squared_error_unmasked(channel_index, function_name,
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        if expect_ensemble:
+        if is_nn_evidential:
+            relevant_target_tensor = target_tensor[..., channel_index]
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index, 0]
+            )
+            weight_tensor = target_tensor[..., -1]
+        elif expect_ensemble:
             relevant_target_tensor = K.expand_dims(
                 target_tensor[..., channel_index], axis=-1
             )
@@ -222,8 +260,9 @@ def mean_squared_error_unmasked(channel_index, function_name,
     return metric
 
 
-def dual_weighted_mse_anywhere(channel_index, function_name,
-                               expect_ensemble=True, test_mode=False):
+def dual_weighted_mse_anywhere(
+        channel_index, function_name,
+        expect_ensemble=True, is_nn_evidential=False, test_mode=False):
     """Creates function to return dual-weighted MSE (DWMSE) anywhere.
 
     "Anywhere" = over masked and unmasked grid cells
@@ -239,7 +278,9 @@ def dual_weighted_mse_anywhere(channel_index, function_name,
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
     error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
 
     def metric(target_tensor, prediction_tensor):
         """Computes metric (DWMSE anywhere).
@@ -251,7 +292,12 @@ def dual_weighted_mse_anywhere(channel_index, function_name,
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        if expect_ensemble:
+        if is_nn_evidential:
+            relevant_target_tensor = target_tensor[..., channel_index]
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index, 0]
+            )
+        elif expect_ensemble:
             relevant_target_tensor = K.expand_dims(
                 target_tensor[..., channel_index], axis=-1
             )
@@ -279,13 +325,15 @@ def dual_weighted_mse_anywhere(channel_index, function_name,
     return metric
 
 
-def dual_weighted_mse_unmasked(channel_index, function_name,
-                               expect_ensemble=True, test_mode=False):
+def dual_weighted_mse_unmasked(
+        channel_index, function_name,
+        expect_ensemble=True, is_nn_evidential=False, test_mode=False):
     """Creates function to return DWMSE at unmasked grid cells.
 
     :param channel_index: See doc for `max_prediction_anywhere`.
     :param function_name: Same.
     :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
     :param test_mode: Same.
     :return: metric: Metric function (defined below).
     """
@@ -294,7 +342,9 @@ def dual_weighted_mse_unmasked(channel_index, function_name,
     error_checking.assert_is_geq(channel_index, 0)
     error_checking.assert_is_string(function_name)
     error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
     error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
 
     def metric(target_tensor, prediction_tensor):
         """Computes metric (DWMSE at unmasked grid cells).
@@ -306,7 +356,13 @@ def dual_weighted_mse_unmasked(channel_index, function_name,
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
-        if expect_ensemble:
+        if is_nn_evidential:
+            relevant_target_tensor = target_tensor[..., channel_index]
+            relevant_prediction_tensor = (
+                prediction_tensor[:, :, :, channel_index, 0]
+            )
+            weight_tensor = target_tensor[..., -1]
+        elif expect_ensemble:
             relevant_target_tensor = K.expand_dims(
                 target_tensor[..., channel_index], axis=-1
             )

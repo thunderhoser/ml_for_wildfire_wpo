@@ -65,6 +65,7 @@ L1_WEIGHT_KEY = chiu_net_arch.L1_WEIGHT_KEY
 L2_WEIGHT_KEY = chiu_net_arch.L2_WEIGHT_KEY
 USE_BATCH_NORM_KEY = chiu_net_arch.USE_BATCH_NORM_KEY
 ENSEMBLE_SIZE_KEY = chiu_net_arch.ENSEMBLE_SIZE_KEY
+USE_EVIDENTIAL_KEY = chiu_net_arch.USE_EVIDENTIAL_KEY
 
 OPTIMIZER_FUNCTION_KEY = chiu_net_arch.OPTIMIZER_FUNCTION_KEY
 
@@ -291,7 +292,7 @@ def _get_3d_conv_block(
         input_layer_object, do_residual, num_conv_layers, filter_size_px,
         regularizer_object, activation_function_name, activation_function_alpha,
         dropout_rates, use_batch_norm, basic_layer_name):
-    """Creates convolutional block for data with 2 spatial dimensions.
+    """Creates convolutional block for data with 3 spatial dimensions.
 
     :param input_layer_object: Input layer to block (with 3 spatial dims).
     :param do_residual: See documentation for `_get_3d_conv_block`.
@@ -526,6 +527,10 @@ def create_model(option_dict, loss_function, metric_list):
     l2_weight = option_dict[L2_WEIGHT_KEY]
     use_batch_normalization = option_dict[USE_BATCH_NORM_KEY]
     ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
+    use_evidential_nn = option_dict[USE_EVIDENTIAL_KEY]
+
+    if use_evidential_nn:
+        ensemble_size = 4
 
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
     num_gfs_lead_times = None
@@ -901,11 +906,7 @@ def create_model(option_dict, loss_function, metric_list):
         num_filters=num_target_fields * ensemble_size,
         do_time_distributed_conv=False,
         regularizer_object=regularizer_object,
-        activation_function_name=(
-            output_activ_function_name
-            if input_layer_object_predn_baseline is None
-            else None
-        ),
+        activation_function_name=output_activ_function_name,
         activation_function_alpha=output_activ_function_alpha,
         dropout_rates=-1.,
         use_batch_norm=False,
@@ -933,21 +934,32 @@ def create_model(option_dict, loss_function, metric_list):
             )
 
             layer_object_predn_baseline = keras.layers.Reshape(
-                target_shape=new_dims, name='reshape_predn_baseline'
+                target_shape=new_dims,
+                name='reshape_predn_baseline'
             )(input_layer_object_predn_baseline)
+
+            if use_evidential_nn:
+                layer_object_predn_baseline = keras.layers.Permute(
+                    dims=(1, 2, 4, 3),
+                    name='permute_predn_baseline'
+                )(layer_object_predn_baseline)
+
+                padding_arg = ((0, 0), (0, ensemble_size - 1))
+                layer_object_predn_baseline = keras.layers.ZeroPadding2D(
+                    padding=padding_arg,
+                    name='pad_predn_baseline'
+                )(layer_object_predn_baseline)
+
+                layer_object_predn_baseline = keras.layers.Permute(
+                    dims=(1, 2, 4, 3),
+                    name='permute_predn_baseline_back'
+                )(layer_object_predn_baseline)
         else:
             layer_object_predn_baseline = input_layer_object_predn_baseline
 
         output_layer_object = keras.layers.Add(name='output_add_baseline')([
             output_layer_object, layer_object_predn_baseline
         ])
-
-        output_layer_object = architecture_utils.get_activation_layer(
-            activation_function_string=output_activ_function_name,
-            alpha_for_relu=output_activ_function_alpha,
-            alpha_for_elu=output_activ_function_alpha,
-            layer_name='output_activation'
-        )(output_layer_object)
 
     input_layer_objects = [
         l for l in [
