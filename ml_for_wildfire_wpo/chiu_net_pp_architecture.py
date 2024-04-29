@@ -944,8 +944,8 @@ def create_model(option_dict, loss_function, metric_list):
                     name='permute_predn_baseline'
                 )(layer_object_predn_baseline)
 
-                padding_arg = ((0, 0), (0, ensemble_size - 1))
-                layer_object_predn_baseline = keras.layers.ZeroPadding2D(
+                padding_arg = ((0, 0), (0, 0), (0, ensemble_size - 1))
+                layer_object_predn_baseline = keras.layers.ZeroPadding3D(
                     padding=padding_arg,
                     name='pad_predn_baseline'
                 )(layer_object_predn_baseline)
