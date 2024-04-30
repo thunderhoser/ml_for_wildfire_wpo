@@ -818,6 +818,8 @@ def create_model(option_dict, loss_function, metric_list):
                 basic_layer_name='gfs_fcst_level{0:d}'.format(i)
             )
         else:
+
+            # TODO(thunderhoser): Fuck, this is wrong.
             this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
             # gfs_fcst_module_layer_objects[i] = keras.layers.Lambda(
             #     _get_time_slicing_function(0),
@@ -845,6 +847,7 @@ def create_model(option_dict, loss_function, metric_list):
                 basic_layer_name='gfs_fcst_level{0:d}'.format(i)
             )
 
+        gfs_fcst_module_layer_objects[i] = these_layer_objects[-1]
         layer_objects += these_layer_objects
         input_objects_by_layer += these_input_objects_by_layer
 
@@ -923,6 +926,8 @@ def create_model(option_dict, loss_function, metric_list):
                 basic_layer_name='lagtgt_fcst_level{0:d}'.format(i)
             )
         else:
+
+            # TODO(thunderhoser): Fuck, this is wrong.
             this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
             # lagtgt_fcst_module_layer_objects[i] = keras.layers.Lambda(
             #     _get_time_slicing_function(0),
@@ -950,6 +955,7 @@ def create_model(option_dict, loss_function, metric_list):
                 basic_layer_name='lagtgt_fcst_level{0:d}'.format(i)
             )
 
+        lagtgt_fcst_module_layer_objects[i] = these_layer_objects[-1]
         layer_objects += these_layer_objects
         input_objects_by_layer += these_input_objects_by_layer
 
