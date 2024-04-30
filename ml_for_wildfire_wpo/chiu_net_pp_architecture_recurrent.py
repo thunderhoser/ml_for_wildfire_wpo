@@ -9,6 +9,8 @@ import os
 import sys
 import numpy
 import keras
+import tensorflow
+from tensorflow.keras.layers import Layer
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -68,6 +70,22 @@ ENSEMBLE_SIZE_KEY = basic_arch.ENSEMBLE_SIZE_KEY
 USE_EVIDENTIAL_KEY = basic_arch.USE_EVIDENTIAL_KEY
 
 OPTIMIZER_FUNCTION_KEY = basic_arch.OPTIMIZER_FUNCTION_KEY
+
+
+class SqueezeLayer(Layer):
+    def __init__(self, **kwargs):
+        super(SqueezeLayer, self).__init__(**kwargs)
+
+    def call(self, inputs):
+        return tensorflow.squeeze(inputs, axis=-2)
+
+    def get_config(self):
+        base_config = super(SqueezeLayer, self).get_config()
+        return base_config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
 
 
 def _get_time_slicing_function(time_index):
@@ -401,10 +419,11 @@ def _get_3d_conv_block(
             layer_objects.append(conv_layer_object)
 
             this_name = '{0:s}_remove-time-dim'.format(basic_layer_name)
-            remove_time_layer_object = keras.layers.Lambda(
-                _get_time_slicing_function(0),
-                name=this_name
-            )
+            # remove_time_layer_object = keras.layers.Lambda(
+            #     _get_time_slicing_function(0),
+            #     name=this_name
+            # )
+            remove_time_layer_object = SqueezeLayer(name=this_name)
 
             input_objects_by_layer.append([layer_objects[-1]])
             layer_objects.append(remove_time_layer_object)
@@ -439,10 +458,11 @@ def _get_3d_conv_block(
             layer_objects.append(pooling_layer_object)
 
             this_name = '{0:s}_preresidual_squeeze'.format(basic_layer_name)
-            squeeze_layer_object = keras.layers.Lambda(
-                _get_time_slicing_function(0),
-                name=this_name
-            )
+            # squeeze_layer_object = keras.layers.Lambda(
+            #     _get_time_slicing_function(0),
+            #     name=this_name
+            # )
+            squeeze_layer_object = SqueezeLayer(name=this_name)
 
             input_objects_by_layer.append([layer_objects[-1]])
             layer_objects.append(squeeze_layer_object)
@@ -799,10 +819,11 @@ def create_model(option_dict, loss_function, metric_list):
             )
         else:
             this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
-            gfs_fcst_module_layer_objects[i] = keras.layers.Lambda(
-                _get_time_slicing_function(0),
-                name=this_name
-            )
+            # gfs_fcst_module_layer_objects[i] = keras.layers.Lambda(
+            #     _get_time_slicing_function(0),
+            #     name=this_name
+            # )
+            gfs_fcst_module_layer_objects[i] = SqueezeLayer(name=this_name)
 
             input_objects_by_layer.append([layer_objects[-1]])
             layer_objects.append(gfs_fcst_module_layer_objects[i])
@@ -903,10 +924,11 @@ def create_model(option_dict, loss_function, metric_list):
             )
         else:
             this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
-            lagtgt_fcst_module_layer_objects[i] = keras.layers.Lambda(
-                _get_time_slicing_function(0),
-                name=this_name
-            )
+            # lagtgt_fcst_module_layer_objects[i] = keras.layers.Lambda(
+            #     _get_time_slicing_function(0),
+            #     name=this_name
+            # )
+            lagtgt_fcst_module_layer_objects[i] = SqueezeLayer(name=this_name)
 
             input_objects_by_layer.append([layer_objects[-1]])
             layer_objects.append(lagtgt_fcst_module_layer_objects[i])
