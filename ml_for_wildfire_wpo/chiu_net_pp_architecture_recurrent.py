@@ -158,8 +158,8 @@ def _create_skip_connection(
     )
     current_width = len(input_layer_objects) - 1
 
-    layer_objects = []
-    input_objects_by_layer = []
+    layer_objects = [None] * current_width
+    input_objects_by_layer = [[None]] * current_width
 
     for j in range(current_width):
         this_name = 'block{0:d}-{1:d}_preskipconv{2:d}'.format(
