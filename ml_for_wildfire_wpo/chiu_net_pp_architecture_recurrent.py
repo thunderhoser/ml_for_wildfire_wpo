@@ -1490,63 +1490,62 @@ def create_model(option_dict, loss_function, metric_list):
         layer_name_to_object[this_name] = add_layer_object
         layer_names.append(this_name)
 
-    for i in range(len(layer_names)):
-        these_input_layer_names = layer_name_to_input_layer_names[
-            layer_names[i]
-        ]
-        if not isinstance(these_input_layer_names, list):
-            these_input_layer_names = [these_input_layer_names]
+    def construct_model():
+        """Puts the layers together.
 
-        for j in range(len(these_input_layer_names)):
-            print(these_input_layer_names[j])
+        :return: output_layer_object: Output layer.
+        """
+        
+        # TODO(thunderhoser): This method probably needs input args.
+        for curr_layer_name in layer_names:
+            input_layer_names = layer_name_to_input_layer_names[curr_layer_name]
+            if not isinstance(input_layer_names, list):
+                input_layer_names = [input_layer_names]
 
-    print('\n\n\n\n\n\n\n\n')
-
-    for i in range(len(layer_names)):
-        these_input_layer_names = layer_name_to_input_layer_names[
-            layer_names[i]
-        ]
-        if not isinstance(these_input_layer_names, list):
-            these_input_layer_names = [these_input_layer_names]
-
-        if len(these_input_layer_names) == 0:
-            continue
-
-        print(layer_names[i])
-        print(these_input_layer_names)
-        print('\n\n')
-
-        these_input_layer_objects = [layer_name_to_object[n] for n in these_input_layer_names]
-
-        try:
-            if len(these_input_layer_objects) == 1:
-                layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects[0])
-            else:
-                layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects)
-
-            continue
-        except:
-            pass
-
-        these_pixel_counts = numpy.array(
-            [l.shape[1] * l.shape[2] for l in these_input_layer_objects],
-            dtype=int
-        )
-        target_layer_index = numpy.argmax(these_pixel_counts)
-
-        for j in range(len(these_input_layer_objects)):
-            if j == target_layer_index:
+            if len(input_layer_names) == 0:
                 continue
 
-            these_input_layer_objects[j] = _pad_2d_layer(
-                source_layer_object=these_input_layer_objects[j],
-                target_layer_object=these_input_layer_objects[target_layer_index],
-                padding_layer_name='padding_{0:.7f}'.format(time.time())
+            input_objects = [layer_name_to_object[n] for n in input_layer_names]
+
+            try:
+                if len(input_objects) == 1:
+                    layer_name_to_object[curr_layer_name] = (
+                        layer_name_to_object[curr_layer_name](input_objects[0])
+                    )
+                else:
+                    layer_name_to_object[curr_layer_name] = (
+                        layer_name_to_object[curr_layer_name](input_objects)
+                    )
+
+                continue
+            except:
+                pass
+
+            input_pixel_counts = numpy.array(
+                [l.shape[1] * l.shape[2] for l in input_objects],
+                dtype=int
+            )
+            target_layer_index = numpy.argmax(input_pixel_counts)
+
+            for j in range(len(input_objects)):
+                if j == target_layer_index:
+                    continue
+
+                input_objects[j] = _pad_2d_layer(
+                    source_layer_object=input_objects[j],
+                    target_layer_object=input_objects[target_layer_index],
+                    padding_layer_name='padding_{0:.7f}'.format(time.time())
+                )
+
+                layer_name_to_object[input_layer_names[j]] = (
+                    input_objects[j]
+                )
+
+            layer_name_to_object[curr_layer_name] = (
+                layer_name_to_object[curr_layer_name](input_objects)
             )
 
-            layer_name_to_object[these_input_layer_names[j]] = these_input_layer_objects[j]
-
-        layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects)
+        return layer_name_to_object[layer_names[-1]]
 
     input_layer_objects = [
         l for l in [
@@ -1557,7 +1556,7 @@ def create_model(option_dict, loss_function, metric_list):
     ]
     model_object = keras.models.Model(
         inputs=input_layer_objects,
-        outputs=layer_name_to_object[layer_names[-1]]
+        outputs=construct_model()
     )
 
     model_object.compile(
