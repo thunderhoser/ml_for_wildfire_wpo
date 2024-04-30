@@ -1167,6 +1167,10 @@ def create_model(option_dict, loss_function, metric_list):
         layer_objects.append(add_layer_object)
 
     for i in range(len(layer_objects)):
+        print(layer_objects[i])
+        print(input_objects_by_layer[i])
+        print('\n\n')
+
         if len(input_objects_by_layer[i]) == 1:
             layer_objects[i] = layer_objects[i](input_objects_by_layer[i][0])
         else:
