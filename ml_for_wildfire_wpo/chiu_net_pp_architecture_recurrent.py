@@ -90,24 +90,20 @@ def _get_time_slicing_function(time_index):
     return time_slicing_function
 
 
-def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
+def _get_channel_counts_for_skip_cnxn(
+        current_channel_counts, num_output_channels):
     """Determines number of channels for each input layer to skip connection.
 
-    A = number of input layers.
+    A = number of input layers
 
-    :param input_layer_objects: length-A list of input layers (instances of
-        subclass of `keras.layers`).
+    :param current_channel_counts: length-A numpy array of channel counts.
     :param num_output_channels: Number of desired output channels (after
         concatenation).
     :return: desired_channel_counts: length-A numpy array with number of
         desired channels for each input layer.
     """
 
-    current_channel_counts = numpy.array(
-        [l.shape[-1] for l in input_layer_objects], dtype=float
-    )
-
-    num_input_layers = len(input_layer_objects)
+    num_input_layers = len(current_channel_counts)
     desired_channel_counts = numpy.full(num_input_layers, -1, dtype=int)
 
     half_num_output_channels = int(numpy.round(0.5 * num_output_channels))
@@ -135,12 +131,16 @@ def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
     return desired_channel_counts
 
 
-def _create_skip_connection(input_layer_objects, num_output_channels,
-                            current_level_num, regularizer_object):
+def _create_skip_connection(
+        input_layer_objects, input_channel_counts, num_output_channels,
+        current_level_num, regularizer_object):
     """Creates skip connection.
 
-    :param input_layer_objects: 1-D list of input layers (instances of subclass
-        of `keras.layers`).
+    A = number of input layers
+
+    :param input_layer_objects: length-A list of input layers (instances of
+        subclass of `keras.layers`).
+    :param input_channel_counts: length-A numpy array of channel counts.
     :param num_output_channels: Desired number of output channels.
     :param current_level_num: Current level in Chiu-net++ architecture.  This
         should be a zero-based integer index.
@@ -153,7 +153,7 @@ def _create_skip_connection(input_layer_objects, num_output_channels,
     """
 
     desired_input_channel_counts = _get_channel_counts_for_skip_cnxn(
-        input_layer_objects=input_layer_objects,
+        current_channel_counts=input_channel_counts,
         num_output_channels=num_output_channels
     )
     current_width = len(input_layer_objects) - 1
@@ -336,13 +336,16 @@ def _get_2d_conv_block(
 
 
 def _get_3d_conv_block(
-        input_layer_object, do_residual, num_conv_layers, filter_size_px,
+        input_layer_object, num_time_steps, num_filters,
+        do_residual, num_conv_layers, filter_size_px,
         regularizer_object, activation_function_name, activation_function_alpha,
         dropout_rates, use_batch_norm, basic_layer_name):
     """Creates convolutional block for data with 3 spatial dimensions.
 
     :param input_layer_object: Input layer to block (with 3 spatial dims).
-    :param do_residual: See documentation for `_get_3d_conv_block`.
+    :param num_time_steps: Number of time steps.
+    :param num_filters: Number of filters.
+    :param do_residual: See documentation for `_get_2d_conv_block`.
     :param num_conv_layers: Same.
     :param filter_size_px: Same.
     :param regularizer_object: Same.
@@ -376,10 +379,6 @@ def _get_3d_conv_block(
     # Do actual stuff.
     layer_objects = []
     input_objects_by_layer = []
-
-    # TODO(thunderhoser): This might not work.  We'll see.
-    num_time_steps = input_layer_object.shape[-2]
-    num_filters = input_layer_object.shape[-1]
 
     for i in range(num_conv_layers):
         this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
@@ -786,6 +785,8 @@ def create_model(option_dict, loss_function, metric_list):
                 these_layer_objects, these_input_objects_by_layer
             ) = _get_3d_conv_block(
                 input_layer_object=gfs_fcst_module_layer_objects[i],
+                num_time_steps=num_gfs_lead_times,
+                num_filters=gfs_encoder_num_channels_by_level[i],
                 do_residual=use_residual_blocks,
                 num_conv_layers=gfs_fcst_num_conv_layers,
                 filter_size_px=1,
@@ -888,6 +889,8 @@ def create_model(option_dict, loss_function, metric_list):
                 these_layer_objects, these_input_objects_by_layer
             ) = _get_3d_conv_block(
                 input_layer_object=lagtgt_fcst_module_layer_objects[i],
+                num_time_steps=num_target_lag_times,
+                num_filters=lagtgt_encoder_num_channels_by_level[i],
                 do_residual=use_residual_blocks,
                 num_conv_layers=lagtgt_fcst_num_conv_layers,
                 filter_size_px=1,
@@ -947,6 +950,9 @@ def create_model(option_dict, loss_function, metric_list):
     last_conv_layer_matrix = numpy.full(
         (num_levels + 1, num_levels + 1), '', dtype=object
     )
+    last_conv_num_channels_matrix = numpy.full(
+        (num_levels + 1, num_levels + 1), -1, dtype=int
+    )
 
     for i in range(num_levels + 1):
         this_name = 'fcst_level{0:d}_concat'.format(i)
@@ -959,6 +965,11 @@ def create_model(option_dict, loss_function, metric_list):
             lagtgt_fcst_module_layer_objects[i]
         ])
         layer_objects.append(last_conv_layer_matrix[i, 0])
+
+        last_conv_num_channels_matrix[i, 0] = (
+            gfs_encoder_num_channels_by_level[i] +
+            lagtgt_encoder_num_channels_by_level[i]
+        )
 
         i_new = i + 0
         j = 0
@@ -1006,6 +1017,7 @@ def create_model(option_dict, loss_function, metric_list):
             )
 
             last_conv_layer_matrix[i_new, j] = these_layer_objects[-1]
+            last_conv_num_channels_matrix[i_new, j] = this_num_channels
             layer_objects += these_layer_objects
             input_objects_by_layer += these_input_objects_by_layer
 
@@ -1014,6 +1026,8 @@ def create_model(option_dict, loss_function, metric_list):
             ) = _create_skip_connection(
                 input_layer_objects=
                 last_conv_layer_matrix[i_new, :(j + 1)].tolist(),
+                input_channel_counts=
+                last_conv_num_channels_matrix[i_new, :(j + 1)],
                 num_output_channels=decoder_num_channels_by_level[i_new],
                 current_level_num=i_new,
                 regularizer_object=regularizer_object
