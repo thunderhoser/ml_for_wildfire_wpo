@@ -1192,10 +1192,10 @@ def create_model(option_dict, loss_function, metric_list):
 
         for j in range(len(layer_objects)):
             for k in range(len(input_objects_by_layer[j])):
-                print('FOO')
                 if str(input_objects_by_layer[j][k]) != orig_layer_name:
                     continue
 
+                print('FOO')
                 input_objects_by_layer[j][k] = layer_objects[i]
 
     input_layer_objects = [
