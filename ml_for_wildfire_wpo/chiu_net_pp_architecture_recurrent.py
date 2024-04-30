@@ -70,6 +70,26 @@ USE_EVIDENTIAL_KEY = basic_arch.USE_EVIDENTIAL_KEY
 OPTIMIZER_FUNCTION_KEY = basic_arch.OPTIMIZER_FUNCTION_KEY
 
 
+def _get_time_slicing_function(time_index):
+    """Returns function that takes one time step from input tensor.
+
+    :param time_index: Will take the [k]th time step, where k = `time_index`.
+    :return: time_slicing_function: Function handle (see below).
+    """
+
+    # TODO(thunderhoser): Make this flexible, so that time can be either second or second-last axis.
+    def time_slicing_function(input_tensor_3d):
+        """Takes one time step from the input tensor.
+
+        :param input_tensor_3d: Input tensor with 3 spatiotemporal dimensions.
+        :return: input_tensor_2d: Input tensor with 2 spatial dimensions.
+        """
+
+        return input_tensor_3d[..., time_index, :]
+
+    return time_slicing_function
+
+
 def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
     """Determines number of channels for each input layer to skip connection.
 
@@ -254,39 +274,32 @@ def _get_2d_conv_block(
         layer_objects.append(conv_layer_object)
 
         if i == num_conv_layers - 1 and do_residual:
-            if input_layer_object.shape[-1] != num_filters:
-                this_name = '{0:s}_preresidual_conv'.format(basic_layer_name)
-                new_conv_layer_object = architecture_utils.get_2d_conv_layer(
-                    num_kernel_rows=filter_size_px,
-                    num_kernel_columns=filter_size_px,
-                    num_rows_per_stride=1,
-                    num_columns_per_stride=1,
-                    num_filters=num_filters,
-                    padding_type_string=architecture_utils.YES_PADDING_STRING,
-                    weight_regularizer=regularizer_object,
-                    layer_name=this_name
+            this_name = '{0:s}_preresidual_conv'.format(basic_layer_name)
+            new_conv_layer_object = architecture_utils.get_2d_conv_layer(
+                num_kernel_rows=filter_size_px,
+                num_kernel_columns=filter_size_px,
+                num_rows_per_stride=1,
+                num_columns_per_stride=1,
+                num_filters=num_filters,
+                padding_type_string=architecture_utils.YES_PADDING_STRING,
+                weight_regularizer=regularizer_object,
+                layer_name=this_name
+            )
+
+            if do_time_distributed_conv:
+                new_conv_layer_object = keras.layers.TimeDistributed(
+                    new_conv_layer_object, name=this_name
                 )
 
-                if do_time_distributed_conv:
-                    new_conv_layer_object = keras.layers.TimeDistributed(
-                        new_conv_layer_object, name=this_name
-                    )
-
-                input_objects_by_layer.append([input_layer_object])
-                layer_objects.append(new_conv_layer_object)
+            input_objects_by_layer.append([input_layer_object])
+            layer_objects.append(new_conv_layer_object)
 
             this_name = '{0:s}_residual'.format(basic_layer_name)
             add_layer_object = keras.layers.Add(name=this_name)
 
-            if input_layer_object.shape[-1] == num_filters:
-                input_objects_by_layer.append(
-                    [layer_objects[-1], input_layer_object]
-                )
-            else:
-                input_objects_by_layer.append(
-                    [layer_objects[-1], layer_objects[-2]]
-                )
-
+            input_objects_by_layer.append(
+                [layer_objects[-1], layer_objects[-2]]
+            )
             layer_objects.append(add_layer_object)
 
         if activation_function_name is not None:
@@ -388,14 +401,10 @@ def _get_3d_conv_block(
             input_objects_by_layer.append([input_layer_object])
             layer_objects.append(conv_layer_object)
 
-            new_dims = (
-                conv_layer_object.shape[1:3] +
-                (conv_layer_object.shape[-1],)
-            )
-
             this_name = '{0:s}_remove-time-dim'.format(basic_layer_name)
-            remove_time_layer_object = keras.layers.Reshape(
-                target_shape=new_dims, name=this_name
+            remove_time_layer_object = keras.layers.Lambda(
+                _get_time_slicing_function(0),
+                name=this_name
             )
 
             input_objects_by_layer.append([layer_objects[-1]])
@@ -430,14 +439,10 @@ def _get_3d_conv_block(
             input_objects_by_layer.append([input_layer_object])
             layer_objects.append(pooling_layer_object)
 
-            new_dims = (
-                pooling_layer_object.shape[1:3] +
-                (pooling_layer_object.shape[-1],)
-            )
-
             this_name = '{0:s}_preresidual_squeeze'.format(basic_layer_name)
-            squeeze_layer_object = keras.layers.Reshape(
-                target_shape=new_dims, name=this_name
+            squeeze_layer_object = keras.layers.Lambda(
+                _get_time_slicing_function(0),
+                name=this_name
             )
 
             input_objects_by_layer.append([layer_objects[-1]])
@@ -792,12 +797,10 @@ def create_model(option_dict, loss_function, metric_list):
                 basic_layer_name='gfs_fcst_level{0:d}'.format(i)
             )
         else:
-            orig_dims = gfs_fcst_module_layer_objects[i].shape
-            new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
-
             this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
-            gfs_fcst_module_layer_objects[i] = keras.layers.Reshape(
-                target_shape=new_dims, name=this_name
+            gfs_fcst_module_layer_objects[i] = keras.layers.Lambda(
+                _get_time_slicing_function(0),
+                name=this_name
             )
 
             input_objects_by_layer.append([layer_objects[-1]])
@@ -896,12 +899,10 @@ def create_model(option_dict, loss_function, metric_list):
                 basic_layer_name='lagtgt_fcst_level{0:d}'.format(i)
             )
         else:
-            orig_dims = lagtgt_fcst_module_layer_objects[i].shape
-            new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
-
             this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
-            lagtgt_fcst_module_layer_objects[i] = keras.layers.Reshape(
-                target_shape=new_dims, name=this_name
+            lagtgt_fcst_module_layer_objects[i] = keras.layers.Lambda(
+                _get_time_slicing_function(0),
+                name=this_name
             )
 
             input_objects_by_layer.append([layer_objects[-1]])
