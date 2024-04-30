@@ -1193,11 +1193,11 @@ def create_model(option_dict, loss_function, metric_list):
 
         for j in range(len(layer_objects)):
             for k in range(len(input_objects_by_layer[j])):
-                if str(input_objects_by_layer[j][k]) != orig_layer_name:
-                    continue
+                if str(input_objects_by_layer[j][k]) == orig_layer_name:
+                    input_objects_by_layer[j][k] = layer_objects[i]
 
-                print('FOO')
-                input_objects_by_layer[j][k] = layer_objects[i]
+                if str(input_objects_by_layer[j][k].replace('built=True', 'built=False')) == orig_layer_name:
+                    input_objects_by_layer[j][k] = layer_objects[i]
 
     input_layer_objects = [
         l for l in [
