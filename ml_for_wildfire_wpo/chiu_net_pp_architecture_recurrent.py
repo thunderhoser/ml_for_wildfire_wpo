@@ -1196,7 +1196,7 @@ def create_model(option_dict, loss_function, metric_list):
                 if str(input_objects_by_layer[j][k]) == orig_layer_name:
                     input_objects_by_layer[j][k] = layer_objects[i]
 
-                if str(input_objects_by_layer[j][k].replace('built=True', 'built=False')) == orig_layer_name:
+                if str(input_objects_by_layer[j][k]).replace('built=True', 'built=False') == orig_layer_name:
                     input_objects_by_layer[j][k] = layer_objects[i]
 
     input_layer_objects = [
