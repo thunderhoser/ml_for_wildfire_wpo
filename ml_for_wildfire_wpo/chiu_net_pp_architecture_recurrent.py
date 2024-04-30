@@ -1515,35 +1515,40 @@ def create_model(option_dict, loss_function, metric_list):
         print(these_input_layer_names)
         these_input_layer_objects = [layer_name_to_object[n] for n in these_input_layer_names]
 
-        try:
-            if len(these_input_layer_objects) == 1:
-                layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects[0])
-            else:
-                layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects)
-
-            continue
-        except:
-            pass
-
-        these_pixel_counts = numpy.array(
-            [l.shape[1] * l.shape[2] for l in these_input_layer_objects],
-            dtype=int
-        )
-        target_layer_index = numpy.argmax(these_pixel_counts)
-
-        for j in range(len(these_input_layer_objects)):
-            if j == target_layer_index:
-                continue
-
-            these_input_layer_objects[j] = _pad_2d_layer(
-                source_layer_object=these_input_layer_objects[j],
-                target_layer_object=these_input_layer_objects[target_layer_index],
-                padding_layer_name='padding_{0:.7f}'.format(time.time())
-            )
-
-            layer_name_to_object[these_input_layer_names[j]] = these_input_layer_objects[j]
-
+        if len(these_input_layer_objects) == 1:
+            layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects[0])
+        else:
             layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects)
+
+        # try:
+        #     if len(these_input_layer_objects) == 1:
+        #         layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects[0])
+        #     else:
+        #         layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects)
+        #
+        #     continue
+        # except:
+        #     pass
+        #
+        # these_pixel_counts = numpy.array(
+        #     [l.shape[1] * l.shape[2] for l in these_input_layer_objects],
+        #     dtype=int
+        # )
+        # target_layer_index = numpy.argmax(these_pixel_counts)
+        #
+        # for j in range(len(these_input_layer_objects)):
+        #     if j == target_layer_index:
+        #         continue
+        #
+        #     these_input_layer_objects[j] = _pad_2d_layer(
+        #         source_layer_object=these_input_layer_objects[j],
+        #         target_layer_object=these_input_layer_objects[target_layer_index],
+        #         padding_layer_name='padding_{0:.7f}'.format(time.time())
+        #     )
+        #
+        #     layer_name_to_object[these_input_layer_names[j]] = these_input_layer_objects[j]
+        #
+        #     layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects)
 
     input_layer_objects = [
         l for l in [
