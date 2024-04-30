@@ -713,11 +713,11 @@ def create_model(option_dict, loss_function, metric_list):
         )
         layer_objects.append(this_layer_object)
 
-        layer_object_gfs = keras.layers.Concatenate(
-            axis=-1, name='gfs_concat-era5'
-        )
         input_objects_by_layer.append(
             [layer_object_gfs, this_layer_object]
+        )
+        layer_object_gfs = keras.layers.Concatenate(
+            axis=-1, name='gfs_concat-era5'
         )
         layer_objects.append(layer_object_gfs)
 
@@ -729,11 +729,11 @@ def create_model(option_dict, loss_function, metric_list):
         )
         layer_objects.append(this_layer_object)
 
-        layer_object_lagged_target = keras.layers.Concatenate(
-            axis=-1, name='lagged_targets_concat-era5'
-        )
         input_objects_by_layer.append(
             [layer_object_lagged_target, this_layer_object]
+        )
+        layer_object_lagged_target = keras.layers.Concatenate(
+            axis=-1, name='lagged_targets_concat-era5'
         )
         layer_objects.append(layer_object_lagged_target)
 
