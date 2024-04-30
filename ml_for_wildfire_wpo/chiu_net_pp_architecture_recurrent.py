@@ -7,6 +7,7 @@ step is used as an input, i.e., a predictor.
 
 import os
 import sys
+import time
 import numpy
 import keras
 import tensorflow
@@ -1214,6 +1215,28 @@ def create_model(option_dict, loss_function, metric_list):
         if len(input_objects_by_layer[i]) == 1:
             layer_objects[i] = layer_objects[i](input_objects_by_layer[i][0])
         else:
+            try:
+                layer_objects[i] = layer_objects[i](input_objects_by_layer[i])
+                continue
+            except ValueError:
+                pass
+
+            these_pixel_counts = numpy.array(
+                [l.shape[1] * l.shape[2] for l in input_objects_by_layer[i]],
+                dtype=int
+            )
+            target_layer_index = numpy.argmax(these_pixel_counts)
+
+            for m in range(len(input_objects_by_layer[i])):
+                if m == target_layer_index:
+                    continue
+
+                input_objects_by_layer[i][m] = _pad_2d_layer(
+                    source_layer_object=input_objects_by_layer[i][m],
+                    target_layer_object=input_objects_by_layer[i][target_layer_index],
+                    padding_layer_name='padding_{0:.7f}'.format(time.time())
+                )
+
             layer_objects[i] = layer_objects[i](input_objects_by_layer[i])
 
         print(layer_objects[i])
