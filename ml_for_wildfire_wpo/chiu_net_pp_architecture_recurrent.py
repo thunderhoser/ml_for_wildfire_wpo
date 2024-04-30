@@ -185,7 +185,7 @@ def _create_skip_connection(
     concat_layer_object = keras.layers.Concatenate(axis=-1, name=this_name)
 
     layer_names.append(this_name)
-    layer_name_to_input_layer_names[this_name] = layer_names[:-1]
+    layer_name_to_input_layer_names[this_name] = layer_names[:-1] + [input_layer_names[-1]]
     layer_name_to_object[this_name] = concat_layer_object
 
     return layer_names, layer_name_to_input_layer_names, layer_name_to_object
