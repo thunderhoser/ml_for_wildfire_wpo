@@ -1492,6 +1492,7 @@ def create_model(option_dict, loss_function, metric_list):
 
     for i in range(len(layer_names)):
         these_input_layer_names = layer_name_to_input_layer_names[layer_names[i]]
+        print(these_input_layer_names)
         if isinstance(these_input_layer_names, list) and len(these_input_layer_names) == 0:
             continue
 
