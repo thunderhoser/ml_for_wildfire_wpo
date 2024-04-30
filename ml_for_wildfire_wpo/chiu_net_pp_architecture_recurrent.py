@@ -1166,21 +1166,27 @@ def create_model(option_dict, loss_function, metric_list):
         )
         layer_objects.append(add_layer_object)
 
-    # input_layer_objects = [
-    #     l for l in [
-    #         input_layer_object_gfs_3d, input_layer_object_gfs_2d,
-    #         input_layer_object_era5, input_layer_object_lagged_target,
-    #         input_layer_object_predn_baseline
-    #     ] if l is not None
-    # ]
-    # model_object = keras.models.Model(
-    #     inputs=input_layer_objects, outputs=layer_objects[-1]
-    # )
-    #
-    # model_object.compile(
-    #     loss=loss_function, optimizer=optimizer_function,
-    #     metrics=metric_list
-    # )
-    #
-    # model_object.summary()
-    # return model_object
+    for i in range(len(layer_objects)):
+        if len(input_objects_by_layer[i]) == 1:
+            layer_objects[i] = layer_objects[i](input_objects_by_layer[i][0])
+        else:
+            layer_objects[i] = layer_objects[i](input_objects_by_layer[i])
+
+    input_layer_objects = [
+        l for l in [
+            input_layer_object_gfs_3d, input_layer_object_gfs_2d,
+            input_layer_object_era5, input_layer_object_lagged_target,
+            input_layer_object_predn_baseline
+        ] if l is not None
+    ]
+    model_object = keras.models.Model(
+        inputs=input_layer_objects, outputs=layer_objects[-1]
+    )
+
+    model_object.compile(
+        loss=loss_function, optimizer=optimizer_function,
+        metrics=metric_list
+    )
+
+    model_object.summary()
+    return model_object
