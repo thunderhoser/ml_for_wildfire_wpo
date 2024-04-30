@@ -1495,11 +1495,13 @@ def create_model(option_dict, loss_function, metric_list):
         if not isinstance(these_input_layer_names, list):
             these_input_layer_names = [these_input_layer_names]
 
-        print(these_input_layer_names)
         if len(these_input_layer_names) == 0:
             continue
 
         these_input_layer_objects = [layer_name_to_object[n] for n in these_input_layer_names]
+        print(these_input_layer_names)
+        print(these_input_layer_objects)
+
         layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects)
 
         try:
