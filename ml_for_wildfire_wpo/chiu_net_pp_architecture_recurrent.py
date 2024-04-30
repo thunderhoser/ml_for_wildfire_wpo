@@ -1503,7 +1503,7 @@ def create_model(option_dict, loss_function, metric_list):
         print(these_input_layer_objects)
 
         try:
-            if len(these_input_layer_objects) == 0:
+            if len(these_input_layer_objects) == 1:
                 layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects[0])
             else:
                 layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects)
