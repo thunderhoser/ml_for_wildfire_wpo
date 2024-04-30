@@ -1512,7 +1512,10 @@ def create_model(option_dict, loss_function, metric_list):
         if len(these_input_layer_names) == 0:
             continue
 
+        print(layer_names[i])
         print(these_input_layer_names)
+        print('\n\n')
+
         these_input_layer_objects = [layer_name_to_object[n] for n in these_input_layer_names]
 
         if len(these_input_layer_objects) == 1:
