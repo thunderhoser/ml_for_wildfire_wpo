@@ -1179,11 +1179,16 @@ def create_model(option_dict, loss_function, metric_list):
 
     for i in range(len(layer_objects)):
         orig_layer_name = str(layer_objects[i])
+        print(layer_objects[i])
+        print(orig_layer_name)
 
         if len(input_objects_by_layer[i]) == 1:
             layer_objects[i] = layer_objects[i](input_objects_by_layer[i][0])
         else:
             layer_objects[i] = layer_objects[i](input_objects_by_layer[i])
+
+        print(layer_objects[i])
+        print('\n\n')
 
         for j in range(len(layer_objects)):
             for k in range(len(input_objects_by_layer[j])):
