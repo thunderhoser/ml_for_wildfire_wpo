@@ -1546,7 +1546,7 @@ def create_model(option_dict, loss_function, metric_list):
 
             layer_name_to_object[these_input_layer_names[j]] = these_input_layer_objects[j]
 
-            layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects)
+        layer_name_to_object[layer_names[i]] = layer_name_to_object[layer_names[i]](these_input_layer_objects)
 
     input_layer_objects = [
         l for l in [
