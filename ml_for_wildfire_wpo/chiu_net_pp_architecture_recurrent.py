@@ -1491,7 +1491,12 @@ def create_model(option_dict, loss_function, metric_list):
         layer_names.append(this_name)
 
     for i in range(len(layer_names)):
-        print(layer_names[i])
+        these_input_layer_names = layer_name_to_input_layer_names[
+            layer_names[i]
+        ]
+
+        for j in range(len(these_input_layer_names)):
+            print(these_input_layer_names[j])
 
     print('\n\n\n\n\n\n\n\n')
 
