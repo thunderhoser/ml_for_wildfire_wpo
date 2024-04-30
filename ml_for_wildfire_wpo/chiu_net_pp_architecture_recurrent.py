@@ -1167,8 +1167,8 @@ def create_model(option_dict, loss_function, metric_list):
         layer_objects.append(add_layer_object)
 
     for i in range(3):
-        layer_objects[i] = layer_objects[i](input_objects_by_layer[i][0])
         print(layer_objects[i])
+        layer_objects[i] = layer_objects[i](input_objects_by_layer[i][0])
 
     for i in range(len(layer_objects)):
         print(layer_objects[i])
