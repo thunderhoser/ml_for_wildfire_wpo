@@ -1494,6 +1494,8 @@ def create_model(option_dict, loss_function, metric_list):
         these_input_layer_names = layer_name_to_input_layer_names[
             layer_names[i]
         ]
+        if not isinstance(these_input_layer_names, list):
+            these_input_layer_names = [these_input_layer_names]
 
         for j in range(len(these_input_layer_names)):
             print(these_input_layer_names[j])
