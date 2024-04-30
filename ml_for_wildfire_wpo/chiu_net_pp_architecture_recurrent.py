@@ -867,7 +867,7 @@ def create_model(option_dict, loss_function, metric_list):
 
     for i in range(num_levels + 1):
         if i == 0:
-            this_input_layer_name = layer_object_gfs
+            this_input_layer_name = layer_name_gfs
         else:
             this_input_layer_name = gfs_encoder_pooling_layer_names[i - 1]
 
