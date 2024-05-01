@@ -25,7 +25,7 @@ def _run(template_file_name, output_dir_name,
          gfs_use_quantile_norm,
          era5_constant_file_name, era5_constant_predictor_field_names,
          era5_normalization_file_name, era5_use_quantile_norm,
-         target_field_names, target_lead_time_days, target_lag_times_days,
+         target_field_names, model_lead_times_days, target_lag_times_days,
          gfs_forecast_target_lead_times_days, target_normalization_file_name,
          targets_use_quantile_norm,
          num_examples_per_batch, sentinel_value, do_residual_prediction,
@@ -59,7 +59,7 @@ def _run(template_file_name, output_dir_name,
     :param era5_normalization_file_name: Same.
     :param era5_use_quantile_norm: Same.
     :param target_field_names: Same.
-    :param target_lead_time_days: Same.
+    :param model_lead_times_days: Same.
     :param target_lag_times_days: Same.
     :param gfs_forecast_target_lead_times_days: Same.
     :param target_normalization_file_name: Same.
@@ -133,7 +133,7 @@ def _run(template_file_name, output_dir_name,
         neural_net.ERA5_NORM_FILE_KEY: era5_normalization_file_name,
         neural_net.ERA5_USE_QUANTILE_NORM_KEY: era5_use_quantile_norm,
         neural_net.TARGET_FIELDS_KEY: target_field_names,
-        neural_net.TARGET_LEAD_TIME_KEY: target_lead_time_days,
+        neural_net.MODEL_LEAD_TIMES_KEY: model_lead_times_days,
         neural_net.TARGET_LAG_TIMES_KEY: target_lag_times_days,
         neural_net.GFS_FCST_TARGET_LEAD_TIMES_KEY:
             gfs_forecast_target_lead_times_days,
@@ -249,8 +249,9 @@ if __name__ == '__main__':
         target_field_names=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_FIELDS_ARG_NAME
         ),
-        target_lead_time_days=getattr(
-            INPUT_ARG_OBJECT, training_args.TARGET_LEAD_TIME_ARG_NAME
+        model_lead_times_days=numpy.array(
+            getattr(INPUT_ARG_OBJECT, training_args.MODEL_LEAD_TIMES_ARG_NAME),
+            dtype=int
         ),
         target_lag_times_days=numpy.array(
             getattr(INPUT_ARG_OBJECT, training_args.TARGET_LAG_TIMES_ARG_NAME),

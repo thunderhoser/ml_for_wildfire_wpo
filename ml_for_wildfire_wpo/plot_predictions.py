@@ -167,11 +167,10 @@ def _find_lead_time(prediction_file_name_by_model):
         mmd = neural_net.read_metafile(model_metafile_name)
         training_option_dict = mmd[neural_net.TRAINING_OPTIONS_KEY]
 
-        if neural_net.TARGET_LEAD_TIME_KEY not in training_option_dict:
-            continue
+        assert len(training_option_dict[neural_net.MODEL_LEAD_TIMES_KEY]) == 1
 
         this_lead_time_days = (
-            training_option_dict[neural_net.TARGET_LEAD_TIME_KEY]
+            training_option_dict[neural_net.MODEL_LEAD_TIMES_KEY][0]
         )
         if lead_time_days is None:
             lead_time_days = this_lead_time_days + 0

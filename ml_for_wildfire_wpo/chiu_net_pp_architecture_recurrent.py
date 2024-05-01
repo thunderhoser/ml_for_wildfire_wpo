@@ -11,7 +11,7 @@ import time
 import numpy
 import keras
 import tensorflow
-from keras.layers import Layer
+from tensorflow.keras.layers import Layer
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -694,7 +694,7 @@ def _construct_recurrent_model(
         network is evidential.
     :return: output_layer_objects: 1-D list of output layers.
     """
-    
+
     # TODO(thunderhoser): Make this work for evidential NNs (low priority,
     # since evidential NNs appear to perform poorly for this problem in
     # general).
