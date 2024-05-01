@@ -740,20 +740,22 @@ def _construct_recurrent_model(
         else:
             this_layer_object = prev_output_layer_object
 
-        this_name = 'feed_outputs_back_{0:d}days'.format(
-            model_lead_times_days[i]
-        )
-        j = numpy.where(
-            -1 * target_lag_times_in_predictors_days == model_lead_times_days[i]
-        )[0][0]
+        layer_name_to_object['predn_baseline_inputs'] = this_layer_object
 
-        feed_back_layer_object = FeedPredictionsBackLayer(
-            time_index=j, name=this_name
-        )
-        layer_name_to_object['lagged_target_inputs'] = feed_back_layer_object([
-            layer_name_to_object['lagged_target_inputs'],
-            this_layer_object
-        ])
+        # this_name = 'feed_outputs_back_{0:d}days'.format(
+        #     model_lead_times_days[i]
+        # )
+        # j = numpy.where(
+        #     -1 * target_lag_times_in_predictors_days == model_lead_times_days[i]
+        # )[0][0]
+        #
+        # feed_back_layer_object = FeedPredictionsBackLayer(
+        #     time_index=j, name=this_name
+        # )
+        # layer_name_to_object['lagged_target_inputs'] = feed_back_layer_object([
+        #     layer_name_to_object['lagged_target_inputs'],
+        #     this_layer_object
+        # ])
 
         output_layer_objects.append(
             _construct_basic_model(
