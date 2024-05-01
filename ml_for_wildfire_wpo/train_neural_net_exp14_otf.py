@@ -164,7 +164,7 @@ def _create_model():
     option_dict = copy.deepcopy(DEFAULT_OPTION_DICT)
 
     this_num_lead_times = len(
-        NN_LEAD_TIME_DAYS_TO_GFS_LEAD_TIMES_HOURS[NN_LEAD_TIMES_DAYS[i]]
+        NN_LEAD_TIME_DAYS_TO_GFS_LEAD_TIMES_HOURS[NN_LEAD_TIMES_DAYS[0]]
     )
     these_dim_3d = numpy.array([
         265, 537,
@@ -176,10 +176,10 @@ def _create_model():
     ], dtype=int)
 
     this_num_lag_times = len(
-        NN_LEAD_TIME_DAYS_TO_TARGET_LAG_TIMES_DAYS[NN_LEAD_TIMES_DAYS[i]]
+        NN_LEAD_TIME_DAYS_TO_TARGET_LAG_TIMES_DAYS[NN_LEAD_TIMES_DAYS[0]]
     )
     this_num_lead_times = len(
-        NN_LEAD_TIME_DAYS_TO_TARGET_LAG_TIMES_DAYS[NN_LEAD_TIMES_DAYS[i]]
+        NN_LEAD_TIME_DAYS_TO_TARGET_LAG_TIMES_DAYS[NN_LEAD_TIMES_DAYS[0]]
     )
     these_dim_laglead = numpy.array([
         265, 537, this_num_lag_times + this_num_lead_times, 6
