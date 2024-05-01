@@ -1661,9 +1661,14 @@ def create_model(option_dict, loss_function, metric_list):
         inputs=input_layer_objects, outputs=output_layer_objects
     )
 
+    # TODO(thunderhoser): Hard-coded loss dictionary is a HACK.
     model_object.compile(
-        loss=loss_function, optimizer=optimizer_function,
-        metrics=metric_list
+        loss={
+            'final_output_step0': loss_function,
+            'final_output_step1': loss_function
+        },
+        optimizer=optimizer_function,
+        # metrics=metric_list
     )
 
     model_object.summary()
