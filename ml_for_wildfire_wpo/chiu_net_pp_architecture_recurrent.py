@@ -11,7 +11,7 @@ import time
 import numpy
 import keras
 import tensorflow
-from tensorflow.keras.layers import Layer
+from keras.layers import Layer
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -648,12 +648,7 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
         if len(input_layer_names) == 0:
             continue
 
-        print(curr_layer_name)
-        print(layer_name_to_object[curr_layer_name])
-
         input_objects = [layer_name_to_object[n] for n in input_layer_names]
-        print(input_objects)
-        print('\n\n')
 
         try:
             if len(input_objects) == 1:
@@ -747,9 +742,11 @@ def _construct_recurrent_model(
                 model_lead_times_days[i]
             )
             ensemble_mean_layer_object = EnsembleMeanLayer(name=this_name)
+            print(ensemble_mean_layer_object)
             this_layer_object = ensemble_mean_layer_object(
                 prev_output_layer_object
             )
+            print(this_layer_object)
         else:
             this_layer_object = prev_output_layer_object
 
