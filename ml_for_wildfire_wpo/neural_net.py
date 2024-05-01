@@ -2053,9 +2053,13 @@ def read_metafile(pickle_file_name):
         validation_option_dict[DO_RESIDUAL_PREDICTION_KEY] = False
 
     if MODEL_LEAD_TIMES_KEY not in training_option_dict:
-        model_lead_times_days = numpy.array(
-            [training_option_dict['target_lead_time_days']], dtype=int
-        )
+        if 'target_lead_time_days' in training_option_dict:
+            model_lead_times_days = numpy.array(
+                [training_option_dict['target_lead_time_days']], dtype=int
+            )
+        else:
+            model_lead_times_days = numpy.array([2], dtype=int)
+
         training_option_dict[MODEL_LEAD_TIMES_KEY] = model_lead_times_days
         validation_option_dict[MODEL_LEAD_TIMES_KEY] = model_lead_times_days
 
