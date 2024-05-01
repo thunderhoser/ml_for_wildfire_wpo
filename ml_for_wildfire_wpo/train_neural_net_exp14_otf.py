@@ -195,7 +195,7 @@ def _create_model():
 
     return chiu_net_pp_arch.create_model(
         option_dict=option_dict,
-        loss_function=LOSS_FUNCTION,
+        loss_function='mse',
         metric_list=[]
     )
 
