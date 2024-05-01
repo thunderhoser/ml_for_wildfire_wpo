@@ -102,8 +102,6 @@ class EnsembleMeanLayer(Layer):
 
     def compute_output_shape(self, input_shape):
         # Output shape is the same as input shape
-        print('FOOOOO')
-        print(input_shape)
         return input_shape
 
     def get_config(self):
@@ -650,7 +648,12 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
         if len(input_layer_names) == 0:
             continue
 
+        print(curr_layer_name)
+        print(layer_name_to_object[curr_layer_name])
+
         input_objects = [layer_name_to_object[n] for n in input_layer_names]
+        print(input_objects)
+        print('\n\n')
 
         try:
             if len(input_objects) == 1:
