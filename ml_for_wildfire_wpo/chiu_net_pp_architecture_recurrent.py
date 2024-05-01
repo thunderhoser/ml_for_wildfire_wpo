@@ -602,7 +602,8 @@ def _combine_layer_lists(
 
 
 def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
-                           layer_name_to_object_immutable):
+                           layer_name_to_object_immutable, ensemble_size,
+                           integration_step):
     """Constructs basic model, i.e., puts the layers together.
 
     :param layer_names: See output doc for `_combine_layer_lists`.
@@ -610,6 +611,8 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
     :param layer_name_to_object_immutable: Same.
     :return: output_layer_object: Output layer.
     """
+
+    # TODO: input doc
 
     layer_name_to_object = dict()
     for this_key in layer_name_to_object_immutable:
@@ -665,25 +668,27 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
             layer_name_to_object[curr_layer_name](input_objects)
         )
 
-    return layer_name_to_object[layer_names[-1]]
+    if ensemble_size > 1:
+        this_name = 'take_ens_mean_step{0:d}'.format(integration_step + 1)
+        extra_output_object = EnsembleMeanLayer(name=this_name)(
+            layer_name_to_object[layer_names[-1]]
+        )
+        print(extra_output_object)
+    else:
+        extra_output_object = None
+
+    return layer_name_to_object[layer_names[-1]], extra_output_object
 
 
 def _construct_recurrent_model(
         layer_names, layer_name_to_input_layer_names, layer_name_to_object,
-        model_lead_times_days, target_lag_times_in_predictors_days,
-        ensemble_size, use_evidential_nn):
+        num_integration_steps, ensemble_size, use_evidential_nn):
     """Constructs recurrent model, i.e., puts the layers together.
 
     :param layer_names: See output doc for `_combine_layer_lists`.
     :param layer_name_to_input_layer_names: Same.
     :param layer_name_to_object: Same.
-    :param model_lead_times_days: 1-D numpy array of model lead times.
-    :param target_lag_times_in_predictors_days: 1-D numpy array of target lag
-        times used in predictors, in the order that they appear in the relevant
-        input tensor.  Lead times can be encoded as negative lag times.  For
-        example, if the input tensor includes lag times of {3, 2, 1} days
-        followed by lead times of {1, 2, 3} days, this array should be
-        [3, 2, 1, -1, -2, -3].
+    :param num_integration_steps: Number of model-integration steps.
     :param ensemble_size: Ensemble size for network outputs.
     :param use_evidential_nn: Boolean flag, indicating whether or not the
         network is evidential.
@@ -693,61 +698,33 @@ def _construct_recurrent_model(
     # TODO(thunderhoser): Make this work for evidential NNs (low priority,
     # since evidential NNs appear to perform poorly for this problem in
     # general).
-    
-    # TODO(thunderhoser): Figure out the best normalization approach with
-    # recurrence.  The best approach is probably either (1) normalize the
-    # target variables everywhere, including where they appear as predictors or
-    # as the network output; or (2) do not normalize the target variables
-    # anywhere.  Any other approach will require on-the-fly normalization of
-    # network outputs, before they are fed back in as predictors for the next
-    # time step.
 
-    this_layer_object = _construct_basic_model(
+    if use_evidential_nn:
+        raise ValueError()
+
+    output_layer_objects = [None] * num_integration_steps
+    output_layer_objects[0], extra_layer_object = _construct_basic_model(
         layer_names=layer_names,
         layer_name_to_input_layer_names=layer_name_to_input_layer_names,
-        layer_name_to_object_immutable=layer_name_to_object
+        layer_name_to_object_immutable=layer_name_to_object,
+        ensemble_size=ensemble_size,
+        integration_step=0
     )
-    output_layer_objects = [this_layer_object]
 
-    for i in range(1, len(model_lead_times_days)):
-        prev_output_layer_object = output_layer_objects[i - 1]
-
-        if use_evidential_nn:
-            raise ValueError()
-        elif ensemble_size > 1:
-            this_name = 'take_ens_mean_{0:d}days'.format(
-                model_lead_times_days[i]
+    for i in range(1, num_integration_steps):
+        if extra_layer_object is None:
+            layer_name_to_object['predn_baseline_inputs'] = (
+                output_layer_objects[i - 1]
             )
-            this_layer_object = EnsembleMeanLayer(name=this_name)(
-                prev_output_layer_object
-            )
-            print(this_layer_object)
         else:
-            this_layer_object = prev_output_layer_object
+            layer_name_to_object['predn_baseline_inputs'] = extra_layer_object
 
-        layer_name_to_object['predn_baseline_inputs'] = this_layer_object
-
-        # this_name = 'feed_outputs_back_{0:d}days'.format(
-        #     model_lead_times_days[i]
-        # )
-        # j = numpy.where(
-        #     -1 * target_lag_times_in_predictors_days == model_lead_times_days[i]
-        # )[0][0]
-        #
-        # feed_back_layer_object = FeedPredictionsBackLayer(
-        #     time_index=j, name=this_name
-        # )
-        # layer_name_to_object['lagged_target_inputs'] = feed_back_layer_object([
-        #     layer_name_to_object['lagged_target_inputs'],
-        #     this_layer_object
-        # ])
-
-        output_layer_objects.append(
-            _construct_basic_model(
-                layer_names=layer_names,
-                layer_name_to_input_layer_names=layer_name_to_input_layer_names,
-                layer_name_to_object_immutable=layer_name_to_object
-            )
+        output_layer_objects[i], extra_layer_object = _construct_basic_model(
+            layer_names=layer_names,
+            layer_name_to_input_layer_names=layer_name_to_input_layer_names,
+            layer_name_to_object_immutable=layer_name_to_object,
+            ensemble_size=ensemble_size,
+            integration_step=i
         )
 
     return output_layer_objects
@@ -1677,10 +1654,6 @@ def create_model(option_dict, loss_function, metric_list):
         layer_name_to_object[this_name] = add_layer_object
         layer_names.append(this_name)
 
-    # TODO(thunderhoser): These should be input args.
-    model_lead_times_days = numpy.array([1, 2], dtype=int)
-    target_lag_times_in_predictors_days = numpy.array([3, 2, 1, -1, -2, -3], dtype=int)
-
     input_layer_objects = [
         l for l in [
             input_layer_object_gfs_3d, input_layer_object_gfs_2d,
@@ -1693,8 +1666,7 @@ def create_model(option_dict, loss_function, metric_list):
         layer_names=layer_names,
         layer_name_to_input_layer_names=layer_name_to_input_layer_names,
         layer_name_to_object=layer_name_to_object,
-        model_lead_times_days=model_lead_times_days,
-        target_lag_times_in_predictors_days=target_lag_times_in_predictors_days,
+        num_integration_steps=2,  # TODO(thunderhoser): Should be input arg.
         ensemble_size=ensemble_size,
         use_evidential_nn=use_evidential_nn
     )
