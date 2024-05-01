@@ -101,8 +101,7 @@ class EnsembleMeanLayer(Layer):
         return tensorflow.reduce_mean(inputs, axis=-1)
 
     def compute_output_shape(self, input_shape):
-        print(input_shape)
-        return input_shape[..., 0]
+        return input_shape[:-1]
 
     def get_config(self):
         base_config = super(EnsembleMeanLayer, self).get_config()
