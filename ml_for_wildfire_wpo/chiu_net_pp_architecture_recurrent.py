@@ -529,35 +529,6 @@ def _get_3d_conv_block(
     return layer_names, layer_name_to_input_layer_names, layer_name_to_object
 
 
-def _pad_2d_layer(source_layer_object, target_layer_object, padding_layer_name):
-    """Pads layer with 2 spatial dimensions.
-
-    :param source_layer_object: Source layer.
-    :param target_layer_object: Target layer.  The source layer will be padded,
-        if necessary, to have the same dimensions as the target layer.
-    :param padding_layer_name: Name of padding layer.
-    :return: source_layer_object: Same as input, except maybe with different
-        spatial dimensions.
-    """
-
-    num_source_rows = source_layer_object.shape[1]
-    num_target_rows = target_layer_object.shape[1]
-    num_padding_rows = num_target_rows - num_source_rows
-
-    num_source_columns = source_layer_object.shape[2]
-    num_target_columns = target_layer_object.shape[2]
-    num_padding_columns = num_target_columns - num_source_columns
-
-    if num_padding_rows + num_padding_columns > 0:
-        padding_arg = ((0, num_padding_rows), (0, num_padding_columns))
-
-        return keras.layers.ZeroPadding2D(
-            padding=padding_arg, name=padding_layer_name
-        )(source_layer_object)
-
-    return source_layer_object
-
-
 def _combine_layer_lists(
         layer_name_lists, layer_name_to_input_dicts,
         layer_name_to_object_dicts):
@@ -630,43 +601,14 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
 
         input_objects = [layer_name_to_object[n] for n in input_layer_names]
 
-        try:
-            if len(input_objects) == 1:
-                layer_name_to_object[curr_layer_name] = (
-                    layer_name_to_object[curr_layer_name](input_objects[0])
-                )
-            else:
-                layer_name_to_object[curr_layer_name] = (
-                    layer_name_to_object[curr_layer_name](input_objects)
-                )
-
-            continue
-        except:
-            pass
-
-        # input_pixel_counts = numpy.array(
-        #     [l.shape[1] * l.shape[2] for l in input_objects],
-        #     dtype=int
-        # )
-        # target_layer_index = numpy.argmax(input_pixel_counts)
-        #
-        # for j in range(len(input_objects)):
-        #     if j == target_layer_index:
-        #         continue
-        #
-        #     input_objects[j] = _pad_2d_layer(
-        #         source_layer_object=input_objects[j],
-        #         target_layer_object=input_objects[target_layer_index],
-        #         padding_layer_name='padding_{0:.7f}'.format(time.time())
-        #     )
-        #
-        #     layer_name_to_object[input_layer_names[j]] = (
-        #         input_objects[j]
-        #     )
-        #
-        # layer_name_to_object[curr_layer_name] = (
-        #     layer_name_to_object[curr_layer_name](input_objects)
-        # )
+        if len(input_objects) == 1:
+            layer_name_to_object[curr_layer_name] = (
+                layer_name_to_object[curr_layer_name](input_objects[0])
+            )
+        else:
+            layer_name_to_object[curr_layer_name] = (
+                layer_name_to_object[curr_layer_name](input_objects)
+            )
 
     if ensemble_size > 1:
         this_name = 'take_ens_mean_step{0:d}'.format(integration_step + 1)
@@ -710,6 +652,7 @@ def _construct_recurrent_model(
         ensemble_size=ensemble_size,
         integration_step=0
     )
+    print(output_layer_objects[0])
 
     for i in range(1, num_integration_steps):
         if extra_layer_object is None:
@@ -726,6 +669,7 @@ def _construct_recurrent_model(
             ensemble_size=ensemble_size,
             integration_step=i
         )
+        print(output_layer_objects[i])
 
     return output_layer_objects
 
