@@ -1602,7 +1602,8 @@ def create_model(option_dict, loss_function, metric_list):
         """
 
         output_layer_objects = []
-        model_function = globals()['construct_basic_model']
+        # model_function = globals()['construct_basic_model']
+        model_function = construct_basic_model
         output_layer_objects.append(model_function())
 
         for i in range(1, len(model_lead_times_days)):
