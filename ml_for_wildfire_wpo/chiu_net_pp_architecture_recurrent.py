@@ -1605,8 +1605,10 @@ def create_model(option_dict, loss_function, metric_list):
         # model_function = globals()['construct_basic_model']
         model_function = construct_basic_model
         output_layer_objects.append(model_function())
+        print('FOO')
 
         for i in range(1, len(model_lead_times_days)):
+            print(i)
             prev_output_layer_object = output_layer_objects[i - 1]
 
             if use_evidential_nn:
