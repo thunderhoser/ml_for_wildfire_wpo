@@ -1648,6 +1648,7 @@ def create_model(option_dict, loss_function, metric_list):
                 this_layer_object,
                 input_layer_object_lagged_target[..., (j + 1):, :]
             ])
+            print(layer_name_to_object['lagged_target_inputs'])
 
             output_layer_objects.append(model_function())
 
