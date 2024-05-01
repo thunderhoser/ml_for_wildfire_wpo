@@ -1585,6 +1585,10 @@ def create_model(option_dict, loss_function, metric_list):
                     input_objects[j]
                 )
 
+            print(curr_layer_name)
+            print(layer_name_to_object[curr_layer_name])
+            print(input_objects)
+            print('\n\n')
             layer_name_to_object[curr_layer_name] = (
                 layer_name_to_object[curr_layer_name](input_objects)
             )
