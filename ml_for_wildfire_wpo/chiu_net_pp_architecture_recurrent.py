@@ -121,6 +121,28 @@ class AddSecondLastAxisLayer(Layer):
         return cls(**config)
 
 
+class FeedPredictionsBackLayer(Layer):
+    def __init__(self, time_index, **kwargs):
+        super(FeedPredictionsBackLayer, self).__init__(**kwargs)
+        self.time_index = time_index
+
+    def call(self, inputs):
+        return tensorflow.concat([
+            inputs[0][..., :self.time_index, :],
+            inputs[1],
+            inputs[0][..., (self.time_index + 1):, :],
+        ],
+        axis=-2)
+
+    def get_config(self):
+        base_config = super(FeedPredictionsBackLayer, self).get_config()
+        return base_config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
+
+
 def _get_channel_counts_for_skip_cnxn(
         current_channel_counts, num_output_channels):
     """Determines number of channels for each input layer to skip connection.
@@ -754,17 +776,14 @@ def _construct_recurrent_model(
         this_name = 'feed_outputs_back_{0:d}days'.format(
             model_lead_times_days[i]
         )
-        new_input_layer_object = layer_name_to_object['lagged_target_inputs']
-
-        new_input_layer_object = keras.layers.Concatenate(
-            name=this_name, axis=-2
-        )([
-            new_input_layer_object[..., :j, :],
-            this_layer_object,
-            new_input_layer_object[..., (j + 1):, :]
+        feed_back_layer_object = FeedPredictionsBackLayer(
+            time_index=j, name=this_name
+        )
+        layer_name_to_object['lagged_target_inputs'] = feed_back_layer_object([
+            layer_name_to_object['lagged_target_inputs'],
+            this_layer_object
         ])
 
-        layer_name_to_object['lagged_target_inputs'] = new_input_layer_object
         print(layer_name_to_object['lagged_target_inputs'])
 
         output_layer_objects.append(
