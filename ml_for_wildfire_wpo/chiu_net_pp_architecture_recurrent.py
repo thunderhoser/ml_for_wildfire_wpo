@@ -4,7 +4,7 @@ The 'recurrent' part means that the network predicts multiple time steps.  For
 predicting the (k + 1)th time step, the network's prediction at the (k)th time
 step is used as an input, i.e., a predictor.
 """
-import copy
+
 import os
 import sys
 import time
@@ -89,31 +89,15 @@ class RemoveTimeDimLayer(Layer):
         return cls(**config)
 
 
-class AverageOverFinalAxisLayer(Layer):
+class EnsembleMeanLayer(Layer):
     def __init__(self, **kwargs):
-        super(AverageOverFinalAxisLayer, self).__init__(**kwargs)
+        super(EnsembleMeanLayer, self).__init__(**kwargs)
 
     def call(self, inputs):
         return tensorflow.reduce_mean(inputs, axis=-1)
 
     def get_config(self):
-        base_config = super(AverageOverFinalAxisLayer, self).get_config()
-        return base_config
-
-    @classmethod
-    def from_config(cls, config):
-        return cls(**config)
-
-
-class AddSecondLastAxisLayer(Layer):
-    def __init__(self, **kwargs):
-        super(AddSecondLastAxisLayer, self).__init__(**kwargs)
-
-    def call(self, inputs):
-        return tensorflow.expand_dims(inputs, axis=-2)
-
-    def get_config(self):
-        base_config = super(AddSecondLastAxisLayer, self).get_config()
+        base_config = super(EnsembleMeanLayer, self).get_config()
         return base_config
 
     @classmethod
@@ -129,13 +113,13 @@ class FeedPredictionsBackLayer(Layer):
     def call(self, inputs):
         return tensorflow.concat([
             inputs[0][..., :self.time_index, :],
-            inputs[1],
+            tensorflow.expand_dims(inputs[1], axis=-2),
             inputs[0][..., (self.time_index + 1):, :],
-        ],
-        axis=-2)
+        ], axis=-2)
 
     def get_config(self):
         base_config = super(FeedPredictionsBackLayer, self).get_config()
+        base_config.update({'time_index': self.time_index})
         return base_config
 
     @classmethod
@@ -733,10 +717,6 @@ def _construct_recurrent_model(
     # network outputs, before they are fed back in as predictors for the next
     # time step.
 
-    # model_function = globals()['_construct_basic_model']
-    # model_function = _construct_basic_model
-
-    # TODO(thunderhoser): Ugh, I don't know if copying layers is a good idea.
     this_layer_object = _construct_basic_model(
         layer_names=layer_names,
         layer_name_to_input_layer_names=layer_name_to_input_layer_names,
@@ -744,10 +724,7 @@ def _construct_recurrent_model(
     )
     output_layer_objects = [this_layer_object]
 
-    print('FOO')
-
     for i in range(1, len(model_lead_times_days)):
-        print(i)
         prev_output_layer_object = output_layer_objects[i - 1]
 
         if use_evidential_nn:
@@ -756,26 +733,20 @@ def _construct_recurrent_model(
             this_name = 'take_ens_mean_{0:d}days'.format(
                 model_lead_times_days[i]
             )
-            average_layer_object = AverageOverFinalAxisLayer(name=this_name)
-            this_layer_object = average_layer_object(
+            ensemble_mean_layer_object = EnsembleMeanLayer(name=this_name)
+            this_layer_object = ensemble_mean_layer_object(
                 prev_output_layer_object
             )
         else:
             this_layer_object = prev_output_layer_object
 
-        this_name = 'add_laglead_axis_{0:d}days'.format(
+        this_name = 'feed_outputs_back_{0:d}days'.format(
             model_lead_times_days[i]
         )
-        expand_dims_layer_object = AddSecondLastAxisLayer(name=this_name)
-        this_layer_object = expand_dims_layer_object(this_layer_object)
-
         j = numpy.where(
             -1 * target_lag_times_in_predictors_days == model_lead_times_days[i]
         )[0][0]
 
-        this_name = 'feed_outputs_back_{0:d}days'.format(
-            model_lead_times_days[i]
-        )
         feed_back_layer_object = FeedPredictionsBackLayer(
             time_index=j, name=this_name
         )
@@ -783,8 +754,6 @@ def _construct_recurrent_model(
             layer_name_to_object['lagged_target_inputs'],
             this_layer_object
         ])
-
-        print(layer_name_to_object['lagged_target_inputs'])
 
         output_layer_objects.append(
             _construct_basic_model(
