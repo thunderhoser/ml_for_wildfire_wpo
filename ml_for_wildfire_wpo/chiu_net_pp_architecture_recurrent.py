@@ -4,7 +4,7 @@ The 'recurrent' part means that the network predicts multiple time steps.  For
 predicting the (k + 1)th time step, the network's prediction at the (k)th time
 step is used as an input, i.e., a predictor.
 """
-
+import copy
 import os
 import sys
 import time
@@ -608,6 +608,168 @@ def _combine_layer_lists(
         )
 
     return layer_names, layer_name_to_input_layer_names, layer_name_to_object
+
+
+def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
+                           layer_name_to_object):
+    """Constructs basic model, i.e., puts the layers together.
+
+    :param layer_names: See output doc for `_combine_layer_lists`.
+    :param layer_name_to_input_layer_names: Same.
+    :param layer_name_to_object: Same.
+    :return: output_layer_object: Output layer.
+    """
+
+    for curr_layer_name in layer_names:
+        input_layer_names = layer_name_to_input_layer_names[curr_layer_name]
+        if not isinstance(input_layer_names, list):
+            input_layer_names = [input_layer_names]
+
+        if len(input_layer_names) == 0:
+            continue
+
+        input_objects = [layer_name_to_object[n] for n in input_layer_names]
+
+        try:
+            if len(input_objects) == 1:
+                layer_name_to_object[curr_layer_name] = (
+                    layer_name_to_object[curr_layer_name](input_objects[0])
+                )
+            else:
+                layer_name_to_object[curr_layer_name] = (
+                    layer_name_to_object[curr_layer_name](input_objects)
+                )
+
+            continue
+        except:
+            pass
+
+        input_pixel_counts = numpy.array(
+            [l.shape[1] * l.shape[2] for l in input_objects],
+            dtype=int
+        )
+        target_layer_index = numpy.argmax(input_pixel_counts)
+
+        for j in range(len(input_objects)):
+            if j == target_layer_index:
+                continue
+
+            input_objects[j] = _pad_2d_layer(
+                source_layer_object=input_objects[j],
+                target_layer_object=input_objects[target_layer_index],
+                padding_layer_name='padding_{0:.7f}'.format(time.time())
+            )
+
+            layer_name_to_object[input_layer_names[j]] = (
+                input_objects[j]
+            )
+
+        layer_name_to_object[curr_layer_name] = (
+            layer_name_to_object[curr_layer_name](input_objects)
+        )
+
+    return layer_name_to_object[layer_names[-1]]
+
+
+def _construct_recurrent_model(
+        layer_names, layer_name_to_input_layer_names, layer_name_to_object,
+        model_lead_times_days, target_lag_times_in_predictors_days,
+        ensemble_size, use_evidential_nn):
+    """Constructs recurrent model, i.e., puts the layers together.
+
+    :param layer_names: See output doc for `_combine_layer_lists`.
+    :param layer_name_to_input_layer_names: Same.
+    :param layer_name_to_object: Same.
+    :param model_lead_times_days: 1-D numpy array of model lead times.
+    :param target_lag_times_in_predictors_days: 1-D numpy array of target lag
+        times used in predictors, in the order that they appear in the relevant
+        input tensor.  Lead times can be encoded as negative lag times.  For
+        example, if the input tensor includes lag times of {3, 2, 1} days
+        followed by lead times of {1, 2, 3} days, this array should be
+        [3, 2, 1, -1, -2, -3].
+    :param ensemble_size: Ensemble size for network outputs.
+    :param use_evidential_nn: Boolean flag, indicating whether or not the
+        network is evidential.
+    :return: output_layer_objects: 1-D list of output layers.
+    """
+    
+    # TODO(thunderhoser): Make this work for evidential NNs (low priority,
+    # since evidential NNs appear to perform poorly for this problem in
+    # general).
+    
+    # TODO(thunderhoser): Figure out the best normalization approach with
+    # recurrence.  The best approach is probably either (1) normalize the
+    # target variables everywhere, including where they appear as predictors or
+    # as the network output; or (2) do not normalize the target variables
+    # anywhere.  Any other approach will require on-the-fly normalization of
+    # network outputs, before they are fed back in as predictors for the next
+    # time step.
+
+    # model_function = globals()['_construct_basic_model']
+    # model_function = _construct_basic_model
+
+    # TODO(thunderhoser): Ugh, I don't know if copying layers is a good idea.
+    this_layer_object = _construct_basic_model(
+        layer_names=layer_names,
+        layer_name_to_input_layer_names=layer_name_to_input_layer_names,
+        layer_name_to_object=copy.deepcopy(layer_name_to_object)
+    )
+    output_layer_objects = [this_layer_object]
+
+    print('FOO')
+
+    for i in range(1, len(model_lead_times_days)):
+        print(i)
+        prev_output_layer_object = output_layer_objects[i - 1]
+
+        if use_evidential_nn:
+            raise ValueError()
+        elif ensemble_size > 1:
+            this_name = 'take_ens_mean_{0:d}days'.format(
+                model_lead_times_days[i]
+            )
+            average_layer_object = AverageOverFinalAxisLayer(name=this_name)
+            this_layer_object = average_layer_object(
+                prev_output_layer_object
+            )
+        else:
+            this_layer_object = prev_output_layer_object
+
+        this_name = 'add_laglead_axis_{0:d}days'.format(
+            model_lead_times_days[i]
+        )
+        expand_dims_layer_object = AddSecondLastAxisLayer(name=this_name)
+        this_layer_object = expand_dims_layer_object(this_layer_object)
+
+        j = numpy.where(
+            -1 * target_lag_times_in_predictors_days == model_lead_times_days[i]
+        )[0][0]
+
+        this_name = 'feed_outputs_back_{0:d}days'.format(
+            model_lead_times_days[i]
+        )
+        new_input_layer_object = layer_name_to_object['lagged_target_inputs']
+
+        new_input_layer_object = keras.layers.Concatenate(
+            name=this_name, axis=-2
+        )([
+            new_input_layer_object[..., :j, :],
+            this_layer_object,
+            new_input_layer_object[..., (j + 1):, :]
+        ])
+
+        layer_name_to_object['lagged_target_inputs'] = new_input_layer_object
+        print(layer_name_to_object['lagged_target_inputs'])
+
+        output_layer_objects.append(
+            _construct_basic_model(
+                layer_names=layer_names,
+                layer_name_to_input_layer_names=layer_name_to_input_layer_names,
+                layer_name_to_object=copy.deepcopy(layer_name_to_object)
+            )
+        )
+
+    return output_layer_objects
 
 
 def create_model(option_dict, loss_function, metric_list):
@@ -1534,125 +1696,9 @@ def create_model(option_dict, loss_function, metric_list):
         layer_name_to_object[this_name] = add_layer_object
         layer_names.append(this_name)
 
-    def construct_basic_model():
-        """Constructs basic model, i.e., puts the layers together.
-
-        :return: output_layer_object: Output layer.
-        """
-        
-        # TODO(thunderhoser): This method probably needs input args.
-        for curr_layer_name in layer_names:
-            input_layer_names = layer_name_to_input_layer_names[curr_layer_name]
-            if not isinstance(input_layer_names, list):
-                input_layer_names = [input_layer_names]
-
-            if len(input_layer_names) == 0:
-                continue
-
-            input_objects = [layer_name_to_object[n] for n in input_layer_names]
-
-            try:
-                if len(input_objects) == 1:
-                    layer_name_to_object[curr_layer_name] = (
-                        layer_name_to_object[curr_layer_name](input_objects[0])
-                    )
-                else:
-                    layer_name_to_object[curr_layer_name] = (
-                        layer_name_to_object[curr_layer_name](input_objects)
-                    )
-
-                continue
-            except:
-                pass
-
-            input_pixel_counts = numpy.array(
-                [l.shape[1] * l.shape[2] for l in input_objects],
-                dtype=int
-            )
-            target_layer_index = numpy.argmax(input_pixel_counts)
-
-            for j in range(len(input_objects)):
-                if j == target_layer_index:
-                    continue
-
-                input_objects[j] = _pad_2d_layer(
-                    source_layer_object=input_objects[j],
-                    target_layer_object=input_objects[target_layer_index],
-                    padding_layer_name='padding_{0:.7f}'.format(time.time())
-                )
-
-                layer_name_to_object[input_layer_names[j]] = (
-                    input_objects[j]
-                )
-
-            print(curr_layer_name)
-            print(layer_name_to_object[curr_layer_name])
-            print(input_objects)
-            print('\n\n')
-            layer_name_to_object[curr_layer_name] = (
-                layer_name_to_object[curr_layer_name](input_objects)
-            )
-
-        return layer_name_to_object[layer_names[-1]]
-
     # TODO(thunderhoser): These should be input args.
     model_lead_times_days = numpy.array([1, 2], dtype=int)
-    target_lag_times_days = numpy.array([3, 2, 1, -1, -2, -3], dtype=int)
-
-    def construct_recurrent_model():
-        """Constructs recurrent model, i.e., puts the layers together.
-
-        :return: output_layer_objects: 1-D list of output layers.
-        """
-
-        output_layer_objects = []
-        # model_function = globals()['construct_basic_model']
-        model_function = construct_basic_model
-        output_layer_objects.append(model_function())
-        print('FOO')
-
-        for i in range(1, len(model_lead_times_days)):
-            print(i)
-            prev_output_layer_object = output_layer_objects[i - 1]
-
-            if use_evidential_nn:
-                raise ValueError()
-            elif ensemble_size > 1:
-                this_name = 'take_ens_mean_{0:d}days'.format(
-                    model_lead_times_days[i]
-                )
-                average_layer_object = AverageOverFinalAxisLayer(name=this_name)
-                this_layer_object = average_layer_object(
-                    prev_output_layer_object
-                )
-            else:
-                this_layer_object = prev_output_layer_object
-
-            this_name = 'add_laglead_axis_{0:d}days'.format(
-                model_lead_times_days[i]
-            )
-            expand_dims_layer_object = AddSecondLastAxisLayer(name=this_name)
-            this_layer_object = expand_dims_layer_object(this_layer_object)
-
-            j = numpy.where(
-                -1 * target_lag_times_days == model_lead_times_days[i]
-            )[0][0]
-
-            this_name = 'feed_outputs_back_{0:d}days'.format(
-                model_lead_times_days[i]
-            )
-
-            # TODO(thunderhoser): I don't know if replacing this "global" variable is going to work.
-            layer_name_to_object['lagged_target_inputs'] = keras.layers.Concatenate(name=this_name, axis=-2)([
-                input_layer_object_lagged_target[..., :j, :],
-                this_layer_object,
-                input_layer_object_lagged_target[..., (j + 1):, :]
-            ])
-            print(layer_name_to_object['lagged_target_inputs'])
-
-            output_layer_objects.append(model_function())
-
-        return output_layer_objects
+    target_lag_times_in_predictors_days = numpy.array([3, 2, 1, -1, -2, -3], dtype=int)
 
     input_layer_objects = [
         l for l in [
@@ -1662,9 +1708,18 @@ def create_model(option_dict, loss_function, metric_list):
         ] if l is not None
     ]
 
+    output_layer_objects = _construct_recurrent_model(
+        layer_names=layer_names,
+        layer_name_to_input_layer_names=layer_name_to_input_layer_names,
+        layer_name_to_object=layer_name_to_object,
+        model_lead_times_days=model_lead_times_days,
+        target_lag_times_in_predictors_days=target_lag_times_in_predictors_days,
+        ensemble_size=ensemble_size,
+        use_evidential_nn=use_evidential_nn
+    )
+
     model_object = keras.models.Model(
-        inputs=input_layer_objects,
-        outputs=construct_recurrent_model()
+        inputs=input_layer_objects, outputs=output_layer_objects
     )
 
     model_object.compile(
