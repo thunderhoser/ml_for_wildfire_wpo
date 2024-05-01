@@ -1461,11 +1461,6 @@ def data_generator(option_dict):
             for m in target_matrix_by_model_lead
         ]
 
-        # TODO(thunderhoser): HAAAAAACK
-        target_matrix_with_weights = numpy.concatenate(
-            target_matrix_with_weights_by_model_lead, axis=0
-        )
-
         predictor_matrices = {}
         if gfs_predictor_matrix_3d is not None:
             predictor_matrices.update({
@@ -1490,6 +1485,11 @@ def data_generator(option_dict):
                     baseline_prediction_matrix.astype('float32')
             })
 
+        target_matrices = {}
+        for k in range(len(model_lead_times_days)):
+            this_key = 'final_output_step{0:d}'.format(k)
+            target_matrices[this_key] = target_matrix_with_weights_by_model_lead[k]
+
         print((
             'Shape of target matrix (including weights as last channel): {0:s}'
         ).format(
@@ -1504,15 +1504,13 @@ def data_generator(option_dict):
         # predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
 
-        # if len(model_lead_times_days) > 1:
-        #     yield predictor_matrices, target_matrix_with_weights_by_model_lead
-        # else:
-        #     yield (
-        #         predictor_matrices,
-        #         target_matrix_with_weights_by_model_lead[0]
-        #     )
-
-        yield predictor_matrices, target_matrix_with_weights
+        if len(model_lead_times_days) > 1:
+            yield predictor_matrices, target_matrices
+        else:
+            yield (
+                predictor_matrices,
+                target_matrix_with_weights_by_model_lead[0]
+            )
 
 
 def create_data(option_dict, init_date_string):
