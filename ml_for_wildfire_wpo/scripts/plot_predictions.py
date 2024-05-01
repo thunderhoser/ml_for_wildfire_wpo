@@ -159,11 +159,10 @@ def _find_lead_time(prediction_file_name_by_model):
         mmd = neural_net.read_metafile(model_metafile_name)
         training_option_dict = mmd[neural_net.TRAINING_OPTIONS_KEY]
 
-        if neural_net.TARGET_LEAD_TIME_KEY not in training_option_dict:
-            continue
+        assert len(training_option_dict[neural_net.MODEL_LEAD_TIMES_KEY]) == 1
 
         this_lead_time_days = (
-            training_option_dict[neural_net.TARGET_LEAD_TIME_KEY]
+            training_option_dict[neural_net.MODEL_LEAD_TIMES_KEY][0]
         )
         if lead_time_days is None:
             lead_time_days = this_lead_time_days + 0
@@ -238,9 +237,18 @@ def _plot_predictions_one_model(
         )
 
         bad_flag_matrix = numpy.logical_and(
-            latitude_matrix_deg_n > 49.,
-            longitude_matrix_deg_e > 220.
+            latitude_matrix_deg_n > 50.,
+            longitude_matrix_deg_e > 221.
         )
+        weight_matrix[bad_flag_matrix] = -1.
+
+        bad_flag_matrix = numpy.logical_and(
+            latitude_matrix_deg_n > 59.5,
+            longitude_matrix_deg_e < 192.
+        )
+        weight_matrix[bad_flag_matrix] = -1.
+
+        bad_flag_matrix = latitude_matrix_deg_n < 23.5
         weight_matrix[bad_flag_matrix] = -1.
 
         # full_prediction_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = (
@@ -322,6 +330,9 @@ def _plot_predictions_one_model(
 
             this_prediction_matrix = numpy.percentile(
                 full_prediction_matrix, this_percentile, axis=-1
+            )
+            this_prediction_matrix[weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW] = (
+                numpy.nan
             )
 
             _plot_one_field(
@@ -636,9 +647,9 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
 
     # Check other input args.
     if len(ensemble_percentiles) == 1 and ensemble_percentiles[0] < 0:
-        ensemble_percentiles = None
+        ensemble_percentiles = numpy.array([])
 
-    if ensemble_percentiles is not None:
+    if len(ensemble_percentiles) > 0:
         error_checking.assert_is_geq_numpy_array(ensemble_percentiles, 0.)
         error_checking.assert_is_leq_numpy_array(ensemble_percentiles, 100.)
 
@@ -707,9 +718,18 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
                 )
 
                 bad_flag_matrix = numpy.logical_and(
-                    latitude_matrix_deg_n > 49.,
-                    longitude_matrix_deg_e > 220.
+                    latitude_matrix_deg_n > 50.,
+                    longitude_matrix_deg_e > 221.
                 )
+                this_weight_matrix[bad_flag_matrix] = -1.
+
+                bad_flag_matrix = numpy.logical_and(
+                    latitude_matrix_deg_n > 59.5,
+                    longitude_matrix_deg_e < 192.
+                )
+                this_weight_matrix[bad_flag_matrix] = -1.
+
+                bad_flag_matrix = latitude_matrix_deg_n < 23.5
                 this_weight_matrix[bad_flag_matrix] = -1.
 
                 this_pred_matrix[
@@ -753,7 +773,7 @@ if __name__ == '__main__':
             INPUT_ARG_OBJECT, MODEL_DESCRIPTIONS_ARG_NAME
         ),
         ensemble_percentiles=numpy.array(
-            getattr(INPUT_ARG_OBJECT, MODEL_DESCRIPTIONS_ARG_NAME),
+            getattr(INPUT_ARG_OBJECT, ENSEMBLE_PERCENTILES_ARG_NAME),
             dtype=float
         ),
         field_names=getattr(INPUT_ARG_OBJECT, FIELDS_ARG_NAME),
