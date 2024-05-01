@@ -644,29 +644,29 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
         except:
             pass
 
-        input_pixel_counts = numpy.array(
-            [l.shape[1] * l.shape[2] for l in input_objects],
-            dtype=int
-        )
-        target_layer_index = numpy.argmax(input_pixel_counts)
-
-        for j in range(len(input_objects)):
-            if j == target_layer_index:
-                continue
-
-            input_objects[j] = _pad_2d_layer(
-                source_layer_object=input_objects[j],
-                target_layer_object=input_objects[target_layer_index],
-                padding_layer_name='padding_{0:.7f}'.format(time.time())
-            )
-
-            layer_name_to_object[input_layer_names[j]] = (
-                input_objects[j]
-            )
-
-        layer_name_to_object[curr_layer_name] = (
-            layer_name_to_object[curr_layer_name](input_objects)
-        )
+        # input_pixel_counts = numpy.array(
+        #     [l.shape[1] * l.shape[2] for l in input_objects],
+        #     dtype=int
+        # )
+        # target_layer_index = numpy.argmax(input_pixel_counts)
+        #
+        # for j in range(len(input_objects)):
+        #     if j == target_layer_index:
+        #         continue
+        #
+        #     input_objects[j] = _pad_2d_layer(
+        #         source_layer_object=input_objects[j],
+        #         target_layer_object=input_objects[target_layer_index],
+        #         padding_layer_name='padding_{0:.7f}'.format(time.time())
+        #     )
+        #
+        #     layer_name_to_object[input_layer_names[j]] = (
+        #         input_objects[j]
+        #     )
+        #
+        # layer_name_to_object[curr_layer_name] = (
+        #     layer_name_to_object[curr_layer_name](input_objects)
+        # )
 
     if ensemble_size > 1:
         this_name = 'take_ens_mean_step{0:d}'.format(integration_step + 1)
@@ -1387,6 +1387,40 @@ def create_model(option_dict, loss_function, metric_list):
                 upsampling_layer_object
             )
             layer_names.append(upsampling_layer_name)
+
+            # TODO: Do padding here!
+            if i_new == 0 or i_new == 3:
+                this_name = 'block{0:d}-{1:d}_padding'.format(i_new, j)
+                padding_arg = ((0, 1), (0, 1))
+                padding_layer_object = keras.layers.ZeroPadding2D(
+                    padding=padding_arg, name=this_name
+                )
+
+                layer_name_to_input_layer_names[this_name] = (
+                    upsampling_layer_name
+                )
+                layer_name_to_object[this_name] = padding_layer_object
+                layer_names.append(this_name)
+
+                upsampling_layer_name = 'block{0:d}-{1:d}_padding'.format(
+                    i_new, j
+                )
+            elif i_new == 4:
+                this_name = 'block{0:d}-{1:d}_padding'.format(i_new, j)
+                padding_arg = ((0, 0), (0, 1))
+                padding_layer_object = keras.layers.ZeroPadding2D(
+                    padding=padding_arg, name=this_name
+                )
+
+                layer_name_to_input_layer_names[this_name] = (
+                    upsampling_layer_name
+                )
+                layer_name_to_object[this_name] = padding_layer_object
+                layer_names.append(this_name)
+
+                upsampling_layer_name = 'block{0:d}-{1:d}_padding'.format(
+                    i_new, j
+                )
 
             this_num_channels = int(numpy.round(
                 0.5 * decoder_num_channels_by_level[i_new]
