@@ -93,41 +93,11 @@ class EnsembleMeanLayer(Layer):
     def __init__(self, **kwargs):
         super(EnsembleMeanLayer, self).__init__(**kwargs)
 
-    def build(self, input_shape):
-        # No weights to be defined in this case
-        pass
-
     def call(self, inputs):
         return tensorflow.reduce_mean(inputs, axis=-1)
 
-    def compute_output_shape(self, input_shape):
-        # Output shape is the same as input shape
-        return input_shape
-
     def get_config(self):
         base_config = super(EnsembleMeanLayer, self).get_config()
-        return base_config
-
-    @classmethod
-    def from_config(cls, config):
-        return cls(**config)
-
-
-class FeedPredictionsBackLayer(Layer):
-    def __init__(self, time_index, **kwargs):
-        super(FeedPredictionsBackLayer, self).__init__(**kwargs)
-        self.time_index = time_index
-
-    def call(self, inputs):
-        return tensorflow.concat([
-            inputs[0][..., :self.time_index, :],
-            tensorflow.expand_dims(inputs[1], axis=-2),
-            inputs[0][..., (self.time_index + 1):, :],
-        ], axis=-2)
-
-    def get_config(self):
-        base_config = super(FeedPredictionsBackLayer, self).get_config()
-        base_config.update({'time_index': self.time_index})
         return base_config
 
     @classmethod
