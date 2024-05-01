@@ -93,8 +93,15 @@ class EnsembleMeanLayer(Layer):
     def __init__(self, **kwargs):
         super(EnsembleMeanLayer, self).__init__(**kwargs)
 
+    def build(self, input_shape):
+        # No weights to be defined in this case
+        pass
+
     def call(self, inputs):
         return tensorflow.reduce_mean(inputs, axis=-1)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape[..., 0]
 
     def get_config(self):
         base_config = super(EnsembleMeanLayer, self).get_config()
