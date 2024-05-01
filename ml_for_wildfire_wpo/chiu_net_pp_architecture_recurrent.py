@@ -718,9 +718,7 @@ def _construct_recurrent_model(
             this_name = 'take_ens_mean_{0:d}days'.format(
                 model_lead_times_days[i]
             )
-            ensemble_mean_layer_object = EnsembleMeanLayer(name=this_name)
-            print(ensemble_mean_layer_object)
-            this_layer_object = ensemble_mean_layer_object(
+            this_layer_object = EnsembleMeanLayer(name=this_name)(
                 prev_output_layer_object
             )
             print(this_layer_object)
