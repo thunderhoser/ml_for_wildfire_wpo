@@ -2093,9 +2093,12 @@ def read_model(hdf5_file_name):
     )
     metadata_dict = read_metafile(metafile_name)
 
+    import chiu_net_pp_architecture_recurrent
+
     print(metadata_dict[LOSS_FUNCTION_KEY])
     custom_object_dict = {
-        'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
+        'loss': eval(metadata_dict[LOSS_FUNCTION_KEY]),
+        'take_ens_mean_2days': chiu_net_pp_architecture_recurrent.EnsembleMeanLayer
     }
     model_object = load_model(
         hdf5_file_name, custom_objects=custom_object_dict, compile=False
