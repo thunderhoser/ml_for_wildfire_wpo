@@ -89,6 +89,38 @@ class RemoveTimeDimLayer(Layer):
         return cls(**config)
 
 
+class AverageOverFinalAxisLayer(Layer):
+    def __init__(self, **kwargs):
+        super(AverageOverFinalAxisLayer, self).__init__(**kwargs)
+
+    def call(self, inputs):
+        return tensorflow.reduce_mean(inputs, axis=-1)
+
+    def get_config(self):
+        base_config = super(AverageOverFinalAxisLayer, self).get_config()
+        return base_config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
+
+
+class AddSecondLastAxisLayer(Layer):
+    def __init__(self, **kwargs):
+        super(AddSecondLastAxisLayer, self).__init__(**kwargs)
+
+    def call(self, inputs):
+        return tensorflow.expand_dims(inputs, axis=-2)
+
+    def get_config(self):
+        base_config = super(AddSecondLastAxisLayer, self).get_config()
+        return base_config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)
+
+
 def _get_channel_counts_for_skip_cnxn(
         current_channel_counts, num_output_channels):
     """Determines number of channels for each input layer to skip connection.
@@ -535,15 +567,32 @@ def _pad_2d_layer(source_layer_object, target_layer_object, padding_layer_name):
     return source_layer_object
 
 
-def _update_layer_lists(
+def _combine_layer_lists(
         layer_name_lists, layer_name_to_input_dicts,
         layer_name_to_object_dicts):
-    """Updates layer lists.
+    """Combines layer lists.
 
-    :return:
+    S = number of layer sets
+
+    :param layer_name_lists: length-S list, where the element
+        layer_name_lists[i] is a 1-D list of layer names for the [i]th set.
+    :param layer_name_to_input_dicts: length-S list, where the element
+        layer_name_to_input_dicts[i] is a dictionary for the [i]th set,
+        such that each key is a string from layer_name_lists[i] and the
+        corresponding value is a list of strings -- also from
+        layer_name_lists[i] -- indicating the inputs to said layer.
+    :param layer_name_to_object_dicts: length-S list, where the element
+        layer_name_to_object_dicts[i] is a dictionary for the [i]th set,
+        such that each key is a string from layer_name_lists[i] and the
+        corresponding value is the layer object.
+    :return: layer_names: A single 1-D list of layer names.
+    :return: layer_name_to_input_layer_names: A single dictionary, where each
+        key is a string from layer_names and the corresponding value is a list
+        of strings -- also from layer_names -- indicating the inputs to said
+        layer.
+    :return: layer_name_to_object: A single dictionary, where each key is a
+        string from layer_names and the corresponding value is the layer object.
     """
-
-    # TODO(thunderhoser): Add proper documentation.
 
     layer_names = layer_name_lists[0]
     layer_name_to_input_layer_names = layer_name_to_input_dicts[0]
@@ -658,7 +707,6 @@ def create_model(option_dict, loss_function, metric_list):
             name=this_name
         )
 
-        # TODO(thunderhoser): Make sure I don't fuck this up.
         layer_name_to_input_layer_names[this_name] = []
         layer_name_to_object[this_name] = input_layer_object_gfs_3d
         layer_names.append(this_name)
@@ -704,7 +752,6 @@ def create_model(option_dict, loss_function, metric_list):
             name=this_name
         )
 
-        # TODO(thunderhoser): Make sure I don't fuck this up.
         layer_name_to_input_layer_names[this_name] = []
         layer_name_to_object[this_name] = input_layer_object_gfs_2d
         layer_names.append(this_name)
@@ -747,7 +794,6 @@ def create_model(option_dict, loss_function, metric_list):
         name=this_name
     )
 
-    # TODO(thunderhoser): Make sure I don't fuck this up.
     layer_name_to_input_layer_names[this_name] = []
     layer_name_to_object[this_name] = input_layer_object_lagged_target
     layer_names.append(this_name)
@@ -773,7 +819,6 @@ def create_model(option_dict, loss_function, metric_list):
             name=this_name
         )
 
-        # TODO(thunderhoser): Make sure I don't fuck this up.
         layer_name_to_input_layer_names[this_name] = []
         layer_name_to_object[this_name] = input_layer_object_predn_baseline
         layer_names.append(this_name)
@@ -790,7 +835,6 @@ def create_model(option_dict, loss_function, metric_list):
             name=this_name
         )
 
-        # TODO(thunderhoser): Make sure I don't fuck this up.
         layer_name_to_input_layer_names[this_name] = []
         layer_name_to_object[this_name] = input_layer_object_era5
         layer_names.append(this_name)
@@ -896,7 +940,7 @@ def create_model(option_dict, loss_function, metric_list):
             layer_names,
             layer_name_to_input_layer_names,
             layer_name_to_object
-        ) = _update_layer_lists(
+        ) = _combine_layer_lists(
             layer_name_lists=[layer_names, new_layer_names],
             layer_name_to_input_dicts=[
                 layer_name_to_input_layer_names,
@@ -942,7 +986,7 @@ def create_model(option_dict, loss_function, metric_list):
                 layer_names,
                 layer_name_to_input_layer_names,
                 layer_name_to_object
-            ) = _update_layer_lists(
+            ) = _combine_layer_lists(
                 layer_name_lists=[layer_names, new_layer_names],
                 layer_name_to_input_dicts=[
                     layer_name_to_input_layer_names,
@@ -985,7 +1029,7 @@ def create_model(option_dict, loss_function, metric_list):
                 layer_names,
                 layer_name_to_input_layer_names,
                 layer_name_to_object
-            ) = _update_layer_lists(
+            ) = _combine_layer_lists(
                 layer_name_lists=[layer_names, new_layer_names],
                 layer_name_to_input_dicts=[
                     layer_name_to_input_layer_names,
@@ -1055,7 +1099,7 @@ def create_model(option_dict, loss_function, metric_list):
             layer_names,
             layer_name_to_input_layer_names,
             layer_name_to_object
-        ) = _update_layer_lists(
+        ) = _combine_layer_lists(
             layer_name_lists=[layer_names, new_layer_names],
             layer_name_to_input_dicts=[
                 layer_name_to_input_layer_names,
@@ -1101,7 +1145,7 @@ def create_model(option_dict, loss_function, metric_list):
                 layer_names,
                 layer_name_to_input_layer_names,
                 layer_name_to_object
-            ) = _update_layer_lists(
+            ) = _combine_layer_lists(
                 layer_name_lists=[layer_names, new_layer_names],
                 layer_name_to_input_dicts=[
                     layer_name_to_input_layer_names,
@@ -1144,7 +1188,7 @@ def create_model(option_dict, loss_function, metric_list):
                 layer_names,
                 layer_name_to_input_layer_names,
                 layer_name_to_object
-            ) = _update_layer_lists(
+            ) = _combine_layer_lists(
                 layer_name_lists=[layer_names, new_layer_names],
                 layer_name_to_input_dicts=[
                     layer_name_to_input_layer_names,
@@ -1254,7 +1298,7 @@ def create_model(option_dict, loss_function, metric_list):
                 layer_names,
                 layer_name_to_input_layer_names,
                 layer_name_to_object
-            ) = _update_layer_lists(
+            ) = _combine_layer_lists(
                 layer_name_lists=[layer_names, new_layer_names],
                 layer_name_to_input_dicts=[
                     layer_name_to_input_layer_names,
@@ -1286,7 +1330,7 @@ def create_model(option_dict, loss_function, metric_list):
                 layer_names,
                 layer_name_to_input_layer_names,
                 layer_name_to_object
-            ) = _update_layer_lists(
+            ) = _combine_layer_lists(
                 layer_name_lists=[layer_names, new_layer_names],
                 layer_name_to_input_dicts=[
                     layer_name_to_input_layer_names,
@@ -1323,7 +1367,7 @@ def create_model(option_dict, loss_function, metric_list):
                 layer_names,
                 layer_name_to_input_layer_names,
                 layer_name_to_object
-            ) = _update_layer_lists(
+            ) = _combine_layer_lists(
                 layer_name_lists=[layer_names, new_layer_names],
                 layer_name_to_input_dicts=[
                     layer_name_to_input_layer_names,
@@ -1361,7 +1405,7 @@ def create_model(option_dict, loss_function, metric_list):
             layer_names,
             layer_name_to_input_layer_names,
             layer_name_to_object
-        ) = _update_layer_lists(
+        ) = _combine_layer_lists(
             layer_name_lists=[layer_names, new_layer_names],
             layer_name_to_input_dicts=[
                 layer_name_to_input_layer_names,
@@ -1396,7 +1440,7 @@ def create_model(option_dict, loss_function, metric_list):
         layer_names,
         layer_name_to_input_layer_names,
         layer_name_to_object
-    ) = _update_layer_lists(
+    ) = _combine_layer_lists(
         layer_name_lists=[layer_names, new_layer_names],
         layer_name_to_input_dicts=[
             layer_name_to_input_layer_names,
@@ -1490,8 +1534,8 @@ def create_model(option_dict, loss_function, metric_list):
         layer_name_to_object[this_name] = add_layer_object
         layer_names.append(this_name)
 
-    def construct_model():
-        """Puts the layers together.
+    def construct_basic_model():
+        """Constructs basic model, i.e., puts the layers together.
 
         :return: output_layer_object: Output layer.
         """
@@ -1547,6 +1591,61 @@ def create_model(option_dict, loss_function, metric_list):
 
         return layer_name_to_object[layer_names[-1]]
 
+    # TODO(thunderhoser): These should be input args.
+    model_lead_times_days = numpy.array([1, 2], dtype=int)
+    target_lag_times_days = numpy.array([3, 2, 1, -1, -2, -3], dtype=int)
+
+    def construct_recurrent_model():
+        """Constructs recurrent model, i.e., puts the layers together.
+
+        :return: output_layer_objects: 1-D list of output layers.
+        """
+
+        output_layer_objects = []
+        model_function = globals()['construct_basic_model']
+        output_layer_objects.append(model_function())
+
+        for i in range(1, len(model_lead_times_days)):
+            prev_output_layer_object = output_layer_objects[i - 1]
+
+            if use_evidential_nn:
+                raise ValueError()
+            elif ensemble_size > 1:
+                this_name = 'take_ens_mean_{0:d}days'.format(
+                    model_lead_times_days[i]
+                )
+                average_layer_object = AverageOverFinalAxisLayer(name=this_name)
+                this_layer_object = average_layer_object(
+                    prev_output_layer_object
+                )
+            else:
+                this_layer_object = prev_output_layer_object
+
+            this_name = 'add_laglead_axis_{0:d}days'.format(
+                model_lead_times_days[i]
+            )
+            expand_dims_layer_object = AddSecondLastAxisLayer(name=this_name)
+            this_layer_object = expand_dims_layer_object(this_layer_object)
+
+            j = numpy.where(
+                -1 * target_lag_times_days == model_lead_times_days[i]
+            )[0][0]
+
+            this_name = 'feed_outputs_back_{0:d}days'.format(
+                model_lead_times_days[i]
+            )
+
+            # TODO(thunderhoser): I don't know if replacing this "global" variable is going to work.
+            layer_name_to_object['lagged_target_inputs'] = keras.layers.Concatenate(name=this_name, axis=-2)([
+                input_layer_object_lagged_target[..., :j, :],
+                this_layer_object,
+                input_layer_object_lagged_target[..., (j + 1):, :]
+            ])
+
+            output_layer_objects.append(model_function())
+
+        return output_layer_objects
+
     input_layer_objects = [
         l for l in [
             input_layer_object_gfs_3d, input_layer_object_gfs_2d,
@@ -1554,9 +1653,10 @@ def create_model(option_dict, loss_function, metric_list):
             input_layer_object_predn_baseline
         ] if l is not None
     ]
+
     model_object = keras.models.Model(
         inputs=input_layer_objects,
-        outputs=construct_model()
+        outputs=construct_recurrent_model()
     )
 
     model_object.compile(
