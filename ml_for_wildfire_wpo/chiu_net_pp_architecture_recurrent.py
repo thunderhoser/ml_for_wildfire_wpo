@@ -652,6 +652,10 @@ def _construct_recurrent_model(
         ensemble_size=ensemble_size,
         integration_step=0
     )
+
+    print(output_layer_objects[0])
+    this_name = 'final_output_step0'
+    output_layer_objects[0]._name = this_name
     print(output_layer_objects[0])
 
     for i in range(1, num_integration_steps):
@@ -669,6 +673,10 @@ def _construct_recurrent_model(
             ensemble_size=ensemble_size,
             integration_step=i
         )
+
+        print(output_layer_objects[i])
+        this_name = 'final_output_step{0:d}'.format(i)
+        output_layer_objects[i]._name = this_name
         print(output_layer_objects[i])
 
     return output_layer_objects
