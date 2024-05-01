@@ -602,7 +602,7 @@ def _combine_layer_lists(
 
 
 def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
-                           layer_name_to_object_immutable, take_ensemble_mean):
+                           layer_name_to_object_immutable):
     """Constructs basic model, i.e., puts the layers together.
 
     :param layer_names: See output doc for `_combine_layer_lists`.
@@ -618,14 +618,6 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
         )
 
     for curr_layer_name in layer_names:
-        if curr_layer_name == 'predn_baseline_inputs' and take_ensemble_mean:
-            print('FOOOOOOOOO')
-            print(layer_name_to_object[curr_layer_name])
-            layer_name_to_object[curr_layer_name] = EnsembleMeanLayer(name='take_ens_mean_2days')(layer_name_to_object[curr_layer_name])
-            print(layer_name_to_object[curr_layer_name])
-            print('\n\n')
-            continue
-
         input_layer_names = layer_name_to_input_layer_names[curr_layer_name]
         if not isinstance(input_layer_names, list):
             input_layer_names = [input_layer_names]
@@ -633,10 +625,7 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
         if len(input_layer_names) == 0:
             continue
 
-        print(curr_layer_name)
-        print(layer_name_to_object[curr_layer_name])
         input_objects = [layer_name_to_object[n] for n in input_layer_names]
-        print(input_objects)
 
         try:
             if len(input_objects) == 1:
@@ -648,8 +637,6 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
                     layer_name_to_object[curr_layer_name](input_objects)
                 )
 
-            print(layer_name_to_object[curr_layer_name])
-            print('\n\n')
             continue
         except:
             pass
@@ -718,45 +705,48 @@ def _construct_recurrent_model(
     this_layer_object = _construct_basic_model(
         layer_names=layer_names,
         layer_name_to_input_layer_names=layer_name_to_input_layer_names,
-        layer_name_to_object_immutable=layer_name_to_object,
-        take_ensemble_mean=False
+        layer_name_to_object_immutable=layer_name_to_object
     )
     output_layer_objects = [this_layer_object]
 
     for i in range(1, len(model_lead_times_days)):
         prev_output_layer_object = output_layer_objects[i - 1]
 
-        # if use_evidential_nn:
-        #     raise ValueError()
-        # elif ensemble_size > 1:
-        #     this_name = 'take_ens_mean_{0:d}days'.format(
-        #         model_lead_times_days[i]
-        #     )
-        #     this_layer_object = EnsembleMeanLayer(name=this_name)(
-        #         prev_output_layer_object
-        #     )
-        #     print(this_layer_object)
-        # else:
-        #     this_layer_object = prev_output_layer_object
-        #
-        # layer_name_to_object['predn_baseline_inputs'] = this_layer_object
-        #
-        # output_layer_objects.append(
-        #     _construct_basic_model(
-        #         layer_names=layer_names,
-        #         layer_name_to_input_layer_names=layer_name_to_input_layer_names,
-        #         layer_name_to_object_immutable=layer_name_to_object
-        #     )
-        # )
+        if use_evidential_nn:
+            raise ValueError()
+        elif ensemble_size > 1:
+            this_name = 'take_ens_mean_{0:d}days'.format(
+                model_lead_times_days[i]
+            )
+            this_layer_object = EnsembleMeanLayer(name=this_name)(
+                prev_output_layer_object
+            )
+            print(this_layer_object)
+        else:
+            this_layer_object = prev_output_layer_object
 
-        layer_name_to_object['predn_baseline_inputs'] = prev_output_layer_object
+        layer_name_to_object['predn_baseline_inputs'] = this_layer_object
+
+        # this_name = 'feed_outputs_back_{0:d}days'.format(
+        #     model_lead_times_days[i]
+        # )
+        # j = numpy.where(
+        #     -1 * target_lag_times_in_predictors_days == model_lead_times_days[i]
+        # )[0][0]
+        #
+        # feed_back_layer_object = FeedPredictionsBackLayer(
+        #     time_index=j, name=this_name
+        # )
+        # layer_name_to_object['lagged_target_inputs'] = feed_back_layer_object([
+        #     layer_name_to_object['lagged_target_inputs'],
+        #     this_layer_object
+        # ])
 
         output_layer_objects.append(
             _construct_basic_model(
                 layer_names=layer_names,
                 layer_name_to_input_layer_names=layer_name_to_input_layer_names,
-                layer_name_to_object_immutable=layer_name_to_object,
-                take_ensemble_mean=True
+                layer_name_to_object_immutable=layer_name_to_object
             )
         )
 
