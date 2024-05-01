@@ -611,14 +611,20 @@ def _combine_layer_lists(
 
 
 def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
-                           layer_name_to_object):
+                           layer_name_to_object_immutable):
     """Constructs basic model, i.e., puts the layers together.
 
     :param layer_names: See output doc for `_combine_layer_lists`.
     :param layer_name_to_input_layer_names: Same.
-    :param layer_name_to_object: Same.
+    :param layer_name_to_object_immutable: Same.
     :return: output_layer_object: Output layer.
     """
+
+    layer_name_to_object = dict()
+    for this_key in layer_name_to_object_immutable:
+        layer_name_to_object[this_key] = (
+            layer_name_to_object_immutable[this_key]
+        )
 
     for curr_layer_name in layer_names:
         input_layer_names = layer_name_to_input_layer_names[curr_layer_name]
@@ -712,7 +718,7 @@ def _construct_recurrent_model(
     this_layer_object = _construct_basic_model(
         layer_names=layer_names,
         layer_name_to_input_layer_names=layer_name_to_input_layer_names,
-        layer_name_to_object=copy.deepcopy(layer_name_to_object)
+        layer_name_to_object_immutable=layer_name_to_object
     )
     output_layer_objects = [this_layer_object]
 
@@ -765,7 +771,7 @@ def _construct_recurrent_model(
             _construct_basic_model(
                 layer_names=layer_names,
                 layer_name_to_input_layer_names=layer_name_to_input_layer_names,
-                layer_name_to_object=copy.deepcopy(layer_name_to_object)
+                layer_name_to_object_immutable=layer_name_to_object
             )
         )
 
