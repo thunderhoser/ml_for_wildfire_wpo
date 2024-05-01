@@ -102,6 +102,8 @@ class EnsembleMeanLayer(Layer):
 
     def compute_output_shape(self, input_shape):
         # Output shape is the same as input shape
+        print('FOOOOO')
+        print(input_shape)
         return input_shape
 
     def get_config(self):
