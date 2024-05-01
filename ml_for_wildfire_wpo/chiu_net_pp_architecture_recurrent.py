@@ -619,7 +619,11 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
 
     for curr_layer_name in layer_names:
         if curr_layer_name == 'predn_baseline_inputs' and take_ensemble_mean:
+            print('FOOOOOOOOO')
+            print(layer_name_to_object[curr_layer_name])
             layer_name_to_object[curr_layer_name] = EnsembleMeanLayer(name='take_ens_mean_2days')(layer_name_to_object[curr_layer_name])
+            print(layer_name_to_object[curr_layer_name])
+            print('\n\n')
             continue
 
         input_layer_names = layer_name_to_input_layer_names[curr_layer_name]
@@ -629,7 +633,10 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
         if len(input_layer_names) == 0:
             continue
 
+        print(curr_layer_name)
+        print(layer_name_to_object[curr_layer_name])
         input_objects = [layer_name_to_object[n] for n in input_layer_names]
+        print(input_objects)
 
         try:
             if len(input_objects) == 1:
@@ -641,6 +648,8 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
                     layer_name_to_object[curr_layer_name](input_objects)
                 )
 
+            print(layer_name_to_object[curr_layer_name])
+            print('\n\n')
             continue
         except:
             pass
