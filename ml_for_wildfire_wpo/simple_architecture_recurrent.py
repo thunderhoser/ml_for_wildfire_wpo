@@ -976,7 +976,7 @@ def create_model(option_dict, loss_function, metric_list):
     layer_names.append(this_name)
 
     if input_layer_object_predn_baseline is not None:
-        this_name = 'output_add_baseline'
+        this_name = 'out_add_bl'
         add_layer_object = keras.layers.Add(name=this_name)
 
         layer_name_to_input_layer_names[this_name] = [
@@ -1017,5 +1017,5 @@ def create_model(option_dict, loss_function, metric_list):
         metrics=metric_list
     )
 
-    model_object.summary(line_length=200)
+    model_object.summary()
     return model_object
