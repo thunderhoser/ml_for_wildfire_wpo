@@ -457,9 +457,14 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
 
     layer_name_to_object = dict()
     for this_key in layer_name_to_object_immutable:
-        layer_name_to_object[this_key] = copy.deepcopy(
-            layer_name_to_object_immutable[this_key]
-        )
+        if layer_name_to_object_immutable[this_key].built:
+            layer_name_to_object[this_key] = (
+                layer_name_to_object_immutable[this_key]
+            )
+        else:
+            layer_name_to_object[this_key] = copy.deepcopy(
+                layer_name_to_object_immutable[this_key]
+            )
 
     for curr_layer_name in layer_names:
         input_layer_names = layer_name_to_input_layer_names[curr_layer_name]
