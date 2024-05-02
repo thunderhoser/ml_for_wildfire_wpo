@@ -267,8 +267,8 @@ def create_model(option_dict, loss_function, metric_list):
     def _construct_basic_model(x_gfs_2d, x_lagged_target, x_predn_baseline):
         x0 = put_time_first_layer_object(x_gfs_2d)
         x1 = put_time_first_layer_object(x_lagged_target)
-        x0 = gfs_conv2d_layer_object(x0)
-        x1 = lagtgt_conv2d_layer_object(x1)
+        x0 = keras.layers.TimeDistributed(gfs_conv2d_layer_object)(x0)
+        x1 = keras.layers.TimeDistributed(lagtgt_conv2d_layer_object)(x1)
         x0 = put_time_last_layer_object(x0)
         x1 = put_time_last_layer_object(x1)
         x0 = gfs_conv3d_layer_object(x0)
