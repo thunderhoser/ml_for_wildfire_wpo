@@ -246,7 +246,10 @@ def _create_model():
 
     return chiu_net_pp_arch.create_model(
         option_dict=option_dict,
-        loss_function=custom_losses.mean_squared_error(function_name='mse_loss', expect_ensemble=False, is_nn_evidential=False),
+        loss_function={
+            'final_output_step0': custom_losses.mean_squared_error(function_name='mse_loss', expect_ensemble=False, is_nn_evidential=False),
+            'final_output_step1': custom_losses.mean_squared_error(function_name='mse_loss', expect_ensemble=False, is_nn_evidential=False)
+        },
         metric_list={
             'final_output_step0': first_metric_list,
             'final_output_step1': second_metric_list
