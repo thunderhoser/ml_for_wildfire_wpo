@@ -1543,7 +1543,7 @@ def dwmse_loss_part3b(
             predicted_dsr_tensor = 0.0272 * K.pow(
                 prediction_tensor[..., fwi_index], 1.77
             )
-            return K.max(predicted_dsr_tensor)
+            return K.max(prediction_tensor[..., fwi_index])
 
         return 0.
 
