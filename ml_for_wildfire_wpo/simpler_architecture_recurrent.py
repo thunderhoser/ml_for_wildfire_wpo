@@ -204,7 +204,7 @@ def create_model(option_dict, loss_function, metric_list):
         weight_regularizer=regularizer_object
     )
     put_time_last_layer_object = keras.layers.Permute(
-        dims=(2, 3, 1, 4), name=this_name
+        dims=(2, 3, 1, 4)
     )
 
     gfs_conv3d_layer_object = architecture_utils.get_3d_conv_layer(
@@ -252,8 +252,7 @@ def create_model(option_dict, loss_function, metric_list):
         num_columns_per_stride=1,
         num_filters=num_target_fields,
         padding_type_string=architecture_utils.YES_PADDING_STRING,
-        weight_regularizer=regularizer_object,
-        layer_name=this_name
+        weight_regularizer=regularizer_object
     )
 
     add_baseline_layer_object = keras.layers.Add()
