@@ -459,10 +459,6 @@ def dual_weighted_mse_constrained_dsr(
         :return: loss: Mean squared error.
         """
 
-        print(target_tensor)
-        print('\n\n\n\n\n')
-        print(prediction_tensor)
-
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
         target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
         target_tensor = K.concatenate([
@@ -546,6 +542,11 @@ def dual_weighted_mse_constrained_dsr(
             (relevant_target_tensor - relevant_prediction_tensor) ** 2
         )
         mask_weight_tensor = K.expand_dims(mask_weight_tensor, axis=-1)
+
+        print((
+                K.sum(mask_weight_tensor * error_tensor) /
+                K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        ))
 
         # return K.mean(mask_weight_tensor * error_tensor)
         return (

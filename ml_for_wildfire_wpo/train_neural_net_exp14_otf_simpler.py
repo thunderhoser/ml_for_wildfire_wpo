@@ -345,11 +345,6 @@ def _run(template_file_name, output_dir_name,
     # model_object = neural_net.read_model(hdf5_file_name=template_file_name)
 
     model_object = _create_model()
-    model_object.compile(
-        loss=LOSS_FUNCTION,
-        optimizer=OPTIMIZER_FUNCTION
-    )
-    model_object.summary()
 
     output_layer_names = [layer.name for layer in model_object.outputs]
     print('OUTPUT LAYERS:\n{0:s}'.format(str(output_layer_names)))
