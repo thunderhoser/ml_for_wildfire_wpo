@@ -315,6 +315,7 @@ def create_model(option_dict, loss_function, metric_list):
             'final_output_step0': loss_function,
             'final_output_step1': loss_function
         },
+        loss_weights=numpy.full(2, 1.),
         # loss=loss_function,
         optimizer=optimizer_function,
         metrics=metric_list
