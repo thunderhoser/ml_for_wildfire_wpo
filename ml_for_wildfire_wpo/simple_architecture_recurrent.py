@@ -1017,5 +1017,5 @@ def create_model(option_dict, loss_function, metric_list):
         metrics=metric_list
     )
 
-    model_object.summary()
+    model_object.summary(line_length=200)
     return model_object
