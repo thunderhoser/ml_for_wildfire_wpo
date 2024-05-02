@@ -543,11 +543,6 @@ def dual_weighted_mse_constrained_dsr(
         )
         mask_weight_tensor = K.expand_dims(mask_weight_tensor, axis=-1)
 
-        print((
-                K.sum(mask_weight_tensor * error_tensor) /
-                K.sum(mask_weight_tensor * K.ones_like(error_tensor))
-        ))
-
         # return K.mean(mask_weight_tensor * error_tensor)
         return (
             K.sum(mask_weight_tensor * error_tensor) /
