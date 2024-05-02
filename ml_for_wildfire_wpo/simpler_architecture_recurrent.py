@@ -256,6 +256,7 @@ def create_model(option_dict, loss_function, metric_list):
     )
 
     add_baseline_layer_object = keras.layers.Add()
+    batch_norm_layer_object = architecture_utils.get_batch_norm_layer()
 
     # def _construct_basic_model(integration_step, prev_output):
     #     x0 = put_time_first_layer_object(input_layer_object_gfs_2d)
@@ -282,9 +283,11 @@ def create_model(option_dict, loss_function, metric_list):
 
     def _construct_basic_model(integration_step, prev_output):
         if integration_step == 0:
-            x = output_conv_layer_object(input_layer_object_predn_baseline)
+            # x = output_conv_layer_object(input_layer_object_predn_baseline)
+            x = batch_norm_layer_object(input_layer_object_predn_baseline)
         else:
-            x = output_conv_layer_object(prev_output)
+            # x = output_conv_layer_object(prev_output)
+            x = batch_norm_layer_object(prev_output)
 
         this_name = 'final_output_step{0:d}'.format(integration_step)
 
