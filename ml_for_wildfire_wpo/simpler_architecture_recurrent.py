@@ -311,11 +311,11 @@ def create_model(option_dict, loss_function, metric_list):
     print(loss_function)
 
     model_object.compile(
-        # loss={
-        #     'final_output_step0': loss_function,
-        #     'final_output_step1': loss_function
-        # },
-        loss=loss_function,
+        loss={
+            'final_output_step0': loss_function,
+            'final_output_step1': loss_function
+        },
+        # loss=loss_function,
         optimizer=optimizer_function,
         metrics=metric_list
     )
