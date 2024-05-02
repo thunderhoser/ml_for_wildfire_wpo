@@ -7,7 +7,7 @@ import time
 import random
 import pickle
 import numpy
-import keras
+import tensorflow.keras as keras
 from tensorflow.keras.saving import load_model
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(

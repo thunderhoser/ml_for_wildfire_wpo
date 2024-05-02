@@ -3,7 +3,7 @@
 import os
 import sys
 import numpy
-import keras
+import tensorflow.keras as keras
 import tensorflow
 from tensorflow.keras.layers import Layer
 
