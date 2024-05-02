@@ -347,6 +347,8 @@ def _run(template_file_name, output_dir_name,
     model_object = _create_model()
     output_layer_names = [layer.name for layer in model_object.outputs]
     print('OUTPUT LAYERS:\n{0:s}'.format(str(output_layer_names)))
+    
+    print('LOSS FUNCTION:\n{0:s}'.format(str(model_object.loss)))
 
     model_metafile_name = neural_net.find_metafile(
         model_file_name=template_file_name, raise_error_if_missing=True
