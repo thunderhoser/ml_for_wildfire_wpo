@@ -22,24 +22,44 @@ import training_args
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER = training_args.add_input_args(parser_object=INPUT_ARG_PARSER)
 
-CHANNEL_WEIGHTS = numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004])
-MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856])
+# CHANNEL_WEIGHTS = numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004])
+# MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856])
+#
+# LOSS_FUNCTION = custom_losses.dual_weighted_mse_constrained_dsr(
+#     channel_weights=CHANNEL_WEIGHTS,
+#     max_dual_weight_by_channel=MAX_DUAL_WEIGHTS,
+#     fwi_index=5,
+#     function_name='loss_dwmse',
+#     expect_ensemble=False,
+#     is_nn_evidential=False
+# )
+#
+# LOSS_FUNCTION_STRING = (
+#     'custom_losses.dual_weighted_mse_constrained_dsr('
+#     'channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), '
+#     'max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), '
+#     'fwi_index=5, '
+#     'function_name="loss_dwcrps",'
+#     'expect_ensemble=False,'
+#     'is_nn_evidential=False)'
+# )
 
-LOSS_FUNCTION = custom_losses.dual_weighted_mse_constrained_dsr(
+CHANNEL_WEIGHTS = numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268])
+MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669])
+
+LOSS_FUNCTION = custom_losses.dual_weighted_mse(
     channel_weights=CHANNEL_WEIGHTS,
     max_dual_weight_by_channel=MAX_DUAL_WEIGHTS,
-    fwi_index=5,
     function_name='loss_dwmse',
     expect_ensemble=False,
     is_nn_evidential=False
 )
 
 LOSS_FUNCTION_STRING = (
-    'custom_losses.dual_weighted_mse_constrained_dsr('
+    'custom_losses.dual_weighted_mse('
     'channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), '
     'max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), '
-    'fwi_index=5, '
-    'function_name="loss_dwcrps",'
+    'function_name="loss_dwmse",'
     'expect_ensemble=False,'
     'is_nn_evidential=False)'
 )
@@ -196,32 +216,32 @@ def _create_model():
 
     first_metric_list = [
         custom_metrics.max_prediction_anywhere(channel_index=0, expect_ensemble=False, is_nn_evidential=False, function_name='ffmc_max_prediction_step0'),
-        custom_losses.dwmse_loss_part1(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part1_step0', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part2(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part2_step0', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part3(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3_step0', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part3a(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3a_step0', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part3b(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3b_step0', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part3c(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3c_step0', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part4(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part4_step0', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part5(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part5_step0', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part6(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part6_step0', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part7(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part7_step0', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part8(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part8_step0', expect_ensemble=False, is_nn_evidential=False)
+        # custom_losses.dwmse_loss_part1(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part1_step0', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part2(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part2_step0', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part3(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3_step0', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part3a(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3a_step0', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part3b(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3b_step0', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part3c(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3c_step0', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part4(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part4_step0', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part5(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part5_step0', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part6(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part6_step0', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part7(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part7_step0', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part8(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part8_step0', expect_ensemble=False, is_nn_evidential=False)
     ]
 
     second_metric_list = [
         custom_metrics.max_prediction_anywhere(channel_index=0, expect_ensemble=False, is_nn_evidential=False, function_name='ffmc_max_prediction_step1'),
-        custom_losses.dwmse_loss_part1(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part1_step1', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part2(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part2_step1', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part3(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3_step1', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part3a(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3a_step1', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part3b(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3b_step1', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part3c(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3c_step1', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part4(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part4_step1', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part5(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part5_step1', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part6(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part6_step1', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part7(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part7_step1', expect_ensemble=False, is_nn_evidential=False),
-        custom_losses.dwmse_loss_part8(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part8_step1', expect_ensemble=False, is_nn_evidential=False)
+        # custom_losses.dwmse_loss_part1(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part1_step1', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part2(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part2_step1', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part3(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3_step1', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part3a(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3a_step1', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part3b(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3b_step1', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part3c(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part3c_step1', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part4(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part4_step1', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part5(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part5_step1', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part6(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part6_step1', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part7(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part7_step1', expect_ensemble=False, is_nn_evidential=False),
+        # custom_losses.dwmse_loss_part8(channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwmse_loss_part8_step1', expect_ensemble=False, is_nn_evidential=False)
     ]
 
     return chiu_net_pp_arch.create_model(
