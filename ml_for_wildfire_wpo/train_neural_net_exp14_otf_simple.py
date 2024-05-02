@@ -197,7 +197,7 @@ def _create_model():
     return chiu_net_pp_arch.create_model(
         option_dict=option_dict,
         loss_function='mse',
-        metric_list=custom_metrics.max_prediction_anywhere(channel_index=0, expect_ensemble=False, is_nn_evidential=False, function_name='ffmc_max_prediction_anywhere')
+        metric_list=[custom_metrics.max_prediction_anywhere(channel_index=0, expect_ensemble=False, is_nn_evidential=False, function_name='ffmc_max_prediction_anywhere')]
     )
 
 
