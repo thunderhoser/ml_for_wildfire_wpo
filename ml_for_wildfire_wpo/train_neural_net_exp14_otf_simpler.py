@@ -354,6 +354,9 @@ def _run(template_file_name, output_dir_name,
     output_layer_names = [layer.name for layer in model_object.outputs]
     print('OUTPUT LAYERS:\n{0:s}'.format(str(output_layer_names)))
 
+    for this_layer in model_object.outputs:
+        print('OUTPUT-LAYER SHAPE:\n{0:s}'.format(str(this_layer.shape)))
+
     print('LOSS FUNCTION:\n{0:s}'.format(str(model_object.loss)))
 
     model_metafile_name = neural_net.find_metafile(
