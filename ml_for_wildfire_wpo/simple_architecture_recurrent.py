@@ -471,6 +471,7 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
         # print(curr_layer_name)
         # print(layer_name_to_object[curr_layer_name])
         input_objects = [layer_name_to_object[n] for n in input_layer_names]
+        print(layer_name_to_object_immutable[curr_layer_name])
         # print(input_objects)
 
         if len(input_objects) == 1:
