@@ -276,6 +276,8 @@ def create_model(option_dict, loss_function, metric_list):
         else:
             x = add_baseline_layer_object([prev_output, x])
 
+        print(dir(x))
+
         return x
     
     def _construct_recurrent_model(num_integration_steps):
