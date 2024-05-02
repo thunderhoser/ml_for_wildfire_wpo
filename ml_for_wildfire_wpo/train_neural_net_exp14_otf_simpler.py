@@ -22,47 +22,47 @@ import training_args
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER = training_args.add_input_args(parser_object=INPUT_ARG_PARSER)
 
-# CHANNEL_WEIGHTS = numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004])
-# MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856])
-#
-# LOSS_FUNCTION = custom_losses.dual_weighted_mse_constrained_dsr(
-#     channel_weights=CHANNEL_WEIGHTS,
-#     max_dual_weight_by_channel=MAX_DUAL_WEIGHTS,
-#     fwi_index=5,
-#     function_name='loss_dwmse',
-#     expect_ensemble=False,
-#     is_nn_evidential=False
-# )
-#
-# LOSS_FUNCTION_STRING = (
-#     'custom_losses.dual_weighted_mse_constrained_dsr('
-#     'channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), '
-#     'max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), '
-#     'fwi_index=5, '
-#     'function_name="loss_dwcrps",'
-#     'expect_ensemble=False,'
-#     'is_nn_evidential=False)'
-# )
+CHANNEL_WEIGHTS = numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004])
+MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856])
 
-CHANNEL_WEIGHTS = numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268])
-MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669])
-
-LOSS_FUNCTION = custom_losses.dual_weighted_mse(
+LOSS_FUNCTION = custom_losses.dual_weighted_mse_constrained_dsr(
     channel_weights=CHANNEL_WEIGHTS,
     max_dual_weight_by_channel=MAX_DUAL_WEIGHTS,
+    fwi_index=5,
     function_name='loss_dwmse',
     expect_ensemble=False,
     is_nn_evidential=False
 )
 
 LOSS_FUNCTION_STRING = (
-    'custom_losses.dual_weighted_mse('
+    'custom_losses.dual_weighted_mse_constrained_dsr('
     'channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), '
     'max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), '
-    'function_name="loss_dwmse",'
+    'fwi_index=5, '
+    'function_name="loss_dwcrps",'
     'expect_ensemble=False,'
     'is_nn_evidential=False)'
 )
+
+# CHANNEL_WEIGHTS = numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268])
+# MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669])
+#
+# LOSS_FUNCTION = custom_losses.dual_weighted_mse(
+#     channel_weights=CHANNEL_WEIGHTS,
+#     max_dual_weight_by_channel=MAX_DUAL_WEIGHTS,
+#     function_name='loss_dwmse',
+#     expect_ensemble=False,
+#     is_nn_evidential=False
+# )
+#
+# LOSS_FUNCTION_STRING = (
+#     'custom_losses.dual_weighted_mse('
+#     'channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), '
+#     'max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), '
+#     'function_name="loss_dwmse",'
+#     'expect_ensemble=False,'
+#     'is_nn_evidential=False)'
+# )
 
 NUM_CONV_LAYERS_PER_BLOCK = 1
 
