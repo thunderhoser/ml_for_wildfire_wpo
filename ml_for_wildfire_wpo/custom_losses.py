@@ -227,6 +227,22 @@ def convert_evidential_outputs(prediction_tensor):
     return K.stack([mu_tensor, v_tensor, alpha_tensor, beta_tensor], axis=-1)
 
 
+def simple_mse(function_name):
+    """Creates simple MSE loss function.
+
+    :param function_name: Function name (string).
+    :return: loss: Loss function (defined below).
+    """
+
+    error_checking.assert_is_string(function_name)
+
+    def loss(target_tensor, prediction_tensor):
+        return K.mean((target_tensor[..., :-1] - prediction_tensor) ** 2)
+
+    loss.__name__ = function_name
+    return loss
+
+
 def mean_squared_error(function_name, expect_ensemble=True,
                        is_nn_evidential=False, test_mode=False):
     """Creates mean squared error (MSE) loss function.
