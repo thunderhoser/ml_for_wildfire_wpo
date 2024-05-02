@@ -1007,6 +1007,9 @@ def create_model(option_dict, loss_function, metric_list):
     )
 
     # TODO(thunderhoser): Hard-coded loss dictionary is a HACK.
+    print('LOSS FUNCTION:')
+    print(loss_function)
+
     model_object.compile(
         # loss={
         #     'final_output_step0': loss_function,
