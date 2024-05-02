@@ -457,9 +457,9 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
 
     layer_name_to_object = dict()
     for this_key in layer_name_to_object_immutable:
-        print(layer_name_to_object_immutable[this_key])
+        print(str(layer_name_to_object_immutable[this_key]))
 
-        if layer_name_to_object_immutable[this_key].built:
+        if 'KerasTensor' in str(layer_name_to_object_immutable[this_key]):
             layer_name_to_object[this_key] = (
                 layer_name_to_object_immutable[this_key]
             )
