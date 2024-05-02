@@ -198,8 +198,8 @@ def _create_model():
         option_dict=option_dict,
         loss_function='mse',
         metric_list={
-            'output_add_baseline': custom_metrics.max_prediction_anywhere(channel_index=0, expect_ensemble=False, is_nn_evidential=False, function_name='ffmc_max_prediction1'),
-            'output_add_baseline[1][0]': custom_metrics.max_prediction_anywhere(channel_index=0, expect_ensemble=False, is_nn_evidential=False, function_name='ffmc_max_prediction2')
+            'out_add_bl': custom_metrics.max_prediction_anywhere(channel_index=0, expect_ensemble=False, is_nn_evidential=False, function_name='ffmc_max_prediction1'),
+            'out_add_bl[0][0]': custom_metrics.max_prediction_anywhere(channel_index=0, expect_ensemble=False, is_nn_evidential=False, function_name='ffmc_max_prediction2')
         }
     )
 
