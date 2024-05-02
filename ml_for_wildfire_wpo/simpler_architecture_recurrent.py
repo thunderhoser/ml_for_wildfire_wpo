@@ -313,7 +313,7 @@ def create_model(option_dict, loss_function, metric_list):
         # },
         loss=loss_function,
         optimizer=optimizer_function,
-        metrics=metric_list
+        # metrics=metric_list
     )
 
     model_object.summary()
