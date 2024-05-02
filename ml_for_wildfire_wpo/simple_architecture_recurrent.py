@@ -468,10 +468,10 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
         if len(input_layer_names) == 0:
             continue
 
-        print(curr_layer_name)
-        print(layer_name_to_object[curr_layer_name])
+        # print(curr_layer_name)
+        # print(layer_name_to_object[curr_layer_name])
         input_objects = [layer_name_to_object[n] for n in input_layer_names]
-        print(input_objects)
+        # print(input_objects)
 
         if len(input_objects) == 1:
             layer_name_to_object[curr_layer_name] = (
@@ -482,8 +482,8 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
                 layer_name_to_object[curr_layer_name](input_objects)
             )
 
-        print(layer_name_to_object[curr_layer_name])
-        print('\n\n')
+        # print(layer_name_to_object[curr_layer_name])
+        # print('\n\n')
 
     return layer_name_to_object[layer_names[-1]]
 
@@ -979,7 +979,9 @@ def create_model(option_dict, loss_function, metric_list):
         this_name = 'output_add_baseline'
         add_layer_object = keras.layers.Add(name=this_name)
 
-        layer_name_to_input_layer_names[this_name] = input_layer_name_predn_baseline
+        layer_name_to_input_layer_names[this_name] = [
+            layer_names[-1], input_layer_name_predn_baseline
+        ]
         layer_name_to_object[this_name] = add_layer_object
         layer_names.append(this_name)
 
