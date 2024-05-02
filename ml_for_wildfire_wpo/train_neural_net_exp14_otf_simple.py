@@ -46,9 +46,9 @@ LOSS_FUNCTION_STRING = (
 
 NUM_CONV_LAYERS_PER_BLOCK = 1
 
-OPTIMIZER_FUNCTION = keras.optimizers.Nadam(gradient_accumulation_steps=1)
+OPTIMIZER_FUNCTION = keras.optimizers.Nadam()
 OPTIMIZER_FUNCTION_STRING = (
-    'keras.optimizers.Nadam(gradient_accumulation_steps=1)'
+    'keras.optimizers.Nadam()'
 )
 
 DEFAULT_OPTION_DICT = {
