@@ -284,10 +284,10 @@ def create_model(option_dict, loss_function, metric_list):
     def _construct_basic_model(integration_step, prev_output):
         if integration_step == 0:
             # x = output_conv_layer_object(input_layer_object_predn_baseline)
-            x = batch_norm_layer_object(input_layer_object_predn_baseline)
+            x = keras.layers.BatchNormalization(name='bn_step{0:d}'.format(integration_step))(input_layer_object_predn_baseline)
         else:
             # x = output_conv_layer_object(prev_output)
-            x = batch_norm_layer_object(prev_output)
+            x = keras.layers.BatchNormalization(name='bn_step{0:d}'.format(integration_step))(prev_output)
 
         this_name = 'final_output_step{0:d}'.format(integration_step)
 
