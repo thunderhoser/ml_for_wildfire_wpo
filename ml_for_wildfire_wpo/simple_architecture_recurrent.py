@@ -468,7 +468,10 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
         if len(input_layer_names) == 0:
             continue
 
+        print(curr_layer_name)
+        print(layer_name_to_object[curr_layer_name])
         input_objects = [layer_name_to_object[n] for n in input_layer_names]
+        print(input_objects)
 
         if len(input_objects) == 1:
             layer_name_to_object[curr_layer_name] = (
@@ -478,6 +481,9 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
             layer_name_to_object[curr_layer_name] = (
                 layer_name_to_object[curr_layer_name](input_objects)
             )
+
+        print(layer_name_to_object[curr_layer_name])
+        print('\n\n')
 
     return layer_name_to_object[layer_names[-1]]
 
