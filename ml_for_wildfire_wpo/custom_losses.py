@@ -553,6 +553,914 @@ def dual_weighted_mse_constrained_dsr(
     return loss
 
 
+def dwmse_loss_part5(
+        channel_weights, fwi_index, function_name,
+        max_dual_weight_by_channel=None,
+        expect_ensemble=True, is_nn_evidential=False, test_mode=False):
+    """Creates DWMSE loss function with constrained DSR.
+
+    "Constrained DSR" means that daily severity rating is computed directly from
+    fire-weather index (FWI).  This method assumes that the last elements of
+    the arrays `channel_weights` and `max_dual_weight_by_channel` pertain to
+    DSR.
+
+    K = number of output channels (target variables), not including DSR
+
+    :param channel_weights: length-(K + 1) numpy array of channel weights.
+    :param fwi_index: Array index for FWI.  This tells the method that FWI
+        predictions and targets can be found in
+        target_tensor[:, :, :, fwi_index, ...] and
+        prediction_tensor[:, :, :, fwi_index, ...], respectively.
+    :param function_name: See doc for `mean_squared_error`.
+    :param max_dual_weight_by_channel: length-(K + 1) numpy array of maximum
+        dual weights.
+    :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_integer(fwi_index)
+    error_checking.assert_is_geq(fwi_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    error_checking.assert_is_numpy_array(
+        channel_weights,
+        exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
+    )
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (DWMSE).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: loss: Mean squared error.
+        """
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
+        target_tensor = K.concatenate([
+            target_tensor[..., :-1],
+            K.expand_dims(target_dsr_tensor, axis=-1),
+            K.expand_dims(target_tensor[..., -1], axis=-1)
+        ], axis=-1)
+
+        if is_nn_evidential:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor[..., 0]
+            mask_weight_tensor = target_tensor[..., -1]
+        elif expect_ensemble:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., :-1], axis=-1
+            )
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        else:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-1)
+            ], axis=-1)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = target_tensor[..., -1]
+
+        dual_weight_tensor = K.maximum(
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_prediction_tensor)
+        )
+
+        return K.max(dual_weight_tensor)
+
+    loss.__name__ = function_name
+    return loss
+
+
+def dwmse_loss_part6(
+        channel_weights, fwi_index, function_name,
+        max_dual_weight_by_channel=None,
+        expect_ensemble=True, is_nn_evidential=False, test_mode=False):
+    """Creates DWMSE loss function with constrained DSR.
+
+    "Constrained DSR" means that daily severity rating is computed directly from
+    fire-weather index (FWI).  This method assumes that the last elements of
+    the arrays `channel_weights` and `max_dual_weight_by_channel` pertain to
+    DSR.
+
+    K = number of output channels (target variables), not including DSR
+
+    :param channel_weights: length-(K + 1) numpy array of channel weights.
+    :param fwi_index: Array index for FWI.  This tells the method that FWI
+        predictions and targets can be found in
+        target_tensor[:, :, :, fwi_index, ...] and
+        prediction_tensor[:, :, :, fwi_index, ...], respectively.
+    :param function_name: See doc for `mean_squared_error`.
+    :param max_dual_weight_by_channel: length-(K + 1) numpy array of maximum
+        dual weights.
+    :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_integer(fwi_index)
+    error_checking.assert_is_geq(fwi_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    error_checking.assert_is_numpy_array(
+        channel_weights,
+        exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
+    )
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (DWMSE).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: loss: Mean squared error.
+        """
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
+        target_tensor = K.concatenate([
+            target_tensor[..., :-1],
+            K.expand_dims(target_dsr_tensor, axis=-1),
+            K.expand_dims(target_tensor[..., -1], axis=-1)
+        ], axis=-1)
+
+        if is_nn_evidential:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor[..., 0]
+            mask_weight_tensor = target_tensor[..., -1]
+        elif expect_ensemble:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., :-1], axis=-1
+            )
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        else:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-1)
+            ], axis=-1)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = target_tensor[..., -1]
+
+        dual_weight_tensor = K.maximum(
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_prediction_tensor)
+        )
+
+        max_dual_weight_tensor = K.cast(
+            K.constant(max_dual_weight_by_channel), dual_weight_tensor.dtype
+        )
+        for _ in range(3):
+            max_dual_weight_tensor = K.expand_dims(
+                max_dual_weight_tensor, axis=0
+            )
+        if expect_ensemble:
+            max_dual_weight_tensor = K.expand_dims(
+                max_dual_weight_tensor, axis=-1
+            )
+
+        dual_weight_tensor = K.minimum(
+            dual_weight_tensor, max_dual_weight_tensor
+        )
+        return K.max(dual_weight_tensor)
+
+    loss.__name__ = function_name
+    return loss
+
+
+def dwmse_loss_part7(
+        channel_weights, fwi_index, function_name,
+        max_dual_weight_by_channel=None,
+        expect_ensemble=True, is_nn_evidential=False, test_mode=False):
+    """Creates DWMSE loss function with constrained DSR.
+
+    "Constrained DSR" means that daily severity rating is computed directly from
+    fire-weather index (FWI).  This method assumes that the last elements of
+    the arrays `channel_weights` and `max_dual_weight_by_channel` pertain to
+    DSR.
+
+    K = number of output channels (target variables), not including DSR
+
+    :param channel_weights: length-(K + 1) numpy array of channel weights.
+    :param fwi_index: Array index for FWI.  This tells the method that FWI
+        predictions and targets can be found in
+        target_tensor[:, :, :, fwi_index, ...] and
+        prediction_tensor[:, :, :, fwi_index, ...], respectively.
+    :param function_name: See doc for `mean_squared_error`.
+    :param max_dual_weight_by_channel: length-(K + 1) numpy array of maximum
+        dual weights.
+    :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_integer(fwi_index)
+    error_checking.assert_is_geq(fwi_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    error_checking.assert_is_numpy_array(
+        channel_weights,
+        exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
+    )
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (DWMSE).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: loss: Mean squared error.
+        """
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
+        target_tensor = K.concatenate([
+            target_tensor[..., :-1],
+            K.expand_dims(target_dsr_tensor, axis=-1),
+            K.expand_dims(target_tensor[..., -1], axis=-1)
+        ], axis=-1)
+
+        if is_nn_evidential:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor[..., 0]
+            mask_weight_tensor = target_tensor[..., -1]
+        elif expect_ensemble:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., :-1], axis=-1
+            )
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        else:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-1)
+            ], axis=-1)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = target_tensor[..., -1]
+
+        dual_weight_tensor = K.maximum(
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_prediction_tensor)
+        )
+
+        max_dual_weight_tensor = K.cast(
+            K.constant(max_dual_weight_by_channel), dual_weight_tensor.dtype
+        )
+        for _ in range(3):
+            max_dual_weight_tensor = K.expand_dims(
+                max_dual_weight_tensor, axis=0
+            )
+        if expect_ensemble:
+            max_dual_weight_tensor = K.expand_dims(
+                max_dual_weight_tensor, axis=-1
+            )
+
+        dual_weight_tensor = K.minimum(
+            dual_weight_tensor, max_dual_weight_tensor
+        )
+
+        channel_weight_tensor = K.cast(
+            K.constant(channel_weights), dual_weight_tensor.dtype
+        )
+        for _ in range(3):
+            channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
+        if expect_ensemble:
+            channel_weight_tensor = K.expand_dims(
+                channel_weight_tensor, axis=-1
+            )
+
+        return K.max(channel_weight_tensor)
+
+    loss.__name__ = function_name
+    return loss
+
+
+def dwmse_loss_part8(
+        channel_weights, fwi_index, function_name,
+        max_dual_weight_by_channel=None,
+        expect_ensemble=True, is_nn_evidential=False, test_mode=False):
+    """Creates DWMSE loss function with constrained DSR.
+
+    "Constrained DSR" means that daily severity rating is computed directly from
+    fire-weather index (FWI).  This method assumes that the last elements of
+    the arrays `channel_weights` and `max_dual_weight_by_channel` pertain to
+    DSR.
+
+    K = number of output channels (target variables), not including DSR
+
+    :param channel_weights: length-(K + 1) numpy array of channel weights.
+    :param fwi_index: Array index for FWI.  This tells the method that FWI
+        predictions and targets can be found in
+        target_tensor[:, :, :, fwi_index, ...] and
+        prediction_tensor[:, :, :, fwi_index, ...], respectively.
+    :param function_name: See doc for `mean_squared_error`.
+    :param max_dual_weight_by_channel: length-(K + 1) numpy array of maximum
+        dual weights.
+    :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_integer(fwi_index)
+    error_checking.assert_is_geq(fwi_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    error_checking.assert_is_numpy_array(
+        channel_weights,
+        exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
+    )
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (DWMSE).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: loss: Mean squared error.
+        """
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
+        target_tensor = K.concatenate([
+            target_tensor[..., :-1],
+            K.expand_dims(target_dsr_tensor, axis=-1),
+            K.expand_dims(target_tensor[..., -1], axis=-1)
+        ], axis=-1)
+
+        if is_nn_evidential:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor[..., 0]
+            mask_weight_tensor = target_tensor[..., -1]
+        elif expect_ensemble:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., :-1], axis=-1
+            )
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        else:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-1)
+            ], axis=-1)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = target_tensor[..., -1]
+
+        dual_weight_tensor = K.maximum(
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_prediction_tensor)
+        )
+
+        max_dual_weight_tensor = K.cast(
+            K.constant(max_dual_weight_by_channel), dual_weight_tensor.dtype
+        )
+        for _ in range(3):
+            max_dual_weight_tensor = K.expand_dims(
+                max_dual_weight_tensor, axis=0
+            )
+        if expect_ensemble:
+            max_dual_weight_tensor = K.expand_dims(
+                max_dual_weight_tensor, axis=-1
+            )
+
+        dual_weight_tensor = K.minimum(
+            dual_weight_tensor, max_dual_weight_tensor
+        )
+
+        channel_weight_tensor = K.cast(
+            K.constant(channel_weights), dual_weight_tensor.dtype
+        )
+        for _ in range(3):
+            channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
+        if expect_ensemble:
+            channel_weight_tensor = K.expand_dims(
+                channel_weight_tensor, axis=-1
+            )
+
+        error_tensor = (
+                channel_weight_tensor * dual_weight_tensor *
+                (relevant_target_tensor - relevant_prediction_tensor) ** 2
+        )
+        return K.max(error_tensor)
+
+    loss.__name__ = function_name
+    return loss
+
+
+def dwmse_loss_part1(
+        channel_weights, fwi_index, function_name,
+        max_dual_weight_by_channel=None,
+        expect_ensemble=True, is_nn_evidential=False, test_mode=False):
+    """Creates DWMSE loss function with constrained DSR.
+
+    "Constrained DSR" means that daily severity rating is computed directly from
+    fire-weather index (FWI).  This method assumes that the last elements of
+    the arrays `channel_weights` and `max_dual_weight_by_channel` pertain to
+    DSR.
+
+    K = number of output channels (target variables), not including DSR
+
+    :param channel_weights: length-(K + 1) numpy array of channel weights.
+    :param fwi_index: Array index for FWI.  This tells the method that FWI
+        predictions and targets can be found in
+        target_tensor[:, :, :, fwi_index, ...] and
+        prediction_tensor[:, :, :, fwi_index, ...], respectively.
+    :param function_name: See doc for `mean_squared_error`.
+    :param max_dual_weight_by_channel: length-(K + 1) numpy array of maximum
+        dual weights.
+    :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_integer(fwi_index)
+    error_checking.assert_is_geq(fwi_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    error_checking.assert_is_numpy_array(
+        channel_weights,
+        exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
+    )
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (DWMSE).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: loss: Mean squared error.
+        """
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
+        target_tensor = K.concatenate([
+            target_tensor[..., :-1],
+            K.expand_dims(target_dsr_tensor, axis=-1),
+            K.expand_dims(target_tensor[..., -1], axis=-1)
+        ], axis=-1)
+
+        return K.max(target_tensor)
+
+    loss.__name__ = function_name
+    return loss
+
+
+def dwmse_loss_part2(
+        channel_weights, fwi_index, function_name,
+        max_dual_weight_by_channel=None,
+        expect_ensemble=True, is_nn_evidential=False, test_mode=False):
+    """Creates DWMSE loss function with constrained DSR.
+
+    "Constrained DSR" means that daily severity rating is computed directly from
+    fire-weather index (FWI).  This method assumes that the last elements of
+    the arrays `channel_weights` and `max_dual_weight_by_channel` pertain to
+    DSR.
+
+    K = number of output channels (target variables), not including DSR
+
+    :param channel_weights: length-(K + 1) numpy array of channel weights.
+    :param fwi_index: Array index for FWI.  This tells the method that FWI
+        predictions and targets can be found in
+        target_tensor[:, :, :, fwi_index, ...] and
+        prediction_tensor[:, :, :, fwi_index, ...], respectively.
+    :param function_name: See doc for `mean_squared_error`.
+    :param max_dual_weight_by_channel: length-(K + 1) numpy array of maximum
+        dual weights.
+    :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_integer(fwi_index)
+    error_checking.assert_is_geq(fwi_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    error_checking.assert_is_numpy_array(
+        channel_weights,
+        exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
+    )
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (DWMSE).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: loss: Mean squared error.
+        """
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
+        target_tensor = K.concatenate([
+            target_tensor[..., :-1],
+            K.expand_dims(target_dsr_tensor, axis=-1),
+            K.expand_dims(target_tensor[..., -1], axis=-1)
+        ], axis=-1)
+
+        if is_nn_evidential:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor[..., 0]
+            mask_weight_tensor = target_tensor[..., -1]
+        elif expect_ensemble:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., :-1], axis=-1
+            )
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        else:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-1)
+            ], axis=-1)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = target_tensor[..., -1]
+
+        return K.max(relevant_target_tensor)
+
+    loss.__name__ = function_name
+    return loss
+
+
+def dwmse_loss_part3(
+        channel_weights, fwi_index, function_name,
+        max_dual_weight_by_channel=None,
+        expect_ensemble=True, is_nn_evidential=False, test_mode=False):
+    """Creates DWMSE loss function with constrained DSR.
+
+    "Constrained DSR" means that daily severity rating is computed directly from
+    fire-weather index (FWI).  This method assumes that the last elements of
+    the arrays `channel_weights` and `max_dual_weight_by_channel` pertain to
+    DSR.
+
+    K = number of output channels (target variables), not including DSR
+
+    :param channel_weights: length-(K + 1) numpy array of channel weights.
+    :param fwi_index: Array index for FWI.  This tells the method that FWI
+        predictions and targets can be found in
+        target_tensor[:, :, :, fwi_index, ...] and
+        prediction_tensor[:, :, :, fwi_index, ...], respectively.
+    :param function_name: See doc for `mean_squared_error`.
+    :param max_dual_weight_by_channel: length-(K + 1) numpy array of maximum
+        dual weights.
+    :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_integer(fwi_index)
+    error_checking.assert_is_geq(fwi_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    error_checking.assert_is_numpy_array(
+        channel_weights,
+        exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
+    )
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (DWMSE).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: loss: Mean squared error.
+        """
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
+        target_tensor = K.concatenate([
+            target_tensor[..., :-1],
+            K.expand_dims(target_dsr_tensor, axis=-1),
+            K.expand_dims(target_tensor[..., -1], axis=-1)
+        ], axis=-1)
+
+        if is_nn_evidential:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor[..., 0]
+            mask_weight_tensor = target_tensor[..., -1]
+        elif expect_ensemble:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., :-1], axis=-1
+            )
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        else:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-1)
+            ], axis=-1)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = target_tensor[..., -1]
+
+        return K.max(relevant_prediction_tensor)
+
+    loss.__name__ = function_name
+    return loss
+
+
+def dwmse_loss_part4(
+        channel_weights, fwi_index, function_name,
+        max_dual_weight_by_channel=None,
+        expect_ensemble=True, is_nn_evidential=False, test_mode=False):
+    """Creates DWMSE loss function with constrained DSR.
+
+    "Constrained DSR" means that daily severity rating is computed directly from
+    fire-weather index (FWI).  This method assumes that the last elements of
+    the arrays `channel_weights` and `max_dual_weight_by_channel` pertain to
+    DSR.
+
+    K = number of output channels (target variables), not including DSR
+
+    :param channel_weights: length-(K + 1) numpy array of channel weights.
+    :param fwi_index: Array index for FWI.  This tells the method that FWI
+        predictions and targets can be found in
+        target_tensor[:, :, :, fwi_index, ...] and
+        prediction_tensor[:, :, :, fwi_index, ...], respectively.
+    :param function_name: See doc for `mean_squared_error`.
+    :param max_dual_weight_by_channel: length-(K + 1) numpy array of maximum
+        dual weights.
+    :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_integer(fwi_index)
+    error_checking.assert_is_geq(fwi_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    error_checking.assert_is_numpy_array(
+        channel_weights,
+        exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
+    )
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (DWMSE).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: loss: Mean squared error.
+        """
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
+        target_tensor = K.concatenate([
+            target_tensor[..., :-1],
+            K.expand_dims(target_dsr_tensor, axis=-1),
+            K.expand_dims(target_tensor[..., -1], axis=-1)
+        ], axis=-1)
+
+        if is_nn_evidential:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor[..., 0]
+            mask_weight_tensor = target_tensor[..., -1]
+        elif expect_ensemble:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index, :], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+
+            relevant_target_tensor = K.expand_dims(
+                target_tensor[..., :-1], axis=-1
+            )
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
+        else:
+            predicted_dsr_tensor = 0.0272 * K.pow(
+                prediction_tensor[..., fwi_index], 1.77
+            )
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-1)
+            ], axis=-1)
+
+            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_prediction_tensor = prediction_tensor
+            mask_weight_tensor = target_tensor[..., -1]
+
+        return K.max(mask_weight_tensor)
+
+    loss.__name__ = function_name
+    return loss
+
+
 def dual_weighted_mse_1channel(
         channel_weight, channel_index, function_name, max_dual_weight=1e12,
         expect_ensemble=True, is_nn_evidential=False, test_mode=False):
