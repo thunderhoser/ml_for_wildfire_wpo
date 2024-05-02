@@ -285,11 +285,13 @@ def create_model(option_dict, loss_function, metric_list):
         )
     
         for i in range(1, num_integration_steps):
+            this_layer_object = keras.layers.Identity(output_layer_objects[i - 1])
             output_layer_objects[i] = _construct_basic_model(
                 integration_step=i,
-                prev_output=output_layer_objects[i - 1]
+                prev_output=this_layer_object
             )
 
+        print(output_layer_objects)
         return output_layer_objects
 
     input_layer_objects = [
