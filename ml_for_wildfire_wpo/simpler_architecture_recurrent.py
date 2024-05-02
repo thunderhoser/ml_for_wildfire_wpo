@@ -274,9 +274,9 @@ def create_model(option_dict, loss_function, metric_list):
         this_name = 'final_output_step{0:d}'.format(integration_step)
 
         if integration_step == 0:
-            x = keras.layers.Add(this_name)([input_layer_object_predn_baseline, x])
+            x = keras.layers.Add(name=this_name)([input_layer_object_predn_baseline, x])
         else:
-            x = keras.layers.Add(this_name)([prev_output, x])
+            x = keras.layers.Add(name=this_name)([prev_output, x])
 
         return x
     
