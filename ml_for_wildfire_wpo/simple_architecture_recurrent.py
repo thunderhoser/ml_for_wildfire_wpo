@@ -482,8 +482,9 @@ def _construct_basic_model(layer_names, layer_name_to_input_layer_names,
                 layer_name_to_object[curr_layer_name](input_objects)
             )
 
-        # print(layer_name_to_object[curr_layer_name])
-        # print('\n\n')
+        print(layer_name_to_object[curr_layer_name])
+        print(layer_name_to_object_immutable[curr_layer_name])
+        print('\n\n')
 
     return layer_name_to_object[layer_names[-1]]
 
