@@ -271,12 +271,12 @@ def create_model(option_dict, loss_function, metric_list):
         x = concat_channels_layer_object([x0, x1])
         x = output_conv_layer_object(x)
 
-        if integration_step == 0:
-            x = add_baseline_layer_object([input_layer_object_predn_baseline, x])
-        else:
-            x = add_baseline_layer_object([prev_output, x])
+        this_name = 'final_output_step{0:d}'.format(integration_step)
 
-        print(dir(x))
+        if integration_step == 0:
+            x = keras.layers.Add(this_name)([input_layer_object_predn_baseline, x])
+        else:
+            x = keras.layers.Add(this_name)([prev_output, x])
 
         return x
     
