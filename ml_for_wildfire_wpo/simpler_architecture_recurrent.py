@@ -257,19 +257,34 @@ def create_model(option_dict, loss_function, metric_list):
 
     add_baseline_layer_object = keras.layers.Add()
 
+    # def _construct_basic_model(integration_step, prev_output):
+    #     x0 = put_time_first_layer_object(input_layer_object_gfs_2d)
+    #     x1 = put_time_first_layer_object(input_layer_object_lagged_target)
+    #     x0 = keras.layers.TimeDistributed(gfs_conv2d_layer_object)(x0)
+    #     x1 = keras.layers.TimeDistributed(lagtgt_conv2d_layer_object)(x1)
+    #     x0 = put_time_last_layer_object(x0)
+    #     x1 = put_time_last_layer_object(x1)
+    #     x0 = gfs_conv3d_layer_object(x0)
+    #     x1 = lagtgt_conv3d_layer_object(x1)
+    #     x0 = remove_time_layer_object(x0)
+    #     x1 = remove_time_layer_object(x1)
+    #     x = concat_channels_layer_object([x0, x1])
+    #     x = output_conv_layer_object(x)
+    #
+    #     this_name = 'final_output_step{0:d}'.format(integration_step)
+    #
+    #     if integration_step == 0:
+    #         x = keras.layers.Add(name=this_name)([input_layer_object_predn_baseline, x])
+    #     else:
+    #         x = keras.layers.Add(name=this_name)([prev_output, x])
+    #
+    #     return x
+
     def _construct_basic_model(integration_step, prev_output):
-        x0 = put_time_first_layer_object(input_layer_object_gfs_2d)
-        x1 = put_time_first_layer_object(input_layer_object_lagged_target)
-        x0 = keras.layers.TimeDistributed(gfs_conv2d_layer_object)(x0)
-        x1 = keras.layers.TimeDistributed(lagtgt_conv2d_layer_object)(x1)
-        x0 = put_time_last_layer_object(x0)
-        x1 = put_time_last_layer_object(x1)
-        x0 = gfs_conv3d_layer_object(x0)
-        x1 = lagtgt_conv3d_layer_object(x1)
-        x0 = remove_time_layer_object(x0)
-        x1 = remove_time_layer_object(x1)
-        x = concat_channels_layer_object([x0, x1])
-        x = output_conv_layer_object(x)
+        if integration_step == 0:
+            x = output_conv_layer_object(input_layer_object_predn_baseline)
+        else:
+            x = output_conv_layer_object(prev_output)
 
         this_name = 'final_output_step{0:d}'.format(integration_step)
 
@@ -287,15 +302,15 @@ def create_model(option_dict, loss_function, metric_list):
         )
     
         for i in range(1, num_integration_steps):
-            output_layer_objects[i] = _construct_basic_model(
-                integration_step=i, prev_output=input_layer_object_predn_baseline
-            )
-
-            # this_layer_object = keras.layers.Identity()(output_layer_objects[i - 1])
             # output_layer_objects[i] = _construct_basic_model(
-            #     integration_step=i,
-            #     prev_output=this_layer_object
+            #     integration_step=i, prev_output=input_layer_object_predn_baseline
             # )
+
+            this_layer_object = keras.layers.Identity()(output_layer_objects[i - 1])
+            output_layer_objects[i] = _construct_basic_model(
+                integration_step=i,
+                prev_output=this_layer_object
+            )
 
         print(output_layer_objects)
         return output_layer_objects
