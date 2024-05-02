@@ -285,7 +285,7 @@ def create_model(option_dict, loss_function, metric_list):
         )
     
         for i in range(1, num_integration_steps):
-            this_layer_object = keras.layers.Identity(output_layer_objects[i - 1])
+            this_layer_object = keras.layers.Identity()(output_layer_objects[i - 1])
             output_layer_objects[i] = _construct_basic_model(
                 integration_step=i,
                 prev_output=this_layer_object
