@@ -459,6 +459,10 @@ def dual_weighted_mse_constrained_dsr(
         :return: loss: Mean squared error.
         """
 
+        print(target_tensor)
+        print('\n\n\n\n\n')
+        print(prediction_tensor)
+
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
         target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
         target_tensor = K.concatenate([
