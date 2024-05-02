@@ -559,7 +559,7 @@ def create_model(option_dict, loss_function, metric_list):
     """
 
     option_dict = chiu_net_architecture.check_args(option_dict)
-    error_checking.assert_is_list(metric_list)
+    # error_checking.assert_is_list(metric_list)
 
     input_dimensions_gfs_3d = option_dict[GFS_3D_DIMENSIONS_KEY]
     input_dimensions_gfs_2d = option_dict[GFS_2D_DIMENSIONS_KEY]
@@ -1014,7 +1014,7 @@ def create_model(option_dict, loss_function, metric_list):
         # },
         loss=loss_function,
         optimizer=optimizer_function,
-        # metrics=metric_list
+        metrics=metric_list
     )
 
     model_object.summary()
