@@ -258,13 +258,8 @@ def create_model(option_dict, loss_function, metric_list):
 
     add_baseline_layer_object = keras.layers.Add()
 
-    input_layer_objects = [
-        input_layer_object_gfs_2d,
-        input_layer_object_lagged_target,
-        input_layer_object_predn_baseline
-    ]
-
     def _construct_basic_model(x_gfs_2d, x_lagged_target, x_predn_baseline):
+        print(x_predn_baseline)
         x0 = put_time_first_layer_object(x_gfs_2d)
         x1 = put_time_first_layer_object(x_lagged_target)
         x0 = keras.layers.TimeDistributed(gfs_conv2d_layer_object)(x0)
@@ -296,6 +291,12 @@ def create_model(option_dict, loss_function, metric_list):
             )
 
         return output_layer_objects
+
+    input_layer_objects = [
+        input_layer_object_gfs_2d,
+        input_layer_object_lagged_target,
+        input_layer_object_predn_baseline
+    ]
 
     model_object = keras.models.Model(
         inputs=input_layer_objects, outputs=_construct_recurrent_model(2)
