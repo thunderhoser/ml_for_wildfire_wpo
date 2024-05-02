@@ -316,8 +316,8 @@ def create_model(option_dict, loss_function, metric_list):
         return output_layer_objects
 
     input_layer_objects = [
-        input_layer_object_gfs_2d,
-        input_layer_object_lagged_target,
+        # input_layer_object_gfs_2d,
+        # input_layer_object_lagged_target,
         input_layer_object_predn_baseline
     ]
 
