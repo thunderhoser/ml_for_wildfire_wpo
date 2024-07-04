@@ -342,6 +342,7 @@ def _get_3d_conv_block(
     num_time_steps = keras.layers.Lambda(
         __get_num_time_steps, output_shape=()
     )(input_layer_object)
+    num_time_steps = num_time_steps[0]
 
     for i in range(num_conv_layers):
         this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
