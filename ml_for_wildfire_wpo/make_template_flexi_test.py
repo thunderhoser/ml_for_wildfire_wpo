@@ -223,7 +223,7 @@ def _run():
         chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
     })
 
-    model_object = chiu_net_pp_arch.create_model(
+    model_object = chiu_net_pp_arch.create_flexible_lead_time_model(
         option_dict=option_dict,
         loss_function=LOSS_FUNCTION,
         metric_list=METRIC_FUNCTIONS
