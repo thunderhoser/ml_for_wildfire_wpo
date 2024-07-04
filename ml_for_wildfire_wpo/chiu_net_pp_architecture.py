@@ -1135,6 +1135,8 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
             __get_num_time_steps, output_shape=(1,)
         )(input_layer_object_gfs_2d)
 
+    print(num_gfs_lead_times)
+    print('\n\n\n\n\n\n')
 
     if input_dimensions_gfs_3d is None:
         layer_object_gfs = layer_object_gfs_2d
