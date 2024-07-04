@@ -336,8 +336,12 @@ def _get_3d_conv_block(
 
     # Do actual stuff.
     current_layer_object = None
-    num_time_steps = input_layer_object.shape[-2]
+    # num_time_steps = input_layer_object.shape[-2]
     num_filters = input_layer_object.shape[-1]
+
+    num_time_steps = keras.layers.Lambda(
+        __get_num_time_steps, output_shape=()
+    )(input_layer_object)
 
     for i in range(num_conv_layers):
         this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
@@ -346,8 +350,7 @@ def _get_3d_conv_block(
             current_layer_object = architecture_utils.get_3d_conv_layer(
                 num_kernel_rows=filter_size_px,
                 num_kernel_columns=filter_size_px,
-                # num_kernel_heights=num_time_steps,
-                num_kernel_heights=None,
+                num_kernel_heights=num_time_steps,
                 num_rows_per_stride=1,
                 num_columns_per_stride=1,
                 num_heights_per_stride=1,
