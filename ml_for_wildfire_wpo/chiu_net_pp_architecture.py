@@ -76,6 +76,11 @@ def __get_num_time_steps(x):
     return tensorflow.shape(x)[-2]
 
 
+def __repeat_tensor(x, num_time_steps):
+    repeated = tensorflow.tile(x, [1, num_time_steps, 1, 1])  # Example: Tile `x` along time axis
+    return repeated
+
+
 def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
     """Determines number of channels for each input layer to skip connection.
 
@@ -1222,11 +1227,15 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         target_shape=new_dims, name='const_add-time-dim'
     )(layer_object_constants)
 
-    this_layer_object = keras.layers.Concatenate(
-        axis=-4, name='const_add-gfs-times'
-    )(
-        num_gfs_lead_times * [layer_object_constants]
-    )
+    this_layer_object = keras.layers.Lambda(
+        lambda x: __repeat_tensor(x[0], x[1]), name='repeated_tensor'
+    )([layer_object_constants, num_gfs_lead_times])
+
+    # this_layer_object = keras.layers.Concatenate(
+    #     axis=-4, name='const_add-gfs-times'
+    # )(
+    #     num_gfs_lead_times * [layer_object_constants]
+    # )
 
     layer_object_gfs = keras.layers.Concatenate(
         axis=-1, name='gfs_concat-const'
