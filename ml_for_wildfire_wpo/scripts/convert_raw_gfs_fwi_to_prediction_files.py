@@ -281,8 +281,7 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
     generator_option_dict = {
         neural_net.TARGET_FIELDS_KEY: TARGET_FIELD_NAMES,
         neural_net.TARGET_NORM_FILE_KEY: target_norm_file_name,
-        neural_net.MODEL_LEAD_TIMES_KEY:
-            numpy.array([lead_time_days], dtype=int)
+        neural_net.TARGET_LEAD_TIME_KEY: lead_time_days
     }
 
     fake_model_file_name = '{0:s}/fake_model_{1:s}/model.h5'.format(
