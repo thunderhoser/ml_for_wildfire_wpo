@@ -1116,7 +1116,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
 
         # num_gfs_lead_times = K.shape(input_layer_object_gfs_3d)[-2]
         num_gfs_lead_times = keras.layers.Lambda(
-            __get_num_time_steps, output_shape=(1,)
+            __get_num_time_steps, output_shape=()
         )(input_layer_object_gfs_3d)
 
     if input_dimensions_gfs_2d is None:
@@ -1132,7 +1132,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         )(input_layer_object_gfs_2d)
 
         num_gfs_lead_times = keras.layers.Lambda(
-            __get_num_time_steps, output_shape=(1,)
+            __get_num_time_steps, output_shape=()
         )(input_layer_object_gfs_2d)
 
     print(num_gfs_lead_times)
@@ -1195,7 +1195,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
 
     num_target_fields = input_dimensions_lagged_target[-1]
     num_target_lag_times = keras.layers.Lambda(
-        __get_num_time_steps, output_shape=(1,)
+        __get_num_time_steps, output_shape=()
     )(input_layer_object_lagged_target)
 
     if input_dimensions_era5 is None:
