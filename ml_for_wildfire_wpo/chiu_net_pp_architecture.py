@@ -346,7 +346,8 @@ def _get_3d_conv_block(
             current_layer_object = architecture_utils.get_3d_conv_layer(
                 num_kernel_rows=filter_size_px,
                 num_kernel_columns=filter_size_px,
-                num_kernel_heights=num_time_steps,
+                # num_kernel_heights=num_time_steps,
+                num_kernel_heights=None,
                 num_rows_per_stride=1,
                 num_columns_per_stride=1,
                 num_heights_per_stride=1,
