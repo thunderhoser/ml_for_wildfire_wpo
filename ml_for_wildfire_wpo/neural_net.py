@@ -55,7 +55,7 @@ ERA5_CONSTANT_FILE_KEY = 'era5_constant_file_name'
 ERA5_NORM_FILE_KEY = 'era5_normalization_file_name'
 ERA5_USE_QUANTILE_NORM_KEY = 'era5_use_quantile_norm'
 TARGET_FIELDS_KEY = 'target_field_names'
-MODEL_LEAD_TIMES_KEY = 'model_lead_times_days'
+TARGET_LEAD_TIME_KEY = 'target_lead_time_days'
 TARGET_LAG_TIMES_KEY = 'target_lag_times_days'
 GFS_FCST_TARGET_LEAD_TIMES_KEY = 'gfs_forecast_target_lead_times_days'
 TARGET_DIRECTORY_KEY = 'target_dir_name'
@@ -226,15 +226,8 @@ def _check_generator_args(option_dict):
     for this_field_name in option_dict[TARGET_FIELDS_KEY]:
         canadian_fwi_utils.check_field_name(this_field_name)
 
-    error_checking.assert_is_integer_numpy_array(
-        option_dict[MODEL_LEAD_TIMES_KEY]
-    )
-    error_checking.assert_is_geq_numpy_array(
-        option_dict[MODEL_LEAD_TIMES_KEY], 0
-    )
-    option_dict[MODEL_LEAD_TIMES_KEY] = numpy.unique(
-        option_dict[MODEL_LEAD_TIMES_KEY]
-    )
+    error_checking.assert_is_integer(option_dict[TARGET_LEAD_TIME_KEY])
+    error_checking.assert_is_geq(option_dict[TARGET_LEAD_TIME_KEY], 0)
 
     error_checking.assert_is_numpy_array(
         option_dict[TARGET_LAG_TIMES_KEY], num_dimensions=1
@@ -970,7 +963,6 @@ def data_generator(option_dict):
     F = number of ERA5-constant predictor fields
     l = number of time steps for lag/lead-target predictor fields
     T = number of target fields
-    A = number of lead times for model output
 
     :param option_dict: Dictionary with the following keys.
     option_dict["inner_latitude_limits_deg_n"]: length-2 numpy array with
@@ -1014,8 +1006,7 @@ def data_generator(option_dict):
         for ERA5 data.
     option_dict["target_field_names"]: length-T list with names of target fields
         (fire-weather indices).
-    option_dict["model_lead_times_days"]: length-A numpy array of lead times
-        for model output.
+    option_dict["target_lead_time_days"]: Lead time for target fields.
     option_dict["target_lag_times_days"]: 1-D numpy array with lag times for
         lagged-target predictors.  A "lagged-target predictor" consists of the
         actual target fields at one lag time.
@@ -1056,14 +1047,13 @@ def data_generator(option_dict):
     predictor_matrices[4]: E-by-M-by-N-by-T numpy array of baseline values for
         residual prediction.
 
-    :return: target_matrix_by_model_lead: length-A list.
-        target_matrix_by_model_lead[k] is an E-by-M-by-N-by-(T + 1) numpy array,
-        target_matrix_by_model_lead[k][..., 0] through
-        target_matrix_by_model_lead[k][..., -2] contain target fields for the
-        [k]th model lead time, while target_matrix_by_model_lead[k][..., -1]
-        contains a binary mask.  Where the binary mask is 0, predictions should
-        not be evaluated.
+    :return: target_matrix: E-by-M-by-N-by-(T + 1) numpy array, where
+        target_matrix[..., 0] through target_matrix[..., -2] contain values of
+        the target fields and target_matrix[..., -1] contains a binary mask.
+        Where the binary mask is 0, predictions should not be evaluated.
     """
+
+    # TODO(thunderhoser): Allow multiple lead times for target.
 
     # Everywhere in the U.S. -- even parts of Alaska west of the International
     # Date Line -- has a time zone behind UTC.  Thus, in the predictors, the GFS
@@ -1090,7 +1080,7 @@ def data_generator(option_dict):
     era5_normalization_file_name = option_dict[ERA5_NORM_FILE_KEY]
     era5_use_quantile_norm = option_dict[ERA5_USE_QUANTILE_NORM_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
-    model_lead_times_days = option_dict[MODEL_LEAD_TIMES_KEY]
+    target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
     target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
     gfs_forecast_target_lead_times_days = option_dict[
         GFS_FCST_TARGET_LEAD_TIMES_KEY
@@ -1194,7 +1184,7 @@ def data_generator(option_dict):
         gfs_predictor_matrix_2d = None
         laglead_target_predictor_matrix = None
         baseline_prediction_matrix = None
-        target_matrix_by_model_lead = None
+        target_matrix = None
         num_examples_in_memory = 0
 
         while num_examples_in_memory < num_examples_per_batch:
@@ -1289,24 +1279,22 @@ def data_generator(option_dict):
                     axis=-2
                 )
 
-            target_file_names = _find_target_files_needed_1example(
+            target_file_name = _find_target_files_needed_1example(
                 gfs_init_date_string=
                 gfs_io.file_name_to_date(gfs_file_names[gfs_file_index]),
                 target_dir_name=target_dir_name,
-                target_lead_times_days=model_lead_times_days
-            )
+                target_lead_times_days=
+                numpy.array([target_lead_time_days], dtype=int)
+            )[0]
 
-            this_target_matrix_by_model_lead = [
-                _get_target_fields(
-                    target_file_name=f,
-                    desired_row_indices=desired_target_row_indices,
-                    desired_column_indices=desired_target_column_indices,
-                    field_names=target_field_names,
-                    norm_param_table_xarray=None,
-                    use_quantile_norm=False
-                )
-                for f in target_file_names
-            ]
+            this_target_matrix = _get_target_fields(
+                target_file_name=target_file_name,
+                desired_row_indices=desired_target_row_indices,
+                desired_column_indices=desired_target_column_indices,
+                field_names=target_field_names,
+                norm_param_table_xarray=None,
+                use_quantile_norm=False
+            )
 
             if this_gfs_predictor_matrix_3d is not None:
                 if gfs_predictor_matrix_3d is None:
@@ -1355,19 +1343,13 @@ def data_generator(option_dict):
                 this_laglead_target_predictor_matrix
             )
 
-            if target_matrix_by_model_lead is None:
+            if target_matrix is None:
                 these_dim = (
-                    (num_examples_per_batch,) +
-                    this_target_matrix_by_model_lead[0].shape
+                    (num_examples_per_batch,) + this_target_matrix.shape
                 )
-                target_matrix_by_model_lead = len(model_lead_times_days) * [
-                    numpy.full(these_dim, numpy.nan)
-                ]
+                target_matrix = numpy.full(these_dim, numpy.nan)
 
-            for k in range(len(model_lead_times_days)):
-                target_matrix_by_model_lead[k][num_examples_in_memory, ...] = (
-                    this_target_matrix_by_model_lead[k]
-                )
+            target_matrix[num_examples_in_memory, ...] = this_target_matrix
 
             num_examples_in_memory += 1
             gfs_file_index += 1
@@ -1446,20 +1428,15 @@ def data_generator(option_dict):
                 str(era5_constant_matrix.shape)
             ))
 
-        target_matrix_by_model_lead = [
-            _pad_inner_to_outer_domain(
-                data_matrix=m,
-                outer_latitude_buffer_deg=outer_latitude_buffer_deg,
-                outer_longitude_buffer_deg=outer_longitude_buffer_deg,
-                is_example_axis_present=True,
-                fill_value=0.
-            )
-            for m in target_matrix_by_model_lead
-        ]
-        target_matrix_with_weights_by_model_lead = [
-            numpy.concatenate([m, weight_matrix], axis=-1)
-            for m in target_matrix_by_model_lead
-        ]
+        target_matrix = _pad_inner_to_outer_domain(
+            data_matrix=target_matrix,
+            outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+            outer_longitude_buffer_deg=outer_longitude_buffer_deg,
+            is_example_axis_present=True, fill_value=0.
+        )
+        target_matrix_with_weights = numpy.concatenate(
+            (target_matrix, weight_matrix), axis=-1
+        )
 
         predictor_matrices = {}
         if gfs_predictor_matrix_3d is not None:
@@ -1486,25 +1463,26 @@ def data_generator(option_dict):
             })
 
         print((
-            'Shape of target matrix (including weights as last channel): {0:s}'
+            'Shape of target matrix (including land mask as last channel): '
+            '{0:s}'
         ).format(
-            str(target_matrix_with_weights_by_model_lead[0].shape)
+            str(target_matrix_with_weights.shape)
+        ))
+
+        print((
+            'Shape of target matrix (including land mask as last channel): '
+            '{0:s}'
+        ).format(
+            str(target_matrix_with_weights.shape)
         ))
 
         print('Min and max target values = {0:.4f}, {1:.4f}'.format(
-            min([numpy.min(m) for m in target_matrix_by_model_lead]),
-            max([numpy.max(m) for m in target_matrix_by_model_lead])
+            numpy.min(target_matrix), numpy.max(target_matrix)
         ))
 
         # predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
-        if len(model_lead_times_days) > 1:
-            yield predictor_matrices, target_matrix_with_weights_by_model_lead
-        else:
-            yield (
-                predictor_matrices,
-                target_matrix_with_weights_by_model_lead[0]
-            )
+        yield predictor_matrices, target_matrix_with_weights
 
 
 def create_data(option_dict, init_date_string):
@@ -1551,7 +1529,7 @@ def create_data(option_dict, init_date_string):
     era5_normalization_file_name = option_dict[ERA5_NORM_FILE_KEY]
     era5_use_quantile_norm = option_dict[ERA5_USE_QUANTILE_NORM_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
-    target_lead_time_days = option_dict[MODEL_LEAD_TIMES_KEY][0]  # TODO(thunderhoser): Allow the multiple lead times.
+    target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
     target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
     gfs_forecast_target_lead_times_days = option_dict[
         GFS_FCST_TARGET_LEAD_TIMES_KEY
@@ -1838,7 +1816,7 @@ def create_data(option_dict, init_date_string):
     ]
 
     print((
-        'Shape of target matrix (including weights as last channel): '
+        'Shape of target matrix (including land mask as last channel): '
         '{0:s}'
     ).format(
         str(target_matrix_with_weights.shape)
@@ -2051,17 +2029,6 @@ def read_metafile(pickle_file_name):
     if DO_RESIDUAL_PREDICTION_KEY not in training_option_dict:
         training_option_dict[DO_RESIDUAL_PREDICTION_KEY] = False
         validation_option_dict[DO_RESIDUAL_PREDICTION_KEY] = False
-
-    if MODEL_LEAD_TIMES_KEY not in training_option_dict:
-        if 'target_lead_time_days' in training_option_dict:
-            model_lead_times_days = numpy.array(
-                [training_option_dict['target_lead_time_days']], dtype=int
-            )
-        else:
-            model_lead_times_days = numpy.array([2], dtype=int)
-
-        training_option_dict[MODEL_LEAD_TIMES_KEY] = model_lead_times_days
-        validation_option_dict[MODEL_LEAD_TIMES_KEY] = model_lead_times_days
 
     metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
     metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict
@@ -2306,8 +2273,6 @@ def apply_model(
     :return: prediction_matrix: E-by-M-by-N-by-T-by-S numpy array of predicted
         values.
     """
-
-    # TODO(thunderhoser): This needs to handle models with multiple lead times.
 
     # Check input args.
     for this_matrix in predictor_matrices:
