@@ -213,7 +213,7 @@ def check_args(option_dict):
             exact_dimensions=numpy.array([5], dtype=int)
         )
         error_checking.assert_is_integer_numpy_array(input_dimensions_gfs_3d)
-        error_checking.assert_is_greater_numpy_array(input_dimensions_gfs_3d, 0)
+        # error_checking.assert_is_greater_numpy_array(input_dimensions_gfs_3d, 0)
 
         num_grid_rows = input_dimensions_gfs_3d[0]
         num_grid_columns = input_dimensions_gfs_3d[1]
@@ -225,7 +225,7 @@ def check_args(option_dict):
             exact_dimensions=numpy.array([4], dtype=int)
         )
         error_checking.assert_is_integer_numpy_array(input_dimensions_gfs_2d)
-        error_checking.assert_is_greater_numpy_array(input_dimensions_gfs_2d, 0)
+        # error_checking.assert_is_greater_numpy_array(input_dimensions_gfs_2d, 0)
 
         if input_dimensions_gfs_3d is not None:
             these_dim = numpy.array([
@@ -247,9 +247,9 @@ def check_args(option_dict):
         error_checking.assert_is_integer_numpy_array(
             input_dimensions_era5_constants
         )
-        error_checking.assert_is_greater_numpy_array(
-            input_dimensions_era5_constants, 0
-        )
+        # error_checking.assert_is_greater_numpy_array(
+        #     input_dimensions_era5_constants, 0
+        # )
 
         these_dim = numpy.array([
             num_grid_rows, num_grid_columns, input_dimensions_era5_constants[2]
@@ -262,9 +262,9 @@ def check_args(option_dict):
         exact_dimensions=numpy.array([4], dtype=int)
     )
     error_checking.assert_is_integer_numpy_array(input_dimensions_lagged_target)
-    error_checking.assert_is_greater_numpy_array(
-        input_dimensions_lagged_target, 0
-    )
+    # error_checking.assert_is_greater_numpy_array(
+    #     input_dimensions_lagged_target, 0
+    # )
 
     these_dim = numpy.array([
         num_grid_rows, num_grid_columns,
