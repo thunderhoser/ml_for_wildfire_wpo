@@ -72,6 +72,10 @@ USE_EVIDENTIAL_KEY = chiu_net_arch.USE_EVIDENTIAL_KEY
 OPTIMIZER_FUNCTION_KEY = chiu_net_arch.OPTIMIZER_FUNCTION_KEY
 
 
+def __get_num_time_steps(x):
+    return tensorflow.shape(x)[-2]
+
+
 def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
     """Determines number of channels for each input layer to skip connection.
 
@@ -1110,7 +1114,10 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
             name='gfs_3d_flatten-pressure-levels'
         )(layer_object_gfs_3d)
 
-        num_gfs_lead_times = K.shape(input_layer_object_gfs_3d)[-2]
+        # num_gfs_lead_times = K.shape(input_layer_object_gfs_3d)[-2]
+        num_gfs_lead_times = keras.layers.Lambda(__get_num_time_steps)(
+            input_layer_object_gfs_3d
+        )
 
     if input_dimensions_gfs_2d is None:
         input_layer_object_gfs_2d = None
@@ -1124,7 +1131,9 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
             name='gfs_2d_put-time-first'
         )(input_layer_object_gfs_2d)
 
-        num_gfs_lead_times = K.shape(input_layer_object_gfs_2d)[-2]
+        num_gfs_lead_times = keras.layers.Lambda(__get_num_time_steps)(
+            input_layer_object_gfs_2d
+        )
 
     if input_dimensions_gfs_3d is None:
         layer_object_gfs = layer_object_gfs_2d
@@ -1177,9 +1186,13 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         num_grid_rows * [layer_object_lead_time]
     )
 
-    num_target_lag_times = K.shape(
+    # num_target_lag_times = K.shape(
+    #     input_layer_object_lagged_target
+    # )[-2]
+
+    num_target_lag_times = keras.layers.Lambda(__get_num_time_steps)(
         input_layer_object_lagged_target
-    )[-2]
+    )
     num_target_fields = input_dimensions_lagged_target[-1]
 
     if input_dimensions_era5 is None:
