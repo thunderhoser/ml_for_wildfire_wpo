@@ -1244,11 +1244,16 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         [layer_object_gfs, this_layer_object]
     )
 
-    this_layer_object = keras.layers.Concatenate(
-        axis=-4, name='const_add-lag-times'
-    )(
-        num_target_lag_times * [layer_object_constants]
-    )
+    this_layer_object = keras.layers.Lambda(
+        lambda x: __repeat_tensor(x[0], x[1]), name='repeated_tensor',
+        output_shape=(None, 265, 537, 8)
+    )([layer_object_constants, num_target_lag_times])
+
+    # this_layer_object = keras.layers.Concatenate(
+    #     axis=-4, name='const_add-lag-times'
+    # )(
+    #     num_target_lag_times * [layer_object_constants]
+    # )
 
     layer_object_lagged_target = keras.layers.Concatenate(
         axis=-1, name='lagged_targets_concat-const'
