@@ -9,6 +9,7 @@ import sys
 import numpy
 import keras
 import tensorflow
+from tensorflow.keras import backend as K
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -1109,7 +1110,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
             name='gfs_3d_flatten-pressure-levels'
         )(layer_object_gfs_3d)
 
-        num_gfs_lead_times = tensorflow.shape(input_layer_object_gfs_3d)[-2]
+        num_gfs_lead_times = K.shape(input_layer_object_gfs_3d)[-2]
 
     if input_dimensions_gfs_2d is None:
         input_layer_object_gfs_2d = None
@@ -1123,7 +1124,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
             name='gfs_2d_put-time-first'
         )(input_layer_object_gfs_2d)
 
-        num_gfs_lead_times = tensorflow.shape(input_layer_object_gfs_2d)[-2]
+        num_gfs_lead_times = K.shape(input_layer_object_gfs_2d)[-2]
 
     if input_dimensions_gfs_3d is None:
         layer_object_gfs = layer_object_gfs_2d
@@ -1176,7 +1177,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         num_grid_rows * [layer_object_lead_time]
     )
 
-    num_target_lag_times = tensorflow.shape(
+    num_target_lag_times = K.shape(
         input_layer_object_lagged_target
     )[-2]
     num_target_fields = input_dimensions_lagged_target[-1]
