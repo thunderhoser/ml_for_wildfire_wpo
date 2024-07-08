@@ -1376,6 +1376,9 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
     these_dims = (
         None, num_grid_rows, num_grid_columns, 1 + input_dimensions_era5[-1]
     )
+    second_dims = (None, 265, 537, 8)
+    print(these_dims == second_dims)
+
     print(these_dims)
     print(type(these_dims))
     print(num_grid_rows)
