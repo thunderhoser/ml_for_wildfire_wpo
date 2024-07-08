@@ -1375,7 +1375,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
 
     def dynamic_output_shape(input_shapes):
         shape1, shape2 = input_shapes
-        return (shape2[1], shape1[2], shape1[3], shape1[4])
+        return (shape1[0], shape2[1], shape1[2], shape1[3], shape1[4])
 
     print(layer_object_constants)
 
