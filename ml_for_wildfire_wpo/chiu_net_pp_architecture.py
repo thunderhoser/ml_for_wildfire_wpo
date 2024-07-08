@@ -110,7 +110,8 @@ def _get_lstm_layer(
         alpha_for_relu=recurrent_activ_function_alpha
     )
 
-    return keras.layers.LSTM(num_filters, return_sequences=return_sequences)
+    # return keras.layers.LSTM(num_filters, return_sequences=return_sequences)
+    return keras.layers.GRU(num_filters, return_sequences=return_sequences)
 
     # return keras.layers.LSTM(
     #     units=num_filters,
