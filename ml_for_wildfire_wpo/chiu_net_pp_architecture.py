@@ -1377,17 +1377,10 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         None, num_grid_rows, num_grid_columns, 1 + input_dimensions_era5[-1]
     )
     second_dims = (None, 265, 537, 8)
-    print(these_dims == second_dims)
-
-    print(these_dims)
-    print(type(these_dims))
-    print(num_grid_rows)
-    print(num_grid_columns)
-    print(1 + input_dimensions_era5[-1])
 
     this_layer_object = keras.layers.Lambda(
         lambda x: __repeat_tensor(x[0], x[1]), name='first_repeated_tensor',
-        output_shape=(None, 265, 537, 1 + input_dimensions_era5[-1])
+        output_shape=second_dims
     )([layer_object_constants, num_gfs_lead_times])
 
     # this_layer_object = keras.layers.Concatenate(
