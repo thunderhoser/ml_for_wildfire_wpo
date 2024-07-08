@@ -1373,11 +1373,13 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         target_shape=new_dims, name='const_add-time-dim'
     )(layer_object_constants)
 
-    these_dims = (None,) + layer_object_constants.shape[2:]
+    these_dims = (
+        None, num_grid_rows, num_grid_columns, 1 + input_dimensions_era5[-1]
+    )
     print(these_dims)
     this_layer_object = keras.layers.Lambda(
         lambda x: __repeat_tensor(x[0], x[1]), name='first_repeated_tensor',
-        output_shape=(None, layer_object_constants.shape[2], 537, 8)
+        output_shape=these_dims
     )([layer_object_constants, num_gfs_lead_times])
 
     # this_layer_object = keras.layers.Concatenate(
