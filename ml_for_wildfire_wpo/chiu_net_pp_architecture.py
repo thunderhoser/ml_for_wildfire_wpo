@@ -1377,10 +1377,14 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         shape1, shape2 = input_shapes
         return (shape2[0], shape1[1], shape1[2], shape1[3])
 
+    print(layer_object_constants)
+
     this_layer_object = keras.layers.Lambda(
         lambda x: __repeat_tensor(x[0], x[1]), name='first_repeated_tensor',
         output_shape=dynamic_output_shape
     )([layer_object_constants, layer_object_gfs])
+
+    print(this_layer_object)
 
     # this_layer_object = keras.layers.Concatenate(
     #     axis=-4, name='const_add-gfs-times'
