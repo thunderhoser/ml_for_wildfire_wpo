@@ -72,13 +72,52 @@ USE_EVIDENTIAL_KEY = chiu_net_arch.USE_EVIDENTIAL_KEY
 OPTIMIZER_FUNCTION_KEY = chiu_net_arch.OPTIMIZER_FUNCTION_KEY
 
 
-def __get_num_time_steps(x):
-    return tensorflow.shape(x)[-2]
+def __repeat_tensor_get_output_shape(input_shapes):
+    """Computes output shape for a Lambda layer that calls __repeat_tensor.
+    
+    :param input_shapes: length-2 list, where the [k]th item is the shape, in
+        tuple form, of the [k]th input to __repeat_tensor.
+    :return: output_shape: Output shape in tuple form.
+    """
+
+    first_shape, second_shape = input_shapes
+    return (
+        first_shape[0], second_shape[1],
+        first_shape[2], first_shape[3], first_shape[4]
+    )
 
 
-def __repeat_tensor(x, num_time_steps):
-    repeated = tensorflow.tile(x, [1, __get_num_time_steps(num_time_steps)[0], 1, 1])  # Example: Tile `x` along time axis
-    return repeated
+def _get_num_time_steps_time_first(input_tensor):
+    """Returns number of time steps in tensor.
+    
+    Time must be the first non-batch dimension.
+    
+    :param input_tensor: Keras tensor.
+    :return: num_time_steps: Keras tensor with shape of (1,).
+    """
+    
+    return tensorflow.shape(input_tensor)[1]
+
+
+def _repeat_tensor_along_time_axis(input_tensor_time_first,
+                                   comparison_tensor_time_first):
+    """Repeats input tensor along time axis.
+
+    Time must be the first non-batch dimension in each tensor.
+    
+    :param input_tensor_time_first: Keras tensor to be repeated.
+    :param comparison_tensor_time_first: Comparison tensor.  The output tensor
+        will have the same number of time steps as the comparison tensor.
+    :return: output_tensor_time_first: Same as input tensor but with more time
+        steps.
+    """
+
+    num_times = _get_num_time_steps_time_first(comparison_tensor_time_first)[0]
+
+    return tensorflow.tile(
+        input_tensor_time_first,
+        [1, num_times, 1, 1]
+    )
 
 
 def _get_lstm_layer(
@@ -388,11 +427,6 @@ def _get_3d_conv_block(
     current_layer_object = None
     num_time_steps = input_layer_object.shape[-2]
     num_filters = input_layer_object.shape[-1]
-
-    # num_time_steps = keras.layers.Lambda(
-    #     __get_num_time_steps, output_shape=()
-    # )(input_layer_object)
-    # num_time_steps = num_time_steps[0]
 
     for i in range(num_conv_layers):
         this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
@@ -1240,7 +1274,6 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         ensemble_size = 4
 
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
-    num_gfs_lead_times = None
 
     if input_dimensions_gfs_3d is None:
         input_layer_object_gfs_3d = None
@@ -1265,11 +1298,6 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
             name='gfs_3d_flatten-pressure-levels'
         )(layer_object_gfs_3d)
 
-        # num_gfs_lead_times = K.shape(input_layer_object_gfs_3d)[-2]
-        num_gfs_lead_times = keras.layers.Lambda(
-            __get_num_time_steps, output_shape=()
-        )(input_layer_object_gfs_3d)
-
     if input_dimensions_gfs_2d is None:
         input_layer_object_gfs_2d = None
         layer_object_gfs_2d = None
@@ -1281,14 +1309,6 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
             dims=(3, 1, 2, 4),
             name='gfs_2d_put-time-first'
         )(input_layer_object_gfs_2d)
-
-        num_gfs_lead_times = keras.layers.Lambda(
-            __get_num_time_steps, output_shape=()
-        )(input_layer_object_gfs_2d)
-
-    num_gfs_lead_times = num_gfs_lead_times[0]
-    print(num_gfs_lead_times)
-    print('\n\n\n\n\n\n')
 
     if input_dimensions_gfs_3d is None:
         layer_object_gfs = layer_object_gfs_2d
@@ -1341,14 +1361,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         num_grid_rows * [layer_object_lead_time]
     )
 
-    # num_target_lag_times = K.shape(
-    #     input_layer_object_lagged_target
-    # )[-2]
-
     num_target_fields = input_dimensions_lagged_target[-1]
-    num_target_lag_times = keras.layers.Lambda(
-        __get_num_time_steps, output_shape=()
-    )(input_layer_object_lagged_target)
 
     if input_dimensions_era5 is None:
         input_layer_object_era5 = None
@@ -1373,20 +1386,11 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         target_shape=new_dims, name='const_add-time-dim'
     )(layer_object_constants)
 
-    def dynamic_output_shape(input_shapes):
-        shape1, shape2 = input_shapes
-        return (shape1[0], shape2[1], shape1[2], shape1[3], shape1[4])
-
     this_layer_object = keras.layers.Lambda(
-        lambda x: __repeat_tensor(x[0], x[1]), name='first_repeated_tensor',
-        output_shape=dynamic_output_shape
+        lambda x: _repeat_tensor_along_time_axis(x[0], x[1]),
+        name='const_add-gfs-times',
+        output_shape=__repeat_tensor_get_output_shape
     )([layer_object_constants, layer_object_gfs])
-
-    # this_layer_object = keras.layers.Concatenate(
-    #     axis=-4, name='const_add-gfs-times'
-    # )(
-    #     num_gfs_lead_times * [layer_object_constants]
-    # )
 
     layer_object_gfs = keras.layers.Concatenate(
         axis=-1, name='gfs_concat-const'
@@ -1395,15 +1399,10 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
     )
 
     this_layer_object = keras.layers.Lambda(
-        lambda x: __repeat_tensor(x[0], x[1]), name='second_repeated_tensor',
-        output_shape=dynamic_output_shape
-    )([layer_object_constants, input_layer_object_lagged_target])
-
-    # this_layer_object = keras.layers.Concatenate(
-    #     axis=-4, name='const_add-lag-times'
-    # )(
-    #     num_target_lag_times * [layer_object_constants]
-    # )
+        lambda x: _repeat_tensor_along_time_axis(x[0], x[1]),
+        name='const_add-target-times',
+        output_shape=__repeat_tensor_get_output_shape
+    )([layer_object_constants, layer_object_lagged_target])
 
     layer_object_lagged_target = keras.layers.Concatenate(
         axis=-1, name='lagged_targets_concat-const'
