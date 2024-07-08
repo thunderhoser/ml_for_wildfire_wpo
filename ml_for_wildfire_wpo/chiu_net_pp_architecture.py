@@ -1433,7 +1433,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
 
         gfs_fcst_module_layer_objects[i] = _get_lstm_block(
             input_layer_object=gfs_encoder_conv_layer_objects[i],
-            num_lstm_layers=2, # TODO
+            num_lstm_layers=1, # TODO
             num_filters=gfs_encoder_num_channels_by_level[i], # TODO
             regularizer_object=regularizer_object,
             main_activ_function_name=inner_activ_function_name, # TODO
@@ -1441,7 +1441,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
             recurrent_activ_function_name=
             architecture_utils.SIGMOID_FUNCTION_STRING,
             recurrent_activ_function_alpha=0.,
-            dropout_rates=numpy.full(2, 0.), # TODO
+            dropout_rates=numpy.array([0.]), # TODO
             use_batch_norm=use_batch_normalization,
             basic_layer_name='gfs_fcst_level{0:d}'.format(i)
         )
@@ -1488,7 +1488,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
 
         lagtgt_fcst_module_layer_objects[i] = _get_lstm_block(
             input_layer_object=lagtgt_encoder_conv_layer_objects[i],
-            num_lstm_layers=2, # TODO
+            num_lstm_layers=1, # TODO
             num_filters=lagtgt_encoder_num_channels_by_level[i], # TODO
             regularizer_object=regularizer_object,
             main_activ_function_name=inner_activ_function_name, # TODO
@@ -1496,7 +1496,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
             recurrent_activ_function_name=
             architecture_utils.SIGMOID_FUNCTION_STRING,
             recurrent_activ_function_alpha=0.,
-            dropout_rates=numpy.full(2, 0.), # TODO
+            dropout_rates=numpy.array([0.]), # TODO
             use_batch_norm=use_batch_normalization,
             basic_layer_name='lagtgt_fcst_level{0:d}'.format(i)
         )
