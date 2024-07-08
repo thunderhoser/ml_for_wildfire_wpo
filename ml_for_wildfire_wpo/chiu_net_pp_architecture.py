@@ -1374,6 +1374,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
     )(layer_object_constants)
 
     these_dims = (None,) + layer_object_constants.shape[2:]
+    print(these_dims)
     this_layer_object = keras.layers.Lambda(
         lambda x: __repeat_tensor(x[0], x[1]), name='first_repeated_tensor',
         output_shape=these_dims
@@ -1392,6 +1393,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
     )
 
     these_dims = (None,) + layer_object_constants.shape[2:]
+    print(these_dims)
     this_layer_object = keras.layers.Lambda(
         lambda x: __repeat_tensor(x[0], x[1]), name='second_repeated_tensor',
         output_shape=these_dims
