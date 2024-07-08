@@ -77,7 +77,7 @@ def __get_num_time_steps(x):
 
 
 def __repeat_tensor(x, num_time_steps):
-    repeated = tensorflow.tile(x, [1, num_time_steps, 1, 1])  # Example: Tile `x` along time axis
+    repeated = tensorflow.tile(x, [1, len(num_time_steps), 1, 1])  # Example: Tile `x` along time axis
     return repeated
 
 
@@ -1373,15 +1373,14 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         target_shape=new_dims, name='const_add-time-dim'
     )(layer_object_constants)
 
-    these_dims = (
-        None, num_grid_rows, num_grid_columns, 1 + input_dimensions_era5[-1]
-    )
-    second_dims = (None, 265, 537, 8)
+    def dynamic_output_shape(input_shapes):
+        shape1, shape2 = input_shapes
+        return (shape2[0], shape1[1], shape1[2], shape1[3])
 
     this_layer_object = keras.layers.Lambda(
         lambda x: __repeat_tensor(x[0], x[1]), name='first_repeated_tensor',
-        output_shape=second_dims
-    )([layer_object_constants, num_gfs_lead_times])
+        output_shape=dynamic_output_shape
+    )([layer_object_constants, numpy.full(num_gfs_lead_times, 0.)])
 
     # this_layer_object = keras.layers.Concatenate(
     #     axis=-4, name='const_add-gfs-times'
