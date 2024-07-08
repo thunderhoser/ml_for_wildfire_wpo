@@ -563,20 +563,15 @@ def _get_lstm_block(
     assert len(dropout_rates) == num_lstm_layers
 
     # Do actual stuff.
-    num_grid_rows = input_layer_object.shape[2]
-    num_grid_columns = input_layer_object.shape[3]
-
-    # this_name = '{0:s}_flatten-space'.format(basic_layer_name)
-    # flattening_layer_object = keras.layers.Flatten()
-    # current_layer_object = keras.layers.TimeDistributed(
-    #     flattening_layer_object, name=this_name
-    # )(input_layer_object)
-
-    current_layer_object = input_layer_object
+    current_layer_object = None
 
     for i in range(num_lstm_layers):
-        this_name = '{0:s}_lstm{1:d}'.format(basic_layer_name, i)
+        if current_layer_object is None:
+            this_input_layer_object = input_layer_object
+        else:
+            this_input_layer_object = current_layer_object
 
+        this_name = '{0:s}_lstm{1:d}'.format(basic_layer_name, i)
         current_layer_object = _get_lstm_layer(
             main_activ_function_name=main_activ_function_name,
             main_activ_function_alpha=main_activ_function_alpha,
@@ -586,7 +581,7 @@ def _get_lstm_block(
             regularizer_object=regularizer_object,
             layer_name=this_name,
             return_sequences=i < num_lstm_layers - 1
-        )(current_layer_object)
+        )(this_input_layer_object)
 
         if dropout_rates[i] > 0:
             this_name = '{0:s}_dropout{1:d}'.format(basic_layer_name, i)
@@ -599,12 +594,6 @@ def _get_lstm_block(
             current_layer_object = architecture_utils.get_batch_norm_layer(
                 layer_name=this_name
             )(current_layer_object)
-
-    # new_dims = (num_grid_rows, num_grid_columns, num_filters)
-    # this_name = '{0:s}_restore-space'.format(basic_layer_name)
-    # current_layer_object = keras.layers.Reshape(
-    #     target_shape=new_dims, name=this_name
-    # )(current_layer_object)
 
     return current_layer_object
 
