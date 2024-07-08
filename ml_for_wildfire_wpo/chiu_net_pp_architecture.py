@@ -111,7 +111,7 @@ def _get_lstm_layer(
     )
 
     # return keras.layers.LSTM(num_filters, return_sequences=return_sequences)
-    return keras.layers.GRU(num_filters, return_sequences=return_sequences)
+    return keras.layers.ConvLSTM2D(filters=num_filters, kernel_size=1, data_format='channels_last', return_sequences=return_sequences)
 
     # return keras.layers.LSTM(
     #     units=num_filters,
