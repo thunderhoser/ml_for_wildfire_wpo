@@ -530,11 +530,13 @@ def _get_lstm_block(
     num_grid_rows = input_layer_object.shape[2]
     num_grid_columns = input_layer_object.shape[3]
 
-    this_name = '{0:s}_flatten-space'.format(basic_layer_name)
-    flattening_layer_object = keras.layers.Flatten()
-    current_layer_object = keras.layers.TimeDistributed(
-        flattening_layer_object, name=this_name
-    )(input_layer_object)
+    # this_name = '{0:s}_flatten-space'.format(basic_layer_name)
+    # flattening_layer_object = keras.layers.Flatten()
+    # current_layer_object = keras.layers.TimeDistributed(
+    #     flattening_layer_object, name=this_name
+    # )(input_layer_object)
+
+    current_layer_object = input_layer_object
 
     for i in range(num_lstm_layers):
         this_name = '{0:s}_lstm{1:d}'.format(basic_layer_name, i)
@@ -562,11 +564,11 @@ def _get_lstm_block(
                 layer_name=this_name
             )(current_layer_object)
 
-    new_dims = (num_grid_rows, num_grid_columns, num_filters)
-    this_name = '{0:s}_restore-space'.format(basic_layer_name)
-    current_layer_object = keras.layers.Reshape(
-        target_shape=new_dims, name=this_name
-    )(current_layer_object)
+    # new_dims = (num_grid_rows, num_grid_columns, num_filters)
+    # this_name = '{0:s}_restore-space'.format(basic_layer_name)
+    # current_layer_object = keras.layers.Reshape(
+    #     target_shape=new_dims, name=this_name
+    # )(current_layer_object)
 
     return current_layer_object
 
