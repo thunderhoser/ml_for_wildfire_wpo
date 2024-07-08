@@ -14,7 +14,7 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import custom_losses
 import custom_metrics
 import neural_net
-import chiu_net_pp_architecture as chiu_net_pp_arch
+import chiu_net_pp_flexi_architecture as chiu_net_pp_flexi_arch
 import architecture_utils
 import file_system_utils
 
@@ -139,61 +139,59 @@ OPTIMIZER_FUNCTION_STRING = (
 )
 
 DEFAULT_OPTION_DICT = {
-    # chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY: numpy.array(
+    # chiu_net_pp_flexi_arch.GFS_3D_DIMENSIONS_KEY: numpy.array(
     #     [265, 537, 2, NUM_GFS_LEAD_TIMES, 5], dtype=int
     # ),
-    # chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
+    # chiu_net_pp_flexi_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
     #     [265, 537, NUM_GFS_LEAD_TIMES, 7], dtype=int
     # ),
-    chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
+    chiu_net_pp_flexi_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
         [265, 537, 7], dtype=int
     ),
-    # chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
+    # chiu_net_pp_flexi_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
     #     [265, 537, 6, 7], dtype=int
     # ),
-    chiu_net_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array(
+    chiu_net_pp_flexi_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array(
         [265, 537, 6], dtype=int
     ),
-    chiu_net_pp_arch.GFS_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
-    chiu_net_pp_arch.GFS_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
-    chiu_net_pp_arch.GFS_FC_MODULE_USE_3D_CONV: True,
-    chiu_net_pp_arch.LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
-    chiu_net_pp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
-    chiu_net_pp_arch.LAGTGT_FC_MODULE_USE_3D_CONV: True,
-    chiu_net_pp_arch.NUM_LEVELS_KEY: 6,
-    chiu_net_pp_arch.GFS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
+    chiu_net_pp_flexi_arch.GFS_FC_MODULE_NUM_LSTM_LAYERS_KEY: 2,
+    chiu_net_pp_flexi_arch.GFS_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0., 0.]),
+    chiu_net_pp_flexi_arch.LAGTGT_FC_MODULE_NUM_LSTM_LAYERS_KEY: 2,
+    chiu_net_pp_flexi_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0., 0.]),
+    chiu_net_pp_flexi_arch.NUM_LEVELS_KEY: 6,
+    chiu_net_pp_flexi_arch.GFS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
         7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
     ),
-    chiu_net_pp_arch.GFS_ENCODER_NUM_CHANNELS_KEY: numpy.array(
+    chiu_net_pp_flexi_arch.GFS_ENCODER_NUM_CHANNELS_KEY: numpy.array(
         [25, 37, 50, 62, 75, 87, 100], dtype=int
     ),
-    chiu_net_pp_arch.GFS_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
-    chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
+    chiu_net_pp_flexi_arch.GFS_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
+    chiu_net_pp_flexi_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
         7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
     ),
-    chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array(
+    chiu_net_pp_flexi_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array(
         [15, 20, 25, 30, 35, 40, 45], dtype=int
     ),
-    chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
-    chiu_net_pp_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(6, 2, dtype=int),
-    chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY: numpy.array(
+    chiu_net_pp_flexi_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
+    chiu_net_pp_flexi_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(6, 2, dtype=int),
+    chiu_net_pp_flexi_arch.DECODER_NUM_CHANNELS_KEY: numpy.array(
         [20, 28, 37, 46, 55, 63], dtype=int
     ),
-    chiu_net_pp_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(6, 0.),
-    chiu_net_pp_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(6, 0.),
-    chiu_net_pp_arch.INCLUDE_PENULTIMATE_KEY: False,
-    chiu_net_pp_arch.INNER_ACTIV_FUNCTION_KEY:
+    chiu_net_pp_flexi_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(6, 0.),
+    chiu_net_pp_flexi_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(6, 0.),
+    chiu_net_pp_flexi_arch.INCLUDE_PENULTIMATE_KEY: False,
+    chiu_net_pp_flexi_arch.INNER_ACTIV_FUNCTION_KEY:
         architecture_utils.RELU_FUNCTION_STRING,
-    chiu_net_pp_arch.INNER_ACTIV_FUNCTION_ALPHA_KEY: 0.2,
-    chiu_net_pp_arch.OUTPUT_ACTIV_FUNCTION_KEY:
+    chiu_net_pp_flexi_arch.INNER_ACTIV_FUNCTION_ALPHA_KEY: 0.2,
+    chiu_net_pp_flexi_arch.OUTPUT_ACTIV_FUNCTION_KEY:
         architecture_utils.RELU_FUNCTION_STRING,
-    chiu_net_pp_arch.OUTPUT_ACTIV_FUNCTION_ALPHA_KEY: 0.,
-    chiu_net_pp_arch.L1_WEIGHT_KEY: 0.,
-    chiu_net_pp_arch.L2_WEIGHT_KEY: 1e-6,
-    chiu_net_pp_arch.USE_BATCH_NORM_KEY: True,
-    chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 25,
-    # chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION,
-    chiu_net_pp_arch.USE_RESIDUAL_BLOCKS_KEY: True
+    chiu_net_pp_flexi_arch.OUTPUT_ACTIV_FUNCTION_ALPHA_KEY: 0.,
+    chiu_net_pp_flexi_arch.L1_WEIGHT_KEY: 0.,
+    chiu_net_pp_flexi_arch.L2_WEIGHT_KEY: 1e-6,
+    chiu_net_pp_flexi_arch.USE_BATCH_NORM_KEY: True,
+    chiu_net_pp_flexi_arch.ENSEMBLE_SIZE_KEY: 25,
+    # chiu_net_pp_flexi_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION,
+    chiu_net_pp_flexi_arch.USE_RESIDUAL_BLOCKS_KEY: True
 }
 
 NUM_GFS_PRESSURE_LEVELS = 2
@@ -216,14 +214,14 @@ def _run():
     these_dim_laglead = numpy.array([265, 537, -1, 6], dtype=int)
 
     option_dict.update({
-        chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY:
+        chiu_net_pp_flexi_arch.GFS_3D_DIMENSIONS_KEY:
             None if numpy.any(these_dim_3d == 0) else these_dim_3d,
-        chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: these_dim_2d,
-        chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: these_dim_laglead,
-        chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
+        chiu_net_pp_flexi_arch.GFS_2D_DIMENSIONS_KEY: these_dim_2d,
+        chiu_net_pp_flexi_arch.LAGTGT_DIMENSIONS_KEY: these_dim_laglead,
+        chiu_net_pp_flexi_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
     })
 
-    model_object = chiu_net_pp_arch.create_flexible_lead_time_model(
+    model_object = chiu_net_pp_flexi_arch.create_model(
         option_dict=option_dict,
         loss_function=LOSS_FUNCTION,
         metric_list=METRIC_FUNCTIONS

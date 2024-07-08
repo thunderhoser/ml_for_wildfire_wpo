@@ -9,7 +9,6 @@ import sys
 import numpy
 import keras
 import tensorflow
-from tensorflow.keras import backend as K
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -70,106 +69,6 @@ ENSEMBLE_SIZE_KEY = chiu_net_arch.ENSEMBLE_SIZE_KEY
 USE_EVIDENTIAL_KEY = chiu_net_arch.USE_EVIDENTIAL_KEY
 
 OPTIMIZER_FUNCTION_KEY = chiu_net_arch.OPTIMIZER_FUNCTION_KEY
-
-
-def __repeat_tensor_get_output_shape(input_shapes):
-    """Computes output shape for a Lambda layer that calls __repeat_tensor.
-    
-    :param input_shapes: length-2 list, where the [k]th item is the shape, in
-        tuple form, of the [k]th input to __repeat_tensor.
-    :return: output_shape: Output shape in tuple form.
-    """
-
-    first_shape, second_shape = input_shapes
-    return (
-        first_shape[0], second_shape[1],
-        first_shape[2], first_shape[3], first_shape[4]
-    )
-
-
-def _get_num_time_steps_time_first(input_tensor):
-    """Returns number of time steps in tensor.
-    
-    Time must be the first non-batch dimension.
-    
-    :param input_tensor: Keras tensor.
-    :return: num_time_steps: Keras tensor with shape of (1,).
-    """
-    
-    return tensorflow.shape(input_tensor)[1]
-
-
-def _repeat_tensor_along_time_axis(input_tensor_time_first,
-                                   comparison_tensor_time_first):
-    """Repeats input tensor along time axis.
-
-    Time must be the first non-batch dimension in each tensor.
-    
-    :param input_tensor_time_first: Keras tensor to be repeated.
-    :param comparison_tensor_time_first: Comparison tensor.  The output tensor
-        will have the same number of time steps as the comparison tensor.
-    :return: output_tensor_time_first: Same as input tensor but with more time
-        steps.
-    """
-
-    num_times = _get_num_time_steps_time_first(comparison_tensor_time_first)[0]
-
-    return tensorflow.tile(
-        input_tensor_time_first,
-        [1, num_times, 1, 1]
-    )
-
-
-def _get_lstm_layer(
-        main_activ_function_name, main_activ_function_alpha,
-        recurrent_activ_function_name, recurrent_activ_function_alpha,
-        num_filters, regularizer_object, layer_name, return_sequences):
-    """Returns LSTM layer with the desired hyperparameters.
-
-    :param main_activ_function_name: See documentation for `_get_lstm_block`.
-    :param main_activ_function_alpha: Same.
-    :param recurrent_activ_function_name: Same.
-    :param recurrent_activ_function_alpha: Same.
-    :param num_filters: Same.
-    :param regularizer_object: Same.
-    :param layer_name: Layer name.
-    :param return_sequences: Boolean flag.  If True (False), layer will (not)
-        include time dimension.
-    :return: lstm_layer_object: Instance of `keras.layers.LSTM`.
-    """
-
-    main_activ_function = architecture_utils.get_activation_layer(
-        activation_function_string=main_activ_function_name,
-        alpha_for_elu=main_activ_function_alpha,
-        alpha_for_relu=main_activ_function_alpha
-    )
-    recurrent_activ_function = architecture_utils.get_activation_layer(
-        activation_function_string=recurrent_activ_function_name,
-        alpha_for_elu=recurrent_activ_function_alpha,
-        alpha_for_relu=recurrent_activ_function_alpha
-    )
-
-    return keras.layers.ConvLSTM2D(
-        filters=num_filters,
-        kernel_size=1,
-        strides=1,
-        dilation_rate=1,
-        padding='valid',
-        data_format='channels_last',
-        activation=main_activ_function,
-        recurrent_activation=recurrent_activ_function,
-        use_bias=True,
-        kernel_initializer='glorot_uniform',
-        recurrent_initializer='orthogonal',
-        bias_initializer='zeros',
-        unit_forget_bias=True,
-        kernel_regularizer=regularizer_object,
-        recurrent_regularizer=regularizer_object,
-        bias_regularizer=regularizer_object,
-        activity_regularizer=None,
-        return_sequences=return_sequences,
-        name=layer_name
-    )
 
 
 def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
@@ -397,7 +296,7 @@ def _get_3d_conv_block(
     """Creates convolutional block for data with 3 spatial dimensions.
 
     :param input_layer_object: Input layer to block (with 3 spatial dims).
-    :param do_residual: See documentation for `_get_2d_conv_block`.
+    :param do_residual: See documentation for `_get_3d_conv_block`.
     :param num_conv_layers: Same.
     :param filter_size_px: Same.
     :param regularizer_object: Same.
@@ -437,7 +336,7 @@ def _get_3d_conv_block(
             current_layer_object = architecture_utils.get_3d_conv_layer(
                 num_kernel_rows=filter_size_px,
                 num_kernel_columns=filter_size_px,
-                num_kernel_heights=num_time_steps * 2,
+                num_kernel_heights=num_time_steps,
                 num_rows_per_stride=1,
                 num_columns_per_stride=1,
                 num_heights_per_stride=1,
@@ -472,10 +371,10 @@ def _get_3d_conv_block(
             this_layer_object = architecture_utils.get_3d_pooling_layer(
                 num_rows_in_window=1,
                 num_columns_in_window=1,
-                num_heights_in_window=num_time_steps * 2,
+                num_heights_in_window=num_time_steps,
                 num_rows_per_stride=1,
                 num_columns_per_stride=1,
-                num_heights_per_stride=num_time_steps * 2,
+                num_heights_per_stride=num_time_steps,
                 pooling_type_string=architecture_utils.MEAN_POOLING_STRING,
                 layer_name=this_name
             )(input_layer_object)
@@ -502,86 +401,6 @@ def _get_3d_conv_block(
             alpha_for_elu=activation_function_alpha,
             layer_name=this_name
         )(current_layer_object)
-
-        if dropout_rates[i] > 0:
-            this_name = '{0:s}_dropout{1:d}'.format(basic_layer_name, i)
-            current_layer_object = architecture_utils.get_dropout_layer(
-                dropout_fraction=dropout_rates[i], layer_name=this_name
-            )(current_layer_object)
-
-        if use_batch_norm:
-            this_name = '{0:s}_bn{1:d}'.format(basic_layer_name, i)
-            current_layer_object = architecture_utils.get_batch_norm_layer(
-                layer_name=this_name
-            )(current_layer_object)
-
-    return current_layer_object
-
-
-def _get_lstm_block(
-        input_layer_object, num_lstm_layers, num_filters, regularizer_object,
-        main_activ_function_name, main_activ_function_alpha,
-        recurrent_activ_function_name, recurrent_activ_function_alpha,
-        dropout_rates, use_batch_norm, basic_layer_name):
-    """Creates LSTM block.
-
-    :param input_layer_object: Input layer to block (with 2 spatial dims and 1
-        time dim).
-    :param num_lstm_layers: Number of LSTM layers in block.
-    :param num_filters: Number of filters (same for every LSTM layer).
-    :param regularizer_object: See documentation for `_get_2d_conv_block`.
-    :param main_activ_function_name: Name of main activation function -- same
-        for every LSTM layer.  Must be accepted by
-        `architecture_utils.check_activation_function`.
-    :param main_activ_function_alpha: Alpha (slope parameter) for main
-        activation function -- same for every LSTM layer.  Applies only to ReLU
-        and eLU.
-    :param recurrent_activ_function_name: Name of activation function for
-        recurrent step -- same for every LSTM layer.  Must be accepted by
-        `architecture_utils.check_activation_function`.
-    :param recurrent_activ_function_alpha: Alpha (slope parameter) for
-        activation function for recurrent step -- same for every LSTM layer.
-        Applies only to ReLU and eLU.
-    :param dropout_rates: See documentation for `_get_2d_conv_block`.
-    :param use_batch_norm: Same.
-    :param basic_layer_name: Same.
-    :return: output_layer_object: Output layer from block (with 2 spatial dims
-        and 0 time dims).
-    """
-
-    # Process input args.
-    try:
-        _ = len(dropout_rates)
-    except:
-        dropout_rates = numpy.full(num_lstm_layers, dropout_rates)
-
-    if len(dropout_rates) < num_lstm_layers:
-        dropout_rates = numpy.concatenate([
-            dropout_rates, dropout_rates[[-1]]
-        ])
-
-    assert len(dropout_rates) == num_lstm_layers
-
-    # Do actual stuff.
-    current_layer_object = None
-
-    for i in range(num_lstm_layers):
-        if current_layer_object is None:
-            this_input_layer_object = input_layer_object
-        else:
-            this_input_layer_object = current_layer_object
-
-        this_name = '{0:s}_lstm{1:d}'.format(basic_layer_name, i)
-        current_layer_object = _get_lstm_layer(
-            main_activ_function_name=main_activ_function_name,
-            main_activ_function_alpha=main_activ_function_alpha,
-            recurrent_activ_function_name=recurrent_activ_function_name,
-            recurrent_activ_function_alpha=recurrent_activ_function_alpha,
-            num_filters=num_filters,
-            regularizer_object=regularizer_object,
-            layer_name=this_name,
-            return_sequences=i < num_lstm_layers - 1
-        )(this_input_layer_object)
 
         if dropout_rates[i] > 0:
             this_name = '{0:s}_dropout{1:d}'.format(basic_layer_name, i)
@@ -1265,6 +1084,7 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         ensemble_size = 4
 
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
+    num_gfs_lead_times = None
 
     if input_dimensions_gfs_3d is None:
         input_layer_object_gfs_3d = None
@@ -1289,6 +1109,8 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
             name='gfs_3d_flatten-pressure-levels'
         )(layer_object_gfs_3d)
 
+        num_gfs_lead_times = tensorflow.shape(input_layer_object_gfs_3d)[-2]
+
     if input_dimensions_gfs_2d is None:
         input_layer_object_gfs_2d = None
         layer_object_gfs_2d = None
@@ -1300,6 +1122,8 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
             dims=(3, 1, 2, 4),
             name='gfs_2d_put-time-first'
         )(input_layer_object_gfs_2d)
+
+        num_gfs_lead_times = tensorflow.shape(input_layer_object_gfs_2d)[-2]
 
     if input_dimensions_gfs_3d is None:
         layer_object_gfs = layer_object_gfs_2d
@@ -1352,6 +1176,9 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         num_grid_rows * [layer_object_lead_time]
     )
 
+    num_target_lag_times = tensorflow.shape(
+        input_layer_object_lagged_target
+    )[-2]
     num_target_fields = input_dimensions_lagged_target[-1]
 
     if input_dimensions_era5 is None:
@@ -1377,11 +1204,11 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         target_shape=new_dims, name='const_add-time-dim'
     )(layer_object_constants)
 
-    this_layer_object = keras.layers.Lambda(
-        lambda x: _repeat_tensor_along_time_axis(x[0], x[1]),
-        name='const_add-gfs-times',
-        output_shape=__repeat_tensor_get_output_shape
-    )([layer_object_constants, layer_object_gfs])
+    this_layer_object = keras.layers.Concatenate(
+        axis=-4, name='const_add-gfs-times'
+    )(
+        num_gfs_lead_times * [layer_object_constants]
+    )
 
     layer_object_gfs = keras.layers.Concatenate(
         axis=-1, name='gfs_concat-const'
@@ -1389,11 +1216,11 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         [layer_object_gfs, this_layer_object]
     )
 
-    this_layer_object = keras.layers.Lambda(
-        lambda x: _repeat_tensor_along_time_axis(x[0], x[1]),
-        name='const_add-target-times',
-        output_shape=__repeat_tensor_get_output_shape
-    )([layer_object_constants, layer_object_lagged_target])
+    this_layer_object = keras.layers.Concatenate(
+        axis=-4, name='const_add-lag-times'
+    )(
+        num_target_lag_times * [layer_object_constants]
+    )
 
     layer_object_lagged_target = keras.layers.Concatenate(
         axis=-1, name='lagged_targets_concat-const'
@@ -1430,20 +1257,47 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
             basic_layer_name='gfs_encoder_level{0:d}'.format(i)
         )
 
-        gfs_fcst_module_layer_objects[i] = _get_lstm_block(
-            input_layer_object=gfs_encoder_conv_layer_objects[i],
-            num_lstm_layers=2, # TODO
-            num_filters=gfs_encoder_num_channels_by_level[i], # TODO
-            regularizer_object=regularizer_object,
-            main_activ_function_name=inner_activ_function_name, # TODO
-            main_activ_function_alpha=inner_activ_function_alpha, # TODO
-            recurrent_activ_function_name=
-            architecture_utils.SIGMOID_FUNCTION_STRING,
-            recurrent_activ_function_alpha=0.,
-            dropout_rates=numpy.full(2, 0.), # TODO
-            use_batch_norm=use_batch_normalization,
-            basic_layer_name='gfs_fcst_level{0:d}'.format(i)
-        )
+        this_name = 'gfs_fcst_level{0:d}_put-time-last'.format(i)
+        gfs_fcst_module_layer_objects[i] = keras.layers.Permute(
+            dims=(2, 3, 1, 4), name=this_name
+        )(gfs_encoder_conv_layer_objects[i])
+
+        if gfs_fcst_use_3d_conv:
+            gfs_fcst_module_layer_objects[i] = _get_3d_conv_block(
+                input_layer_object=gfs_fcst_module_layer_objects[i],
+                do_residual=use_residual_blocks,
+                num_conv_layers=gfs_fcst_num_conv_layers,
+                filter_size_px=1,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=gfs_fcst_dropout_rates,
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='gfs_fcst_level{0:d}'.format(i)
+            )
+        else:
+            orig_dims = gfs_fcst_module_layer_objects[i].shape
+            new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
+
+            this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
+            gfs_fcst_module_layer_objects[i] = keras.layers.Reshape(
+                target_shape=new_dims, name=this_name
+            )(gfs_fcst_module_layer_objects[i])
+
+            gfs_fcst_module_layer_objects[i] = _get_2d_conv_block(
+                input_layer_object=gfs_fcst_module_layer_objects[i],
+                do_residual=use_residual_blocks,
+                num_conv_layers=gfs_fcst_num_conv_layers,
+                filter_size_px=1,
+                num_filters=gfs_encoder_num_channels_by_level[i],
+                do_time_distributed_conv=False,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=gfs_fcst_dropout_rates,
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='gfs_fcst_level{0:d}'.format(i)
+            )
 
         if i == num_levels:
             break
@@ -1485,20 +1339,47 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
             basic_layer_name='lagtgt_encoder_level{0:d}'.format(i)
         )
 
-        lagtgt_fcst_module_layer_objects[i] = _get_lstm_block(
-            input_layer_object=lagtgt_encoder_conv_layer_objects[i],
-            num_lstm_layers=2, # TODO
-            num_filters=lagtgt_encoder_num_channels_by_level[i], # TODO
-            regularizer_object=regularizer_object,
-            main_activ_function_name=inner_activ_function_name, # TODO
-            main_activ_function_alpha=inner_activ_function_alpha, # TODO
-            recurrent_activ_function_name=
-            architecture_utils.SIGMOID_FUNCTION_STRING,
-            recurrent_activ_function_alpha=0.,
-            dropout_rates=numpy.full(2, 0.), # TODO
-            use_batch_norm=use_batch_normalization,
-            basic_layer_name='lagtgt_fcst_level{0:d}'.format(i)
-        )
+        this_name = 'lagtgt_fcst_level{0:d}_put-time-last'.format(i)
+        lagtgt_fcst_module_layer_objects[i] = keras.layers.Permute(
+            dims=(2, 3, 1, 4), name=this_name
+        )(lagtgt_encoder_conv_layer_objects[i])
+
+        if lagtgt_fcst_use_3d_conv:
+            lagtgt_fcst_module_layer_objects[i] = _get_3d_conv_block(
+                input_layer_object=lagtgt_fcst_module_layer_objects[i],
+                do_residual=use_residual_blocks,
+                num_conv_layers=lagtgt_fcst_num_conv_layers,
+                filter_size_px=1,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=lagtgt_fcst_dropout_rates,
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='lagtgt_fcst_level{0:d}'.format(i)
+            )
+        else:
+            orig_dims = lagtgt_fcst_module_layer_objects[i].shape
+            new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
+
+            this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
+            lagtgt_fcst_module_layer_objects[i] = keras.layers.Reshape(
+                target_shape=new_dims, name=this_name
+            )(lagtgt_fcst_module_layer_objects[i])
+
+            lagtgt_fcst_module_layer_objects[i] = _get_2d_conv_block(
+                input_layer_object=lagtgt_fcst_module_layer_objects[i],
+                do_residual=use_residual_blocks,
+                num_conv_layers=lagtgt_fcst_num_conv_layers,
+                filter_size_px=1,
+                num_filters=lagtgt_encoder_num_channels_by_level[i],
+                do_time_distributed_conv=False,
+                regularizer_object=regularizer_object,
+                activation_function_name=inner_activ_function_name,
+                activation_function_alpha=inner_activ_function_alpha,
+                dropout_rates=lagtgt_fcst_dropout_rates,
+                use_batch_norm=use_batch_normalization,
+                basic_layer_name='lagtgt_fcst_level{0:d}'.format(i)
+            )
 
         if i == num_levels:
             break
