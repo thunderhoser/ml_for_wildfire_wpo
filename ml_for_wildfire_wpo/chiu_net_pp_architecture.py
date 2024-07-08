@@ -110,22 +110,24 @@ def _get_lstm_layer(
         alpha_for_relu=recurrent_activ_function_alpha
     )
 
-    return keras.layers.LSTM(
-        units=num_filters,
-        activation=main_activ_function,
-        recurrent_activation=recurrent_activ_function,
-        use_bias=True,
-        kernel_initializer='glorot_uniform',
-        recurrent_initializer='orthogonal',
-        bias_initializer='zeros',
-        unit_forget_bias=True,
-        kernel_regularizer=regularizer_object,
-        recurrent_regularizer=regularizer_object,
-        bias_regularizer=regularizer_object,
-        activity_regularizer=None,
-        return_sequences=return_sequences,
-        name=layer_name
-    )
+    return keras.layers.LSTM(num_filters, return_sequences=return_sequences)
+
+    # return keras.layers.LSTM(
+    #     units=num_filters,
+    #     activation=main_activ_function,
+    #     recurrent_activation=recurrent_activ_function,
+    #     use_bias=True,
+    #     kernel_initializer='glorot_uniform',
+    #     recurrent_initializer='orthogonal',
+    #     bias_initializer='zeros',
+    #     unit_forget_bias=True,
+    #     kernel_regularizer=regularizer_object,
+    #     recurrent_regularizer=regularizer_object,
+    #     bias_regularizer=regularizer_object,
+    #     activity_regularizer=None,
+    #     return_sequences=return_sequences,
+    #     name=layer_name
+    # )
 
 
 def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
