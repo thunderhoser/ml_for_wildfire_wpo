@@ -1377,6 +1377,10 @@ def create_flexible_lead_time_model(option_dict, loss_function, metric_list):
         shape1, shape2 = input_shapes
         return (shape2[0], shape1[1], shape1[2], shape1[3])
 
+    print(num_gfs_lead_times)
+    print(K.eval(num_gfs_lead_times))
+    print(numpy.full(num_gfs_lead_times, 0.))
+
     this_layer_object = keras.layers.Lambda(
         lambda x: __repeat_tensor(x[0], x[1]), name='first_repeated_tensor',
         output_shape=dynamic_output_shape
