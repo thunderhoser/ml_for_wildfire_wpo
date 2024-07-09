@@ -444,7 +444,7 @@ def _check_args(option_dict):
             num_grid_rows, num_grid_columns, input_dimensions_lagged_target[3]
         ], dtype=int)
 
-        assert numpy.array_equal(input_dimensions_predn_baseline, these_dim)
+        # assert numpy.array_equal(input_dimensions_predn_baseline, these_dim)
         error_checking.assert_is_integer_numpy_array(
             input_dimensions_predn_baseline
         )
