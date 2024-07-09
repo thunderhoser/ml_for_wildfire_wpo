@@ -2199,25 +2199,28 @@ def read_metafile(pickle_file_name):
     vod = metadata_dict[VALIDATION_OPTIONS_KEY]
 
     if MODEL_LEAD_TO_GFS_PRED_LEADS_KEY not in tod:
-        model_lead_time_days = tod['target_lead_time_days']
+        try:
+            model_lead_time_days = tod['target_lead_time_days']
 
-        this_dict = {
-            model_lead_time_days: tod['gfs_predictor_lead_times_hours']
-        }
-        tod[MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = this_dict
-        vod[MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = this_dict
+            this_dict = {
+                model_lead_time_days: tod['gfs_predictor_lead_times_hours']
+            }
+            tod[MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = this_dict
+            vod[MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = this_dict
 
-        this_dict = {
-            model_lead_time_days: tod['target_lag_times_days']
-        }
-        tod[MODEL_LEAD_TO_TARGET_LAGS_KEY] = this_dict
-        vod[MODEL_LEAD_TO_TARGET_LAGS_KEY] = this_dict
+            this_dict = {
+                model_lead_time_days: tod['target_lag_times_days']
+            }
+            tod[MODEL_LEAD_TO_TARGET_LAGS_KEY] = this_dict
+            vod[MODEL_LEAD_TO_TARGET_LAGS_KEY] = this_dict
 
-        this_dict = {
-            model_lead_time_days: tod['gfs_forecast_target_lead_times_days']
-        }
-        tod[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = this_dict
-        vod[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = this_dict
+            this_dict = {
+                model_lead_time_days: tod['gfs_forecast_target_lead_times_days']
+            }
+            tod[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = this_dict
+            vod[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = this_dict
+        except KeyError:
+            pass
 
     metadata_dict[TRAINING_OPTIONS_KEY] = tod
     metadata_dict[VALIDATION_OPTIONS_KEY] = vod
@@ -2458,9 +2461,6 @@ def train_model(
 
         validation_option_dict[this_key] = training_option_dict[this_key]
 
-    training_option_dict = _check_generator_args(training_option_dict)
-    validation_option_dict = _check_generator_args(validation_option_dict)
-
     model_file_name = '{0:s}/model.weights.h5'.format(output_dir_name)
     history_file_name = '{0:s}/history.csv'.format(output_dir_name)
 
@@ -2551,7 +2551,7 @@ def train_model(
         model_object.fit(
             x=training_generator,
             steps_per_epoch=num_training_batches_per_epoch,
-            epochs=this_epoch,  # TODO(thunderhoser): Should maybe be this_epoch + 1?
+            epochs=this_epoch + 1,  # TODO(thunderhoser): Should maybe be this_epoch + 1?
             initial_epoch=this_epoch,
             verbose=1,
             callbacks=list_of_callback_objects,
