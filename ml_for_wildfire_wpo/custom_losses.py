@@ -1106,35 +1106,9 @@ def dwcrps_constrained_dsr_part2a_max_pred(
         ], axis=-1)
 
         # Add DSR to prediction tensor.
-        predicted_dsr_tensor = 0.0272 * K.pow(
-            prediction_tensor[..., fwi_index, :], 1.77
-        )
-        print('\n\n\n\n')
-        print(prediction_tensor)
-        print('\n\n\n\n')
-        print(predicted_dsr_tensor)
-        print('\n\n\n\n')
-        print(K.expand_dims(predicted_dsr_tensor, axis=-2))
-        print('\n\n\n\n')
-
-        prediction_tensor = tensorflow.transpose(
-            prediction_tensor, perm=[0, 1, 2, 4, 3]
-        )
-        predicted_dsr_tensor = K.expand_dims(predicted_dsr_tensor, axis=-1)
-
-        print(prediction_tensor)
-        print('\n\n\n\n')
-
-        prediction_tensor = K.concatenate([
-            prediction_tensor, predicted_dsr_tensor
-        ], axis=-1)
-
-        print(prediction_tensor)
-        print('\n\n\n\n')
-
-        prediction_tensor = tensorflow.transpose(
-            prediction_tensor, perm=[0, 1, 2, 4, 3]
-        )
+        new_slice = 0.0272 * tensorflow.pow(prediction_tensor[:, :, :, fwi_index, :], 1.77)
+        new_slice = tensorflow.expand_dims(new_slice, axis=3)
+        prediction_tensor = tensorflow.concat([prediction_tensor, new_slice], axis=3)
 
         print(prediction_tensor)
         print('\n\n\n\n')
