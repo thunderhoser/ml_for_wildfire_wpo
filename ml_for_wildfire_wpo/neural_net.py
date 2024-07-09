@@ -2317,26 +2317,26 @@ def read_model(hdf5_file_name):
         model_object.load_weights(hdf5_file_name)
         return model_object
 
-    # chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
-    # if chiu_net_pp_architecture_dict is not None:
-    #     import \
-    #         chiu_net_pp_architecture
-    #
-    #     arch_dict = chiu_net_pp_architecture_dict
-    #
-    #     for this_key in [
-    #             chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
-    #             chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
-    #     ]:
-    #         arch_dict[this_key] = eval(arch_dict[this_key])
-    #
-    #     for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
-    #         for k in range(len(arch_dict[this_key])):
-    #             arch_dict[this_key][k] = eval(arch_dict[this_key][k])
-    #
-    #     model_object = chiu_net_pp_architecture.create_model(arch_dict)
-    #     model_object.load_weights(hdf5_file_name)
-    #     return model_object
+    chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
+    if chiu_net_pp_architecture_dict is not None:
+        import \
+            chiu_net_pp_architecture
+
+        arch_dict = chiu_net_pp_architecture_dict
+
+        for this_key in [
+                chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
+                chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
+        ]:
+            arch_dict[this_key] = eval(arch_dict[this_key])
+
+        for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
+            for k in range(len(arch_dict[this_key])):
+                arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+
+        model_object = chiu_net_pp_architecture.create_model(arch_dict)
+        model_object.load_weights(hdf5_file_name)
+        return model_object
 
     chiu_net_pp_flexi_architecture_dict = metadata_dict[
         CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY
@@ -2550,60 +2550,32 @@ def train_model(
         dtype=int
     ))
 
-    epoch_in_dict = 1
-    model_lead_time_freqs = numpy.array([
-        epoch_and_lead_time_to_freq[epoch_in_dict, l]
-        for l in model_lead_times_days
-    ], dtype=float)
+    for this_epoch in range(initial_epoch, num_epochs):
+        epoch_in_dict = min([this_epoch + 1, max_epoch_in_dict])
+        model_lead_time_freqs = numpy.array([
+            epoch_and_lead_time_to_freq[epoch_in_dict, l]
+            for l in model_lead_times_days
+        ], dtype=float)
 
-    model_lead_days_to_freq = dict(zip(
-        model_lead_times_days, model_lead_time_freqs
-    ))
-    training_option_dict[MODEL_LEAD_TO_FREQ_KEY] = model_lead_days_to_freq
-    validation_option_dict[MODEL_LEAD_TO_FREQ_KEY] = model_lead_days_to_freq
+        model_lead_days_to_freq = dict(zip(
+            model_lead_times_days, model_lead_time_freqs
+        ))
+        training_option_dict[MODEL_LEAD_TO_FREQ_KEY] = model_lead_days_to_freq
+        validation_option_dict[MODEL_LEAD_TO_FREQ_KEY] = model_lead_days_to_freq
 
-    print(model_lead_days_to_freq)
+        training_generator = data_generator(training_option_dict)
+        validation_generator = data_generator(validation_option_dict)
 
-    training_generator = data_generator(training_option_dict)
-    validation_generator = data_generator(validation_option_dict)
-
-    model_object.fit(
-        x=training_generator,
-        steps_per_epoch=num_training_batches_per_epoch,
-        epochs=num_epochs,  # TODO(thunderhoser): Should maybe be this_epoch + 1?
-        # initial_epoch=this_epoch,
-        verbose=1,
-        callbacks=list_of_callback_objects,
-        validation_data=validation_generator,
-        validation_steps=num_validation_batches_per_epoch
-    )
-
-    # for this_epoch in range(initial_epoch, num_epochs):
-    #     epoch_in_dict = min([this_epoch + 1, max_epoch_in_dict])
-    #     model_lead_time_freqs = numpy.array([
-    #         epoch_and_lead_time_to_freq[epoch_in_dict, l]
-    #         for l in model_lead_times_days
-    #     ], dtype=float)
-    #
-    #     model_lead_days_to_freq = dict(zip(
-    #         model_lead_times_days, model_lead_time_freqs
-    #     ))
-    #     training_option_dict[MODEL_LEAD_TO_FREQ_KEY] = model_lead_days_to_freq
-    #     validation_option_dict[MODEL_LEAD_TO_FREQ_KEY] = model_lead_days_to_freq
-    #
-    #     training_generator = data_generator(training_option_dict)
-    #     validation_generator = data_generator(validation_option_dict)
-    #
-    #     model_object.fit(
-    #         x=training_generator,
-    #         steps_per_epoch=num_training_batches_per_epoch,
-    #         epochs=this_epoch + 1,  # TODO(thunderhoser): Should maybe be this_epoch + 1?
-    #         initial_epoch=this_epoch,
-    #         verbose=1,
-    #         callbacks=list_of_callback_objects,
-    #         validation_data=validation_generator,
-    #         validation_steps=num_validation_batches_per_epoch
-    #     )
+        model_object.fit(
+            x=training_generator,
+            steps_per_epoch=num_training_batches_per_epoch,
+            epochs=this_epoch + 1,  # TODO(thunderhoser): Should maybe be this_epoch + 1?
+            initial_epoch=this_epoch,
+            verbose=1,
+            callbacks=list_of_callback_objects,
+            validation_data=validation_generator,
+            validation_steps=num_validation_batches_per_epoch
+        )
 
 
 def apply_model(
