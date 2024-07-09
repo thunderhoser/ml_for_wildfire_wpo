@@ -128,7 +128,7 @@ def _get_num_time_steps_time_first(input_tensor):
     :return: num_time_steps: Keras tensor with shape of (1,).
     """
 
-    return tensorflow.shape(input_tensor)[1]
+    return tensorflow.squeeze(tensorflow.shape(input_tensor)[1])
 
 
 def _repeat_tensor_along_time_axis(input_tensor_time_first,
@@ -144,7 +144,7 @@ def _repeat_tensor_along_time_axis(input_tensor_time_first,
         steps.
     """
 
-    num_times = tensorflow.squeeze(_get_num_time_steps_time_first(comparison_tensor_time_first))
+    num_times = _get_num_time_steps_time_first(comparison_tensor_time_first)
 
     return tensorflow.tile(
         input_tensor_time_first,
