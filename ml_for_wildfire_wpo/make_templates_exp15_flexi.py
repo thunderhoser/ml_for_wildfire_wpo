@@ -143,7 +143,7 @@ DEFAULT_OPTION_DICT = {
         [265, 537, 2, -1, 5], dtype=int
     ),
     chiu_net_pp_flexi_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
-        [265, 537, -1, 7], dtype=int
+        [265, 537, -1, 5], dtype=int
     ),
     chiu_net_pp_flexi_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
         [265, 537, 7], dtype=int
