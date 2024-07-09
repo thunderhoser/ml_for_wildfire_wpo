@@ -202,6 +202,7 @@ def _run(template_file_name, output_dir_name,
     )
     print('Reading model metadata from: "{0:s}"...'.format(model_metafile_name))
     model_metadata_dict = neural_net.read_metafile(model_metafile_name)
+    mmd = model_metadata_dict
 
     neural_net.train_model(
         model_object=model_object,
@@ -210,11 +211,14 @@ def _run(template_file_name, output_dir_name,
         training_option_dict=training_option_dict,
         num_validation_batches_per_epoch=num_validation_batches_per_epoch,
         validation_option_dict=validation_option_dict,
-        loss_function_string=model_metadata_dict[neural_net.LOSS_FUNCTION_KEY],
-        optimizer_function_string=
-        model_metadata_dict[neural_net.OPTIMIZER_FUNCTION_KEY],
-        metric_function_strings=
-        model_metadata_dict[neural_net.METRIC_FUNCTIONS_KEY],
+        loss_function_string=mmd[neural_net.LOSS_FUNCTION_KEY],
+        metric_function_strings=mmd[neural_net.METRIC_FUNCTIONS_KEY],
+        optimizer_function_string=mmd[neural_net.OPTIMIZER_FUNCTION_KEY],
+        chiu_net_architecture_dict=mmd[neural_net.CHIU_NET_ARCHITECTURE_KEY],
+        chiu_net_pp_architecture_dict=
+        mmd[neural_net.CHIU_NET_PP_ARCHITECTURE_KEY],
+        chiu_net_pp_flexi_architecture_dict=
+        mmd[neural_net.CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY],
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs,

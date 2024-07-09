@@ -52,6 +52,8 @@ ENSEMBLE_SIZE_KEY = 'ensemble_size'
 USE_EVIDENTIAL_KEY = 'use_evidential_nn'
 
 OPTIMIZER_FUNCTION_KEY = 'optimizer_function'
+LOSS_FUNCTION_KEY = 'loss_function'
+METRIC_FUNCTIONS_KEY = 'metric_functions'
 
 DEFAULT_ARCHITECTURE_OPTION_DICT = {
     GFS_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
@@ -84,23 +86,50 @@ DEFAULT_ARCHITECTURE_OPTION_DICT = {
 }
 
 
-def _get_time_slicing_function(time_index):
-    """Returns function that takes one time step from input tensor.
+def _create_skip_connection(
+        encoder_conv_layer_objects, decoder_upconv_layer_object,
+        current_level_num):
+    """Creates skip connection.
 
-    :param time_index: Will take the [k]th time step, where k = `time_index`.
-    :return: time_slicing_function: Function handle (see below).
+    :param encoder_conv_layer_objects: 1-D list of conv layers on the encoder
+        side.
+    :param decoder_upconv_layer_object: Upconv layer on the decoder side.
+    :param current_level_num: Integer index for current level.
+    :return: merged_layer_object: Instance of `keras.layers.Concatenate`.
     """
 
-    def time_slicing_function(input_tensor_3d):
-        """Takes one time step from the input tensor.
+    num_upconv_rows = decoder_upconv_layer_object.shape[1]
+    num_desired_rows = encoder_conv_layer_objects[0].shape[2]
+    num_padding_rows = num_desired_rows - num_upconv_rows
 
-        :param input_tensor_3d: Input tensor with 3 spatiotemporal dimensions.
-        :return: input_tensor_2d: Input tensor with 2 spatial dimensions.
-        """
+    num_upconv_columns = decoder_upconv_layer_object.shape[2]
+    num_desired_columns = encoder_conv_layer_objects[0].shape[3]
+    num_padding_columns = num_desired_columns - num_upconv_columns
 
-        return input_tensor_3d[:, time_index, ...]
+    if num_padding_rows + num_padding_columns > 0:
+        padding_arg = ((0, num_padding_rows), (0, num_padding_columns))
+        this_name = 'padding_level{0:d}'.format(current_level_num)
 
-    return time_slicing_function
+        decoder_upconv_layer_object = keras.layers.ZeroPadding2D(
+            padding=padding_arg, name=this_name
+        )(decoder_upconv_layer_object)
+
+    for i in range(len(encoder_conv_layer_objects)):
+        this_num_times = encoder_conv_layer_objects[i].shape[1]
+
+        encoder_conv_layer_objects[i] = keras.layers.Cropping3D(
+            cropping=((this_num_times - 1, 0), (0, 0), (0, 0)),
+            data_format='channels_last'
+        )(encoder_conv_layer_objects[i])
+
+        encoder_conv_layer_objects[i] = keras.layers.Reshape(
+            target_shape=encoder_conv_layer_objects[i].shape[2:]
+        )(encoder_conv_layer_objects[i])
+
+    this_name = 'skip_level{0:d}'.format(current_level_num)
+    return keras.layers.Concatenate(
+        axis=-1, name=this_name
+    )(encoder_conv_layer_objects + [decoder_upconv_layer_object])
 
 
 def check_args(option_dict):
@@ -178,6 +207,8 @@ def check_args(option_dict):
         batch normalization after each inner (non-output) conv layer.
     option_dict["ensemble_size"]: Ensemble size.
     option_dict["optimizer_function"]: Optimizer function.
+    option_dict["loss_function"]: Loss function.
+    option_dict["metric_functions"]: List of metric functions.
 
     :return: option_dict: Same as input, except defaults may have been added.
     """
@@ -394,6 +425,7 @@ def check_args(option_dict):
     error_checking.assert_is_boolean(option_dict[USE_BATCH_NORM_KEY])
     error_checking.assert_is_integer(option_dict[ENSEMBLE_SIZE_KEY])
     error_checking.assert_is_greater(option_dict[ENSEMBLE_SIZE_KEY], 0)
+    error_checking.assert_is_list(option_dict[METRIC_FUNCTIONS_KEY])
 
     error_checking.assert_is_boolean(option_dict[USE_EVIDENTIAL_KEY])
     if option_dict[USE_EVIDENTIAL_KEY]:
@@ -402,59 +434,7 @@ def check_args(option_dict):
     return option_dict
 
 
-def _create_skip_connection(
-        encoder_conv_layer_objects, decoder_upconv_layer_object,
-        current_level_num):
-    """Creates skip connection.
-
-    :param encoder_conv_layer_objects: 1-D list of conv layers on the encoder
-        side.
-    :param decoder_upconv_layer_object: Upconv layer on the decoder side.
-    :param current_level_num: Integer index for current level.
-    :return: merged_layer_object: Instance of `keras.layers.Concatenate`.
-    """
-
-    num_upconv_rows = decoder_upconv_layer_object.shape[1]
-    num_desired_rows = encoder_conv_layer_objects[0].shape[2]
-    num_padding_rows = num_desired_rows - num_upconv_rows
-
-    num_upconv_columns = decoder_upconv_layer_object.shape[2]
-    num_desired_columns = encoder_conv_layer_objects[0].shape[3]
-    num_padding_columns = num_desired_columns - num_upconv_columns
-
-    if num_padding_rows + num_padding_columns > 0:
-        padding_arg = ((0, num_padding_rows), (0, num_padding_columns))
-        this_name = 'padding_level{0:d}'.format(current_level_num)
-
-        decoder_upconv_layer_object = keras.layers.ZeroPadding2D(
-            padding=padding_arg, name=this_name
-        )(decoder_upconv_layer_object)
-
-    for i in range(len(encoder_conv_layer_objects)):
-        this_num_times = encoder_conv_layer_objects[i].shape[1]
-
-        encoder_conv_layer_objects[i] = keras.layers.Cropping3D(
-            cropping=((this_num_times - 1, 0), (0, 0), (0, 0)),
-            data_format='channels_last'
-        )(encoder_conv_layer_objects[i])
-
-        encoder_conv_layer_objects[i] = keras.layers.Reshape(
-            target_shape=encoder_conv_layer_objects[i].shape[2:]
-        )(encoder_conv_layer_objects[i])
-
-        # this_function = _get_time_slicing_function(-1)
-        # encoder_conv_layer_objects[i] = keras.layers.Lambda(
-        #     this_function,
-        #     output_shape=encoder_conv_layer_objects[i].shape[1:]
-        # )(encoder_conv_layer_objects[i])
-
-    this_name = 'skip_level{0:d}'.format(current_level_num)
-    return keras.layers.Concatenate(
-        axis=-1, name=this_name
-    )(encoder_conv_layer_objects + [decoder_upconv_layer_object])
-
-
-def create_model(option_dict, loss_function, metric_list):
+def create_model(option_dict):
     """Creates Chiu net.
 
     This method sets up the architecture, loss function, and optimizer -- and
@@ -466,8 +446,6 @@ def create_model(option_dict, loss_function, metric_list):
     N = number of columns in grid
 
     :param option_dict: See doc for `check_args`.
-    :param loss_function: Loss function.
-    :param metric_list: 1-D list of metrics.
     :return: model_object: Instance of `keras.models.Model`, with the
         aforementioned architecture.
     """
@@ -481,7 +459,6 @@ def create_model(option_dict, loss_function, metric_list):
     # GFS-lead-time axis and target-lag/lead-time axis.
 
     option_dict = check_args(option_dict)
-    error_checking.assert_is_list(metric_list)
 
     input_dimensions_gfs_3d = option_dict[GFS_3D_DIMENSIONS_KEY]
     input_dimensions_gfs_2d = option_dict[GFS_2D_DIMENSIONS_KEY]
@@ -535,6 +512,9 @@ def create_model(option_dict, loss_function, metric_list):
     assert not option_dict[USE_EVIDENTIAL_KEY]
 
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
+    loss_function = option_dict[LOSS_FUNCTION_KEY]
+    metric_functions = option_dict[METRIC_FUNCTIONS_KEY]
+
     num_gfs_lead_times = None
 
     if input_dimensions_gfs_3d is None:
@@ -1175,7 +1155,7 @@ def create_model(option_dict, loss_function, metric_list):
 
     model_object.compile(
         loss=loss_function, optimizer=optimizer_function,
-        metrics=metric_list
+        metrics=metric_functions
     )
 
     model_object.summary()

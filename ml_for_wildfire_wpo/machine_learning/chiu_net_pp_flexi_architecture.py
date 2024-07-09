@@ -68,6 +68,8 @@ USE_BATCH_NORM_KEY = 'use_batch_normalization'
 ENSEMBLE_SIZE_KEY = 'ensemble_size'
 
 OPTIMIZER_FUNCTION_KEY = 'optimizer_function'
+LOSS_FUNCTION_KEY = 'loss_function'
+METRIC_FUNCTIONS_KEY = 'metric_functions'
 
 DEFAULT_ARCHITECTURE_OPTION_DICT = {
     GFS_FC_MODULE_NUM_LSTM_LAYERS_KEY: 1,
@@ -350,6 +352,8 @@ def _check_args(option_dict):
         batch normalization after each inner (non-output) conv layer.
     option_dict["ensemble_size"]: Ensemble size.
     option_dict["optimizer_function"]: Optimizer function.
+    option_dict["loss_function"]: Loss function.
+    option_dict["metric_functions"]: List of metric functions.
 
     :return: option_dict: Same as input, except defaults may have been added.
     """
@@ -437,7 +441,7 @@ def _check_args(option_dict):
             num_grid_rows, num_grid_columns, input_dimensions_lagged_target[3]
         ], dtype=int)
 
-        assert numpy.array_equal(input_dimensions_predn_baseline, these_dim)
+        # assert numpy.array_equal(input_dimensions_predn_baseline, these_dim)
         error_checking.assert_is_integer_numpy_array(
             input_dimensions_predn_baseline
         )
@@ -572,25 +576,23 @@ def _check_args(option_dict):
     error_checking.assert_is_boolean(option_dict[USE_BATCH_NORM_KEY])
     error_checking.assert_is_integer(option_dict[ENSEMBLE_SIZE_KEY])
     error_checking.assert_is_greater(option_dict[ENSEMBLE_SIZE_KEY], 0)
+    error_checking.assert_is_list(option_dict[METRIC_FUNCTIONS_KEY])
 
     return option_dict
 
 
-def create_model(option_dict, loss_function, metric_list):
+def create_model(option_dict):
     """Creates Chiu-net++ with flexible lead times.
 
     This method sets up the architecture, loss function, and optimizer -- and
     compiles the model -- but does not train it.
 
     :param option_dict: See doc for `_check_args`.
-    :param loss_function: Loss function.
-    :param metric_list: 1-D list of metrics.
     :return: model_object: Instance of `keras.models.Model`, with the
         Chiu-net++ architecture.
     """
 
     option_dict = _check_args(option_dict)
-    error_checking.assert_is_list(metric_list)
 
     input_dimensions_gfs_3d = option_dict[GFS_3D_DIMENSIONS_KEY]
     input_dimensions_gfs_2d = option_dict[GFS_2D_DIMENSIONS_KEY]
@@ -643,6 +645,8 @@ def create_model(option_dict, loss_function, metric_list):
     ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
 
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
+    loss_function = option_dict[LOSS_FUNCTION_KEY]
+    metric_functions = option_dict[METRIC_FUNCTIONS_KEY]
 
     if input_dimensions_gfs_3d is not None:
         input_dimensions_gfs_3d = tuple([
@@ -1077,7 +1081,7 @@ def create_model(option_dict, loss_function, metric_list):
 
     model_object.compile(
         loss=loss_function, optimizer=optimizer_function,
-        metrics=metric_list
+        metrics=metric_functions
     )
 
     model_object.summary()
