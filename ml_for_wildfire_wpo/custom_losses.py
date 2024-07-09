@@ -1007,6 +1007,58 @@ def dwcrps_constrained_dsr_part2_max_pred_dsr(
     return loss
 
 
+def dwcrps_constrained_dsr_part2i_max_pred_orig(
+        channel_weights, fwi_index, function_name,
+        max_dual_weight_by_channel=None, test_mode=False):
+    """Creates dual-weighted CRPS loss function with constrained DSR.
+
+    :param channel_weights: See doc for `dual_weighted_mse_constrained_dsr`.
+    :param fwi_index: Same.
+    :param function_name: Same.
+    :param max_dual_weight_by_channel: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_integer(fwi_index)
+    error_checking.assert_is_geq(fwi_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(test_mode)
+
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    error_checking.assert_is_numpy_array(
+        max_dual_weight_by_channel,
+        exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
+    )
+    error_checking.assert_is_greater_numpy_array(max_dual_weight_by_channel, 0.)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (dual-weighted CRPS).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: loss: Dual-weighted CRPS.
+        """
+
+        # Add DSR to target tensor.
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
+        target_tensor = K.concatenate([
+            target_tensor[..., :-1],
+            K.expand_dims(target_dsr_tensor, axis=-1),
+            K.expand_dims(target_tensor[..., -1], axis=-1)
+        ], axis=-1)
+
+        return K.max(prediction_tensor)
+
+    loss.__name__ = function_name
+    return loss
+
+
 def dwcrps_constrained_dsr_part2a_max_pred(
         channel_weights, fwi_index, function_name,
         max_dual_weight_by_channel=None, test_mode=False):

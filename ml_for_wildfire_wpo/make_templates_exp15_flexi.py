@@ -93,6 +93,9 @@ METRIC_FUNCTIONS = [
     custom_losses.dwcrps_constrained_dsr_part2_max_pred_dsr(
         channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwcrps_part2_max_pred_dsr'
     ),
+    custom_losses.dwcrps_constrained_dsr_part2i_max_pred_orig(
+        channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwcrps_part2i_max_pred_orig'
+    ),
     custom_losses.dwcrps_constrained_dsr_part2a_max_pred(
         channel_weights=CHANNEL_WEIGHTS, max_dual_weight_by_channel=MAX_DUAL_WEIGHTS, fwi_index=5, function_name='dwcrps_part2a_max_pred'
     ),
@@ -159,6 +162,7 @@ METRIC_FUNCTION_STRINGS = [
     'custom_losses.dwcrps_constrained_dsr_part1_max_target_dsr(channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), fwi_index=5, function_name="dwcrps_part1_max_target_dsr")',
     'custom_losses.dwcrps_constrained_dsr_part1a_max_target(channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), fwi_index=5, function_name="dwcrps_part1a_max_target")',
     'custom_losses.dwcrps_constrained_dsr_part2_max_pred_dsr(channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), fwi_index=5, function_name="dwcrps_part2_max_pred_dsr")',
+    'custom_losses.dwcrps_constrained_dsr_part2i_max_pred_orig(channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), fwi_index=5, function_name="dwcrps_part2i_max_pred_orig")',
     'custom_losses.dwcrps_constrained_dsr_part2a_max_pred(channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), fwi_index=5, function_name="dwcrps_part2a_max_pred")',
     'custom_losses.dwcrps_constrained_dsr_part3_max_dual_weight(channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), fwi_index=5, function_name="dwcrps_part3_max_dual_weight")',
     'custom_losses.dwcrps_constrained_dsr_part4_max_dual_weight(channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), fwi_index=5, function_name="dwcrps_part4_max_dual_weight")',
