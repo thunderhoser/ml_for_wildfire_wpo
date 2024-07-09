@@ -149,7 +149,7 @@ DEFAULT_OPTION_DICT = {
         [265, 537, 7], dtype=int
     ),
     chiu_net_pp_flexi_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
-        [265, 537, -1, 7], dtype=int
+        [265, 537, -1, 6], dtype=int
     ),
     chiu_net_pp_flexi_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array(
         [265, 537, 6], dtype=int
