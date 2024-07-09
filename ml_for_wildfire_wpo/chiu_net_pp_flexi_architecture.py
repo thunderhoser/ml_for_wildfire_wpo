@@ -144,7 +144,7 @@ def _repeat_tensor_along_time_axis(input_tensor_time_first,
         steps.
     """
 
-    num_times = _get_num_time_steps_time_first(comparison_tensor_time_first)[0]
+    num_times = tensorflow.squeeze(_get_num_time_steps_time_first(comparison_tensor_time_first))
 
     return tensorflow.tile(
         input_tensor_time_first,
