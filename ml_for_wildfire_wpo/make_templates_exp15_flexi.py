@@ -154,6 +154,7 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_flexi_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array(
         [265, 537, 6], dtype=int
     ),
+    chiu_net_pp_flexi_arch.USE_RESIDUAL_BLOCKS_KEY: False,
     chiu_net_pp_flexi_arch.GFS_FC_MODULE_NUM_LSTM_LAYERS_KEY: 1,
     chiu_net_pp_flexi_arch.GFS_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
     chiu_net_pp_flexi_arch.LAGTGT_FC_MODULE_NUM_LSTM_LAYERS_KEY: 1,
