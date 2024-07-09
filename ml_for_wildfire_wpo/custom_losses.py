@@ -1109,6 +1109,12 @@ def dwcrps_constrained_dsr_part2a_max_pred(
         predicted_dsr_tensor = 0.0272 * K.pow(
             prediction_tensor[..., fwi_index, :], 1.77
         )
+        print('\n\n\n\n')
+        print(prediction_tensor)
+        print('\n\n\n\n')
+        print(predicted_dsr_tensor)
+        print('\n\n\n\n')
+
         prediction_tensor = K.concatenate([
             prediction_tensor,
             K.expand_dims(predicted_dsr_tensor, axis=-2)
