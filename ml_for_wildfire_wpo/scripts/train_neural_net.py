@@ -2,6 +2,7 @@
 
 import argparse
 import numpy
+from ml_for_wildfire_wpo.utils import misc_utils
 from ml_for_wildfire_wpo.machine_learning import neural_net
 from ml_for_wildfire_wpo.scripts import training_args
 
@@ -13,13 +14,15 @@ def _run(template_file_name, output_dir_name,
          inner_latitude_limits_deg_n, inner_longitude_limits_deg_e,
          outer_latitude_buffer_deg, outer_longitude_buffer_deg,
          gfs_predictor_field_names, gfs_pressure_levels_mb,
-         gfs_predictor_lead_times_hours, gfs_normalization_file_name,
-         gfs_use_quantile_norm,
+         model_lead_times_days,
+         curriculum_start_epoch_by_model_lead, curriculum_num_rampup_epochs,
+         gfs_pred_leads_hours_by_model_lead,
+         gfs_normalization_file_name, gfs_use_quantile_norm,
          era5_constant_file_name, era5_constant_predictor_field_names,
          era5_normalization_file_name, era5_use_quantile_norm,
-         target_field_names, target_lead_time_days, target_lag_times_days,
-         gfs_forecast_target_lead_times_days, target_normalization_file_name,
-         targets_use_quantile_norm,
+         target_field_names, target_lags_days_by_model_lead,
+         gfs_target_leads_days_by_model_lead,
+         target_normalization_file_name, targets_use_quantile_norm,
          num_examples_per_batch, sentinel_value, do_residual_prediction,
          gfs_dir_name_for_training, target_dir_name_for_training,
          gfs_forecast_target_dir_name_for_training,
@@ -43,7 +46,10 @@ def _run(template_file_name, output_dir_name,
     :param outer_longitude_buffer_deg: Same.
     :param gfs_predictor_field_names: Same.
     :param gfs_pressure_levels_mb: Same.
-    :param gfs_predictor_lead_times_hours: Same.
+    :param model_lead_times_days: Same.
+    :param curriculum_start_epoch_by_model_lead: Same.
+    :param curriculum_num_rampup_epochs: Same.
+    :param gfs_pred_leads_hours_by_model_lead: Same.
     :param gfs_normalization_file_name: Same.
     :param gfs_use_quantile_norm: Same.
     :param era5_constant_file_name: Same.
@@ -51,9 +57,8 @@ def _run(template_file_name, output_dir_name,
     :param era5_normalization_file_name: Same.
     :param era5_use_quantile_norm: Same.
     :param target_field_names: Same.
-    :param target_lead_time_days: Same.
-    :param target_lag_times_days: Same.
-    :param gfs_forecast_target_lead_times_days: Same.
+    :param target_lags_days_by_model_lead: Same.
+    :param gfs_target_leads_days_by_model_lead: Same.
     :param target_normalization_file_name: Same.
     :param targets_use_quantile_norm: Same.
     :param num_examples_per_batch: Same.
@@ -94,10 +99,10 @@ def _run(template_file_name, output_dir_name,
         era5_constant_predictor_field_names = None
 
     if (
-            len(gfs_forecast_target_lead_times_days) == 1 and
-            gfs_forecast_target_lead_times_days[0] <= 0
+            len(gfs_target_leads_days_by_model_lead) == 1 and
+            gfs_target_leads_days_by_model_lead[0] <= 0
     ):
-        gfs_forecast_target_lead_times_days = None
+        gfs_target_leads_days_by_model_lead = None
         gfs_forecast_target_dir_name_for_training = None
         gfs_forecast_target_dir_name_for_validation = None
 
@@ -105,9 +110,48 @@ def _run(template_file_name, output_dir_name,
             gfs_forecast_target_dir_name_for_training is None or
             gfs_forecast_target_dir_name_for_validation is None
     ):
-        gfs_forecast_target_lead_times_days = None
+        gfs_target_leads_days_by_model_lead = None
         gfs_forecast_target_dir_name_for_training = None
         gfs_forecast_target_dir_name_for_validation = None
+
+    epoch_and_lead_time_to_freq = neural_net.create_learning_curriculum(
+        lead_times_days=model_lead_times_days,
+        start_epoch_by_lead_time=curriculum_start_epoch_by_model_lead,
+        num_rampup_epochs=curriculum_num_rampup_epochs
+    )
+
+    this_array = gfs_pred_leads_hours_by_model_lead
+    this_array = this_array.astype(float)
+    this_array[this_array < -0.1] = numpy.nan
+    this_array = misc_utils.split_array_by_nan(this_array)
+    this_array = [numpy.round(l).astype(int) for l in this_array]
+
+    model_lead_days_to_gfs_pred_leads_hours = dict(zip(
+        model_lead_times_days, this_array
+    ))
+
+    this_array = target_lags_days_by_model_lead
+    this_array = this_array.astype(float)
+    this_array[this_array < -0.1] = numpy.nan
+    this_array = misc_utils.split_array_by_nan(this_array)
+    this_array = [numpy.round(l).astype(int) for l in this_array]
+
+    model_lead_days_to_target_lags_days = dict(zip(
+        model_lead_times_days, this_array
+    ))
+
+    this_array = gfs_target_leads_days_by_model_lead
+    if this_array is None:
+        model_lead_days_to_gfs_target_leads_days = None
+    else:
+        this_array = this_array.astype(float)
+        this_array[this_array < -0.1] = numpy.nan
+        this_array = misc_utils.split_array_by_nan(this_array)
+        this_array = [numpy.round(l).astype(int) for l in this_array]
+
+        model_lead_days_to_gfs_target_leads_days = dict(zip(
+            model_lead_times_days, this_array
+        ))
 
     training_option_dict = {
         neural_net.INNER_LATITUDE_LIMITS_KEY: inner_latitude_limits_deg_n,
@@ -116,7 +160,8 @@ def _run(template_file_name, output_dir_name,
         neural_net.OUTER_LONGITUDE_BUFFER_KEY: outer_longitude_buffer_deg,
         neural_net.GFS_PREDICTOR_FIELDS_KEY: gfs_predictor_field_names,
         neural_net.GFS_PRESSURE_LEVELS_KEY: gfs_pressure_levels_mb,
-        neural_net.GFS_PREDICTOR_LEADS_KEY: gfs_predictor_lead_times_hours,
+        neural_net.MODEL_LEAD_TO_GFS_PRED_LEADS_KEY:
+            model_lead_days_to_gfs_pred_leads_hours,
         neural_net.GFS_NORM_FILE_KEY: gfs_normalization_file_name,
         neural_net.GFS_USE_QUANTILE_NORM_KEY: gfs_use_quantile_norm,
         neural_net.ERA5_CONSTANT_PREDICTOR_FIELDS_KEY:
@@ -125,10 +170,10 @@ def _run(template_file_name, output_dir_name,
         neural_net.ERA5_NORM_FILE_KEY: era5_normalization_file_name,
         neural_net.ERA5_USE_QUANTILE_NORM_KEY: era5_use_quantile_norm,
         neural_net.TARGET_FIELDS_KEY: target_field_names,
-        neural_net.TARGET_LEAD_TIME_KEY: target_lead_time_days,
-        neural_net.TARGET_LAG_TIMES_KEY: target_lag_times_days,
-        neural_net.GFS_FCST_TARGET_LEAD_TIMES_KEY:
-            gfs_forecast_target_lead_times_days,
+        neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY:
+            model_lead_days_to_target_lags_days,
+        neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY:
+            model_lead_days_to_gfs_target_leads_days,
         neural_net.TARGET_NORM_FILE_KEY: target_normalization_file_name,
         neural_net.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
         neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
@@ -173,6 +218,7 @@ def _run(template_file_name, output_dir_name,
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs,
+        epoch_and_lead_time_to_freq=epoch_and_lead_time_to_freq,
         output_dir_name=output_dir_name
     )
 
@@ -214,7 +260,21 @@ if __name__ == '__main__':
             ),
             dtype=int
         ),
-        gfs_predictor_lead_times_hours=numpy.array(
+        model_lead_times_days=numpy.array(
+            getattr(INPUT_ARG_OBJECT, training_args.MODEL_LEAD_TIMES_ARG_NAME),
+            dtype=int
+        ),
+        curriculum_start_epoch_by_model_lead=numpy.array(
+            getattr(
+                INPUT_ARG_OBJECT,
+                training_args.CURRICULUM_START_EPOCHS_ARG_NAME
+            ),
+            dtype=int
+        ),
+        curriculum_num_rampup_epochs=getattr(
+            INPUT_ARG_OBJECT, training_args.CURRICULUM_RAMPUP_ARG_NAME
+        ),
+        gfs_pred_leads_hours_by_model_lead=numpy.array(
             getattr(
                 INPUT_ARG_OBJECT, training_args.GFS_PREDICTOR_LEADS_ARG_NAME
             ),
@@ -241,15 +301,11 @@ if __name__ == '__main__':
         target_field_names=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_FIELDS_ARG_NAME
         ),
-        target_lead_time_days=numpy.array(
-            getattr(INPUT_ARG_OBJECT, training_args.TARGET_LEAD_TIME_ARG_NAME),
-            dtype=int
-        ),
-        target_lag_times_days=numpy.array(
+        target_lags_days_by_model_lead=numpy.array(
             getattr(INPUT_ARG_OBJECT, training_args.TARGET_LAG_TIMES_ARG_NAME),
             dtype=int
         ),
-        gfs_forecast_target_lead_times_days=numpy.array(
+        gfs_target_leads_days_by_model_lead=numpy.array(
             getattr(
                 INPUT_ARG_OBJECT,
                 training_args.GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME

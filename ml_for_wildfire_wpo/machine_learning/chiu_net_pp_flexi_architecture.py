@@ -22,7 +22,8 @@ import keras
 import tensorflow
 from gewittergefahr.gg_utils import error_checking
 from gewittergefahr.deep_learning import architecture_utils
-import chiu_net_pp_architecture as chiu_net_pp_arch
+from ml_for_national_blend.machine_learning import \
+    chiu_net_pp_architecture as chiu_net_pp_arch
 
 GFS_3D_DIMENSIONS_KEY = 'input_dimensions_gfs_3d'
 GFS_2D_DIMENSIONS_KEY = 'input_dimensions_gfs_2d'

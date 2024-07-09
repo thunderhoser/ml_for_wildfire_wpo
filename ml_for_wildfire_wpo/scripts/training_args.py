@@ -9,7 +9,10 @@ OUTER_LATITUDE_BUFFER_ARG_NAME = 'outer_latitude_buffer_deg'
 OUTER_LONGITUDE_BUFFER_ARG_NAME = 'outer_longitude_buffer_deg'
 GFS_PREDICTORS_ARG_NAME = 'gfs_predictor_field_names'
 GFS_PRESSURE_LEVELS_ARG_NAME = 'gfs_pressure_levels_mb'
-GFS_PREDICTOR_LEADS_ARG_NAME = 'gfs_predictor_lead_times_hours'
+MODEL_LEAD_TIMES_ARG_NAME = 'model_lead_times_days'
+CURRICULUM_START_EPOCHS_ARG_NAME = 'curriculum_start_epoch_by_model_lead'
+CURRICULUM_RAMPUP_ARG_NAME = 'curriculum_num_rampup_epochs'
+GFS_PREDICTOR_LEADS_ARG_NAME = 'gfs_pred_leads_hours_by_model_lead'
 GFS_NORM_FILE_ARG_NAME = 'gfs_normalization_file_name'
 GFS_USE_QUANTILE_NORM_ARG_NAME = 'gfs_use_quantile_norm'
 ERA5_CONSTANT_FILE_ARG_NAME = 'era5_constant_file_name'
@@ -17,9 +20,8 @@ ERA5_CONSTANT_PREDICTORS_ARG_NAME = 'era5_constant_predictor_field_names'
 ERA5_NORM_FILE_ARG_NAME = 'era5_normalization_file_name'
 ERA5_USE_QUANTILE_NORM_ARG_NAME = 'era5_use_quantile_norm'
 TARGET_FIELDS_ARG_NAME = 'target_field_names'
-TARGET_LEAD_TIME_ARG_NAME = 'target_lead_time_days'
-TARGET_LAG_TIMES_ARG_NAME = 'target_lag_times_days'
-GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME = 'gfs_forecast_target_lead_times_days'
+TARGET_LAG_TIMES_ARG_NAME = 'target_lags_days_by_model_lead'
+GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME = 'gfs_target_leads_days_by_model_lead'
 TARGET_NORM_FILE_ARG_NAME = 'target_normalization_file_name'
 TARGETS_USE_QUANTILE_NORM_ARG_NAME = 'targets_use_quantile_norm'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
@@ -77,8 +79,30 @@ GFS_PRESSURE_LEVELS_HELP_STRING = (
     'every 3-D predictor in the list {0:s}).'
 ).format(GFS_PREDICTORS_ARG_NAME)
 
+MODEL_LEAD_TIMES_HELP_STRING = (
+    '1-D list of target lead times, i.e., lead times the model will be trained '
+    'to predict.'
+)
+CURRICULUM_START_EPOCHS_HELP_STRING = (
+    'length-L list of start epochs for learning curriculum, where L = length '
+    'of `{0:s}`.  For more details, see documentation for '
+    '`neural_net.create_learning_curriculum`.'
+).format(
+    MODEL_LEAD_TIMES_ARG_NAME
+)
+CURRICULUM_RAMPUP_HELP_STRING = (
+    'Ramp-up period for learning curriculum.  For more details, see '
+    'documentation for `neural_net.create_learning_curriculum`.'
+)
 GFS_PREDICTOR_LEADS_HELP_STRING = (
-    'List of lead times to be used for GFS predictors.'
+    'Nested list of lead times (hours) for GFS-based predictors.  The outer '
+    'list must have L items, where L = length of `{0:s}`.  To separate one '
+    'inner list from the next, please use -1.  For example, if you want '
+    'GFS-predictor lead times of (0, 12) hours for the first model lead time '
+    'and GFS-pred lead times of (0, 24, 48) hours for the second model lead '
+    'time: "0 12 -1 0 24 48".'
+).format(
+    MODEL_LEAD_TIMES_ARG_NAME
 )
 GFS_NORM_FILE_HELP_STRING = (
     'Path to file with normalization params for GFS predictors (will be read '
@@ -108,14 +132,24 @@ ERA5_USE_QUANTILE_NORM_HELP_STRING = 'Same as {0:s} but for ERA5 data.'.format(
     GFS_USE_QUANTILE_NORM_ARG_NAME
 )
 TARGET_FIELDS_HELP_STRING = 'List of target fields (fire-weather indices).'
-TARGET_LEAD_TIME_HELP_STRING = 'Lead time for model.'
 TARGET_LAG_TIMES_HELP_STRING = (
-    'List of lag times to be used for lagged-target predictors.'
+    'Nested list of lag times (days) for reanalyzed target fields.  The outer '
+    'list must have L items, where L = length of `{0:s}`.  To separate one '
+    'inner list from the next, please use -1.  For example, if you want lag '
+    'times of (1, 2) days for the first model lead time and lag times of'
+    '(1, 2, 3) days for the second model lead time: "1 2 -1 1 2 3".'
+).format(
+    MODEL_LEAD_TIMES_ARG_NAME
 )
 GFS_FCST_TARGET_LEAD_TIMES_HELP_STRING = (
-    'List of lead times to be used for lead-target predictors.  A '
-    '"lead-target predictor" is the raw-GFS forecast of the target field (fire '
-    'weather index) at one lead time.'
+    'Nested list of lead times (days) for GFS-forecast targets.  The outer '
+    'list must have L items, where L = length of `{0:s}`.  To separate one '
+    'inner list from the next, please use -1.  For example, if you want '
+    'GFS-target lead times of (1, 2) days for the first model lead time and '
+    'GFS-target lead times of (1, 2, 3) days for the second model lead time: '
+    '"1 2 -1 1 2 3".'
+).format(
+    MODEL_LEAD_TIMES_ARG_NAME
 )
 TARGET_NORM_FILE_HELP_STRING = (
     'Path to file with normalization params for lagged-target predictors (will '
@@ -231,6 +265,18 @@ def add_input_args(parser_object):
         required=False, default=[500], help=GFS_PRESSURE_LEVELS_HELP_STRING
     )
     parser_object.add_argument(
+        '--' + MODEL_LEAD_TIMES_ARG_NAME, type=int, nargs='+',
+        required=True, help=MODEL_LEAD_TIMES_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + CURRICULUM_START_EPOCHS_ARG_NAME, type=int, nargs='+',
+        required=True, help=CURRICULUM_START_EPOCHS_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + CURRICULUM_RAMPUP_ARG_NAME, type=int,
+        required=True, help=CURRICULUM_RAMPUP_HELP_STRING
+    )
+    parser_object.add_argument(
         '--' + GFS_PREDICTOR_LEADS_ARG_NAME, type=int, nargs='+',
         required=True, help=GFS_PREDICTOR_LEADS_HELP_STRING
     )
@@ -261,10 +307,6 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + TARGET_FIELDS_ARG_NAME, type=str, nargs='+',
         required=True, help=TARGET_FIELDS_HELP_STRING
-    )
-    parser_object.add_argument(
-        '--' + TARGET_LEAD_TIME_ARG_NAME, type=int,
-        required=True, help=TARGET_LEAD_TIME_HELP_STRING
     )
     parser_object.add_argument(
         '--' + TARGET_LAG_TIMES_ARG_NAME, type=int, nargs='+',
