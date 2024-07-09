@@ -148,7 +148,7 @@ def _repeat_tensor_along_time_axis(input_tensor_time_first,
 
     return tensorflow.tile(
         input_tensor_time_first,
-        [1, num_times, 1, 1]
+        [1, num_times, 1, 1, 1]
     )
 
 
