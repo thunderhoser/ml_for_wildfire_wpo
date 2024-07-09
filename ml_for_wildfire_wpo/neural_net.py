@@ -7,6 +7,7 @@ import time
 import random
 import pickle
 import numpy
+import pandas
 import keras
 from tensorflow.keras.saving import load_model
 
@@ -46,7 +47,7 @@ OUTER_LONGITUDE_BUFFER_KEY = 'outer_longitude_buffer_deg'
 INIT_DATE_LIMITS_KEY = 'init_date_limit_strings'
 GFS_PREDICTOR_FIELDS_KEY = 'gfs_predictor_field_names'
 GFS_PRESSURE_LEVELS_KEY = 'gfs_pressure_levels_mb'
-GFS_PREDICTOR_LEADS_KEY = 'gfs_predictor_lead_times_hours'
+MODEL_LEAD_TO_GFS_PRED_LEADS_KEY = 'model_lead_days_to_gfs_pred_leads_hours'
 GFS_DIRECTORY_KEY = 'gfs_directory_name'
 GFS_NORM_FILE_KEY = 'gfs_normalization_file_name'
 GFS_USE_QUANTILE_NORM_KEY = 'gfs_use_quantile_norm'
@@ -55,9 +56,9 @@ ERA5_CONSTANT_FILE_KEY = 'era5_constant_file_name'
 ERA5_NORM_FILE_KEY = 'era5_normalization_file_name'
 ERA5_USE_QUANTILE_NORM_KEY = 'era5_use_quantile_norm'
 TARGET_FIELDS_KEY = 'target_field_names'
-TARGET_LEAD_TIME_KEY = 'target_lead_time_days'
-TARGET_LAG_TIMES_KEY = 'target_lag_times_days'
-GFS_FCST_TARGET_LEAD_TIMES_KEY = 'gfs_forecast_target_lead_times_days'
+MODEL_LEAD_TO_TARGET_LAGS_KEY = 'model_lead_days_to_target_lags_days'
+MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY = 'model_lead_days_to_gfs_target_leads_days'
+MODEL_LEAD_TO_FREQ_KEY = 'model_lead_days_to_freq'
 TARGET_DIRECTORY_KEY = 'target_dir_name'
 GFS_FORECAST_TARGET_DIR_KEY = 'gfs_forecast_target_dir_name'
 TARGET_NORM_FILE_KEY = 'target_normalization_file_name'
@@ -71,7 +72,6 @@ DEFAULT_GENERATOR_OPTION_DICT = {
     INNER_LONGITUDE_LIMITS_KEY: numpy.array([171, -65], dtype=float),
     OUTER_LATITUDE_BUFFER_KEY: 5.,
     OUTER_LONGITUDE_BUFFER_KEY: 5.,
-    TARGET_LAG_TIMES_KEY: numpy.array([1], dtype=int),
     # SENTINEL_VALUE_KEY: -10.
 }
 
@@ -185,18 +185,79 @@ def _check_generator_args(option_dict):
             option_dict[GFS_PRESSURE_LEVELS_KEY], 0
         )
 
-    error_checking.assert_is_numpy_array(
-        option_dict[GFS_PREDICTOR_LEADS_KEY], num_dimensions=1
+    model_lead_days_to_gfs_pred_leads_hours = option_dict[
+        MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
+    ]
+    model_lead_times_days = numpy.array(
+        list(model_lead_days_to_gfs_pred_leads_hours.keys()),
+        dtype=int
     )
-    error_checking.assert_is_integer_numpy_array(
-        option_dict[GFS_PREDICTOR_LEADS_KEY]
+
+    error_checking.assert_is_integer_numpy_array(model_lead_times_days)
+    error_checking.assert_is_greater_numpy_array(model_lead_times_days, 0)
+    error_checking.assert_equals(
+        len(model_lead_times_days),
+        len(numpy.unique(model_lead_times_days))
     )
-    error_checking.assert_is_geq_numpy_array(
-        option_dict[GFS_PREDICTOR_LEADS_KEY], 0
+
+    for d in model_lead_times_days:
+        these_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[d]
+
+        error_checking.assert_is_numpy_array(
+            these_pred_lead_times_hours, num_dimensions=1
+        )
+        error_checking.assert_is_integer_numpy_array(
+            these_pred_lead_times_hours
+        )
+        error_checking.assert_is_geq_numpy_array(these_pred_lead_times_hours, 0)
+        these_pred_lead_times_hours = numpy.sort(these_pred_lead_times_hours)
+
+        model_lead_days_to_gfs_pred_leads_hours[d] = these_pred_lead_times_hours
+
+    model_lead_days_to_target_lags_days = option_dict[
+        MODEL_LEAD_TO_TARGET_LAGS_KEY
+    ]
+    new_lead_times_days = numpy.array(
+        list(model_lead_days_to_target_lags_days.keys()),
+        dtype=int
     )
-    option_dict[GFS_PREDICTOR_LEADS_KEY] = numpy.sort(
-        option_dict[GFS_PREDICTOR_LEADS_KEY]
+    assert numpy.array_equal(
+        numpy.sort(model_lead_times_days),
+        numpy.sort(new_lead_times_days)
     )
+
+    for d in model_lead_times_days:
+        these_lag_times_days = model_lead_days_to_target_lags_days[d]
+
+        error_checking.assert_is_numpy_array(
+            these_lag_times_days, num_dimensions=1
+        )
+        error_checking.assert_is_integer_numpy_array(these_lag_times_days)
+        error_checking.assert_is_greater_numpy_array(these_lag_times_days, 0)
+
+    model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
+    new_lead_times_days = numpy.array(
+        list(model_lead_days_to_freq.keys()),
+        dtype=int
+    )
+    assert numpy.array_equal(
+        numpy.sort(model_lead_times_days),
+        numpy.sort(new_lead_times_days)
+    )
+
+    model_lead_time_freqs = numpy.array(
+        [model_lead_days_to_freq[d] for d in model_lead_times_days],
+        dtype=float
+    )
+    error_checking.assert_is_geq_numpy_array(model_lead_time_freqs, 0.)
+    error_checking.assert_is_leq_numpy_array(model_lead_time_freqs, 1.)
+    model_lead_time_freqs = (
+        model_lead_time_freqs / numpy.sum(model_lead_time_freqs)
+    )
+
+    option_dict[MODEL_LEAD_TO_FREQ_KEY] = dict(zip(
+        model_lead_times_days, model_lead_time_freqs
+    ))
 
     error_checking.assert_directory_exists(option_dict[GFS_DIRECTORY_KEY])
     if option_dict[GFS_NORM_FILE_KEY] is None:
@@ -226,39 +287,36 @@ def _check_generator_args(option_dict):
     for this_field_name in option_dict[TARGET_FIELDS_KEY]:
         canadian_fwi_utils.check_field_name(this_field_name)
 
-    error_checking.assert_is_integer(option_dict[TARGET_LEAD_TIME_KEY])
-    error_checking.assert_is_geq(option_dict[TARGET_LEAD_TIME_KEY], 0)
-
-    error_checking.assert_is_numpy_array(
-        option_dict[TARGET_LAG_TIMES_KEY], num_dimensions=1
-    )
-    error_checking.assert_is_integer_numpy_array(
-        option_dict[TARGET_LAG_TIMES_KEY]
-    )
-    error_checking.assert_is_greater_numpy_array(
-        option_dict[TARGET_LAG_TIMES_KEY], 0
-    )
-
     if (
-            option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY] is None
+            option_dict[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] is None
             or option_dict[GFS_FORECAST_TARGET_DIR_KEY] is None
     ):
-        option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY] = None
+        option_dict[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = None
         option_dict[GFS_FORECAST_TARGET_DIR_KEY] = None
 
     if option_dict[GFS_FORECAST_TARGET_DIR_KEY] is not None:
         error_checking.assert_directory_exists(
             option_dict[GFS_FORECAST_TARGET_DIR_KEY]
         )
-        error_checking.assert_is_numpy_array(
-            option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY], num_dimensions=1
-        )
-        error_checking.assert_is_integer_numpy_array(
-            option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY]
-        )
-        error_checking.assert_is_greater_numpy_array(
-            option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY], 0
-        )
+
+        model_lead_days_to_gfs_target_leads_days = option_dict[
+            MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
+        ]
+
+        for d in model_lead_times_days:
+            these_target_lead_times_days = (
+                model_lead_days_to_gfs_target_leads_days[d]
+            )
+
+            error_checking.assert_is_numpy_array(
+                these_target_lead_times_days, num_dimensions=1
+            )
+            error_checking.assert_is_integer_numpy_array(
+                these_target_lead_times_days
+            )
+            error_checking.assert_is_greater_numpy_array(
+                these_target_lead_times_days, 0
+            )
 
     error_checking.assert_directory_exists(option_dict[TARGET_DIRECTORY_KEY])
     if option_dict[TARGET_NORM_FILE_KEY] is None:
@@ -272,8 +330,7 @@ def _check_generator_args(option_dict):
         )
 
     error_checking.assert_is_integer(option_dict[BATCH_SIZE_KEY])
-    # error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 8)
-
+    error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 1)
     error_checking.assert_is_not_nan(option_dict[SENTINEL_VALUE_KEY])
     error_checking.assert_is_boolean(option_dict[DO_RESIDUAL_PREDICTION_KEY])
 
@@ -944,14 +1001,89 @@ def _read_lagged_targets_1example(
     return target_field_matrix, desired_row_indices, desired_column_indices
 
 
+def create_learning_curriculum(lead_times_days, start_epoch_by_lead_time,
+                               num_rampup_epochs):
+    """Creates learning curriculum -- used for models with multi target times.
+
+    L = number of target lead times
+
+    :param lead_times_days: length-L numpy array of lead times.
+    :param start_epoch_by_lead_time: length-L numpy array of start epochs.
+        start_epoch_by_lead_time[k] is the first epoch at which the model will
+        be trained to predict lead time lead_times_days[k].
+    :param num_rampup_epochs: Number of ramp-up epochs.  This is the number of
+        epochs it takes for the frequency of the shortest lead time to go from
+        its max to min -- or for the frequency of any other lead time to go from
+        its min to max.
+    :return: epoch_and_lead_time_to_freq: Double indexed dictionary, where each
+        key is (epoch_num, lead_time_days).  The corresponding value is the
+        frequency with which the given lead time, at the given epoch, will be
+        used for training.
+    """
+
+    # Check input args.
+    error_checking.assert_is_numpy_array(lead_times_days, num_dimensions=1)
+    error_checking.assert_is_integer_numpy_array(lead_times_days)
+    error_checking.assert_is_greater_numpy_array(lead_times_days, 0)
+
+    num_lead_times = len(lead_times_days)
+    error_checking.assert_is_numpy_array(
+        start_epoch_by_lead_time,
+        exact_dimensions=numpy.array([num_lead_times], dtype=int)
+    )
+
+    sort_indices = numpy.argsort(lead_times_days)
+    lead_times_days = lead_times_days[sort_indices]
+    start_epoch_by_lead_time = start_epoch_by_lead_time[sort_indices]
+    start_epoch_by_lead_time[0] = 0
+
+    error_checking.assert_is_integer_numpy_array(start_epoch_by_lead_time)
+    error_checking.assert_is_geq_numpy_array(start_epoch_by_lead_time, 0)
+    error_checking.assert_is_greater_numpy_array(
+        numpy.diff(start_epoch_by_lead_time), 0
+    )
+
+    error_checking.assert_is_integer(num_rampup_epochs)
+    error_checking.assert_is_greater(num_rampup_epochs, 0)
+
+    # Do actual stuff.
+    num_epochs = 10 * numpy.max(start_epoch_by_lead_time + num_rampup_epochs)
+    epoch_nums = numpy.linspace(0, num_epochs - 1, num=num_epochs, dtype=float)
+
+    multiplier = 10. / num_rampup_epochs
+    num_lead_times_reciprocal = 1. / num_lead_times
+
+    this_offset = 0.5 * num_rampup_epochs + start_epoch_by_lead_time[1]
+    these_exp_values = numpy.exp(-multiplier * (epoch_nums - this_offset))
+    first_lead_time_freqs = 1. - 1. / (1. + these_exp_values)
+    first_lead_time_freqs = (
+        num_lead_times_reciprocal +
+        (1. - num_lead_times_reciprocal) * first_lead_time_freqs
+    )
+
+    epoch_and_lead_time_to_freq = dict()
+    for i in range(num_epochs):
+        epoch_and_lead_time_to_freq[i + 1, lead_times_days[0]] = (
+            first_lead_time_freqs[i]
+        )
+
+    for j in range(1, num_lead_times):
+        this_offset = 0.5 * num_rampup_epochs + start_epoch_by_lead_time[j]
+        these_exp_values = numpy.exp(-multiplier * (epoch_nums - this_offset))
+        these_lead_time_freqs = (
+            num_lead_times_reciprocal / (1. + these_exp_values)
+        )
+
+        for i in range(num_epochs):
+            epoch_and_lead_time_to_freq[i + 1, lead_times_days[j]] = (
+                these_lead_time_freqs[i]
+            )
+
+    return epoch_and_lead_time_to_freq
+
+
 def data_generator(option_dict):
-    """Generates both training and validation for neural network.
-
-    Generators should be used only at training time, not at inference time.
-
-    This particular generator should be used for neural networks that always see
-    the same geographic domain, with the bounding box for this domain specified
-    in the first few input args of the dictionary.
+    """Generates training or validation data for NN with flexible laad time.
 
     E = number of examples per batch = "batch size"
     M = number of grid rows in outer domain
@@ -984,8 +1116,9 @@ def data_generator(option_dict):
         to be used for GFS predictors (only the 3-D fields in the list
         "gfs_predictor_field_names").  If there are no 3-D fields, make this
         None.
-    option_dict["gfs_predictor_lead_times_hours"]: 1-D numpy array with lead
-        times to be used for GFS predictors.
+    option_dict["model_lead_days_to_gfs_pred_leads_hours"]: Dictionary, where
+        each key is a model lead time (days) and the corresponding value is a
+        1-D numpy array of lead times (hours) for GFS-based predictors.
     option_dict["gfs_directory_name"]: Name of directory with GFS data.  Files
         therein will be found by `gfs_io.find_file` and read by
         `gfs_io.read_file`.
@@ -1006,13 +1139,16 @@ def data_generator(option_dict):
         for ERA5 data.
     option_dict["target_field_names"]: length-T list with names of target fields
         (fire-weather indices).
-    option_dict["target_lead_time_days"]: Lead time for target fields.
-    option_dict["target_lag_times_days"]: 1-D numpy array with lag times for
-        lagged-target predictors.  A "lagged-target predictor" consists of the
-        actual target fields at one lag time.
-    option_dict["gfs_forecast_target_lead_times_days"]: 1-D numpy array with
-        lead times for lead-target predictors.  A "lead-target predictor"
-        consists of the raw-GFS-forecast target fields at one lead time.
+    option_dict["model_lead_days_to_target_lags_days"]: Dictionary, where
+        each key is a model lead time (days) and the corresponding value is a
+        1-D numpy array of lag times (days) for reanalyzed target fields.
+    option_dict["model_lead_days_to_gfs_target_leads_days"]: Dictionary, where
+        each key is a model lead time (days) and the corresponding value is a
+        1-D numpy array of lead times times (days) for GFS-based forecasts of
+        target fields.
+    option_dict["model_lead_days_to_freq"]: Dictionary, where each key is a
+        model lead time (days) and the corresponding value is the frequency with
+        which the model should be trained on this lead time (from 0...1).
     option_dict["target_dir_name"]: Name of directory with target fields.
         Files therein will be found by `canadian_fwo_io.find_file` and read by
         `canadian_fwo_io.read_file`.
@@ -1040,11 +1176,12 @@ def data_generator(option_dict):
         predictors.
     predictor_matrices[1]: E-by-M-by-N-by-L-by-FF numpy array of 2-D GFS
         predictors.
-    predictor_matrices[2]: E-by-M-by-N-by-F numpy array of ERA5-constant
+    predictor_matrices[2]: length-E numpy array of model lead times (days).
+    predictor_matrices[3]: E-by-M-by-N-by-F numpy array of ERA5-constant
         predictors.
-    predictor_matrices[3]: E-by-M-by-N-by-l-by-T numpy array of lag/lead-target
+    predictor_matrices[4]: E-by-M-by-N-by-l-by-T numpy array of lag/lead-target
         predictors.
-    predictor_matrices[4]: E-by-M-by-N-by-T numpy array of baseline values for
+    predictor_matrices[5]: E-by-M-by-N-by-T numpy array of baseline values for
         residual prediction.
 
     :return: target_matrix: E-by-M-by-N-by-(T + 1) numpy array, where
@@ -1052,13 +1189,6 @@ def data_generator(option_dict):
         the target fields and target_matrix[..., -1] contains a binary mask.
         Where the binary mask is 0, predictions should not be evaluated.
     """
-
-    # TODO(thunderhoser): Allow multiple lead times for target.
-
-    # Everywhere in the U.S. -- even parts of Alaska west of the International
-    # Date Line -- has a time zone behind UTC.  Thus, in the predictors, the GFS
-    # run init 00Z on day D should be matched with FWI maps on day (D - 1) or
-    # earlier -- never with FWI maps on day D.
 
     option_dict = _check_generator_args(option_dict)
 
@@ -1069,7 +1199,9 @@ def data_generator(option_dict):
     init_date_limit_strings = option_dict[INIT_DATE_LIMITS_KEY]
     gfs_predictor_field_names = option_dict[GFS_PREDICTOR_FIELDS_KEY]
     gfs_pressure_levels_mb = option_dict[GFS_PRESSURE_LEVELS_KEY]
-    gfs_predictor_lead_times_hours = option_dict[GFS_PREDICTOR_LEADS_KEY]
+    model_lead_days_to_gfs_pred_leads_hours = option_dict[
+        MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
+    ]
     gfs_directory_name = option_dict[GFS_DIRECTORY_KEY]
     gfs_normalization_file_name = option_dict[GFS_NORM_FILE_KEY]
     gfs_use_quantile_norm = option_dict[GFS_USE_QUANTILE_NORM_KEY]
@@ -1080,11 +1212,13 @@ def data_generator(option_dict):
     era5_normalization_file_name = option_dict[ERA5_NORM_FILE_KEY]
     era5_use_quantile_norm = option_dict[ERA5_USE_QUANTILE_NORM_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
-    target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
-    target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
-    gfs_forecast_target_lead_times_days = option_dict[
-        GFS_FCST_TARGET_LEAD_TIMES_KEY
+    model_lead_days_to_target_lags_days = option_dict[
+        MODEL_LEAD_TO_TARGET_LAGS_KEY
     ]
+    model_lead_days_to_gfs_target_leads_days = option_dict[
+        MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
+    ]
+    model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
     target_dir_name = option_dict[TARGET_DIRECTORY_KEY]
     gfs_forecast_target_dir_name = option_dict[GFS_FORECAST_TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
@@ -1092,6 +1226,15 @@ def data_generator(option_dict):
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
+
+    model_lead_times_days = numpy.array(
+        list(model_lead_days_to_freq.keys()),
+        dtype=int
+    )
+    model_lead_time_freqs = numpy.array(
+        [model_lead_days_to_freq[d] for d in model_lead_times_days],
+        dtype=float
+    )
 
     if gfs_normalization_file_name is None:
         gfs_norm_param_table_xarray = None
@@ -1187,6 +1330,16 @@ def data_generator(option_dict):
         target_matrix = None
         num_examples_in_memory = 0
 
+        model_lead_time_days = random.choices(
+            model_lead_times_days, weights=model_lead_time_freqs, k=1
+        )[0]
+        target_lag_times_days = model_lead_days_to_target_lags_days[
+            model_lead_time_days
+        ]
+        lead_time_predictors_days = numpy.full(
+            num_examples_per_batch, model_lead_time_days, dtype=float
+        )
+
         while num_examples_in_memory < num_examples_per_batch:
             if gfs_file_index == len(gfs_file_names):
                 random.shuffle(gfs_file_names)
@@ -1201,7 +1354,8 @@ def data_generator(option_dict):
                 desired_column_indices=desired_gfs_column_indices,
                 latitude_limits_deg_n=outer_latitude_limits_deg_n,
                 longitude_limits_deg_e=outer_longitude_limits_deg_e,
-                lead_times_hours=gfs_predictor_lead_times_hours,
+                lead_times_hours=
+                model_lead_days_to_gfs_pred_leads_hours[model_lead_time_days],
                 field_names=gfs_predictor_field_names,
                 pressure_levels_mb=gfs_pressure_levels_mb,
                 norm_param_table_xarray=gfs_norm_param_table_xarray,
@@ -1259,7 +1413,8 @@ def data_generator(option_dict):
                     init_date_string=gfs_io.file_name_to_date(
                         gfs_file_names[gfs_file_index]
                     ),
-                    target_lead_times_days=gfs_forecast_target_lead_times_days,
+                    target_lead_times_days=
+                    model_lead_days_to_gfs_target_leads_days[model_lead_time_days],
                     desired_row_indices=desired_gfs_fcst_target_row_indices,
                     desired_column_indices=
                     desired_gfs_fcst_target_column_indices,
@@ -1284,7 +1439,7 @@ def data_generator(option_dict):
                 gfs_io.file_name_to_date(gfs_file_names[gfs_file_index]),
                 target_dir_name=target_dir_name,
                 target_lead_times_days=
-                numpy.array([target_lead_time_days], dtype=int)
+                numpy.array([model_lead_time_days], dtype=int)
             )[0]
 
             this_target_matrix = _get_target_fields(
@@ -1380,6 +1535,15 @@ def data_generator(option_dict):
                 numpy.isnan(gfs_predictor_matrix_2d)
             ] = sentinel_value
 
+        print((
+            'Shape of lead_time_predictors_days and min/max values: '
+            '{0:s}, {1:.0f}, {2:.0f}'
+        ).format(
+            str(lead_time_predictors_days.shape),
+            numpy.min(lead_time_predictors_days),
+            numpy.max(lead_time_predictors_days)
+        ))
+
         if baseline_prediction_matrix is not None:
             print((
                 'Shape of baseline prediction matrix and NaN fraction: '
@@ -1447,6 +1611,11 @@ def data_generator(option_dict):
             predictor_matrices.update({
                 'gfs_2d_inputs': gfs_predictor_matrix_2d.astype('float32')
             })
+
+        predictor_matrices.update({
+            'lead_time': lead_time_predictors_days.astype('float32')
+        })
+
         if era5_constant_matrix is not None:
             predictor_matrices.update({
                 'era5_inputs': era5_constant_matrix.astype('float32')
@@ -1485,7 +1654,7 @@ def data_generator(option_dict):
         yield predictor_matrices, target_matrix_with_weights
 
 
-def create_data(option_dict, init_date_string):
+def create_data(option_dict, init_date_string, model_lead_time_days):
     """Creates, rather than generates, neural-net inputs.
 
     M = number of rows in grid
@@ -1494,6 +1663,7 @@ def create_data(option_dict, init_date_string):
     :param option_dict: See doc for `data_generator`.
     :param init_date_string: GFS initialization date (format "yyyymmdd").  Will
         always use the 00Z model run.
+    :param model_lead_time_days: Model lead time.
 
     :return: data_dict: Dictionary with the following keys.
     data_dict["predictor_matrices"]: Same as output from `data_generator`.
@@ -1506,6 +1676,8 @@ def create_data(option_dict, init_date_string):
     """
 
     _ = time_conversion.string_to_unix_sec(init_date_string, DATE_FORMAT)
+    error_checking.assert_is_integer(model_lead_time_days)
+    error_checking.assert_is_greater(model_lead_time_days, 0)
 
     option_dict[INIT_DATE_LIMITS_KEY] = [init_date_string] * 2
     option_dict[BATCH_SIZE_KEY] = 32
@@ -1518,7 +1690,9 @@ def create_data(option_dict, init_date_string):
     outer_longitude_buffer_deg = option_dict[OUTER_LONGITUDE_BUFFER_KEY]
     gfs_predictor_field_names = option_dict[GFS_PREDICTOR_FIELDS_KEY]
     gfs_pressure_levels_mb = option_dict[GFS_PRESSURE_LEVELS_KEY]
-    gfs_predictor_lead_times_hours = option_dict[GFS_PREDICTOR_LEADS_KEY]
+    model_lead_days_to_gfs_pred_leads_hours = option_dict[
+        MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
+    ]
     gfs_directory_name = option_dict[GFS_DIRECTORY_KEY]
     gfs_normalization_file_name = option_dict[GFS_NORM_FILE_KEY]
     gfs_use_quantile_norm = option_dict[GFS_USE_QUANTILE_NORM_KEY]
@@ -1529,10 +1703,11 @@ def create_data(option_dict, init_date_string):
     era5_normalization_file_name = option_dict[ERA5_NORM_FILE_KEY]
     era5_use_quantile_norm = option_dict[ERA5_USE_QUANTILE_NORM_KEY]
     target_field_names = option_dict[TARGET_FIELDS_KEY]
-    target_lead_time_days = option_dict[TARGET_LEAD_TIME_KEY]
-    target_lag_times_days = option_dict[TARGET_LAG_TIMES_KEY]
-    gfs_forecast_target_lead_times_days = option_dict[
-        GFS_FCST_TARGET_LEAD_TIMES_KEY
+    model_lead_days_to_target_lags_days = option_dict[
+        MODEL_LEAD_TO_TARGET_LAGS_KEY
+    ]
+    model_lead_days_to_gfs_target_leads_days = option_dict[
+        MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
     ]
     target_dir_name = option_dict[TARGET_DIRECTORY_KEY]
     gfs_forecast_target_dir_name = option_dict[GFS_FORECAST_TARGET_DIR_KEY]
@@ -1540,6 +1715,16 @@ def create_data(option_dict, init_date_string):
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
+
+    gfs_predictor_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
+        model_lead_time_days
+    ]
+    target_lag_times_days = model_lead_days_to_target_lags_days[
+        model_lead_time_days
+    ]
+    gfs_forecast_target_lead_times_days = (
+        model_lead_days_to_gfs_target_leads_days[model_lead_time_days]
+    )
 
     if gfs_normalization_file_name is None:
         gfs_norm_param_table_xarray = None
@@ -1711,7 +1896,7 @@ def create_data(option_dict, init_date_string):
         gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_name),
         target_dir_name=target_dir_name,
         target_lead_times_days=
-        numpy.array([target_lead_time_days], dtype=int)
+        numpy.array([model_lead_time_days], dtype=int)
     )[0]
 
     target_matrix = _get_target_fields(
@@ -1749,6 +1934,17 @@ def create_data(option_dict, init_date_string):
         gfs_predictor_matrix_2d[
             numpy.isnan(gfs_predictor_matrix_2d)
         ] = sentinel_value
+
+    lead_time_predictors_days = numpy.array([model_lead_time_days], dtype=float)
+
+    print((
+        'Shape of lead_time_predictors_days and min/max values: '
+        '{0:s}, {1:.0f}, {2:.0f}'
+    ).format(
+        str(lead_time_predictors_days.shape),
+        numpy.min(lead_time_predictors_days),
+        numpy.max(lead_time_predictors_days)
+    ))
 
     if baseline_prediction_matrix is not None:
         print((
@@ -1809,8 +2005,8 @@ def create_data(option_dict, init_date_string):
     predictor_matrices = [
         m for m in [
             gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
-            era5_constant_matrix, laglead_target_predictor_matrix,
-            baseline_prediction_matrix
+            lead_time_predictors_days, era5_constant_matrix,
+            laglead_target_predictor_matrix, baseline_prediction_matrix
         ]
         if m is not None
     ]
@@ -1983,55 +2179,38 @@ def read_metafile(pickle_file_name):
 
     if METRIC_FUNCTIONS_KEY not in metadata_dict:
         metadata_dict[METRIC_FUNCTIONS_KEY] = []
+
     if OPTIMIZER_FUNCTION_KEY not in metadata_dict:
         metadata_dict[OPTIMIZER_FUNCTION_KEY] = (
             'keras.optimizers.Adam(clipnorm=1.)'
         )
 
-    training_option_dict = metadata_dict[TRAINING_OPTIONS_KEY]
-    validation_option_dict = metadata_dict[VALIDATION_OPTIONS_KEY]
+    tod = metadata_dict[TRAINING_OPTIONS_KEY]
+    vod = metadata_dict[VALIDATION_OPTIONS_KEY]
 
-    if GFS_FORECAST_TARGET_DIR_KEY not in training_option_dict:
-        training_option_dict[GFS_FORECAST_TARGET_DIR_KEY] = None
-        training_option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY] = None
+    if MODEL_LEAD_TO_GFS_PRED_LEADS_KEY not in tod:
+        model_lead_time_days = tod['target_lead_time_days']
 
-        validation_option_dict[GFS_FORECAST_TARGET_DIR_KEY] = None
-        validation_option_dict[GFS_FCST_TARGET_LEAD_TIMES_KEY] = None
+        this_dict = {
+            model_lead_time_days: tod['gfs_predictor_lead_times_hours']
+        }
+        tod[MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = this_dict
+        vod[MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = this_dict
 
-    if ERA5_NORM_FILE_KEY not in training_option_dict:
-        training_option_dict[ERA5_NORM_FILE_KEY] = None
-        validation_option_dict[ERA5_NORM_FILE_KEY] = None
+        this_dict = {
+            model_lead_time_days: tod['target_lag_times_days']
+        }
+        tod[MODEL_LEAD_TO_TARGET_LAGS_KEY] = this_dict
+        vod[MODEL_LEAD_TO_TARGET_LAGS_KEY] = this_dict
 
-    if GFS_USE_QUANTILE_NORM_KEY not in training_option_dict:
-        training_option_dict[GFS_USE_QUANTILE_NORM_KEY] = False
-        validation_option_dict[GFS_USE_QUANTILE_NORM_KEY] = False
+        this_dict = {
+            model_lead_time_days: tod['gfs_forecast_target_lead_times_days']
+        }
+        tod[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = this_dict
+        vod[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = this_dict
 
-    if ERA5_USE_QUANTILE_NORM_KEY not in training_option_dict:
-        training_option_dict[ERA5_USE_QUANTILE_NORM_KEY] = False
-        validation_option_dict[ERA5_USE_QUANTILE_NORM_KEY] = False
-
-    if TARGETS_USE_QUANTILE_NORM_KEY not in training_option_dict:
-        training_option_dict[TARGETS_USE_QUANTILE_NORM_KEY] = False
-        validation_option_dict[TARGETS_USE_QUANTILE_NORM_KEY] = False
-
-    if TARGET_FIELDS_KEY not in training_option_dict:
-        if 'target_field_name' in training_option_dict:
-            training_option_dict[TARGET_FIELDS_KEY] = [
-                training_option_dict['target_field_name']
-            ]
-            validation_option_dict[TARGET_FIELDS_KEY] = [
-                training_option_dict['target_field_name']
-            ]
-        else:
-            training_option_dict[TARGET_FIELDS_KEY] = []
-            validation_option_dict[TARGET_FIELDS_KEY] = []
-
-    if DO_RESIDUAL_PREDICTION_KEY not in training_option_dict:
-        training_option_dict[DO_RESIDUAL_PREDICTION_KEY] = False
-        validation_option_dict[DO_RESIDUAL_PREDICTION_KEY] = False
-
-    metadata_dict[TRAINING_OPTIONS_KEY] = training_option_dict
-    metadata_dict[VALIDATION_OPTIONS_KEY] = validation_option_dict
+    metadata_dict[TRAINING_OPTIONS_KEY] = tod
+    metadata_dict[VALIDATION_OPTIONS_KEY] = vod
 
     # TODO(thunderhoser): HACK to change target weights for 7-var models.
     orig_strings = [
@@ -2120,7 +2299,7 @@ def train_model(
         loss_function_string, optimizer_function_string,
         metric_function_strings, plateau_patience_epochs,
         plateau_learning_rate_multiplier, early_stopping_patience_epochs,
-        output_dir_name):
+        epoch_and_lead_time_to_freq, output_dir_name):
     """Trains neural net with generator.
 
     :param model_object: Untrained neural net (instance of
@@ -2155,6 +2334,8 @@ def train_model(
     :param early_stopping_patience_epochs: Training will be stopped early if
         validation loss has not decreased in the last N epochs, where N =
         early_stopping_patience_epochs.
+    :param epoch_and_lead_time_to_freq: Dictionary returned by
+        `create_learning_curriculum`.
     :param output_dir_name: Path to output directory (model and training history
         will be saved here).
     """
@@ -2195,10 +2376,17 @@ def train_model(
     validation_option_dict = _check_generator_args(validation_option_dict)
 
     model_file_name = '{0:s}/model.keras'.format(output_dir_name)
+    history_file_name = '{0:s}/history.csv'.format(output_dir_name)
+
+    # TODO(thunderhoser): Hopefully this handles restarts properly.
+    try:
+        history_table_pandas = pandas.read_csv(history_file_name)
+        initial_epoch = history_table_pandas['epoch'].max() + 1
+    except:
+        initial_epoch = 0
 
     history_object = keras.callbacks.CSVLogger(
-        filename='{0:s}/history.csv'.format(output_dir_name),
-        separator=',', append=False
+        filename=history_file_name, separator=',', append=True
     )
     checkpoint_object = keras.callbacks.ModelCheckpoint(
         filepath=model_file_name, monitor='val_loss', verbose=1,
@@ -2215,7 +2403,7 @@ def train_model(
         min_delta=0., cooldown=0
     )
     backup_object = keras.callbacks.BackupAndRestore(
-        backup_dir_name, save_freq='epoch', delete_checkpoint=True
+        backup_dir_name, save_freq='epoch', delete_checkpoint=False
     )
 
     list_of_callback_objects = [
@@ -2223,9 +2411,6 @@ def train_model(
         early_stopping_object, plateau_object,
         backup_object
     ]
-
-    training_generator = data_generator(training_option_dict)
-    validation_generator = data_generator(validation_option_dict)
 
     metafile_name = find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=False
@@ -2247,13 +2432,43 @@ def train_model(
         early_stopping_patience_epochs=early_stopping_patience_epochs
     )
 
-    model_object.fit(
-        x=training_generator,
-        steps_per_epoch=num_training_batches_per_epoch,
-        epochs=num_epochs, verbose=1, callbacks=list_of_callback_objects,
-        validation_data=validation_generator,
-        validation_steps=num_validation_batches_per_epoch
-    )
+    epochs_in_dict = numpy.unique(numpy.array(
+        [l[0] for l in list(epoch_and_lead_time_to_freq.keys())],
+        dtype=int
+    ))
+    max_epoch_in_dict = numpy.max(epochs_in_dict)
+
+    model_lead_times_days = numpy.unique(numpy.array(
+        list(training_option_dict[MODEL_LEAD_TO_TARGET_LAGS_KEY].keys()),
+        dtype=int
+    ))
+
+    for this_epoch in range(initial_epoch, num_epochs):
+        epoch_in_dict = min([this_epoch + 1, max_epoch_in_dict])
+        model_lead_time_freqs = numpy.array([
+            epoch_and_lead_time_to_freq[epoch_in_dict, l]
+            for l in model_lead_times_days
+        ], dtype=float)
+
+        model_lead_days_to_freq = dict(zip(
+            model_lead_times_days, model_lead_time_freqs
+        ))
+        training_option_dict[MODEL_LEAD_TO_FREQ_KEY] = model_lead_days_to_freq
+        validation_option_dict[MODEL_LEAD_TO_FREQ_KEY] = model_lead_days_to_freq
+
+        training_generator = data_generator(training_option_dict)
+        validation_generator = data_generator(validation_option_dict)
+
+        model_object.fit(
+            x=training_generator,
+            steps_per_epoch=num_training_batches_per_epoch,
+            epochs=this_epoch,  # TODO(thunderhoser): Should maybe be this_epoch + 1?
+            initial_epoch=this_epoch,
+            verbose=1,
+            callbacks=list_of_callback_objects,
+            validation_data=validation_generator,
+            validation_steps=num_validation_batches_per_epoch
+        )
 
 
 def apply_model(
