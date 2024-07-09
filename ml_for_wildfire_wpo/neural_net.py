@@ -2313,26 +2313,26 @@ def read_model(hdf5_file_name):
         model_object.load_weights(hdf5_file_name)
         return model_object
 
-    chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
-    if chiu_net_pp_architecture_dict is not None:
-        import \
-            chiu_net_pp_architecture
-
-        arch_dict = chiu_net_pp_architecture_dict
-
-        for this_key in [
-                chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
-                chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
-        ]:
-            arch_dict[this_key] = eval(arch_dict[this_key])
-
-        for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
-            for k in range(len(arch_dict[this_key])):
-                arch_dict[this_key][k] = eval(arch_dict[this_key][k])
-
-        model_object = chiu_net_pp_architecture.create_model(arch_dict)
-        model_object.load_weights(hdf5_file_name)
-        return model_object
+    # chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
+    # if chiu_net_pp_architecture_dict is not None:
+    #     import \
+    #         chiu_net_pp_architecture
+    #
+    #     arch_dict = chiu_net_pp_architecture_dict
+    #
+    #     for this_key in [
+    #             chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
+    #             chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
+    #     ]:
+    #         arch_dict[this_key] = eval(arch_dict[this_key])
+    #
+    #     for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
+    #         for k in range(len(arch_dict[this_key])):
+    #             arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+    #
+    #     model_object = chiu_net_pp_architecture.create_model(arch_dict)
+    #     model_object.load_weights(hdf5_file_name)
+    #     return model_object
 
     chiu_net_pp_flexi_architecture_dict = metadata_dict[
         CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY
