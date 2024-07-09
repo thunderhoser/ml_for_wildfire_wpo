@@ -81,16 +81,21 @@ TRAINING_OPTIONS_KEY = 'training_option_dict'
 NUM_VALIDATION_BATCHES_KEY = 'num_validation_batches_per_epoch'
 VALIDATION_OPTIONS_KEY = 'validation_option_dict'
 LOSS_FUNCTION_KEY = 'loss_function_string'
-OPTIMIZER_FUNCTION_KEY = 'optimizer_function_string'
 METRIC_FUNCTIONS_KEY = 'metric_function_strings'
+OPTIMIZER_FUNCTION_KEY = 'optimizer_function_string'
+CHIU_NET_ARCHITECTURE_KEY = 'chiu_net_architecture_dict'
+CHIU_NET_PP_ARCHITECTURE_KEY = 'chiu_net_pp_architecture_dict'
+CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY = 'chiu_net_pp_flexi_architecture_dict'
 PLATEAU_PATIENCE_KEY = 'plateau_patience_epochs'
 PLATEAU_LR_MUTIPLIER_KEY = 'plateau_learning_rate_multiplier'
 EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
 
 METADATA_KEYS = [
     NUM_EPOCHS_KEY, NUM_TRAINING_BATCHES_KEY, TRAINING_OPTIONS_KEY,
-    NUM_VALIDATION_BATCHES_KEY, VALIDATION_OPTIONS_KEY, LOSS_FUNCTION_KEY,
-    OPTIMIZER_FUNCTION_KEY, METRIC_FUNCTIONS_KEY, PLATEAU_PATIENCE_KEY,
+    NUM_VALIDATION_BATCHES_KEY, VALIDATION_OPTIONS_KEY,
+    LOSS_FUNCTION_KEY, METRIC_FUNCTIONS_KEY, OPTIMIZER_FUNCTION_KEY,
+    CHIU_NET_ARCHITECTURE_KEY, CHIU_NET_PP_ARCHITECTURE_KEY,
+    CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY, PLATEAU_PATIENCE_KEY,
     PLATEAU_LR_MUTIPLIER_KEY, EARLY_STOPPING_PATIENCE_KEY
 ]
 
@@ -2111,8 +2116,10 @@ def find_metafile(model_file_name, raise_error_if_missing=True):
 def write_metafile(
         pickle_file_name, num_epochs, num_training_batches_per_epoch,
         training_option_dict, num_validation_batches_per_epoch,
-        validation_option_dict, loss_function_string, optimizer_function_string,
-        metric_function_strings, plateau_patience_epochs,
+        validation_option_dict, loss_function_string,
+        metric_function_strings, optimizer_function_string,
+        chiu_net_architecture_dict, chiu_net_pp_architecture_dict,
+        chiu_net_pp_flexi_architecture_dict, plateau_patience_epochs,
         plateau_learning_rate_multiplier, early_stopping_patience_epochs):
     """Writes metadata to Pickle file.
 
@@ -2123,8 +2130,11 @@ def write_metafile(
     :param num_validation_batches_per_epoch: Same.
     :param validation_option_dict: Same.
     :param loss_function_string: Same.
-    :param optimizer_function_string: Same.
     :param metric_function_strings: Same.
+    :param optimizer_function_string: Same.
+    :param chiu_net_architecture_dict: Same.
+    :param chiu_net_pp_architecture_dict: Same.
+    :param chiu_net_pp_flexi_architecture_dict: Same.
     :param plateau_patience_epochs: Same.
     :param plateau_learning_rate_multiplier: Same.
     :param early_stopping_patience_epochs: Same.
@@ -2137,8 +2147,11 @@ def write_metafile(
         NUM_VALIDATION_BATCHES_KEY: num_validation_batches_per_epoch,
         VALIDATION_OPTIONS_KEY: validation_option_dict,
         LOSS_FUNCTION_KEY: loss_function_string,
-        OPTIMIZER_FUNCTION_KEY: optimizer_function_string,
         METRIC_FUNCTIONS_KEY: metric_function_strings,
+        OPTIMIZER_FUNCTION_KEY: optimizer_function_string,
+        CHIU_NET_ARCHITECTURE_KEY: chiu_net_architecture_dict,
+        CHIU_NET_PP_ARCHITECTURE_KEY: chiu_net_pp_architecture_dict,
+        CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY: chiu_net_pp_flexi_architecture_dict,
         PLATEAU_PATIENCE_KEY: plateau_patience_epochs,
         PLATEAU_LR_MUTIPLIER_KEY: plateau_learning_rate_multiplier,
         EARLY_STOPPING_PATIENCE_KEY: early_stopping_patience_epochs
@@ -2162,8 +2175,11 @@ def read_metafile(pickle_file_name):
     metadata_dict["num_validation_batches_per_epoch"]: Same.
     metadata_dict["validation_option_dict"]: Same.
     metadata_dict["loss_function_string"]: Same.
-    metadata_dict["optimizer_function_string"]: Same.
     metadata_dict["metric_function_strings"]: Same.
+    metadata_dict["optimizer_function_string"]: Same.
+    metadata_dict["chiu_net_architecture_dict"]: Same.
+    metadata_dict["chiu_net_pp_architecture_dict"]: Same.
+    metadata_dict["chiu_net_pp_flexi_architecture_dict"]: Same.
     metadata_dict["plateau_patience_epochs"]: Same.
     metadata_dict["plateau_learning_rate_multiplier"]: Same.
     metadata_dict["early_stopping_patience_epochs"]: Same.
@@ -2179,11 +2195,12 @@ def read_metafile(pickle_file_name):
 
     if METRIC_FUNCTIONS_KEY not in metadata_dict:
         metadata_dict[METRIC_FUNCTIONS_KEY] = []
-
-    if OPTIMIZER_FUNCTION_KEY not in metadata_dict:
-        metadata_dict[OPTIMIZER_FUNCTION_KEY] = (
-            'keras.optimizers.Adam(clipnorm=1.)'
-        )
+    if CHIU_NET_ARCHITECTURE_KEY not in metadata_dict:
+        metadata_dict[CHIU_NET_ARCHITECTURE_KEY] = None
+    if CHIU_NET_PP_ARCHITECTURE_KEY not in metadata_dict:
+        metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] = None
+    if CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY not in metadata_dict:
+        metadata_dict[CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY] = None
 
     tod = metadata_dict[TRAINING_OPTIONS_KEY]
     vod = metadata_dict[VALIDATION_OPTIONS_KEY]
@@ -2271,8 +2288,72 @@ def read_model(hdf5_file_name):
         model_file_name=hdf5_file_name, raise_error_if_missing=True
     )
     metadata_dict = read_metafile(metafile_name)
-
     print(metadata_dict[LOSS_FUNCTION_KEY])
+
+    chiu_net_architecture_dict = metadata_dict[CHIU_NET_ARCHITECTURE_KEY]
+    if chiu_net_architecture_dict is not None:
+        import chiu_net_architecture
+
+        arch_dict = chiu_net_architecture_dict
+
+        for this_key in [
+                chiu_net_architecture.LOSS_FUNCTION_KEY,
+                chiu_net_architecture.OPTIMIZER_FUNCTION_KEY
+        ]:
+            arch_dict[this_key] = eval(arch_dict[this_key])
+
+        for this_key in [chiu_net_architecture.METRIC_FUNCTIONS_KEY]:
+            for k in range(len(arch_dict[this_key])):
+                arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+
+        model_object = chiu_net_architecture.create_model(arch_dict)
+        model_object.load_weights(hdf5_file_name)
+        return model_object
+
+    chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
+    if chiu_net_pp_architecture_dict is not None:
+        import \
+            chiu_net_pp_architecture
+
+        arch_dict = chiu_net_pp_architecture_dict
+
+        for this_key in [
+                chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
+                chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
+        ]:
+            arch_dict[this_key] = eval(arch_dict[this_key])
+
+        for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
+            for k in range(len(arch_dict[this_key])):
+                arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+
+        model_object = chiu_net_pp_architecture.create_model(arch_dict)
+        model_object.load_weights(hdf5_file_name)
+        return model_object
+
+    chiu_net_pp_flexi_architecture_dict = metadata_dict[
+        CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY
+    ]
+    if chiu_net_pp_flexi_architecture_dict is not None:
+        import \
+            chiu_net_pp_flexi_architecture
+
+        arch_dict = chiu_net_pp_flexi_architecture_dict
+
+        for this_key in [
+                chiu_net_pp_flexi_architecture.LOSS_FUNCTION_KEY,
+                chiu_net_pp_flexi_architecture.OPTIMIZER_FUNCTION_KEY
+        ]:
+            arch_dict[this_key] = eval(arch_dict[this_key])
+
+        for this_key in [chiu_net_pp_flexi_architecture.METRIC_FUNCTIONS_KEY]:
+            for k in range(len(arch_dict[this_key])):
+                arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+
+        model_object = chiu_net_pp_flexi_architecture.create_model(arch_dict)
+        model_object.load_weights(hdf5_file_name)
+        return model_object
+
     custom_object_dict = {
         'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
     }
@@ -2296,10 +2377,12 @@ def train_model(
         model_object, num_epochs,
         num_training_batches_per_epoch, training_option_dict,
         num_validation_batches_per_epoch, validation_option_dict,
-        loss_function_string, optimizer_function_string,
-        metric_function_strings, plateau_patience_epochs,
-        plateau_learning_rate_multiplier, early_stopping_patience_epochs,
-        epoch_and_lead_time_to_freq, output_dir_name):
+        loss_function_string, metric_function_strings,
+        optimizer_function_string, chiu_net_architecture_dict,
+        chiu_net_pp_architecture_dict, chiu_net_pp_flexi_architecture_dict,
+        plateau_patience_epochs, plateau_learning_rate_multiplier,
+        early_stopping_patience_epochs, epoch_and_lead_time_to_freq,
+        output_dir_name):
     """Trains neural net with generator.
 
     :param model_object: Untrained neural net (instance of
@@ -2320,12 +2403,22 @@ def train_model(
 
     :param loss_function_string: Loss function.  This string should be formatted
         such that `eval(loss_function_string)` returns the actual loss function.
-    :param optimizer_function_string: Optimizer.  This string should be
-        formatted such that `eval(optimizer_function_string)` returns the actual
-        optimizer.
     :param metric_function_strings: 1-D list with names of metrics.  Each string
         should be formatted such that `eval(metric_function_strings[i])` returns
         the actual metric function.
+    :param optimizer_function_string: Optimizer.  This string should be
+        formatted such that `eval(optimizer_function_string)` returns the actual
+        optimizer.
+    :param chiu_net_architecture_dict: Dictionary with architecture options for
+        `chiu_net_architecture.create_model`.  If the model being trained is not
+        a Chiu-net, make this None.
+    :param chiu_net_pp_architecture_dict: Dictionary with architecture options
+        for `chiu_net_pp_architecture.create_model`.  If the model being trained
+        is not a Chiu-net++, make this None.
+    :param chiu_net_pp_flexi_architecture_dict: Dictionary with architecture
+        options for `chiu_net_pp_flexi_architecture.create_model`.  If the model
+        being trained is not a Chiu-net++ with flexible lead times, make this
+        None.
     :param plateau_patience_epochs: Training will be deemed to have reached
         "plateau" if validation loss has not decreased in the last N epochs,
         where N = plateau_patience_epochs.
@@ -2375,7 +2468,7 @@ def train_model(
     training_option_dict = _check_generator_args(training_option_dict)
     validation_option_dict = _check_generator_args(validation_option_dict)
 
-    model_file_name = '{0:s}/model.keras'.format(output_dir_name)
+    model_file_name = '{0:s}/model.weights.h5'.format(output_dir_name)
     history_file_name = '{0:s}/history.csv'.format(output_dir_name)
 
     # TODO(thunderhoser): Hopefully this handles restarts properly.
@@ -2390,7 +2483,7 @@ def train_model(
     )
     checkpoint_object = keras.callbacks.ModelCheckpoint(
         filepath=model_file_name, monitor='val_loss', verbose=1,
-        save_best_only=True, save_weights_only=False, mode='min',
+        save_best_only=True, save_weights_only=True, mode='min',
         save_freq='epoch'
     )
     early_stopping_object = keras.callbacks.EarlyStopping(
@@ -2425,8 +2518,11 @@ def train_model(
         num_validation_batches_per_epoch=num_validation_batches_per_epoch,
         validation_option_dict=validation_option_dict,
         loss_function_string=loss_function_string,
-        optimizer_function_string=optimizer_function_string,
         metric_function_strings=metric_function_strings,
+        optimizer_function_string=optimizer_function_string,
+        chiu_net_architecture_dict=chiu_net_architecture_dict,
+        chiu_net_pp_architecture_dict=chiu_net_pp_architecture_dict,
+        chiu_net_pp_flexi_architecture_dict=chiu_net_pp_flexi_architecture_dict,
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs

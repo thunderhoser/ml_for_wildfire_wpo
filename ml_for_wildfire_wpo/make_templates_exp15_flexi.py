@@ -203,15 +203,12 @@ def _run():
 
     option_dict = copy.deepcopy(DEFAULT_OPTION_DICT)
     option_dict.update({
-        chiu_net_pp_flexi_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
+        chiu_net_pp_flexi_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION,
+        chiu_net_pp_flexi_arch.LOSS_FUNCTION_KEY: LOSS_FUNCTION,
+        chiu_net_pp_flexi_arch.METRIC_FUNCTIONS_KEY: METRIC_FUNCTIONS
     })
 
-    model_object = chiu_net_pp_flexi_arch.create_model(
-        option_dict=option_dict,
-        loss_function=LOSS_FUNCTION,
-        metric_list=METRIC_FUNCTIONS
-    )
-
+    model_object = chiu_net_pp_flexi_arch.create_model(option_dict)
     output_file_name = '{0:s}/model.keras'.format(OUTPUT_DIR_NAME)
     file_system_utils.mkdir_recursive_if_necessary(
         file_name=output_file_name
@@ -246,8 +243,11 @@ def _run():
         num_validation_batches_per_epoch=16,
         validation_option_dict={},
         loss_function_string=LOSS_FUNCTION_STRING,
-        optimizer_function_string=OPTIMIZER_FUNCTION_STRING,
         metric_function_strings=METRIC_FUNCTION_STRINGS,
+        optimizer_function_string=OPTIMIZER_FUNCTION_STRING,
+        chiu_net_architecture_dict=None,
+        chiu_net_pp_architecture_dict=None,
+        chiu_net_pp_flexi_architecture_dict=option_dict,
         plateau_patience_epochs=10,
         plateau_learning_rate_multiplier=0.6,
         early_stopping_patience_epochs=50
