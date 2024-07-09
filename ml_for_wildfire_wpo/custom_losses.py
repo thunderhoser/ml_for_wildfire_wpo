@@ -1113,7 +1113,7 @@ def dwcrps_constrained_dsr_part2a_max_pred(
         print(prediction_tensor)
         print('\n\n\n\n')
 
-        return K.max(prediction_tensor)
+        return K.max(new_slice)
 
     loss.__name__ = function_name
     return loss
