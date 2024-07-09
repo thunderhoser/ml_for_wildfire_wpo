@@ -2206,25 +2206,28 @@ def read_metafile(pickle_file_name):
     vod = metadata_dict[VALIDATION_OPTIONS_KEY]
 
     if MODEL_LEAD_TO_GFS_PRED_LEADS_KEY not in tod:
-        model_lead_time_days = tod['target_lead_time_days']
+        try:
+            model_lead_time_days = tod['target_lead_time_days']
 
-        this_dict = {
-            model_lead_time_days: tod['gfs_predictor_lead_times_hours']
-        }
-        tod[MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = this_dict
-        vod[MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = this_dict
+            this_dict = {
+                model_lead_time_days: tod['gfs_predictor_lead_times_hours']
+            }
+            tod[MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = this_dict
+            vod[MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = this_dict
 
-        this_dict = {
-            model_lead_time_days: tod['target_lag_times_days']
-        }
-        tod[MODEL_LEAD_TO_TARGET_LAGS_KEY] = this_dict
-        vod[MODEL_LEAD_TO_TARGET_LAGS_KEY] = this_dict
+            this_dict = {
+                model_lead_time_days: tod['target_lag_times_days']
+            }
+            tod[MODEL_LEAD_TO_TARGET_LAGS_KEY] = this_dict
+            vod[MODEL_LEAD_TO_TARGET_LAGS_KEY] = this_dict
 
-        this_dict = {
-            model_lead_time_days: tod['gfs_forecast_target_lead_times_days']
-        }
-        tod[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = this_dict
-        vod[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = this_dict
+            this_dict = {
+                model_lead_time_days: tod['gfs_forecast_target_lead_times_days']
+            }
+            tod[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = this_dict
+            vod[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = this_dict
+        except KeyError:
+            pass
 
     metadata_dict[TRAINING_OPTIONS_KEY] = tod
     metadata_dict[VALIDATION_OPTIONS_KEY] = vod
