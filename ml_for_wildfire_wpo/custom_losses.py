@@ -1106,14 +1106,12 @@ def dwcrps_constrained_dsr_part2a_max_pred(
         ], axis=-1)
 
         # Add DSR to prediction tensor.
-        new_slice = 0.0272 * tensorflow.pow(prediction_tensor[:, :, :, fwi_index, :], 1.77)
-        # new_slice = tensorflow.expand_dims(new_slice, axis=3)
-        # prediction_tensor = tensorflow.concat([prediction_tensor, new_slice], axis=3)
+        predicted_dsr_tensor = 0.0272 * K.pow(K.maximum(prediction_tensor[..., fwi_index, :], 0.), 1.77)
 
         print(prediction_tensor)
         print('\n\n\n\n')
 
-        return K.max(new_slice)
+        return K.max(predicted_dsr_tensor)
 
     loss.__name__ = function_name
     return loss
