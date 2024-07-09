@@ -1881,10 +1881,10 @@ def dual_weighted_crps_constrained_dsr(
         max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
 
     error_checking.assert_is_numpy_array(
-        channel_weights,
+        max_dual_weight_by_channel,
         exact_dimensions=numpy.array([len(channel_weights)], dtype=int)
     )
-    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_greater_numpy_array(max_dual_weight_by_channel, 0.)
 
     def loss(target_tensor, prediction_tensor):
         """Computes loss (dual-weighted CRPS).

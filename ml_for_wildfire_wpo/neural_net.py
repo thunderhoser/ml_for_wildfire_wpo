@@ -2371,11 +2371,18 @@ def read_model(hdf5_file_name):
     metric_function_list = [
         eval(m) for m in metadata_dict[METRIC_FUNCTIONS_KEY]
     ]
+    print('LOSS FUNCTION WILL BE:')
+    print(metric_function_list[0])
     model_object.compile(
-        loss=custom_object_dict['loss'],
+        loss=metric_function_list[0],
         optimizer=eval(metadata_dict[OPTIMIZER_FUNCTION_KEY]),
         metrics=metric_function_list
     )
+    # model_object.compile(
+    #     loss=custom_object_dict['loss'],
+    #     optimizer=eval(metadata_dict[OPTIMIZER_FUNCTION_KEY]),
+    #     metrics=metric_function_list
+    # )
 
     return model_object
 
