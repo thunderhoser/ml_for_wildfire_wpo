@@ -1654,6 +1654,10 @@ def data_generator(option_dict):
             numpy.min(target_matrix), numpy.max(target_matrix)
         ))
 
+        for this_key in predictor_matrices:
+            assert not numpy.any(numpy.isnan(predictor_matrices[this_key]))
+        assert not numpy.any(numpy.isnan(target_matrix_with_weights))
+
         # predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
         yield predictor_matrices, target_matrix_with_weights
