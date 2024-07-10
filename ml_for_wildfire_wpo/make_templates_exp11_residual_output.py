@@ -228,6 +228,12 @@ NN_LEAD_TIME_DAYS_TO_TARGET_LEAD_TIMES_DAYS = {
     10: numpy.array([2, 4, 6, 8, 10], dtype=int)
 }
 
+# FORECAST_HOURS_DEFAULT = numpy.array([
+#     0, 6, 12, 18, 24, 30, 36, 42, 48,
+#     60, 72, 84, 96, 108, 120,
+#     144, 168, 192, 216, 240, 264, 288, 312, 336
+# ], dtype=int)
+
 NN_LEAD_TIME_DAYS_TO_GFS_LEAD_TIMES_HOURS = {
     1: numpy.array([0, 6, 12, 18, 24], dtype=int),
     2: numpy.array([0, 12, 24, 36, 48], dtype=int),

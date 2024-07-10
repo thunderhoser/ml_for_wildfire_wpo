@@ -1,4 +1,4 @@
-"""Makes templates for non-flexi version of Experiment 15."""
+"""Makes templates for Experiment 15 (with flexible lead time)."""
 
 import os
 import sys
@@ -14,19 +14,19 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import custom_losses
 import custom_metrics
 import neural_net
-import chiu_net_pp_architecture as chiu_net_pp_arch
+import chiu_net_pp_flexi_architecture as chiu_net_pp_flexi_arch
 import architecture_utils
 import file_system_utils
 
 OUTPUT_DIR_NAME = (
     '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/'
-    'experiment15_non_flexi_lead_time/templates'
+    'experiment15_flexi_lead_time_small_new_crps/templates'
 )
 
 CHANNEL_WEIGHTS = numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004])
 MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856])
 
-LOSS_FUNCTION = custom_losses.dual_weighted_crps_constrained_dsr(
+LOSS_FUNCTION = custom_losses.dwcrps_constrained_dsr_while_loop(
     channel_weights=CHANNEL_WEIGHTS,
     max_dual_weight_by_channel=MAX_DUAL_WEIGHTS,
     fwi_index=5,
@@ -34,7 +34,7 @@ LOSS_FUNCTION = custom_losses.dual_weighted_crps_constrained_dsr(
 )
 
 LOSS_FUNCTION_STRING = (
-    'custom_losses.dual_weighted_crps_constrained_dsr('
+    'custom_losses.dwcrps_constrained_dsr_while_loop('
     'channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), '
     'max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), '
     'fwi_index=5, '
@@ -139,78 +139,76 @@ OPTIMIZER_FUNCTION_STRING = (
 )
 
 DEFAULT_OPTION_DICT = {
-    chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY: numpy.array(
-        [265, 537, 2, 5, 5], dtype=int
+    chiu_net_pp_flexi_arch.GFS_3D_DIMENSIONS_KEY: numpy.array(
+        [81, 81, 2, -1, 5], dtype=int
     ),
-    chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
-        [265, 537, 5, 5], dtype=int
+    chiu_net_pp_flexi_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
+        [81, 81, -1, 5], dtype=int
     ),
-    chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
-        [265, 537, 7], dtype=int
+    chiu_net_pp_flexi_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
+        [81, 81, 7], dtype=int
     ),
-    chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
-        [265, 537, 6, 6], dtype=int
+    chiu_net_pp_flexi_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
+        [81, 81, -1, 6], dtype=int
     ),
-    chiu_net_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array(
-        [265, 537, 6], dtype=int
+    chiu_net_pp_flexi_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array(
+        [81, 81, 6], dtype=int
     ),
-    chiu_net_pp_arch.USE_RESIDUAL_BLOCKS_KEY: False,
-    chiu_net_pp_arch.GFS_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
-    chiu_net_pp_arch.GFS_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
-    chiu_net_pp_arch.GFS_FC_MODULE_USE_3D_CONV: True,
-    chiu_net_pp_arch.LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
-    chiu_net_pp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
-    chiu_net_pp_arch.LAGTGT_FC_MODULE_USE_3D_CONV: True,
-    chiu_net_pp_arch.NUM_LEVELS_KEY: 6,
-    chiu_net_pp_arch.GFS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
-        7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
+    chiu_net_pp_flexi_arch.USE_RESIDUAL_BLOCKS_KEY: False,
+    chiu_net_pp_flexi_arch.GFS_FC_MODULE_NUM_LSTM_LAYERS_KEY: 1,
+    chiu_net_pp_flexi_arch.GFS_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
+    chiu_net_pp_flexi_arch.LAGTGT_FC_MODULE_NUM_LSTM_LAYERS_KEY: 1,
+    chiu_net_pp_flexi_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
+    chiu_net_pp_flexi_arch.NUM_LEVELS_KEY: 4,
+    chiu_net_pp_flexi_arch.GFS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
+        5, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
     ),
-    chiu_net_pp_arch.GFS_ENCODER_NUM_CHANNELS_KEY: numpy.array(
-        [50, 75, 100, 125, 150, 175, 200], dtype=int
+    chiu_net_pp_flexi_arch.GFS_ENCODER_NUM_CHANNELS_KEY: numpy.array(
+        [50, 75, 100, 125, 150], dtype=int
     ),
-    chiu_net_pp_arch.GFS_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
-    chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
-        7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
+    chiu_net_pp_flexi_arch.GFS_ENCODER_DROPOUT_RATES_KEY: numpy.full(5, 0.),
+    chiu_net_pp_flexi_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
+        5, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
     ),
-    chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array(
-        [30, 40, 50, 60, 70, 80, 90], dtype=int
+    chiu_net_pp_flexi_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array(
+        [30, 40, 50, 60, 70], dtype=int
     ),
-    chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
-    chiu_net_pp_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(6, 2, dtype=int),
-    chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY: numpy.array(
-        [40, 58, 75, 93, 110, 128], dtype=int
+    chiu_net_pp_flexi_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(5, 0.),
+    chiu_net_pp_flexi_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(4, 2, dtype=int),
+    chiu_net_pp_flexi_arch.DECODER_NUM_CHANNELS_KEY: numpy.array(
+        [40, 58, 75, 93], dtype=int
     ),
-    chiu_net_pp_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(6, 0.),
-    chiu_net_pp_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(6, 0.),
-    chiu_net_pp_arch.INCLUDE_PENULTIMATE_KEY: False,
-    chiu_net_pp_arch.INNER_ACTIV_FUNCTION_KEY:
+    chiu_net_pp_flexi_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(4, 0.),
+    chiu_net_pp_flexi_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(4, 0.),
+    chiu_net_pp_flexi_arch.INCLUDE_PENULTIMATE_KEY: False,
+    chiu_net_pp_flexi_arch.INNER_ACTIV_FUNCTION_KEY:
         architecture_utils.RELU_FUNCTION_STRING,
-    chiu_net_pp_arch.INNER_ACTIV_FUNCTION_ALPHA_KEY: 0.2,
-    chiu_net_pp_arch.OUTPUT_ACTIV_FUNCTION_KEY:
+    chiu_net_pp_flexi_arch.INNER_ACTIV_FUNCTION_ALPHA_KEY: 0.2,
+    chiu_net_pp_flexi_arch.OUTPUT_ACTIV_FUNCTION_KEY:
         architecture_utils.RELU_FUNCTION_STRING,
-    chiu_net_pp_arch.OUTPUT_ACTIV_FUNCTION_ALPHA_KEY: 0.,
-    chiu_net_pp_arch.L1_WEIGHT_KEY: 0.,
-    chiu_net_pp_arch.L2_WEIGHT_KEY: 1e-6,
-    chiu_net_pp_arch.USE_BATCH_NORM_KEY: True,
-    chiu_net_pp_arch.ENSEMBLE_SIZE_KEY: 25,
-    # chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
+    chiu_net_pp_flexi_arch.OUTPUT_ACTIV_FUNCTION_ALPHA_KEY: 0.,
+    chiu_net_pp_flexi_arch.L1_WEIGHT_KEY: 0.,
+    chiu_net_pp_flexi_arch.L2_WEIGHT_KEY: 1e-6,
+    chiu_net_pp_flexi_arch.USE_BATCH_NORM_KEY: True,
+    chiu_net_pp_flexi_arch.ENSEMBLE_SIZE_KEY: 100,
+    # chiu_net_pp_flexi_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
 }
 
 
 def _run():
-    """Makes templates for non-flexi version of Experiment 15.
+    """Makes templates for Experiment 15 (with flexible lead time).
 
     This is effectively the main method.
     """
 
     option_dict = copy.deepcopy(DEFAULT_OPTION_DICT)
     option_dict.update({
-        chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION,
-        chiu_net_pp_arch.LOSS_FUNCTION_KEY: LOSS_FUNCTION,
-        chiu_net_pp_arch.METRIC_FUNCTIONS_KEY: METRIC_FUNCTIONS
+        chiu_net_pp_flexi_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION,
+        chiu_net_pp_flexi_arch.LOSS_FUNCTION_KEY: LOSS_FUNCTION,
+        chiu_net_pp_flexi_arch.METRIC_FUNCTIONS_KEY: METRIC_FUNCTIONS
     })
 
-    model_object = chiu_net_pp_arch.create_model(option_dict)
+    model_object = chiu_net_pp_flexi_arch.create_model(option_dict)
     output_file_name = '{0:s}/model.keras'.format(OUTPUT_DIR_NAME)
     file_system_utils.mkdir_recursive_if_necessary(
         file_name=output_file_name
@@ -227,13 +225,13 @@ def _run():
         model_file_name=output_file_name,
         raise_error_if_missing=False
     )
-    option_dict[chiu_net_pp_arch.LOSS_FUNCTION_KEY] = (
+    option_dict[chiu_net_pp_flexi_arch.LOSS_FUNCTION_KEY] = (
         LOSS_FUNCTION_STRING
     )
-    option_dict[chiu_net_pp_arch.METRIC_FUNCTIONS_KEY] = (
+    option_dict[chiu_net_pp_flexi_arch.METRIC_FUNCTIONS_KEY] = (
         METRIC_FUNCTION_STRINGS
     )
-    option_dict[chiu_net_pp_arch.OPTIMIZER_FUNCTION_KEY] = (
+    option_dict[chiu_net_pp_flexi_arch.OPTIMIZER_FUNCTION_KEY] = (
         OPTIMIZER_FUNCTION_STRING
     )
 
@@ -248,8 +246,8 @@ def _run():
         metric_function_strings=METRIC_FUNCTION_STRINGS,
         optimizer_function_string=OPTIMIZER_FUNCTION_STRING,
         chiu_net_architecture_dict=None,
-        chiu_net_pp_architecture_dict=option_dict,
-        chiu_net_pp_flexi_architecture_dict=None,
+        chiu_net_pp_architecture_dict=None,
+        chiu_net_pp_flexi_architecture_dict=option_dict,
         plateau_patience_epochs=10,
         plateau_learning_rate_multiplier=0.6,
         early_stopping_patience_epochs=50
