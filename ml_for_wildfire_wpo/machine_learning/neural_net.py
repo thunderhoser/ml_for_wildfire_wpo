@@ -2551,7 +2551,7 @@ def train_model(
         model_object.fit(
             x=training_generator,
             steps_per_epoch=num_training_batches_per_epoch,
-            epochs=this_epoch + 1,  # TODO(thunderhoser): Should maybe be this_epoch + 1?
+            epochs=this_epoch + 1,
             initial_epoch=this_epoch,
             verbose=1,
             callbacks=list_of_callback_objects,
