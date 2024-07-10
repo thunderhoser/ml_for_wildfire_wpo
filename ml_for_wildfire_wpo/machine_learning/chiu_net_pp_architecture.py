@@ -900,7 +900,7 @@ def create_model(option_dict):
         num_filters=num_target_fields * ensemble_size,
         do_time_distributed_conv=False,
         regularizer_object=regularizer_object,
-        activation_function_name=output_activ_function_name,
+        activation_function_name=None,
         activation_function_alpha=output_activ_function_alpha,
         dropout_rates=-1.,
         use_batch_norm=False,
@@ -954,6 +954,14 @@ def create_model(option_dict):
         output_layer_object = keras.layers.Add(name='output_add_baseline')([
             output_layer_object, layer_object_predn_baseline
         ])
+
+    if output_activ_function_name is not None:
+        output_layer_object = architecture_utils.get_activation_layer(
+            activation_function_string=output_activ_function_name,
+            alpha_for_relu=output_activ_function_alpha,
+            alpha_for_elu=output_activ_function_alpha,
+            layer_name='output_activation'
+        )(output_layer_object)
 
     input_layer_objects = [
         l for l in [
