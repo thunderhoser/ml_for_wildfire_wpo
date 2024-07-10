@@ -2357,9 +2357,9 @@ def read_model(hdf5_file_name):
             for k in range(len(arch_dict[this_key])):
                 arch_dict[this_key][k] = eval(arch_dict[this_key][k])
 
-        print('LOSS FUNCTION WILL BE:')
-        print(arch_dict[chiu_net_pp_flexi_architecture.METRIC_FUNCTIONS_KEY][0])
-        arch_dict[chiu_net_pp_flexi_architecture.LOSS_FUNCTION_KEY] = arch_dict[chiu_net_pp_flexi_architecture.METRIC_FUNCTIONS_KEY][0]
+        # print('LOSS FUNCTION WILL BE:')
+        # print(arch_dict[chiu_net_pp_flexi_architecture.METRIC_FUNCTIONS_KEY][0])
+        # arch_dict[chiu_net_pp_flexi_architecture.LOSS_FUNCTION_KEY] = arch_dict[chiu_net_pp_flexi_architecture.METRIC_FUNCTIONS_KEY][0]
 
         model_object = chiu_net_pp_flexi_architecture.create_model(arch_dict)
         model_object.load_weights(hdf5_file_name)
