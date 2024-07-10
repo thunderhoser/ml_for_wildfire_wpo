@@ -1654,10 +1654,6 @@ def data_generator(option_dict):
             numpy.min(target_matrix), numpy.max(target_matrix)
         ))
 
-        for this_key in predictor_matrices:
-            assert not numpy.any(numpy.isnan(predictor_matrices[this_key]))
-        assert not numpy.any(numpy.isnan(target_matrix_with_weights))
-
         # predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
         yield predictor_matrices, target_matrix_with_weights
@@ -2357,10 +2353,6 @@ def read_model(hdf5_file_name):
             for k in range(len(arch_dict[this_key])):
                 arch_dict[this_key][k] = eval(arch_dict[this_key][k])
 
-        # print('LOSS FUNCTION WILL BE:')
-        # print(arch_dict[chiu_net_pp_flexi_architecture.METRIC_FUNCTIONS_KEY][0])
-        # arch_dict[chiu_net_pp_flexi_architecture.LOSS_FUNCTION_KEY] = arch_dict[chiu_net_pp_flexi_architecture.METRIC_FUNCTIONS_KEY][0]
-
         model_object = chiu_net_pp_flexi_architecture.create_model(arch_dict)
         model_object.load_weights(hdf5_file_name)
         return model_object
@@ -2566,7 +2558,7 @@ def train_model(
         model_object.fit(
             x=training_generator,
             steps_per_epoch=num_training_batches_per_epoch,
-            epochs=this_epoch + 1,  # TODO(thunderhoser): Should maybe be this_epoch + 1?
+            epochs=this_epoch + 1,
             initial_epoch=this_epoch,
             verbose=1,
             callbacks=list_of_callback_objects,
