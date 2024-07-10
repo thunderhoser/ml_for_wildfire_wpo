@@ -953,7 +953,10 @@ def dwcrps_constrained_dsr_while_loop(
         )
 
         _, mapd_tensor = tensorflow.while_loop(
-            condition, loop_body, [i, mapd_tensor]
+            cond=condition,
+            body=loop_body,
+            loop_vars=[i, mapd_tensor],
+            maximum_iterations=relevant_prediction_tensor.shape[0]
         )
         mapd_tensor = mapd_tensor.stack()
 
