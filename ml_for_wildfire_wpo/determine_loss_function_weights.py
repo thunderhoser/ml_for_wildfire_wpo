@@ -156,6 +156,33 @@ def _increment_mse_one_field(fwi_table_xarray, field_name, climo_mean,
     return numpy.mean(error_values), len(error_values)
 
 
+def _increment_mae_one_field(fwi_table_xarray, field_name, climo_mean,
+                             num_sample_values):
+    """Increments MAE for one field.
+
+    :param fwi_table_xarray: xarray table in format returned by
+        `canadian_fwi_io.read_file`.
+    :param field_name: Name of field.
+    :param climo_mean: Climatological mean for given field.
+    :param num_sample_values: Number of sample values to use from
+        `fwi_table_xarray`.
+    :return: new_mae: MAE for new data batch.
+    :return: new_num_values: Number of values in new data batch.
+    """
+
+    data_matrix = canadian_fwi_utils.get_field(
+        fwi_table_xarray=fwi_table_xarray, field_name=field_name
+    )
+
+    real_data_values = data_matrix[numpy.invert(numpy.isnan(data_matrix))]
+    numpy.random.shuffle(real_data_values)
+    real_data_values = real_data_values[:num_sample_values]
+
+    error_values = numpy.absolute(climo_mean - real_data_values)
+
+    return numpy.mean(error_values), len(error_values)
+
+
 def _run(input_dir_name, target_field_names,
          first_date_strings, last_date_strings,
          normalization_file_name, quantile_level, use_dwmse,
@@ -227,6 +254,7 @@ def _run(input_dir_name, target_field_names,
     num_files = len(target_file_names)
     mean_loss_by_field = numpy.full(num_fields, numpy.nan)
     num_values_by_field = numpy.full(num_fields, 0, dtype=int)
+    mae_by_field = numpy.full(num_fields, numpy.nan)
 
     for i in range(num_files):
         print('Reading data from: "{0:s}"...'.format(target_file_names[i]))
@@ -260,6 +288,26 @@ def _run(input_dir_name, target_field_names,
                     these_means, weights=these_weights
                 )
 
+            # num_values_by_field[j] += new_num_values
+
+            new_mae, new_num_values = _increment_mae_one_field(
+                fwi_table_xarray=fwi_table_xarray,
+                field_name=target_field_names[j],
+                climo_mean=climo_mean_by_field[j],
+                num_sample_values=num_sample_values_per_file
+            )
+
+            if num_values_by_field[j] == 0:
+                mae_by_field[j] = new_mae + 0.
+            else:
+                these_means = numpy.array([mae_by_field[j], new_mae])
+                these_weights = numpy.array([
+                    num_values_by_field[j], new_num_values
+                ])
+                mae_by_field[j] = numpy.average(
+                    these_means, weights=these_weights
+                )
+
             num_values_by_field[j] += new_num_values
 
     unnorm_weight_by_field = numpy.sum(mean_loss_by_field) / mean_loss_by_field
@@ -267,13 +315,15 @@ def _run(input_dir_name, target_field_names,
 
     for j in range(num_fields):
         print((
-            '{0:s} ... {1:s} = {2:.2f} ... climo mean = {3:.4f} ... '
-            'extreme-value threshold = {4:.4f} ... '
-            'unnormalized weight = {5:.4f} ... normalized weight = {6:.8f}'
+            '{0:s} ... {1:s} = {2:.2f} ... MAE = {3:.4f} ... '
+            'climo mean = {4:.4f} ... '
+            'extreme-value threshold = {5:.4f} ... '
+            'unnormalized weight = {6:.4f} ... normalized weight = {7:.8f}'
         ).format(
             target_field_names[j],
             'DWMSE' if use_dwmse else 'MSE',
             mean_loss_by_field[j],
+            mae_by_field[j],
             climo_mean_by_field[j],
             extreme_threshold_by_field[j],
             unnorm_weight_by_field[j],
