@@ -834,7 +834,9 @@ def dual_weighted_crpss(
             cond=condition,
             body=loop_body,
             loop_vars=[i, mapd_tensor],
-            maximum_iterations=relevant_prediction_tensor.shape[0]
+            maximum_iterations=relevant_prediction_tensor.shape[0],
+            # parallel_iterations=1,
+            # swap_memory=True
         )
         mapd_tensor = mapd_tensor.stack()
 
@@ -1039,8 +1041,8 @@ def dual_weighted_crps_constrained_dsr(
             body=loop_body,
             loop_vars=[i, mapd_tensor],
             maximum_iterations=relevant_prediction_tensor.shape[0],
-            parallel_iterations=1,
-            swap_memory=True
+            # parallel_iterations=1,
+            # swap_memory=True
         )
         mapd_tensor = mapd_tensor.stack()
 
