@@ -69,17 +69,6 @@ fi
 let second_lead_time_start_epoch=second_lead_time_start_epoch
 let num_rampup_epochs=num_rampup_epochs
 
-echo ${second_lead_time_start_epoch}
-echo ${num_rampup_epochs}
-echo $((second_lead_time_start_epoch + num_rampup_epochs))
-echo $((second_lead_time_start_epoch + 2 * num_rampup_epochs))
-echo $((second_lead_time_start_epoch + 3 * num_rampup_epochs))
-echo $((second_lead_time_start_epoch + 4 * num_rampup_epochs))
-echo $((second_lead_time_start_epoch + 5 * num_rampup_epochs))
-echo $((second_lead_time_start_epoch + 6 * num_rampup_epochs))
-echo $((second_lead_time_start_epoch + 7 * num_rampup_epochs))
-echo $((second_lead_time_start_epoch + 8 * num_rampup_epochs))
-
 python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --input_template_file_name="${template_file_name}" \
 --output_model_dir_name="${output_dir_name}" \
