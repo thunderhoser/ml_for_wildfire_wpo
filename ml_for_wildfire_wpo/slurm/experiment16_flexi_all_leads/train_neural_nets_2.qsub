@@ -39,6 +39,7 @@ GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wild
 TARGET_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi/normalization_params_2019-2020.nc"
 ERA5_CONSTANT_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_constants.nc"
 ERA5_CONSTANT_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/normalization_params_era5_constants.nc"
+GFS_CRPS_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_fwi_crps.nc"
 
 SECOND_LEAD_TIME_START_EPOCHS=("020" "040" "060" "080" "100" "020" "040" "060" "080" "100" "020" "040" "060" "080" "100" "020" "040" "060" "080" "100" "020" "040" "060" "080" "100" "020" "040" "060" "080" "100" "020" "040" "060" "080" "100" "020" "040" "060" "080" "100" "020" "040" "060" "080" "100" "020" "040" "060" "080" "100" "020" "040" "060" "080" "100" "020" "040" "060" "080" "100" "020" "040" "060" "080" "100" "020" "040" "060" "080" "100" "020" "040" "060" "080" "100")
 RAMPUP_EPOCH_COUNTS=("010" "010" "010" "010" "010" "020" "020" "020" "020" "020" "030" "030" "030" "030" "030" "040" "040" "040" "040" "040" "050" "050" "050" "050" "050" "010" "010" "010" "010" "010" "020" "020" "020" "020" "020" "030" "030" "030" "030" "030" "040" "040" "040" "040" "040" "050" "050" "050" "050" "050" "010" "010" "010" "010" "010" "020" "020" "020" "020" "020" "030" "030" "030" "030" "030" "040" "040" "040" "040" "040" "050" "050" "050" "050" "050")
@@ -90,7 +91,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --target_field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" \
 --target_lags_days_by_model_lead ${target_lags_days_by_model_lead} \
 --gfs_target_leads_days_by_model_lead ${gfs_target_leads_days_by_model_lead} \
---gfs_crps_file_name="" \
+--gfs_crps_file_name="${GFS_CRPS_FILE_NAME}" \
 --target_normalization_file_name="${TARGET_NORM_FILE_NAME}" \
 --targets_use_quantile_norm=1 \
 --num_examples_per_batch=1 \
