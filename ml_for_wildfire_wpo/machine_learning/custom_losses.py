@@ -10,6 +10,22 @@ from gewittergefahr.gg_utils import error_checking
 MIN_EVIDENCE = 1e-12  # Prevents division by zero.
 
 
+def __get_num_target_fields(prediction_tensor, expect_ensemble,
+                            is_nn_evidential):
+    """Determines number of target fields.
+
+    :param prediction_tensor: See documentation for `mean_squared_error`.
+    :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
+    :return: num_target_fields: Integer.
+    """
+
+    if expect_ensemble or is_nn_evidential:
+        return prediction_tensor.shape[-2]
+
+    return prediction_tensor.shape[-1]
+
+
 def _log2(input_tensor):
     """Computes logarithm in base 2.
 
@@ -248,9 +264,15 @@ def mean_squared_error(function_name, expect_ensemble=True,
         T = number of target variables (channels)
         S = ensemble size
 
-        :param target_tensor: E-by-M-by-N-by-(T + 1) tensor, where
-            target_tensor[..., :-1] contains the actual target values and
+        :param target_tensor: This could be an E-by-M-by-N-by-(T + 1) tensor,
+            where target_tensor[..., :-1] contains the actual target values and
             target_tensor[..., -1] contains weights.
+
+        This could also be an E-by-M-by-N-by-(2T + 1) tensor, where
+            target_tensor[..., :T] contains the actual target values;
+            target_tensor[..., T:-1] contains climo errors;
+            and target_tensor[..., -1] contains weights.
+
         :param prediction_tensor: Tensor of predicted values.  If
             expect_ensemble == True, will expect dimensions E x M x N x T x S.
             Otherwise, if is_nn_evidential == True, will expect dimensions
@@ -259,20 +281,26 @@ def mean_squared_error(function_name, expect_ensemble=True,
         :return: loss: Mean squared error.
         """
 
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble,
+            is_nn_evidential=is_nn_evidential
+        )
+
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
         if is_nn_evidential:
-            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_target_tensor = target_tensor[..., :num_target_fields]
             relevant_prediction_tensor = prediction_tensor[..., 0]
             weight_tensor = target_tensor[..., -1]
         elif expect_ensemble:
             relevant_target_tensor = K.expand_dims(
-                target_tensor[..., :-1], axis=-1
+                target_tensor[..., :num_target_fields], axis=-1
             )
             relevant_prediction_tensor = prediction_tensor
             weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         else:
-            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_target_tensor = target_tensor[..., :num_target_fields]
             relevant_prediction_tensor = prediction_tensor
             weight_tensor = target_tensor[..., -1]
 
@@ -333,20 +361,26 @@ def dual_weighted_mse(
         :return: loss: Mean squared error.
         """
 
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble,
+            is_nn_evidential=is_nn_evidential
+        )
+
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
         if is_nn_evidential:
-            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_target_tensor = target_tensor[..., :num_target_fields]
             relevant_prediction_tensor = prediction_tensor[..., 0]
             mask_weight_tensor = target_tensor[..., -1]
         elif expect_ensemble:
             relevant_target_tensor = K.expand_dims(
-                target_tensor[..., :-1], axis=-1
+                target_tensor[..., :num_target_fields], axis=-1
             )
             relevant_prediction_tensor = prediction_tensor
             mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
         else:
-            relevant_target_tensor = target_tensor[..., :-1]
+            relevant_target_tensor = target_tensor[..., :num_target_fields]
             relevant_prediction_tensor = prediction_tensor
             mask_weight_tensor = target_tensor[..., -1]
 
@@ -451,10 +485,16 @@ def dual_weighted_mse_constrained_dsr(
         :return: loss: Mean squared error.
         """
 
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble,
+            is_nn_evidential=is_nn_evidential
+        )
+
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
         target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
         target_tensor = K.concatenate([
-            target_tensor[..., :-1],
+            target_tensor[..., :num_target_fields],
             K.expand_dims(target_dsr_tensor, axis=-1),
             K.expand_dims(target_tensor[..., -1], axis=-1)
         ], axis=-1)
@@ -622,10 +662,12 @@ def dual_weighted_mse_1channel(
     return loss
 
 
-def dual_weighted_crps_constrained_dsr(
+def dual_weighted_crpss(
         channel_weights, fwi_index, function_name,
         max_dual_weight_by_channel=None, test_mode=False):
-    """Creates dual-weighted CRPS loss function with constrained DSR.
+    """Creates dual-weighted CRPSS loss function.
+
+    CRPSS = CRPS skill score
 
     :param channel_weights: See doc for `dual_weighted_mse_constrained_dsr`.
     :param fwi_index: Same.
@@ -634,6 +676,9 @@ def dual_weighted_crps_constrained_dsr(
     :param test_mode: Same.
     :return: loss: Loss function (defined below).
     """
+
+    # TODO(thunderhoser): I might want a version of this loss function with
+    # constrained DSR.
 
     error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
     error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
@@ -659,29 +704,19 @@ def dual_weighted_crps_constrained_dsr(
         :return: loss: Dual-weighted CRPS.
         """
 
-        # Add DSR to target tensor.
-        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
-        target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
-        target_tensor = K.concatenate([
-            target_tensor[..., :-1],
-            K.expand_dims(target_dsr_tensor, axis=-1),
-            K.expand_dims(target_tensor[..., -1], axis=-1)
-        ], axis=-1)
-
-        # Add DSR to prediction tensor.
-        predicted_dsr_tensor = 0.0272 * K.pow(
-            prediction_tensor[..., fwi_index, :], 1.77
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=True,
+            is_nn_evidential=False
         )
-        prediction_tensor = K.concatenate([
-            prediction_tensor,
-            K.expand_dims(predicted_dsr_tensor, axis=-2)
-        ], axis=-2)
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
 
         # Ensure compatible tensor shapes.
         relevant_target_tensor = K.expand_dims(
-            target_tensor[..., :-1], axis=-1
+            target_tensor[..., :num_target_fields], axis=-1
         )
         relevant_prediction_tensor = prediction_tensor
+        climo_crps_tensor = target_tensor[..., num_target_fields:-1]
         mask_weight_tensor = K.expand_dims(target_tensor[..., -1], axis=-1)
 
         # Create dual-weight tensor.
@@ -725,62 +760,103 @@ def dual_weighted_crps_constrained_dsr(
             K.abs(relevant_prediction_tensor), max_dual_weight_tensor
         )
 
-        output_type = tensorflow.TensorSpec(
-            shape=relevant_prediction_tensor.shape[1:-1],
-            dtype=relevant_prediction_tensor.dtype
-        )
+        def compute_mapd_1row(
+                prediction_tensor_1row, censored_prediction_tensor_1row):
+            """Computes MAPD for one grid row.
 
-        # TODO(thunderhoser): In a fresh Colab notebook (albeit one with
-        # Keras 2), map_fn works as expected.  It generates the intermediate
-        # tensors (where the last two axes have size S x S, S being the ensemble
-        # size) individually for each slice along the first axis, i.e., for each
-        # grid row.  After generating the intermediate tensors for one grid row,
-        # map_fn throws out the intermediate tensors, thus conserving memory.
-        # But when I run the code on Hera in Keras 3, map_fn generates the full
-        # intermediate tensor at once -- with dimensions M x E x N x T x S x S
-        # -- and crashes the memory.  I don't know what's causing this to happen
-        # -- maybe Keras 3, maybe something else in the environment, maybe
-        # something weird on Hera?  Anyways, this code works on Hera as long as
-        # I keep the ensemble size down to ~25.
-        mean_prediction_diff_tensor = tensorflow.map_fn(
-            fn=lambda p: K.mean(
+            MAPD = mean absolute pairwise difference
+
+            :param prediction_tensor_1row: E-by-N-by-T-by-S tensor of
+                predictions.
+            :param censored_prediction_tensor_1row: Same as
+                `prediction_tensor_1row`, except that values above the max
+                dual weight have been replaced with the max dual weight.
+            :return: mapd_tensor_1row: E-by-N-by-T tensor of mean absolute
+                pairwise differences.
+            """
+
+            pt1row = prediction_tensor_1row
+            cpt1row = censored_prediction_tensor_1row
+
+            return K.mean(
                 K.maximum(
-                    K.abs(K.expand_dims(p[1], axis=-1)),
-                    K.abs(K.expand_dims(p[1], axis=-2))
+                    K.abs(K.expand_dims(cpt1row, axis=-1)),
+                    K.abs(K.expand_dims(cpt1row, axis=-2))
                 ) *
                 K.abs(
-                    K.expand_dims(p[0], axis=-1) -
-                    K.expand_dims(p[0], axis=-2)
+                    K.expand_dims(pt1row, axis=-1) -
+                    K.expand_dims(pt1row, axis=-2)
                 ),
                 axis=(-2, -1)
-            ),
-            elems=(relevant_prediction_tensor, censored_relevant_prediction_tensor),
-            parallel_iterations=1,
-            swap_memory=True,
-            fn_output_signature=output_type
+            )
+
+        def loop_body(i, mapd_tensor):
+            """Body of while-loop for computing MAPD.
+
+            This method is run once for every iteration through the while-loop,
+            i.e., once for every grid row.
+
+            :param i: Index of current grid row.
+            :param mapd_tensor: M-by-E-by-N-by-T tensor of MAPD values, which
+                this method will update.
+            :return: i_new: Index of next grid row.
+            :return: mapd_tensor: Updated version of input.
+            """
+
+            this_mapd_tensor = compute_mapd_1row(
+                prediction_tensor_1row=relevant_prediction_tensor[i, ...],
+                censored_prediction_tensor_1row=
+                censored_relevant_prediction_tensor[i, ...]
+            )
+
+            mapd_tensor = mapd_tensor.write(i, this_mapd_tensor)
+            return i + 1, mapd_tensor
+
+        mapd_tensor = tensorflow.TensorArray(
+            size=relevant_prediction_tensor.shape[0],
+            dtype=tensorflow.float32
         )
 
-        mean_prediction_diff_tensor = tensorflow.transpose(
-            mean_prediction_diff_tensor, perm=[1, 0, 2, 3]
+        i = tensorflow.constant(0)
+        condition = lambda i, mapd_tensor: tensorflow.less(
+            i, relevant_prediction_tensor.shape[0]
+        )
+
+        _, mapd_tensor = tensorflow.while_loop(
+            cond=condition,
+            body=loop_body,
+            loop_vars=[i, mapd_tensor],
+            maximum_iterations=relevant_prediction_tensor.shape[0]
+        )
+        mapd_tensor = mapd_tensor.stack()
+
+        mapd_tensor = tensorflow.transpose(
+            mapd_tensor, perm=[1, 0, 2, 3]
         )
         error_tensor = channel_weight_tensor * (
             mean_prediction_error_tensor -
-            0.5 * mean_prediction_diff_tensor
+            0.5 * mapd_tensor
+        )
+        climo_error_tensor = channel_weight_tensor * climo_crps_tensor
+        climo_error_tensor = K.maximum(climo_error_tensor, K.epsilon())
+
+        skill_score_tensor = (
+            (climo_error_tensor - error_tensor) / climo_error_tensor
         )
 
         return (
-            K.sum(mask_weight_tensor * error_tensor) /
-            K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+            K.sum(mask_weight_tensor * skill_score_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(skill_score_tensor))
         )
 
     loss.__name__ = function_name
     return loss
 
 
-def dwcrps_constrained_dsr_while_loop(
+def dual_weighted_crps_constrained_dsr(
         channel_weights, fwi_index, function_name,
         max_dual_weight_by_channel=None, test_mode=False):
-    """Same as `dual_weighted_crps_constrained_dsr` but with while-loop.
+    """Creates dual-weighted CRPS loss function with constrained DSR.
 
     The while-loop does the tricky part (mean absolute pairwise difference).
 
@@ -816,11 +892,17 @@ def dwcrps_constrained_dsr_while_loop(
         :return: loss: Dual-weighted CRPS.
         """
 
-        # Add DSR to target tensor.
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=True,
+            is_nn_evidential=False
+        )
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+
+        # Add DSR to target tensor.
         target_dsr_tensor = 0.0272 * K.pow(target_tensor[..., fwi_index], 1.77)
         target_tensor = K.concatenate([
-            target_tensor[..., :-1],
+            target_tensor[..., :num_target_fields],
             K.expand_dims(target_dsr_tensor, axis=-1),
             K.expand_dims(target_tensor[..., -1], axis=-1)
         ], axis=-1)
@@ -945,7 +1027,10 @@ def dwcrps_constrained_dsr_while_loop(
         )
 
         _, mapd_tensor = tensorflow.while_loop(
-            condition, loop_body, [i, mapd_tensor]
+            cond=condition,
+            body=loop_body,
+            loop_vars=[i, mapd_tensor],
+            maximum_iterations=relevant_prediction_tensor.shape[0]
         )
         mapd_tensor = mapd_tensor.stack()
 
@@ -1002,6 +1087,18 @@ def dual_weighted_evidential_loss(
         :param prediction_tensor: Same.
         :return: loss: Dual-weighted evidential loss.
         """
+
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=False,
+            is_nn_evidential=True
+        )
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+
+        target_tensor = K.concatenate([
+            target_tensor[..., :num_target_fields],
+            K.expand_dims(target_tensor[..., -1], axis=-1)
+        ], axis=-1)
 
         first_term = _dual_weighted_evidential_nll(
             target_tensor=target_tensor,

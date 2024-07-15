@@ -22,6 +22,7 @@ ERA5_USE_QUANTILE_NORM_ARG_NAME = 'era5_use_quantile_norm'
 TARGET_FIELDS_ARG_NAME = 'target_field_names'
 TARGET_LAG_TIMES_ARG_NAME = 'target_lags_days_by_model_lead'
 GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME = 'gfs_target_leads_days_by_model_lead'
+GFS_CRPS_FILE_ARG_NAME = 'gfs_crps_file_name'
 TARGET_NORM_FILE_ARG_NAME = 'target_normalization_file_name'
 TARGETS_USE_QUANTILE_NORM_ARG_NAME = 'targets_use_quantile_norm'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
@@ -150,6 +151,12 @@ GFS_FCST_TARGET_LEAD_TIMES_HELP_STRING = (
     '"1 2 -1 1 2 3".'
 ).format(
     MODEL_LEAD_TIMES_ARG_NAME
+)
+GFS_CRPS_FILE_HELP_STRING = (
+    'Path to file with GFS model''s CRPS value for every target field and lead '
+    'time.  This file will be read by `neural_net._get_gfs_crps_values`.  If '
+    'you do not want to include GFS CRPS values in the target matrix, make '
+    'this argument an empty string.'
 )
 TARGET_NORM_FILE_HELP_STRING = (
     'Path to file with normalization params for lagged-target predictors (will '
@@ -315,6 +322,10 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME, type=int, nargs='+',
         required=True, help=GFS_FCST_TARGET_LEAD_TIMES_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + GFS_CRPS_FILE_ARG_NAME, type=str, required=True,
+        help=GFS_CRPS_FILE_HELP_STRING
     )
     parser_object.add_argument(
         '--' + TARGET_NORM_FILE_ARG_NAME, type=str,

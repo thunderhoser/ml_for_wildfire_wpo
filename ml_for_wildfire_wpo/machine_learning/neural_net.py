@@ -6,6 +6,7 @@ import time
 import random
 import pickle
 import numpy
+import xarray
 import pandas
 import keras
 from tensorflow.keras.saving import load_model
@@ -52,6 +53,7 @@ TARGET_FIELDS_KEY = 'target_field_names'
 MODEL_LEAD_TO_TARGET_LAGS_KEY = 'model_lead_days_to_target_lags_days'
 MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY = 'model_lead_days_to_gfs_target_leads_days'
 MODEL_LEAD_TO_FREQ_KEY = 'model_lead_days_to_freq'
+GFS_CRPS_FILE_KEY = 'gfs_crps_file_name'
 TARGET_DIRECTORY_KEY = 'target_dir_name'
 GFS_FORECAST_TARGET_DIR_KEY = 'gfs_forecast_target_dir_name'
 TARGET_NORM_FILE_KEY = 'target_normalization_file_name'
@@ -257,6 +259,9 @@ def _check_generator_args(option_dict):
         model_lead_times_days, model_lead_time_freqs
     ))
 
+    if option_dict[GFS_CRPS_FILE_KEY] is None:
+        error_checking.assert_file_exists(option_dict[GFS_CRPS_FILE_KEY])
+
     error_checking.assert_directory_exists(option_dict[GFS_DIRECTORY_KEY])
     if option_dict[GFS_NORM_FILE_KEY] is None:
         option_dict[GFS_USE_QUANTILE_NORM_KEY] = False
@@ -387,6 +392,36 @@ def _find_target_files_needed_1example(
             raise_error_if_missing=True
         ) for d in target_date_strings
     ]
+
+
+def _get_gfs_crps_values(netcdf_file_name, target_field_names, lead_time_days):
+    """Reads GFS CRPS values (one per target field and lead time) from NetCDF.
+
+    T = number of target fields
+
+    :param netcdf_file_name: Path to input file.
+    :param target_field_names: length-T list with names of target fields.
+    :param lead_time_days: Lead time.
+    :return: gfs_crps_values: length-T numpy array of CRPS values from GFS
+        weather model.
+    """
+
+    lead_time_dim = 'lead_time_days'
+    field_dim = 'field'
+    gfs_crps_key = 'gfs_crps'
+
+    gfs_crps_table_xarray = xarray.open_dataset(netcdf_file_name)
+
+    j_idx = numpy.where(
+        gfs_crps_table_xarray.coords[lead_time_dim].values == lead_time_days
+    )[0][0]
+
+    i_idxs = numpy.array([
+        numpy.where(gfs_crps_table_xarray.coords[field_dim].values == f)[0][0]
+        for f in target_field_names
+    ], dtype=int)
+
+    return gfs_crps_table_xarray[gfs_crps_key].values[i_idxs, j_idx]
 
 
 def _get_2d_gfs_fields(gfs_table_xarray, field_names):
@@ -1147,6 +1182,10 @@ def data_generator(option_dict):
     option_dict["model_lead_days_to_freq"]: Dictionary, where each key is a
         model lead time (days) and the corresponding value is the frequency with
         which the model should be trained on this lead time (from 0...1).
+    option_dict["gfs_crps_file_name"]: Path to file with GFS model's CRPS value
+        for every target field and lead time.  This file will be read by
+        `_get_gfs_crps_values`.  If you do not want to return GFS CRPS values in
+        the target matrix, make this None.
     option_dict["target_dir_name"]: Name of directory with target fields.
         Files therein will be found by `canadian_fwo_io.find_file` and read by
         `canadian_fwo_io.read_file`.
@@ -1182,10 +1221,17 @@ def data_generator(option_dict):
     predictor_matrices[5]: E-by-M-by-N-by-T numpy array of baseline values for
         residual prediction.
 
-    :return: target_matrix: E-by-M-by-N-by-(T + 1) numpy array, where
-        target_matrix[..., 0] through target_matrix[..., -2] contain values of
-        the target fields and target_matrix[..., -1] contains a binary mask.
-        Where the binary mask is 0, predictions should not be evaluated.
+    :return: target_matrix: If `gfs_crps_file_name is None`, this is an
+        E-by-M-by-N-by-(T + 1) numpy array, where target_matrix[..., 0]
+        through target_matrix[..., -2] contain values of the target fields and
+        target_matrix[..., -1] contains a binary mask.  Where the binary mask is
+        0, predictions should not be evaluated.
+
+    If `gfs_crps_file_name is not None`, this is an
+        E-by-M-by-N-by-(2T + 1) numpy array, where
+        target_matrix[:T] contains values of the target fields;
+        target_matrix[T:-1] contains GFS CRPS values for each target field;
+        and target_matrix[..., -1] contains the binary mask.
     """
 
     option_dict = _check_generator_args(option_dict)
@@ -1217,6 +1263,7 @@ def data_generator(option_dict):
         MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
     ]
     model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
+    gfs_crps_file_name = option_dict[GFS_CRPS_FILE_KEY]
     target_dir_name = option_dict[TARGET_DIRECTORY_KEY]
     gfs_forecast_target_dir_name = option_dict[GFS_FORECAST_TARGET_DIR_KEY]
     target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
@@ -1596,6 +1643,28 @@ def data_generator(option_dict):
             outer_longitude_buffer_deg=outer_longitude_buffer_deg,
             is_example_axis_present=True, fill_value=0.
         )
+
+        if gfs_crps_file_name is not None:
+            print('Reading GFS CRPS values from: "{0:s}"...'.format(
+                gfs_crps_file_name
+            ))
+
+            gfs_crps_matrix = _get_gfs_crps_values(
+                netcdf_file_name=gfs_crps_file_name,
+                target_field_names=target_field_names,
+                lead_time_days=model_lead_time_days
+            )
+
+            for k in [2, 1, 0]:
+                gfs_crps_matrix = numpy.expand_dims(gfs_crps_matrix, axis=0)
+                gfs_crps_matrix = numpy.repeat(
+                    gfs_crps_matrix, axis=0, repeats=target_matrix.shape[k]
+                )
+
+            target_matrix = numpy.concatenate(
+                [target_matrix, gfs_crps_matrix], axis=-1
+            )
+
         target_matrix_with_weights = numpy.concatenate(
             (target_matrix, weight_matrix), axis=-1
         )
@@ -2221,6 +2290,10 @@ def read_metafile(pickle_file_name):
             vod[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = this_dict
         except KeyError:
             pass
+
+    if GFS_CRPS_FILE_KEY not in tod:
+        tod[GFS_CRPS_FILE_KEY] = None
+        vod[GFS_CRPS_FILE_KEY] = None
 
     metadata_dict[TRAINING_OPTIONS_KEY] = tod
     metadata_dict[VALIDATION_OPTIONS_KEY] = vod
