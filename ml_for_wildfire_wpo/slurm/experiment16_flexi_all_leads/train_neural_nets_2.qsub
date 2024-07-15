@@ -87,6 +87,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --target_field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" \
 --target_lags_days_by_model_lead ${target_lags_days_by_model_lead} \
 --gfs_target_leads_days_by_model_lead ${gfs_target_leads_days_by_model_lead} \
+--gfs_crps_file_name="" \
 --target_normalization_file_name="${TARGET_NORM_FILE_NAME}" \
 --targets_use_quantile_norm=1 \
 --num_examples_per_batch=1 \
