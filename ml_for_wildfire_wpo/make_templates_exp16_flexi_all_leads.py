@@ -26,7 +26,7 @@ OUTPUT_DIR_NAME = (
 CHANNEL_WEIGHTS = numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004])
 MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856])
 
-LOSS_FUNCTION = custom_losses.dwcrps_constrained_dsr_while_loop(
+LOSS_FUNCTION = custom_losses.dual_weighted_crps_constrained_dsr(
     channel_weights=CHANNEL_WEIGHTS,
     max_dual_weight_by_channel=MAX_DUAL_WEIGHTS,
     fwi_index=5,
@@ -34,7 +34,7 @@ LOSS_FUNCTION = custom_losses.dwcrps_constrained_dsr_while_loop(
 )
 
 LOSS_FUNCTION_STRING = (
-    'custom_losses.dwcrps_constrained_dsr_while_loop('
+    'custom_losses.dual_weighted_crps_constrained_dsr('
     'channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), '
     'max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), '
     'fwi_index=5, '
@@ -190,7 +190,7 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_flexi_arch.L1_WEIGHT_KEY: 0.,
     chiu_net_pp_flexi_arch.L2_WEIGHT_KEY: 1e-6,
     chiu_net_pp_flexi_arch.USE_BATCH_NORM_KEY: True,
-    chiu_net_pp_flexi_arch.ENSEMBLE_SIZE_KEY: 100,
+    chiu_net_pp_flexi_arch.ENSEMBLE_SIZE_KEY: 25,
     # chiu_net_pp_flexi_arch.OPTIMIZER_FUNCTION_KEY: OPTIMIZER_FUNCTION
 }
 

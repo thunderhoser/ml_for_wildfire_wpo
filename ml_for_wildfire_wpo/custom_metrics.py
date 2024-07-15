@@ -49,9 +49,15 @@ def max_prediction_anywhere(channel_index, function_name, expect_ensemble=True,
         T = number of target variables (channels)
         S = ensemble size
 
-        :param target_tensor: E-by-M-by-N-by-(T + 1) tensor, where
-            target_tensor[..., :-1] contains the actual target values and
+        :param target_tensor: This could be an E-by-M-by-N-by-(T + 1) tensor,
+            where target_tensor[..., :-1] contains the actual target values and
             target_tensor[..., -1] contains weights.
+
+        This could also be an E-by-M-by-N-by-(2T + 1) tensor, where
+            target_tensor[..., :T] contains the actual target values;
+            target_tensor[..., T:-1] contains climo errors;
+            and target_tensor[..., -1] contains weights.
+
         :param prediction_tensor: Tensor of predicted values.  If
             expect_ensemble == True, will expect dimensions E x M x N x T x S.
             Otherwise, if is_nn_evidential == True, will expect dimensions
