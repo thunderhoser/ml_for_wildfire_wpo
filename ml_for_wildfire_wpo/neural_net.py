@@ -266,7 +266,7 @@ def _check_generator_args(option_dict):
         model_lead_times_days, model_lead_time_freqs
     ))
 
-    if option_dict[GFS_CRPS_FILE_KEY] is None:
+    if option_dict[GFS_CRPS_FILE_KEY] is not None:
         error_checking.assert_file_exists(option_dict[GFS_CRPS_FILE_KEY])
 
     error_checking.assert_directory_exists(option_dict[GFS_DIRECTORY_KEY])
