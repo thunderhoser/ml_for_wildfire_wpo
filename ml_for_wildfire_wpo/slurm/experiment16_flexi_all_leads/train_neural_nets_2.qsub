@@ -49,7 +49,7 @@ num_rampup_epochs=${RAMPUP_EPOCH_COUNTS[$SLURM_ARRAY_TASK_ID]}
 predictor_time_strategy=${PREDICTOR_TIME_STRATEGIES[$SLURM_ARRAY_TASK_ID]}
 
 template_file_name="${TEMPLATE_DIR_NAME}/model.keras"
-output_dir_name="${TOP_OUTPUT_DIR_NAME}/second-lead-time-start-epoch=${second_lead_time_start_epoch}_num-rampup-epochs=${num_rampup_epochs}"
+output_dir_name="${TOP_OUTPUT_DIR_NAME}/second-lead-time-start-epoch=${second_lead_time_start_epoch}_num-rampup-epochs=${num_rampup_epochs}_predictor-time-strategy=${predictor_time_strategy}"
 echo $output_dir_name
 
 if [ "$predictor_time_strategy" = "all-daily-valid-times-up-to-target-time" ]; then
