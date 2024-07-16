@@ -105,7 +105,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --gfs_forecast_target_dir_name_for_validation="${GFS_FORECAST_TARGET_DIR_NAME}" \
 --gfs_init_date_limit_strings_for_validation "20210101" "20211210" \
 --num_epochs=1000 \
---num_training_batches_per_epoch=192 \
+--num_training_batches_per_epoch=96 \
 --num_validation_batches_per_epoch=48 \
 --plateau_patience_epochs=10 \
 --plateau_learning_rate_multiplier=0.9 \
