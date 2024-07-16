@@ -23,10 +23,13 @@ OUTPUT_DIR_NAME = (
     'experiment16_flexi_all_leads/templates'
 )
 
-CHANNEL_WEIGHTS = numpy.array([0.03502606, 0.00522109, 0.00012253, 0.83691845, 0.00334096, 0.11937091])
-MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669])
+# CHANNEL_WEIGHTS = numpy.array([0.03502606, 0.00522109, 0.00012253, 0.83691845, 0.00334096, 0.11937091])
+# MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669])
 
-LOSS_FUNCTION = custom_losses.dual_weighted_crpss(
+CHANNEL_WEIGHTS = numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004])
+MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856])
+
+LOSS_FUNCTION = custom_losses.dual_weighted_crpss_constrained_dsr(
     channel_weights=CHANNEL_WEIGHTS,
     max_dual_weight_by_channel=MAX_DUAL_WEIGHTS,
     fwi_index=5,
@@ -34,9 +37,9 @@ LOSS_FUNCTION = custom_losses.dual_weighted_crpss(
 )
 
 LOSS_FUNCTION_STRING = (
-    'custom_losses.dual_weighted_crpss('
-    'channel_weights=numpy.array([0.03502606, 0.00522109, 0.00012253, 0.83691845, 0.00334096, 0.11937091]), '
-    'max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669]), '
+    'custom_losses.dual_weighted_crpss_constrained_dsr('
+    'channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004]), '
+    'max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856]), '
     'fwi_index=5, '
     'function_name="loss_dwcrpss")'
 )

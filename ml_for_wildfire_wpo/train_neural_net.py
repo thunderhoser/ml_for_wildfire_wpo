@@ -29,7 +29,7 @@ def _run(template_file_name, output_dir_name,
          era5_constant_file_name, era5_constant_predictor_field_names,
          era5_normalization_file_name, era5_use_quantile_norm,
          target_field_names, target_lags_days_by_model_lead,
-         gfs_target_leads_days_by_model_lead, gfs_crps_file_name,
+         gfs_target_leads_days_by_model_lead, compare_to_gfs_in_loss,
          target_normalization_file_name, targets_use_quantile_norm,
          num_examples_per_batch, sentinel_value, do_residual_prediction,
          gfs_dir_name_for_training, target_dir_name_for_training,
@@ -67,7 +67,7 @@ def _run(template_file_name, output_dir_name,
     :param target_field_names: Same.
     :param target_lags_days_by_model_lead: Same.
     :param gfs_target_leads_days_by_model_lead: Same.
-    :param gfs_crps_file_name: Same.
+    :param compare_to_gfs_in_loss: Same.
     :param target_normalization_file_name: Same.
     :param targets_use_quantile_norm: Same.
     :param num_examples_per_batch: Same.
@@ -101,8 +101,6 @@ def _run(template_file_name, output_dir_name,
         target_normalization_file_name = None
     if era5_normalization_file_name == '':
         era5_normalization_file_name = None
-    if gfs_crps_file_name == '':
-        gfs_crps_file_name = None
 
     if era5_constant_file_name == '':
         era5_constant_file_name = None
@@ -189,7 +187,7 @@ def _run(template_file_name, output_dir_name,
             model_lead_days_to_target_lags_days,
         neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY:
             model_lead_days_to_gfs_target_leads_days,
-        neural_net.GFS_CRPS_FILE_KEY: gfs_crps_file_name,
+        neural_net.COMPARE_TO_GFS_IN_LOSS_KEY: compare_to_gfs_in_loss,
         neural_net.TARGET_NORM_FILE_KEY: target_normalization_file_name,
         neural_net.TARGETS_USE_QUANTILE_NORM_KEY: targets_use_quantile_norm,
         neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
@@ -332,9 +330,9 @@ if __name__ == '__main__':
             ),
             dtype=int
         ),
-        gfs_crps_file_name=getattr(
-            INPUT_ARG_OBJECT, training_args.GFS_CRPS_FILE_ARG_NAME
-        ),
+        compare_to_gfs_in_loss=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.COMPARE_TO_GFS_IN_LOSS_ARG_NAME
+        )),
         target_normalization_file_name=getattr(
             INPUT_ARG_OBJECT, training_args.TARGET_NORM_FILE_ARG_NAME
         ),
