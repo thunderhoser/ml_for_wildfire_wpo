@@ -851,7 +851,7 @@ def dual_weighted_crpss(
         climo_error_tensor = K.maximum(climo_error_tensor, K.epsilon())
 
         negative_skill_score_tensor = (
-                (climo_error_tensor - error_tensor) / climo_error_tensor
+            (error_tensor - climo_error_tensor) / climo_error_tensor
         )
 
         return (
