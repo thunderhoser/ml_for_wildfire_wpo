@@ -850,13 +850,13 @@ def dual_weighted_crpss(
         climo_error_tensor = channel_weight_tensor * climo_crps_tensor
         climo_error_tensor = K.maximum(climo_error_tensor, K.epsilon())
 
-        skill_score_tensor = (
-            (climo_error_tensor - error_tensor) / climo_error_tensor
+        negative_skill_score_tensor = (
+                (climo_error_tensor - error_tensor) / climo_error_tensor
         )
 
         return (
-            K.sum(mask_weight_tensor * skill_score_tensor) /
-            K.sum(mask_weight_tensor * K.ones_like(skill_score_tensor))
+            K.sum(mask_weight_tensor * negative_skill_score_tensor) /
+            K.sum(mask_weight_tensor * K.ones_like(negative_skill_score_tensor))
         )
 
     loss.__name__ = function_name
