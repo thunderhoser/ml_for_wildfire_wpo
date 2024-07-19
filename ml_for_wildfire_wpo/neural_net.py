@@ -2558,9 +2558,6 @@ def train_model(
     except:
         initial_epoch = 0
 
-    history_table_pandas = pandas.read_csv(history_file_name)
-    initial_epoch = history_table_pandas['epoch'].max() + 1
-
     print('INITIAL EPOCH = {0:d}'.format(initial_epoch))
 
     history_object = keras.callbacks.CSVLogger(
