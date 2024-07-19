@@ -2631,6 +2631,7 @@ def train_model(
             for l in model_lead_times_days
         ], dtype=float)
 
+        model_lead_time_freqs[1] = max([model_lead_time_freqs[1], 0.9])
         print('\n\n\n')
         print(model_lead_time_freqs)
         print('\n\n\n')
