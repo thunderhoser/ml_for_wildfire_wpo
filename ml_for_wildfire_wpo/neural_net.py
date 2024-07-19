@@ -2631,6 +2631,10 @@ def train_model(
             for l in model_lead_times_days
         ], dtype=float)
 
+        print('\n\n\n')
+        print(model_lead_time_freqs)
+        print('\n\n\n')
+
         model_lead_days_to_freq = dict(zip(
             model_lead_times_days, model_lead_time_freqs
         ))
