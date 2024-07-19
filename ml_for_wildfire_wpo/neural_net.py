@@ -1657,33 +1657,41 @@ def data_generator(option_dict):
         )
 
         predictor_matrices = {}
+        predictor_matrices_list = []
+
         if gfs_predictor_matrix_3d is not None:
             predictor_matrices.update({
                 'gfs_3d_inputs': gfs_predictor_matrix_3d.astype('float32')
             })
+            predictor_matrices_list.append(gfs_predictor_matrix_3d.astype('float32'))
         if gfs_predictor_matrix_2d is not None:
             predictor_matrices.update({
                 'gfs_2d_inputs': gfs_predictor_matrix_2d.astype('float32')
             })
+            predictor_matrices_list.append(gfs_predictor_matrix_2d.astype('float32'))
 
         predictor_matrices.update({
             'lead_time': lead_time_predictors_days.astype('float32')
         })
+        predictor_matrices_list.append(lead_time_predictors_days.astype('float32'))
 
         if era5_constant_matrix is not None:
             predictor_matrices.update({
                 'era5_inputs': era5_constant_matrix.astype('float32')
             })
+            predictor_matrices_list.append(era5_constant_matrix.astype('float32'))
         if laglead_target_predictor_matrix is not None:
             predictor_matrices.update({
                 'lagged_target_inputs':
                     laglead_target_predictor_matrix.astype('float32')
             })
+            predictor_matrices_list.append(laglead_target_predictor_matrix.astype('float32'))
         if baseline_prediction_matrix is not None:
             predictor_matrices.update({
                 'predn_baseline_inputs':
                     baseline_prediction_matrix.astype('float32')
             })
+            predictor_matrices_list.append(baseline_prediction_matrix.astype('float32'))
 
         print((
             'Shape of target matrix (including land mask as last channel): '
@@ -1705,8 +1713,7 @@ def data_generator(option_dict):
 
         # predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
-        print(predictor_matrices)
-        yield predictor_matrices, target_matrix_with_weights
+        yield predictor_matrices_list, target_matrix_with_weights
 
 
 def create_data(option_dict, init_date_string, model_lead_time_days):
