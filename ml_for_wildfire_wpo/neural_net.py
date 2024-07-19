@@ -1713,7 +1713,7 @@ def data_generator(option_dict):
 
         # predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
-        yield predictor_matrices_list, target_matrix_with_weights
+        yield tuple(predictor_matrices_list), target_matrix_with_weights
 
 
 def create_data(option_dict, init_date_string, model_lead_time_days):
