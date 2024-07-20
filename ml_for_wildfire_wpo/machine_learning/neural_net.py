@@ -27,6 +27,7 @@ from ml_for_wildfire_wpo.utils import normalization
 from ml_for_wildfire_wpo.machine_learning import custom_losses
 from ml_for_wildfire_wpo.machine_learning import custom_metrics
 
+TOLERANCE = 1e-6
 DATE_FORMAT = '%Y%m%d'
 
 GRID_SPACING_DEG = 0.25
@@ -100,6 +101,70 @@ PREDICTOR_MATRICES_KEY = 'predictor_matrices'
 TARGETS_AND_WEIGHTS_KEY = 'target_matrix_with_weights'
 GRID_LATITUDES_KEY = 'grid_latitudes_deg_n'
 GRID_LONGITUDES_KEY = 'grid_longitudes_deg_e'
+
+
+def __determine_num_times_for_interp(generator_option_dict):
+    """For both GFS Wx variables and lag/lead targets, computes # interp times.
+
+    :param generator_option_dict: See documentation for `data_generator`.
+    :return: num_gfs_hours_for_interp: Number of time steps to which GFS Wx
+        variables will be interpolated.  If no interpolation is needed (i.e.,
+        all model lead times require the same number of GFS Wx lead times), this
+        will be None.
+    :return: num_target_times_for_interp: Number of time steps to which lag/lead
+        targets will be interpolated.  If no interpolation is needed (i.e.,
+        all model lead times require the same number of lag/lead target times),
+        this will be None.
+    """
+
+    # TODO(thunderhoser): This could use a unit test.
+
+    model_lead_days_to_gfs_pred_leads_hours = generator_option_dict[
+        MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
+    ]
+    model_lead_days_to_target_lags_days = generator_option_dict[
+        MODEL_LEAD_TO_TARGET_LAGS_KEY
+    ]
+    model_lead_days_to_gfs_target_leads_days = generator_option_dict[
+        MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
+    ]
+    model_lead_times_days = numpy.array(
+        list(model_lead_days_to_target_lags_days.keys()),
+        dtype=int
+    )
+
+    num_gfs_hours_by_model_lead = numpy.array([
+        len(model_lead_days_to_gfs_pred_leads_hours[l])
+        for l in model_lead_times_days
+    ], dtype=int)
+
+    if len(numpy.unique(num_gfs_hours_by_model_lead)) == 1:
+        num_gfs_hours_for_interp = None
+    else:
+        num_gfs_hours_for_interp = numpy.max(num_gfs_hours_by_model_lead)
+
+    num_target_lags_by_model_lead = numpy.array([
+        len(model_lead_days_to_target_lags_days[l])
+        for l in model_lead_times_days
+    ], dtype=int)
+
+    num_gfs_target_leads_by_model_lead = numpy.array([
+        len(model_lead_days_to_gfs_target_leads_days[l])
+        for l in model_lead_times_days
+    ], dtype=int)
+
+    num_target_time_steps_by_model_lead = (
+        num_target_lags_by_model_lead + num_gfs_target_leads_by_model_lead
+    )
+
+    if len(numpy.unique(num_target_time_steps_by_model_lead)) == 1:
+        num_target_times_for_interp = None
+    else:
+        num_target_times_for_interp = numpy.max(
+            num_target_time_steps_by_model_lead
+        )
+
+    return num_gfs_hours_for_interp, num_target_times_for_interp
 
 
 def _check_generator_args(option_dict):
@@ -1110,6 +1175,9 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
             new_predictor_matrix[..., t, p] = this_predictor_matrix
 
         missing_target_time_indices = numpy.where(missing_target_time_flags)[0]
+        if len(missing_target_time_indices) == 0:
+            continue
+
         missing_source_time_flags = numpy.all(
             numpy.isnan(predictor_matrix[..., p]),
             axis=(0, 1)
@@ -1121,25 +1189,6 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
         if len(filled_source_time_indices) == 0:
             continue
 
-        # missing_target_time_indices = [
-        #     t for t in missing_target_time_indices
-        #     if target_lead_times_hours[t] >= numpy.min(
-        #         source_lead_times_hours[filled_source_time_indices]
-        #     )
-        # ]
-        # missing_target_time_indices = [
-        #     t for t in missing_target_time_indices
-        #     if target_lead_times_hours[t] <= numpy.max(
-        #         source_lead_times_hours[filled_source_time_indices]
-        #     )
-        # ]
-        # missing_target_time_indices = numpy.array(
-        #     missing_target_time_indices, dtype=int
-        # )
-
-        if len(missing_target_time_indices) == 0:
-            continue
-
         interp_object = interp1d(
             x=source_lead_times_hours[filled_source_time_indices],
             y=predictor_matrix[..., filled_source_time_indices, p],
@@ -1148,6 +1197,14 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
             bounds_error=True,
             assume_sorted=True
         )
+
+        print((
+            'Interpolating data from lead times of {0:s} hours to lead '
+            'times of {1:s} hours...'
+        ).format(
+            str(source_lead_times_hours[filled_source_time_indices]),
+            str(target_lead_times_hours[missing_target_time_indices])
+        ))
 
         new_predictor_matrix[
             ..., missing_target_time_indices, p
@@ -1496,9 +1553,9 @@ def data_generator(option_dict):
     desired_gfs_fcst_target_row_indices = numpy.array([], dtype=int)
     desired_gfs_fcst_target_column_indices = numpy.array([], dtype=int)
 
-    model_lead_time_days = random.choices(
-        model_lead_times_days, weights=model_lead_time_freqs, k=1
-    )[0]
+    num_gfs_hours_for_interp, num_target_times_for_interp = (
+        __determine_num_times_for_interp(option_dict)
+    )
 
     while True:
         gfs_predictor_matrix_3d = None
@@ -1508,7 +1565,16 @@ def data_generator(option_dict):
         target_matrix = None
         num_examples_in_memory = 0
 
+        model_lead_time_days = random.choices(
+            model_lead_times_days, weights=model_lead_time_freqs, k=1
+        )[0]
+        gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
+            model_lead_time_days
+        ]
         target_lag_times_days = model_lead_days_to_target_lags_days[
+            model_lead_time_days
+        ]
+        gfs_target_lead_times_days = model_lead_days_to_gfs_target_leads_days[
             model_lead_time_days
         ]
         lead_time_predictors_days = numpy.full(
@@ -1529,13 +1595,12 @@ def data_generator(option_dict):
                 desired_column_indices=desired_gfs_column_indices,
                 latitude_limits_deg_n=outer_latitude_limits_deg_n,
                 longitude_limits_deg_e=outer_longitude_limits_deg_e,
-                lead_times_hours=
-                model_lead_days_to_gfs_pred_leads_hours[model_lead_time_days],
+                lead_times_hours=gfs_pred_lead_times_hours,
                 field_names=gfs_predictor_field_names,
                 pressure_levels_mb=gfs_pressure_levels_mb,
                 norm_param_table_xarray=gfs_norm_param_table_xarray,
                 use_quantile_norm=gfs_use_quantile_norm,
-                num_lead_times_for_interp=None
+                num_lead_times_for_interp=num_gfs_hours_for_interp
             )
 
             (
@@ -1589,8 +1654,7 @@ def data_generator(option_dict):
                     init_date_string=gfs_io.file_name_to_date(
                         gfs_file_names[gfs_file_index]
                     ),
-                    target_lead_times_days=
-                    model_lead_days_to_gfs_target_leads_days[model_lead_time_days],
+                    target_lead_times_days=gfs_target_lead_times_days,
                     desired_row_indices=desired_gfs_fcst_target_row_indices,
                     desired_column_indices=
                     desired_gfs_fcst_target_column_indices,
@@ -1610,10 +1674,10 @@ def data_generator(option_dict):
                     axis=-2
                 )
 
-            if num_lead_times_for_interp is not None:
+            if num_target_times_for_interp is not None:
                 source_lead_times_days = numpy.concatenate([
                     numpy.sort(-1 * target_lag_times_days),
-                    model_lead_days_to_gfs_target_leads_days[model_lead_time_days]
+                    gfs_target_lead_times_days
                 ])
 
                 this_laglead_target_predictor_matrix = (
@@ -1621,7 +1685,7 @@ def data_generator(option_dict):
                         predictor_matrix=this_laglead_target_predictor_matrix,
                         source_lead_times_hours=
                         DAYS_TO_HOURS * source_lead_times_days,
-                        num_target_lead_times=num_lead_times_for_interp
+                        num_target_lead_times=num_target_times_for_interp
                     )
                 )
 
@@ -1967,15 +2031,19 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
 
-    gfs_predictor_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
+    num_gfs_hours_for_interp, num_target_times_for_interp = (
+        __determine_num_times_for_interp(option_dict)
+    )
+
+    gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
         model_lead_time_days
     ]
     target_lag_times_days = model_lead_days_to_target_lags_days[
         model_lead_time_days
     ]
-    gfs_forecast_target_lead_times_days = (
-        model_lead_days_to_gfs_target_leads_days[model_lead_time_days]
-    )
+    gfs_target_lead_times_days = model_lead_days_to_gfs_target_leads_days[
+        model_lead_time_days
+    ]
 
     if gfs_normalization_file_name is None:
         gfs_norm_param_table_xarray = None
@@ -2056,12 +2124,12 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
         desired_column_indices=None,
         latitude_limits_deg_n=outer_latitude_limits_deg_n,
         longitude_limits_deg_e=outer_longitude_limits_deg_e,
-        lead_times_hours=gfs_predictor_lead_times_hours,
+        lead_times_hours=gfs_pred_lead_times_hours,
         field_names=gfs_predictor_field_names,
         pressure_levels_mb=gfs_pressure_levels_mb,
         norm_param_table_xarray=gfs_norm_param_table_xarray,
         use_quantile_norm=gfs_use_quantile_norm,
-        num_lead_times_for_interp=None
+        num_lead_times_for_interp=num_gfs_hours_for_interp
     )
 
     gfs_table_xarray = gfs_io.read_file(gfs_file_name)
@@ -2125,7 +2193,7 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
         new_matrix = _read_gfs_forecast_targets_1example(
             daily_gfs_dir_name=gfs_forecast_target_dir_name,
             init_date_string=gfs_io.file_name_to_date(gfs_file_name),
-            target_lead_times_days=gfs_forecast_target_lead_times_days,
+            target_lead_times_days=gfs_target_lead_times_days,
             desired_row_indices=None,
             desired_column_indices=None,
             latitude_limits_deg_n=inner_latitude_limits_deg_n,
@@ -2140,10 +2208,10 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
             axis=-2
         )
 
-    if num_lead_times_for_interp is not None:
+    if num_target_times_for_interp is not None:
         source_lead_times_days = numpy.concatenate([
             numpy.sort(-1 * target_lag_times_days),
-            gfs_forecast_target_lead_times_days
+            gfs_target_lead_times_days
         ])
 
         laglead_target_predictor_matrix = (
@@ -2151,7 +2219,7 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
                 predictor_matrix=laglead_target_predictor_matrix,
                 source_lead_times_hours=
                 DAYS_TO_HOURS * source_lead_times_days,
-                num_target_lead_times=num_lead_times_for_interp
+                num_target_lead_times=num_target_times_for_interp
             )
         )
 
