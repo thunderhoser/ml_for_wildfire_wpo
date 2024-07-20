@@ -8,6 +8,7 @@ import pickle
 import numpy
 import pandas
 import keras
+from scipy.interpolate import interp1d
 from tensorflow.keras.saving import load_model
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import number_rounding
@@ -27,11 +28,13 @@ from ml_for_wildfire_wpo.machine_learning import custom_losses
 from ml_for_wildfire_wpo.machine_learning import custom_metrics
 
 DATE_FORMAT = '%Y%m%d'
-GRID_SPACING_DEG = 0.25
-DEGREES_TO_RADIANS = numpy.pi / 180.
-DAYS_TO_SECONDS = 86400
 
+GRID_SPACING_DEG = 0.25
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
+
+DAYS_TO_HOURS = 24
+DAYS_TO_SECONDS = 86400
+DEGREES_TO_RADIANS = numpy.pi / 180.
 
 INNER_LATITUDE_LIMITS_KEY = 'inner_latitude_limits_deg_n'
 INNER_LONGITUDE_LIMITS_KEY = 'inner_longitude_limits_deg_e'
@@ -209,8 +212,8 @@ def _check_generator_args(option_dict):
             these_pred_lead_times_hours
         )
         error_checking.assert_is_geq_numpy_array(these_pred_lead_times_hours, 0)
-        these_pred_lead_times_hours = numpy.sort(these_pred_lead_times_hours)
 
+        these_pred_lead_times_hours = numpy.sort(these_pred_lead_times_hours)
         model_lead_days_to_gfs_pred_leads_hours[d] = these_pred_lead_times_hours
 
     model_lead_days_to_target_lags_days = option_dict[
@@ -233,6 +236,9 @@ def _check_generator_args(option_dict):
         )
         error_checking.assert_is_integer_numpy_array(these_lag_times_days)
         error_checking.assert_is_greater_numpy_array(these_lag_times_days, 0)
+
+        these_lag_times_days = numpy.sort(these_lag_times_days)[::-1]
+        model_lead_days_to_target_lags_days[d] = these_lag_times_days
 
     model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
     new_lead_times_days = numpy.array(
@@ -317,6 +323,13 @@ def _check_generator_args(option_dict):
             )
             error_checking.assert_is_greater_numpy_array(
                 these_target_lead_times_days, 0
+            )
+
+            these_target_lead_times_days = numpy.sort(
+                these_target_lead_times_days
+            )
+            model_lead_days_to_gfs_target_leads_days[d] = (
+                these_target_lead_times_days
             )
 
     error_checking.assert_directory_exists(option_dict[TARGET_DIRECTORY_KEY])
@@ -432,7 +445,7 @@ def _get_3d_gfs_fields(gfs_table_xarray, field_names, pressure_levels_mb):
     :param gfs_table_xarray: xarray table with GFS data.
     :param field_names: length-F list of field names.
     :param pressure_levels_mb: length-P numpy array of pressure levels.
-    :return: predictor_matrix: None or an M-by-N-by-L-by-P-by-F numpy array.
+    :return: predictor_matrix: None or an M-by-N-by-P-by-L-by-F numpy array.
     """
 
     if len(field_names) == 0:
@@ -753,7 +766,7 @@ def _read_gfs_data_1example(
         gfs_file_name, desired_row_indices, desired_column_indices,
         latitude_limits_deg_n, longitude_limits_deg_e, lead_times_hours,
         field_names, pressure_levels_mb, norm_param_table_xarray,
-        use_quantile_norm):
+        use_quantile_norm, num_lead_times_for_interp):
     """Reads GFS data for one example.
 
     M = number of rows in grid
@@ -783,7 +796,9 @@ def _read_gfs_data_1example(
         you do not want normalization, make this None.
     :param use_quantile_norm: Boolean flag.  If True, will use quantile
         normalization before converting to z-scores.
-    :return: predictor_matrix_3d: None or an M-by-N-by-L-by-P-by-FFF numpy
+    :param num_lead_times_for_interp: Will interpolate to this number of evenly
+        spaced lead times.  If you do not want to interpolate, make this None.
+    :return: predictor_matrix_3d: None or an M-by-N-by-P-by-L-by-FFF numpy
         array.
     :return: predictor_matrix_2d: None or an M-by-N-by-L-by-FF numpy array.
     :return: desired_row_indices: See input documentation.
@@ -854,6 +869,21 @@ def _read_gfs_data_1example(
         gfs_table_xarray=gfs_table_xarray,
         field_names=field_names_2d
     )
+
+    if num_lead_times_for_interp is not None:
+        if predictor_matrix_3d is not None:
+            predictor_matrix_3d = _interp_predictors_by_lead_time(
+                predictor_matrix=predictor_matrix_3d,
+                source_lead_times_hours=lead_times_hours,
+                num_target_lead_times=num_lead_times_for_interp
+            )
+
+        if predictor_matrix_2d is not None:
+            predictor_matrix_2d = _interp_predictors_by_lead_time(
+                predictor_matrix=predictor_matrix_2d,
+                source_lead_times_hours=lead_times_hours,
+                num_target_lead_times=num_lead_times_for_interp
+            )
 
     return (
         predictor_matrix_3d, predictor_matrix_2d,
@@ -1000,6 +1030,137 @@ def _read_lagged_targets_1example(
     ], axis=-2)
 
     return target_field_matrix, desired_row_indices, desired_column_indices
+
+
+def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
+                                    num_target_lead_times):
+    """Interpolates predictors to fill missing lead times.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    S = number of source lead times
+    T = number of target lead times
+    F = number of fields
+    P = number of pressure levels
+
+    :param predictor_matrix: M-by-N-by-S-by-F or M-by-N-by-P-by-S-by-F numpy
+        array of predictor values.
+    :param source_lead_times_hours: length-S numpy array of source lead times.
+        This method assumes that `source_lead_times_hours` is sorted.
+    :param num_target_lead_times: T in the above definitions.
+    :return: predictor_matrix: M-by-N-by-T-by-F or M-by-N-by-P-by-T-by-F numpy
+        array of interpolated predictor values.
+    """
+
+    target_lead_times_hours = numpy.linspace(
+        source_lead_times_hours[0], source_lead_times_hours[-1],
+        num=num_target_lead_times, dtype=float
+    )
+    target_to_source_index = numpy.full(num_target_lead_times, -1, dtype=int)
+
+    for t in range(num_target_lead_times):
+        good_indices = numpy.where(
+            numpy.absolute(source_lead_times_hours - target_lead_times_hours[t])
+            <= TOLERANCE
+        )[0]
+
+        if len(good_indices) == 0:
+            continue
+
+        target_to_source_index[t] = good_indices[0]
+
+    num_source_lead_times = predictor_matrix.shape[-2]
+    num_fields = predictor_matrix.shape[-1]
+    has_pressure_levels = len(predictor_matrix.shape) == 5
+
+    if has_pressure_levels:
+        num_pressure_levels = predictor_matrix.shape[2]
+        these_dims = (
+            predictor_matrix.shape[:2] +
+            (num_source_lead_times, num_pressure_levels * num_fields)
+        )
+        predictor_matrix = numpy.reshape(predictor_matrix, these_dims)
+    else:
+        num_pressure_levels = 0
+
+    new_predictor_matrix = numpy.full(
+        predictor_matrix.shape[:2] + (num_target_lead_times, num_fields),
+        numpy.nan
+    )
+
+    for p in range(num_fields):
+        missing_target_time_flags = numpy.full(
+            num_target_lead_times, True, dtype=bool
+        )
+
+        for t in range(num_target_lead_times):
+            if target_to_source_index[t] == -1:
+                continue
+
+            this_predictor_matrix = predictor_matrix[
+                ..., target_to_source_index[t], p
+            ]
+            missing_target_time_flags[t] = numpy.all(numpy.isnan(
+                this_predictor_matrix
+            ))
+
+            if missing_target_time_flags[t]:
+                continue
+
+            new_predictor_matrix[..., t, p] = this_predictor_matrix
+
+        missing_target_time_indices = numpy.where(missing_target_time_flags)[0]
+        missing_source_time_flags = numpy.all(
+            numpy.isnan(predictor_matrix[..., p]),
+            axis=(0, 1)
+        )
+        filled_source_time_indices = numpy.where(
+            numpy.invert(missing_source_time_flags)
+        )[0]
+
+        if len(filled_source_time_indices) == 0:
+            continue
+
+        # missing_target_time_indices = [
+        #     t for t in missing_target_time_indices
+        #     if target_lead_times_hours[t] >= numpy.min(
+        #         source_lead_times_hours[filled_source_time_indices]
+        #     )
+        # ]
+        # missing_target_time_indices = [
+        #     t for t in missing_target_time_indices
+        #     if target_lead_times_hours[t] <= numpy.max(
+        #         source_lead_times_hours[filled_source_time_indices]
+        #     )
+        # ]
+        # missing_target_time_indices = numpy.array(
+        #     missing_target_time_indices, dtype=int
+        # )
+
+        if len(missing_target_time_indices) == 0:
+            continue
+
+        interp_object = interp1d(
+            x=source_lead_times_hours[filled_source_time_indices],
+            y=predictor_matrix[..., filled_source_time_indices, p],
+            axis=2,
+            kind='linear',
+            bounds_error=True,
+            assume_sorted=True
+        )
+
+        new_predictor_matrix[
+            ..., missing_target_time_indices, p
+        ] = interp_object(target_lead_times_hours[missing_target_time_indices])
+
+    if has_pressure_levels:
+        these_dims = (
+            predictor_matrix.shape[:2] +
+            (num_pressure_levels, num_target_lead_times, num_fields)
+        )
+        new_predictor_matrix = numpy.reshape(new_predictor_matrix, these_dims)
+
+    return new_predictor_matrix
 
 
 def create_learning_curriculum(lead_times_days, start_epoch_by_lead_time,
@@ -1373,7 +1534,8 @@ def data_generator(option_dict):
                 field_names=gfs_predictor_field_names,
                 pressure_levels_mb=gfs_pressure_levels_mb,
                 norm_param_table_xarray=gfs_norm_param_table_xarray,
-                use_quantile_norm=gfs_use_quantile_norm
+                use_quantile_norm=gfs_use_quantile_norm,
+                num_lead_times_for_interp=None
             )
 
             (
@@ -1446,6 +1608,21 @@ def data_generator(option_dict):
                 this_laglead_target_predictor_matrix = numpy.concatenate(
                     (this_laglead_target_predictor_matrix, new_matrix),
                     axis=-2
+                )
+
+            if num_lead_times_for_interp is not None:
+                source_lead_times_days = numpy.concatenate([
+                    numpy.sort(-1 * target_lag_times_days),
+                    model_lead_days_to_gfs_target_leads_days[model_lead_time_days]
+                ])
+
+                this_laglead_target_predictor_matrix = (
+                    _interp_predictors_by_lead_time(
+                        predictor_matrix=this_laglead_target_predictor_matrix,
+                        source_lead_times_hours=
+                        DAYS_TO_HOURS * source_lead_times_days,
+                        num_target_lead_times=num_lead_times_for_interp
+                    )
                 )
 
             target_file_name = _find_target_files_needed_1example(
@@ -1883,7 +2060,8 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
         field_names=gfs_predictor_field_names,
         pressure_levels_mb=gfs_pressure_levels_mb,
         norm_param_table_xarray=gfs_norm_param_table_xarray,
-        use_quantile_norm=gfs_use_quantile_norm
+        use_quantile_norm=gfs_use_quantile_norm,
+        num_lead_times_for_interp=None
     )
 
     gfs_table_xarray = gfs_io.read_file(gfs_file_name)
@@ -1960,6 +2138,21 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
         laglead_target_predictor_matrix = numpy.concatenate(
             (laglead_target_predictor_matrix, new_matrix),
             axis=-2
+        )
+
+    if num_lead_times_for_interp is not None:
+        source_lead_times_days = numpy.concatenate([
+            numpy.sort(-1 * target_lag_times_days),
+            gfs_forecast_target_lead_times_days
+        ])
+
+        laglead_target_predictor_matrix = (
+            _interp_predictors_by_lead_time(
+                predictor_matrix=laglead_target_predictor_matrix,
+                source_lead_times_hours=
+                DAYS_TO_HOURS * source_lead_times_days,
+                num_target_lead_times=num_lead_times_for_interp
+            )
         )
 
     laglead_target_predictor_matrix = numpy.expand_dims(
