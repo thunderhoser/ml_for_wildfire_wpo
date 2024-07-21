@@ -1148,12 +1148,14 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
     else:
         num_pressure_levels = 0
 
+    num_pressure_field_combos = predictor_matrix.shape[-1]
     new_predictor_matrix = numpy.full(
-        predictor_matrix.shape[:2] + (num_target_lead_times, num_fields),
+        predictor_matrix.shape[:2] +
+        (num_target_lead_times, num_pressure_field_combos),
         numpy.nan
     )
 
-    for p in range(num_fields):
+    for p in range(num_pressure_field_combos):
         missing_target_time_flags = numpy.full(
             num_target_lead_times, True, dtype=bool
         )
@@ -1187,6 +1189,24 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
         )[0]
 
         if len(filled_source_time_indices) == 0:
+            continue
+
+        missing_target_time_indices = [
+            t for t in missing_target_time_indices
+            if target_lead_times_hours[t] >= numpy.min(
+                source_lead_times_hours[filled_source_time_indices]
+            )
+        ]
+        missing_target_time_indices = [
+            t for t in missing_target_time_indices
+            if target_lead_times_hours[t] <= numpy.max(
+                source_lead_times_hours[filled_source_time_indices]
+            )
+        ]
+        missing_target_time_indices = numpy.array(
+            missing_target_time_indices, dtype=int
+        )
+        if len(missing_target_time_indices) == 0:
             continue
 
         interp_object = interp1d(
@@ -1399,12 +1419,11 @@ def data_generator(option_dict):
         predictors.
     predictor_matrices[1]: E-by-M-by-N-by-L-by-FF numpy array of 2-D GFS
         predictors.
-    predictor_matrices[2]: length-E numpy array of model lead times (days).
-    predictor_matrices[3]: E-by-M-by-N-by-F numpy array of ERA5-constant
+    predictor_matrices[2]: E-by-M-by-N-by-F numpy array of ERA5-constant
         predictors.
-    predictor_matrices[4]: E-by-M-by-N-by-l-by-T numpy array of lag/lead-target
+    predictor_matrices[3]: E-by-M-by-N-by-l-by-T numpy array of lag/lead-target
         predictors.
-    predictor_matrices[5]: E-by-M-by-N-by-T numpy array of baseline values for
+    predictor_matrices[4]: E-by-M-by-N-by-T numpy array of baseline values for
         residual prediction.
 
     :return: target_matrix: If `compare_to_gfs_in_loss == False`, this is an
@@ -1577,9 +1596,6 @@ def data_generator(option_dict):
         gfs_target_lead_times_days = model_lead_days_to_gfs_target_leads_days[
             model_lead_time_days
         ]
-        lead_time_predictors_days = numpy.full(
-            num_examples_per_batch, model_lead_time_days, dtype=float
-        )
 
         while num_examples_in_memory < num_examples_per_batch:
             if gfs_file_index == len(gfs_file_names):
@@ -1822,15 +1838,6 @@ def data_generator(option_dict):
                 numpy.isnan(gfs_predictor_matrix_2d)
             ] = sentinel_value
 
-        print((
-            'Shape of lead_time_predictors_days and min/max values: '
-            '{0:s}, {1:.0f}, {2:.0f}'
-        ).format(
-            str(lead_time_predictors_days.shape),
-            numpy.min(lead_time_predictors_days),
-            numpy.max(lead_time_predictors_days)
-        ))
-
         if baseline_prediction_matrix is not None:
             print((
                 'Shape of baseline prediction matrix and NaN fraction: '
@@ -1899,11 +1906,6 @@ def data_generator(option_dict):
         #     predictor_matrices.update({
         #         'gfs_2d_inputs': gfs_predictor_matrix_2d.astype('float32')
         #     })
-        #
-        # predictor_matrices.update({
-        #     'lead_time': lead_time_predictors_days.astype('float32')
-        # })
-        #
         # if era5_constant_matrix is not None:
         #     predictor_matrices.update({
         #         'era5_inputs': era5_constant_matrix.astype('float32')
@@ -1928,11 +1930,6 @@ def data_generator(option_dict):
             predictor_matrices.append(
                 gfs_predictor_matrix_2d.astype('float32')
             )
-
-        predictor_matrices.append(
-            lead_time_predictors_days.astype('float32')
-        )
-
         if era5_constant_matrix is not None:
             predictor_matrices.append(
                 era5_constant_matrix.astype('float32')
@@ -1963,6 +1960,7 @@ def data_generator(option_dict):
         print('Min and max target values = {0:.4f}, {1:.4f}'.format(
             numpy.min(target_matrix), numpy.max(target_matrix)
         ))
+        print('MODEL LEAD TIME: {0:d} days'.format(model_lead_time_days))
 
         # predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
@@ -2270,17 +2268,6 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
             numpy.isnan(gfs_predictor_matrix_2d)
         ] = sentinel_value
 
-    lead_time_predictors_days = numpy.array([model_lead_time_days], dtype=float)
-
-    print((
-        'Shape of lead_time_predictors_days and min/max values: '
-        '{0:s}, {1:.0f}, {2:.0f}'
-    ).format(
-        str(lead_time_predictors_days.shape),
-        numpy.min(lead_time_predictors_days),
-        numpy.max(lead_time_predictors_days)
-    ))
-
     if baseline_prediction_matrix is not None:
         print((
             'Shape of baseline prediction matrix and NaN fraction: '
@@ -2340,7 +2327,7 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
     predictor_matrices = [
         m for m in [
             gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
-            lead_time_predictors_days, era5_constant_matrix,
+            era5_constant_matrix,
             laglead_target_predictor_matrix, baseline_prediction_matrix
         ]
         if m is not None
