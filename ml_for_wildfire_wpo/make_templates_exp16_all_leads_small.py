@@ -208,7 +208,7 @@ PREDICTOR_TIME_STRATEGIES = [
 PREDICTOR_TIME_STRATEGY_TO_NUM_GFS_HOURS = {
     'all-daily-valid-times-up-to-target-time': 11,
     'different-valid-times-up-to-target-time': 8,
-    'different-valid-times-up-to-target-time-plus2days': 8
+    'different-valid-times-up-to-target-time-plus2days': 12
 }
 
 PREDICTOR_TIME_STRATEGY_TO_NUM_TARGET_DAYS = {
