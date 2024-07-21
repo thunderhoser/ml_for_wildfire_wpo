@@ -944,6 +944,7 @@ def _read_gfs_data_1example(
 
     if num_lead_times_for_interp is not None:
         if predictor_matrix_3d is not None:
+            print('INTERPOLATING 3-D GFS AT {0:d} TIMES'.format(len(lead_times_hours)))
             predictor_matrix_3d = _interp_predictors_by_lead_time(
                 predictor_matrix=predictor_matrix_3d,
                 source_lead_times_hours=lead_times_hours,
@@ -951,6 +952,7 @@ def _read_gfs_data_1example(
             )
 
         if predictor_matrix_2d is not None:
+            print('INTERPOLATING 2-D GFS AT {0:d} TIMES'.format(len(lead_times_hours)))
             predictor_matrix_2d = _interp_predictors_by_lead_time(
                 predictor_matrix=predictor_matrix_2d,
                 source_lead_times_hours=lead_times_hours,
@@ -1165,6 +1167,8 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
     )
 
     for p in range(num_pressure_field_combos):
+        print('pressure_field_combo = {0:d}'.format(p))
+
         missing_target_time_flags = numpy.full(
             num_target_lead_times, True, dtype=bool
         )
@@ -1221,15 +1225,15 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
             ..., missing_target_time_indices, p
         ] = interp_object(target_lead_times_hours[missing_target_time_indices])
 
+    print(new_predictor_matrix[:5, :5, 0, 0])
+    print('\n\n')
+
     if has_pressure_levels:
         these_dims = (
             predictor_matrix.shape[:2] +
             (num_pressure_levels, num_target_lead_times, num_fields)
         )
         new_predictor_matrix = numpy.reshape(new_predictor_matrix, these_dims)
-
-    print(new_predictor_matrix[:5, :5, 0, 0])
-    print('\n\n')
 
     return new_predictor_matrix
 
@@ -1694,6 +1698,7 @@ def data_generator(option_dict):
                     gfs_target_lead_times_days
                 ])
 
+                print('INTERPOLATING LAG/LEAD TARGETS AT {0:d} TIMES'.format(len(source_lead_times_days)))
                 this_laglead_target_predictor_matrix = (
                     _interp_predictors_by_lead_time(
                         predictor_matrix=this_laglead_target_predictor_matrix,
@@ -2893,10 +2898,6 @@ def train_model(
             epoch_and_lead_time_to_freq[epoch_in_dict, l]
             for l in model_lead_times_days
         ], dtype=float)
-
-        # TODO(thunderhoser): HACK.
-        if this_epoch >= 2:
-            model_lead_time_freqs[1] = max([model_lead_time_freqs[1], 0.9])
 
         model_lead_days_to_freq = dict(zip(
             model_lead_times_days, model_lead_time_freqs
