@@ -1604,9 +1604,6 @@ def data_generator(option_dict):
             model_lead_time_days
         ]
 
-        print('MODEL LEAD TIME:\n{0:d}'.format(model_lead_time_days))
-        print('\n\n\n')
-
         while num_examples_in_memory < num_examples_per_batch:
             if gfs_file_index == len(gfs_file_names):
                 random.shuffle(gfs_file_names)
@@ -1970,6 +1967,7 @@ def data_generator(option_dict):
         print('Min and max target values = {0:.4f}, {1:.4f}'.format(
             numpy.min(target_matrix), numpy.max(target_matrix)
         ))
+        print('MODEL LEAD TIME: {0:d} days'.format(model_lead_time_days))
 
         # predictor_matrices = [p.astype('float32') for p in predictor_matrices]
         # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
@@ -2875,9 +2873,6 @@ def train_model(
             epoch_and_lead_time_to_freq[epoch_in_dict, l]
             for l in model_lead_times_days
         ], dtype=float)
-
-        if this_epoch >= 2:
-            model_lead_time_freqs[1] = max([model_lead_time_freqs[1], 0.9])
 
         model_lead_days_to_freq = dict(zip(
             model_lead_times_days, model_lead_time_freqs
