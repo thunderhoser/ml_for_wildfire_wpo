@@ -1155,12 +1155,16 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
     else:
         num_pressure_levels = 0
 
+    print(predictor_matrix[:5, :5, 0, 0])
+
+    num_pressure_field_combos = predictor_matrix.shape[-1]
     new_predictor_matrix = numpy.full(
-        predictor_matrix.shape[:2] + (num_target_lead_times, num_fields),
+        predictor_matrix.shape[:2] +
+        (num_target_lead_times, num_pressure_field_combos),
         numpy.nan
     )
 
-    for p in range(num_fields):
+    for p in range(num_pressure_field_combos):
         missing_target_time_flags = numpy.full(
             num_target_lead_times, True, dtype=bool
         )
@@ -1220,9 +1224,13 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
     if has_pressure_levels:
         these_dims = (
             predictor_matrix.shape[:2] +
-            (num_pressure_levels, num_target_lead_times, num_fields)
+            (num_pressure_levels, num_target_lead_times,
+             num_pressure_field_combos)
         )
         new_predictor_matrix = numpy.reshape(new_predictor_matrix, these_dims)
+
+    print(new_predictor_matrix[:5, :5, 0, 0])
+    print('\n\n')
 
     return new_predictor_matrix
 
