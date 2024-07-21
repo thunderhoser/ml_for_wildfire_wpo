@@ -162,7 +162,7 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.GFS_FC_MODULE_USE_3D_CONV: True,
     chiu_net_pp_arch.GFS_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
     chiu_net_pp_arch.LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
-    chiu_net_pp_arch.LAGTGT_FC_MODULE_USE_3D_CONV: 1,
+    chiu_net_pp_arch.LAGTGT_FC_MODULE_USE_3D_CONV: True,
     chiu_net_pp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
     chiu_net_pp_arch.NUM_LEVELS_KEY: 6,
     chiu_net_pp_arch.GFS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
