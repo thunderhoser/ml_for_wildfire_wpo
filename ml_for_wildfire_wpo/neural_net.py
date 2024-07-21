@@ -1224,8 +1224,7 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
     if has_pressure_levels:
         these_dims = (
             predictor_matrix.shape[:2] +
-            (num_pressure_levels, num_target_lead_times,
-             num_pressure_field_combos)
+            (num_pressure_levels, num_target_lead_times, num_fields)
         )
         new_predictor_matrix = numpy.reshape(new_predictor_matrix, these_dims)
 
