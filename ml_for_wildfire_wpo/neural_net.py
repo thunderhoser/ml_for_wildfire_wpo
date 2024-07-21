@@ -1204,6 +1204,24 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
         if len(filled_source_time_indices) == 0:
             continue
 
+        missing_target_time_indices = [
+            t for t in missing_target_time_indices
+            if target_lead_times_hours[t] >= numpy.min(
+                source_lead_times_hours[filled_source_time_indices]
+            )
+        ]
+        missing_target_time_indices = [
+            t for t in missing_target_time_indices
+            if target_lead_times_hours[t] <= numpy.max(
+                source_lead_times_hours[filled_source_time_indices]
+            )
+        ]
+        missing_target_time_indices = numpy.array(
+            missing_target_time_indices, dtype=int
+        )
+        if len(missing_target_time_indices) == 0:
+            continue
+
         interp_object = interp1d(
             x=source_lead_times_hours[filled_source_time_indices],
             y=predictor_matrix[..., filled_source_time_indices, p],
