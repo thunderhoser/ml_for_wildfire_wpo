@@ -250,7 +250,7 @@ def _run():
 
         model_object = chiu_net_pp_arch.create_model(option_dict)
         output_file_name = (
-            '{0:s}/model_predictor-time-strategy={1:s}.keras'
+            '{0:s}/predictor-time-strategy={1:s}/model.keras'
         ).format(OUTPUT_DIR_NAME, PREDICTOR_TIME_STRATEGIES[i])
 
         print('Writing model to: "{0:s}"...'.format(output_file_name))

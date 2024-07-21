@@ -30,8 +30,8 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
-TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment16_flexi_all_leads/templates"
-TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment16_flexi_all_leads"
+TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment16_all_leads_small/templates"
+TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment16_all_leads_small"
 
 GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
 TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
@@ -48,7 +48,7 @@ second_lead_time_start_epoch=${SECOND_LEAD_TIME_START_EPOCHS[$SLURM_ARRAY_TASK_I
 num_rampup_epochs=${RAMPUP_EPOCH_COUNTS[$SLURM_ARRAY_TASK_ID]}
 predictor_time_strategy=${PREDICTOR_TIME_STRATEGIES[$SLURM_ARRAY_TASK_ID]}
 
-template_file_name="${TEMPLATE_DIR_NAME}/model.keras"
+template_file_name="${TEMPLATE_DIR_NAME}/predictor-time-strategy=${predictor_time_strategy}/model.keras"
 output_dir_name="${TOP_OUTPUT_DIR_NAME}/second-lead-time-start-epoch=${second_lead_time_start_epoch}_num-rampup-epochs=${num_rampup_epochs}_predictor-time-strategy=${predictor_time_strategy}"
 echo $output_dir_name
 
@@ -72,8 +72,8 @@ num_rampup_epochs=$((10#$num_rampup_epochs + 0))
 python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --input_template_file_name="${template_file_name}" \
 --output_model_dir_name="${output_dir_name}" \
---inner_latitude_limits_deg_n 17 73 \
---inner_longitude_limits_deg_e 171 -65 \
+--inner_latitude_limits_deg_n 30 40 \
+--inner_longitude_limits_deg_e -110 -100 \
 --outer_latitude_buffer_deg=5 \
 --outer_longitude_buffer_deg=5 \
 --gfs_predictor_field_names "temperature_kelvins" "specific_humidity_kg_kg01" "geopotential_height_m_asl" "u_wind_m_s01" "v_wind_m_s01" "temperature_2m_agl_kelvins" "specific_humidity_2m_agl_kg_kg01" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "accumulated_precip_metres" \

@@ -2887,6 +2887,10 @@ def train_model(
             for l in model_lead_times_days
         ], dtype=float)
 
+        # TODO(thunderhoser): HACK.
+        if this_epoch >= 2:
+            model_lead_time_freqs[1] = max([model_lead_time_freqs[1], 0.9])
+
         model_lead_days_to_freq = dict(zip(
             model_lead_times_days, model_lead_time_freqs
         ))
