@@ -1604,6 +1604,9 @@ def data_generator(option_dict):
             model_lead_time_days
         ]
 
+        print('MODEL LEAD TIME:\n{0:d}'.format(model_lead_time_days))
+        print('\n\n\n')
+
         while num_examples_in_memory < num_examples_per_batch:
             if gfs_file_index == len(gfs_file_names):
                 random.shuffle(gfs_file_names)
