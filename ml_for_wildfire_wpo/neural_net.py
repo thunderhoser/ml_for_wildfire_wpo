@@ -944,7 +944,6 @@ def _read_gfs_data_1example(
 
     if num_lead_times_for_interp is not None:
         if predictor_matrix_3d is not None:
-            print('INTERPOLATING 3-D GFS AT {0:d} TIMES'.format(len(lead_times_hours)))
             predictor_matrix_3d = _interp_predictors_by_lead_time(
                 predictor_matrix=predictor_matrix_3d,
                 source_lead_times_hours=lead_times_hours,
@@ -952,7 +951,6 @@ def _read_gfs_data_1example(
             )
 
         if predictor_matrix_2d is not None:
-            print('INTERPOLATING 2-D GFS AT {0:d} TIMES'.format(len(lead_times_hours)))
             predictor_matrix_2d = _interp_predictors_by_lead_time(
                 predictor_matrix=predictor_matrix_2d,
                 source_lead_times_hours=lead_times_hours,
@@ -1157,8 +1155,6 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
     else:
         num_pressure_levels = 0
 
-    print(predictor_matrix[:5, :5, 0, 0])
-
     num_pressure_field_combos = predictor_matrix.shape[-1]
     new_predictor_matrix = numpy.full(
         predictor_matrix.shape[:2] +
@@ -1167,8 +1163,6 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
     )
 
     for p in range(num_pressure_field_combos):
-        print('pressure_field_combo = {0:d}'.format(p))
-
         missing_target_time_flags = numpy.full(
             num_target_lead_times, True, dtype=bool
         )
@@ -1242,9 +1236,6 @@ def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
         new_predictor_matrix[
             ..., missing_target_time_indices, p
         ] = interp_object(target_lead_times_hours[missing_target_time_indices])
-
-    print(new_predictor_matrix[:5, :5, 0, 0])
-    print('\n\n')
 
     if has_pressure_levels:
         these_dims = (
@@ -1435,12 +1426,11 @@ def data_generator(option_dict):
         predictors.
     predictor_matrices[1]: E-by-M-by-N-by-L-by-FF numpy array of 2-D GFS
         predictors.
-    predictor_matrices[2]: length-E numpy array of model lead times (days).
-    predictor_matrices[3]: E-by-M-by-N-by-F numpy array of ERA5-constant
+    predictor_matrices[2]: E-by-M-by-N-by-F numpy array of ERA5-constant
         predictors.
-    predictor_matrices[4]: E-by-M-by-N-by-l-by-T numpy array of lag/lead-target
+    predictor_matrices[3]: E-by-M-by-N-by-l-by-T numpy array of lag/lead-target
         predictors.
-    predictor_matrices[5]: E-by-M-by-N-by-T numpy array of baseline values for
+    predictor_matrices[4]: E-by-M-by-N-by-T numpy array of baseline values for
         residual prediction.
 
     :return: target_matrix: If `compare_to_gfs_in_loss == False`, this is an
@@ -1613,9 +1603,6 @@ def data_generator(option_dict):
         gfs_target_lead_times_days = model_lead_days_to_gfs_target_leads_days[
             model_lead_time_days
         ]
-        lead_time_predictors_days = numpy.full(
-            num_examples_per_batch, model_lead_time_days, dtype=float
-        )
 
         while num_examples_in_memory < num_examples_per_batch:
             if gfs_file_index == len(gfs_file_names):
@@ -1716,7 +1703,6 @@ def data_generator(option_dict):
                     gfs_target_lead_times_days
                 ])
 
-                print('INTERPOLATING LAG/LEAD TARGETS AT {0:d} TIMES'.format(len(source_lead_times_days)))
                 this_laglead_target_predictor_matrix = (
                     _interp_predictors_by_lead_time(
                         predictor_matrix=this_laglead_target_predictor_matrix,
@@ -1859,15 +1845,6 @@ def data_generator(option_dict):
                 numpy.isnan(gfs_predictor_matrix_2d)
             ] = sentinel_value
 
-        print((
-            'Shape of lead_time_predictors_days and min/max values: '
-            '{0:s}, {1:.0f}, {2:.0f}'
-        ).format(
-            str(lead_time_predictors_days.shape),
-            numpy.min(lead_time_predictors_days),
-            numpy.max(lead_time_predictors_days)
-        ))
-
         if baseline_prediction_matrix is not None:
             print((
                 'Shape of baseline prediction matrix and NaN fraction: '
@@ -1936,11 +1913,6 @@ def data_generator(option_dict):
         #     predictor_matrices.update({
         #         'gfs_2d_inputs': gfs_predictor_matrix_2d.astype('float32')
         #     })
-        #
-        # predictor_matrices.update({
-        #     'lead_time': lead_time_predictors_days.astype('float32')
-        # })
-        #
         # if era5_constant_matrix is not None:
         #     predictor_matrices.update({
         #         'era5_inputs': era5_constant_matrix.astype('float32')
@@ -1965,11 +1937,6 @@ def data_generator(option_dict):
             predictor_matrices.append(
                 gfs_predictor_matrix_2d.astype('float32')
             )
-
-        predictor_matrices.append(
-            lead_time_predictors_days.astype('float32')
-        )
-
         if era5_constant_matrix is not None:
             predictor_matrices.append(
                 era5_constant_matrix.astype('float32')
@@ -2307,17 +2274,6 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
             numpy.isnan(gfs_predictor_matrix_2d)
         ] = sentinel_value
 
-    lead_time_predictors_days = numpy.array([model_lead_time_days], dtype=float)
-
-    print((
-        'Shape of lead_time_predictors_days and min/max values: '
-        '{0:s}, {1:.0f}, {2:.0f}'
-    ).format(
-        str(lead_time_predictors_days.shape),
-        numpy.min(lead_time_predictors_days),
-        numpy.max(lead_time_predictors_days)
-    ))
-
     if baseline_prediction_matrix is not None:
         print((
             'Shape of baseline prediction matrix and NaN fraction: '
@@ -2377,7 +2333,7 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
     predictor_matrices = [
         m for m in [
             gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
-            lead_time_predictors_days, era5_constant_matrix,
+            era5_constant_matrix,
             laglead_target_predictor_matrix, baseline_prediction_matrix
         ]
         if m is not None
