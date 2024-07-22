@@ -937,10 +937,15 @@ def _read_gfs_data_1example(
         field_names=field_names_3d,
         pressure_levels_mb=pressure_levels_mb
     )
+    if predictor_matrix_3d is not None:
+        predictor_matrix_3d = predictor_matrix_3d.astype('float32')
+
     predictor_matrix_2d = _get_2d_gfs_fields(
         gfs_table_xarray=gfs_table_xarray,
         field_names=field_names_2d
     )
+    if predictor_matrix_2d is not None:
+        predictor_matrix_2d = predictor_matrix_2d.astype('float32')
 
     if num_lead_times_for_interp is not None:
         if predictor_matrix_3d is not None:
@@ -949,6 +954,7 @@ def _read_gfs_data_1example(
                 source_lead_times_hours=lead_times_hours,
                 num_target_lead_times=num_lead_times_for_interp
             )
+            predictor_matrix_3d = predictor_matrix_3d.astype('float32')
 
         if predictor_matrix_2d is not None:
             predictor_matrix_2d = _interp_predictors_by_lead_time(
@@ -956,6 +962,7 @@ def _read_gfs_data_1example(
                 source_lead_times_hours=lead_times_hours,
                 num_target_lead_times=num_lead_times_for_interp
             )
+            predictor_matrix_2d = predictor_matrix_2d.astype('float32')
 
     return (
         predictor_matrix_3d, predictor_matrix_2d,
@@ -1025,6 +1032,7 @@ def _read_gfs_forecast_targets_1example(
         norm_param_table_xarray=norm_param_table_xarray,
         use_quantile_norm=use_quantile_norm
     )
+    target_field_matrix = target_field_matrix.astype('float32')
 
     return target_field_matrix, desired_row_indices, desired_column_indices
 
@@ -1557,6 +1565,7 @@ def data_generator(option_dict):
             numpy.expand_dims(era5_constant_matrix, axis=0),
             axis=0, repeats=num_examples_per_batch
         )
+        era5_constant_matrix = era5_constant_matrix.astype('float32')
 
     weight_matrix = _create_weight_matrix(
         era5_constant_file_name=era5_constant_file_name,
@@ -2101,6 +2110,7 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
             use_quantile_norm=era5_use_quantile_norm
         )
         era5_constant_matrix = numpy.expand_dims(era5_constant_matrix, axis=0)
+        era5_constant_matrix = era5_constant_matrix.astype('float32')
 
     weight_matrix = _create_weight_matrix(
         era5_constant_file_name=era5_constant_file_name,
