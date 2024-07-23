@@ -124,8 +124,6 @@ def __determine_num_times_for_interp(generator_option_dict):
         this will be None.
     """
 
-    # TODO(thunderhoser): This could use a unit test.
-
     model_lead_days_to_gfs_pred_leads_hours = generator_option_dict[
         MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
     ]
@@ -2570,40 +2568,6 @@ def read_metafile(pickle_file_name):
     metadata_dict[TRAINING_OPTIONS_KEY] = tod
     metadata_dict[VALIDATION_OPTIONS_KEY] = vod
 
-    # TODO(thunderhoser): HACK to change target weights for 7-var models.
-    orig_strings = [
-        '0.00633568', '0.00029226', '0.00000163', '0.79002088', '0.00018185',
-        '0.04245499', '0.16071271'
-    ]
-    new_strings = [
-        '0.02562263', '0.00373885', '0.00008940', '0.60291427', '0.00251213',
-        '0.08761268', '0.27751004'
-    ]
-
-    for s_orig, s_new in zip(orig_strings, new_strings):
-        metadata_dict[LOSS_FUNCTION_KEY] = (
-            metadata_dict[LOSS_FUNCTION_KEY].replace(s_orig, s_new)
-        )
-
-        for i in range(len(metadata_dict[METRIC_FUNCTIONS_KEY])):
-            metadata_dict[METRIC_FUNCTIONS_KEY][i] = (
-                metadata_dict[METRIC_FUNCTIONS_KEY][i].replace(s_orig, s_new)
-            )
-
-    # # TODO(thunderhoser): HACK to change target weights for 2-var models.
-    # orig_strings = ['0.9571', '0.0429']
-    # new_strings = ['0.91064912', '0.08935088']
-    #
-    # for s_orig, s_new in zip(orig_strings, new_strings):
-    #     metadata_dict[LOSS_FUNCTION_KEY] = (
-    #         metadata_dict[LOSS_FUNCTION_KEY].replace(s_orig, s_new)
-    #     )
-    #
-    #     for i in range(len(metadata_dict[METRIC_FUNCTIONS_KEY])):
-    #         metadata_dict[METRIC_FUNCTIONS_KEY][i] = (
-    #             metadata_dict[METRIC_FUNCTIONS_KEY][i].replace(s_orig, s_new)
-    #         )
-
     missing_keys = list(set(METADATA_KEYS) - set(metadata_dict.keys()))
     if len(missing_keys) == 0:
         return metadata_dict
@@ -2809,7 +2773,6 @@ def train_model(
     model_file_name = '{0:s}/model.weights.h5'.format(output_dir_name)
     history_file_name = '{0:s}/history.csv'.format(output_dir_name)
 
-    # TODO(thunderhoser): Hopefully this handles restarts properly.
     try:
         history_table_pandas = pandas.read_csv(history_file_name)
         initial_epoch = history_table_pandas['epoch'].max() + 1
@@ -2879,16 +2842,32 @@ def train_model(
 
     for this_epoch in range(initial_epoch, num_epochs):
         epoch_in_dict = min([this_epoch + 1, max_epoch_in_dict])
-        model_lead_time_freqs = numpy.array([
+        training_lead_time_freqs = numpy.array([
             epoch_and_lead_time_to_freq[epoch_in_dict, l]
             for l in model_lead_times_days
         ], dtype=float)
 
-        model_lead_days_to_freq = dict(zip(
-            model_lead_times_days, model_lead_time_freqs
+        training_lead_time_days_to_freq = dict(zip(
+            model_lead_times_days, training_lead_time_freqs
         ))
-        training_option_dict[MODEL_LEAD_TO_FREQ_KEY] = model_lead_days_to_freq
-        validation_option_dict[MODEL_LEAD_TO_FREQ_KEY] = model_lead_days_to_freq
+        training_option_dict[MODEL_LEAD_TO_FREQ_KEY] = (
+            training_lead_time_days_to_freq
+        )
+
+        validation_lead_time_freqs = numpy.array([
+            epoch_and_lead_time_to_freq[max_epoch_in_dict, l]
+            for l in model_lead_times_days
+        ], dtype=float)
+
+        validation_lead_time_days_to_freq = dict(zip(
+            model_lead_times_days, validation_lead_time_freqs
+        ))
+        validation_option_dict[MODEL_LEAD_TO_FREQ_KEY] = (
+            validation_lead_time_days_to_freq
+        )
+
+        print(validation_lead_time_days_to_freq)
+        print('\n\n\n')
 
         training_generator = data_generator(training_option_dict)
         validation_generator = data_generator(validation_option_dict)
