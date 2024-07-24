@@ -28,6 +28,8 @@ TARGETS_USE_QUANTILE_NORM_ARG_NAME = 'targets_use_quantile_norm'
 BATCH_SIZE_ARG_NAME = 'num_examples_per_batch'
 SENTINEL_VALUE_ARG_NAME = 'sentinel_value'
 DO_RESIDUAL_PRED_ARG_NAME = 'do_residual_prediction'
+USE_LEAD_TIME_AS_PRED_ARG_NAME = 'use_lead_time_as_predictor'
+CHANGE_LEAD_EVERY_N_BATCHES_ARG_NAME = 'change_model_lead_every_n_batches'
 
 GFS_TRAINING_DIR_ARG_NAME = 'gfs_dir_name_for_training'
 TARGET_TRAINING_DIR_ARG_NAME = 'target_dir_name_for_training'
@@ -176,6 +178,14 @@ DO_RESIDUAL_PRED_HELP_STRING = (
     'Boolean flag.  If 1, the NN predicts only the residual, with the baseline '
     '(most recent lagged target fields) being added at the end.  If 0, the NN '
     'just predicts the raw target fields like a normal robot.'
+)
+USE_LEAD_TIME_AS_PRED_HELP_STRING = (
+    'Boolean flag.  If 1, will use the model lead time as a scalar predictor.'
+)
+CHANGE_LEAD_EVERY_N_BATCHES_HELP_STRING = (
+    'Will change model lead time only once every N batches, where N is this '
+    'variable.  If you want to allow different model lead times in the same '
+    'batch, make this negative.'
 )
 
 GFS_TRAINING_DIR_HELP_STRING = (
@@ -346,6 +356,14 @@ def add_input_args(parser_object):
     parser_object.add_argument(
         '--' + DO_RESIDUAL_PRED_ARG_NAME, type=int, required=False, default=0,
         help=DO_RESIDUAL_PRED_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + USE_LEAD_TIME_AS_PRED_ARG_NAME, type=int, required=True,
+        help=USE_LEAD_TIME_AS_PRED_HELP_STRING
+    )
+    parser_object.add_argument(
+        '--' + CHANGE_LEAD_EVERY_N_BATCHES_ARG_NAME, type=int, required=False,
+        default=-1, help=CHANGE_LEAD_EVERY_N_BATCHES_HELP_STRING
     )
 
     parser_object.add_argument(

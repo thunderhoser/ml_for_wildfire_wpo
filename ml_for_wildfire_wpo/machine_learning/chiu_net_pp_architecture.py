@@ -16,6 +16,7 @@ ERA5_CONST_DIMENSIONS_KEY = chiu_net_arch.ERA5_CONST_DIMENSIONS_KEY
 LAGTGT_DIMENSIONS_KEY = chiu_net_arch.LAGTGT_DIMENSIONS_KEY
 PREDN_BASELINE_DIMENSIONS_KEY = 'input_dimensions_predn_baseline'
 USE_RESIDUAL_BLOCKS_KEY = 'use_residual_blocks'
+USE_LEAD_TIME_AS_PRED_KEY = 'use_lead_time_as_predictor'
 
 GFS_FC_MODULE_NUM_CONV_LAYERS_KEY = (
     chiu_net_arch.GFS_FC_MODULE_NUM_CONV_LAYERS_KEY
@@ -466,6 +467,7 @@ def create_model(option_dict):
     input_dimensions_lagged_target = option_dict[LAGTGT_DIMENSIONS_KEY]
     input_dimensions_predn_baseline = option_dict[PREDN_BASELINE_DIMENSIONS_KEY]
     use_residual_blocks = option_dict[USE_RESIDUAL_BLOCKS_KEY]
+    use_lead_time_as_predictor = option_dict[USE_LEAD_TIME_AS_PRED_KEY]
 
     if input_dimensions_predn_baseline is not None:
         these_indices = numpy.array([0, 1, 3], dtype=int)
@@ -581,6 +583,37 @@ def create_model(option_dict):
             [layer_object_gfs_3d, layer_object_gfs_2d]
         )
 
+    num_grid_rows = input_dimensions_lagged_target[0]
+    num_grid_columns = input_dimensions_lagged_target[1]
+
+    if use_lead_time_as_predictor:
+        input_layer_object_lead_time = keras.layers.Input(
+            shape=(1,), name='lead_time'
+        )
+
+        layer_object_lead_time = keras.layers.Reshape(
+            target_shape=(1, 1), name='lead_time_add-column-dim'
+        )(input_layer_object_lead_time)
+
+        layer_object_lead_time = keras.layers.Concatenate(
+            axis=-2, name='lead_time_add-columns'
+        )(
+            num_grid_columns * [layer_object_lead_time]
+        )
+
+        layer_object_lead_time = keras.layers.Reshape(
+            target_shape=(1, num_grid_columns, 1), name='lead_time_add-row-dim'
+        )(layer_object_lead_time)
+
+        layer_object_lead_time = keras.layers.Concatenate(
+            axis=-3, name='lead_time_add-rows'
+        )(
+            num_grid_rows * [layer_object_lead_time]
+        )
+    else:
+        input_layer_object_lead_time = None
+        layer_object_lead_time = None
+
     input_layer_object_lagged_target = keras.layers.Input(
         shape=tuple(input_dimensions_lagged_target.tolist()),
         name='lagged_target_inputs'
@@ -604,34 +637,55 @@ def create_model(option_dict):
         input_layer_object_era5 = None
     else:
         input_layer_object_era5 = keras.layers.Input(
-            shape=tuple(input_dimensions_era5.tolist()), name='era5_inputs'
+            shape=input_dimensions_era5, name='era5_inputs'
         )
 
-        new_dims = (1,) + tuple(input_dimensions_era5.tolist())
-        layer_object_era5 = keras.layers.Reshape(
-            target_shape=new_dims, name='era5_add-time-dim'
-        )(input_layer_object_era5)
+    if input_layer_object_era5 is not None and layer_object_lead_time is not None:
+        layer_object_constants = keras.layers.Concatenate(
+            axis=-1, name='concat_constants'
+        )(
+            [input_layer_object_era5, layer_object_lead_time]
+        )
+        new_dims = (
+            1, num_grid_rows, num_grid_columns, 1 + input_dimensions_era5[-1]
+        )
+    elif input_layer_object_era5 is not None:
+        layer_object_constants = input_layer_object_era5
+        new_dims = (
+            1, num_grid_rows, num_grid_columns, input_dimensions_era5[-1]
+        )
+    elif layer_object_lead_time is not None:
+        layer_object_constants = layer_object_lead_time
+        new_dims = (1, num_grid_rows, num_grid_columns, 1)
+    else:
+        layer_object_constants = None
+        new_dims = ()
+
+    if layer_object_constants is not None:
+        layer_object_constants = keras.layers.Reshape(
+            target_shape=new_dims, name='const_add-time-dim'
+        )(layer_object_constants)
 
         this_layer_object = keras.layers.Concatenate(
-            axis=-4, name='era5_add-gfs-times'
+            axis=-4, name='const_add-gfs-times'
         )(
-            num_gfs_lead_times * [layer_object_era5]
+            num_gfs_lead_times * [layer_object_constants]
         )
 
         layer_object_gfs = keras.layers.Concatenate(
-            axis=-1, name='gfs_concat-era5'
+            axis=-1, name='gfs_concat-const'
         )(
             [layer_object_gfs, this_layer_object]
         )
 
         this_layer_object = keras.layers.Concatenate(
-            axis=-4, name='era5_add-lag-times'
+            axis=-4, name='const_add-lag-times'
         )(
-            num_target_lag_times * [layer_object_era5]
+            num_target_lag_times * [layer_object_constants]
         )
 
         layer_object_lagged_target = keras.layers.Concatenate(
-            axis=-1, name='lagged_targets_concat-era5'
+            axis=-1, name='lagged_targets_concat-const'
         )(
             [layer_object_lagged_target, this_layer_object]
         )
@@ -966,8 +1020,8 @@ def create_model(option_dict):
     input_layer_objects = [
         l for l in [
             input_layer_object_gfs_3d, input_layer_object_gfs_2d,
-            input_layer_object_era5, input_layer_object_lagged_target,
-            input_layer_object_predn_baseline
+            input_layer_object_lead_time, input_layer_object_era5,
+            input_layer_object_lagged_target, input_layer_object_predn_baseline
         ] if l is not None
     ]
     model_object = keras.models.Model(

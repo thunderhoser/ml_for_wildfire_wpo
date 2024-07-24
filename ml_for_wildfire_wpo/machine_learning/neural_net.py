@@ -1,7 +1,6 @@
 """Helper methods for training a neural network to predict fire weather."""
 
 import os
-import copy
 import time
 import random
 import pickle
@@ -64,6 +63,8 @@ TARGETS_USE_QUANTILE_NORM_KEY = 'targets_use_quantile_norm'
 BATCH_SIZE_KEY = 'num_examples_per_batch'
 SENTINEL_VALUE_KEY = 'sentinel_value'
 DO_RESIDUAL_PREDICTION_KEY = 'do_residual_prediction'
+USE_LEAD_TIME_AS_PRED_KEY = 'use_lead_time_as_predictor'
+CHANGE_LEAD_EVERY_N_BATCHES_KEY = 'change_model_lead_every_n_batches'
 
 DEFAULT_GENERATOR_OPTION_DICT = {
     INNER_LATITUDE_LIMITS_KEY: numpy.array([17, 73], dtype=float),
@@ -83,7 +84,6 @@ METRIC_FUNCTIONS_KEY = 'metric_function_strings'
 OPTIMIZER_FUNCTION_KEY = 'optimizer_function_string'
 CHIU_NET_ARCHITECTURE_KEY = 'chiu_net_architecture_dict'
 CHIU_NET_PP_ARCHITECTURE_KEY = 'chiu_net_pp_architecture_dict'
-CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY = 'chiu_net_pp_flexi_architecture_dict'
 PLATEAU_PATIENCE_KEY = 'plateau_patience_epochs'
 PLATEAU_LR_MUTIPLIER_KEY = 'plateau_learning_rate_multiplier'
 EARLY_STOPPING_PATIENCE_KEY = 'early_stopping_patience_epochs'
@@ -93,14 +93,99 @@ METADATA_KEYS = [
     NUM_VALIDATION_BATCHES_KEY, VALIDATION_OPTIONS_KEY,
     LOSS_FUNCTION_KEY, METRIC_FUNCTIONS_KEY, OPTIMIZER_FUNCTION_KEY,
     CHIU_NET_ARCHITECTURE_KEY, CHIU_NET_PP_ARCHITECTURE_KEY,
-    CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY, PLATEAU_PATIENCE_KEY,
-    PLATEAU_LR_MUTIPLIER_KEY, EARLY_STOPPING_PATIENCE_KEY
+    PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY, EARLY_STOPPING_PATIENCE_KEY
 ]
 
 PREDICTOR_MATRICES_KEY = 'predictor_matrices'
 TARGETS_AND_WEIGHTS_KEY = 'target_matrix_with_weights'
 GRID_LATITUDES_KEY = 'grid_latitudes_deg_n'
 GRID_LONGITUDES_KEY = 'grid_longitudes_deg_e'
+
+
+def __report_data_properties(
+        gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
+        lead_time_predictors_days, era5_constant_matrix,
+        laglead_target_predictor_matrix, baseline_prediction_matrix,
+        target_matrix_with_weights, sentinel_value):
+    """Reports data properties at end of data-generator or data-creator.
+
+    :param gfs_predictor_matrix_3d: See output doc for `data_generator`.
+    :param gfs_predictor_matrix_2d: Same.
+    :param lead_time_predictors_days: Same.
+    :param era5_constant_matrix: Same.
+    :param laglead_target_predictor_matrix: Same.
+    :param baseline_prediction_matrix: Same.
+    :param target_matrix_with_weights: Same.
+    :param sentinel_value: Same.
+    :return: predictor_matrices: Tuple with 32-bit predictor matrices.
+    """
+
+    error_checking.assert_is_numpy_array_without_nan(target_matrix_with_weights)
+
+    print((
+        'Shape of target matrix with weights in last channel = {0:s} ... '
+        'NaN fraction = {1:.4f} ... min/max = {2:.4f}/{3:.4f}'
+    ).format(
+        str(target_matrix_with_weights.shape),
+        numpy.mean(numpy.isnan(target_matrix_with_weights)),
+        numpy.min(target_matrix_with_weights),
+        numpy.max(target_matrix_with_weights)
+    ))
+
+    predictor_matrices = (
+        gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
+        lead_time_predictors_days, era5_constant_matrix,
+        laglead_target_predictor_matrix, baseline_prediction_matrix
+    )
+    pred_matrix_descriptions = [
+        '3-D GFS predictor matrix', '2-D GFS predictor matrix',
+        'lead-time predictor matrix', 'ERA5-constant predictor matrix',
+        'lag/lead-target predictor matrix', 'residual baseline matrix'
+    ]
+    allow_nan_flags = [True, True, False, False, True, True]
+
+    for k in range(len(predictor_matrices)):
+        if predictor_matrices[k] is None:
+            continue
+
+        print((
+            'Shape of {0:s}: {1:s} ... NaN fraction = {2:.4f} ... '
+            'min/max = {3:.4f}/{4:.4f}'
+        ).format(
+            pred_matrix_descriptions[k],
+            str(predictor_matrices[k].shape),
+            numpy.mean(numpy.isnan(predictor_matrices[k])),
+            numpy.nanmin(predictor_matrices[k]),
+            numpy.nanmax(predictor_matrices[k])
+        ))
+
+        if allow_nan_flags[k]:
+            predictor_matrices[k][numpy.isnan(predictor_matrices[k])] = (
+                sentinel_value
+            )
+        else:
+            error_checking.assert_is_numpy_array_without_nan(
+                predictor_matrices[k]
+            )
+
+    if baseline_prediction_matrix is not None:
+        these_min = numpy.nanmin(
+            baseline_prediction_matrix, axis=(0, 1, 2)
+        )
+        these_max = numpy.nanmax(
+            baseline_prediction_matrix, axis=(0, 1, 2)
+        )
+
+        print('Min values in residual baseline matrix: {0:s}'.format(
+            str(these_min)
+        ))
+        print('Max values in residual baseline matrix: {0:s}'.format(
+            str(these_max)
+        ))
+
+    return tuple(
+        pm.astype('float32') for pm in predictor_matrices if pm is not None
+    )
 
 
 def __determine_num_times_for_interp(generator_option_dict):
@@ -410,6 +495,15 @@ def _check_generator_args(option_dict):
     error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 1)
     error_checking.assert_is_not_nan(option_dict[SENTINEL_VALUE_KEY])
     error_checking.assert_is_boolean(option_dict[DO_RESIDUAL_PREDICTION_KEY])
+    error_checking.assert_is_boolean(option_dict[USE_LEAD_TIME_AS_PRED_KEY])
+
+    if option_dict[CHANGE_LEAD_EVERY_N_BATCHES_KEY] is not None:
+        error_checking.assert_is_integer(
+            option_dict[CHANGE_LEAD_EVERY_N_BATCHES_KEY]
+        )
+        error_checking.assert_is_greater(
+            option_dict[CHANGE_LEAD_EVERY_N_BATCHES_KEY], 0
+        )
 
     return option_dict
 
@@ -1419,6 +1513,11 @@ def data_generator(option_dict):
         difference between the most recent lag time and the target time.
         If False, the neural net does basic prediction, without using the
         residual.
+    option_dict["use_lead_time_as_predictor"]: Boolean flag.  If True, will use
+        the model lead time as a scalar predictor.
+    option_dict["change_model_lead_every_n_batches"]: Will change model lead
+        time only once every N batches, where N is this variable.  If you want
+        to allow different model lead times in the same batch, make this None.
 
     :return: predictor_matrices: List with the following items.  Some items may
         be missing.
@@ -1427,11 +1526,12 @@ def data_generator(option_dict):
         predictors.
     predictor_matrices[1]: E-by-M-by-N-by-L-by-FF numpy array of 2-D GFS
         predictors.
-    predictor_matrices[2]: E-by-M-by-N-by-F numpy array of ERA5-constant
+    predictor_matrices[2]: length-E numpy array of model lead times (days).
+    predictor_matrices[3]: E-by-M-by-N-by-F numpy array of ERA5-constant
         predictors.
-    predictor_matrices[3]: E-by-M-by-N-by-l-by-T numpy array of lag/lead-target
+    predictor_matrices[4]: E-by-M-by-N-by-l-by-T numpy array of lag/lead-target
         predictors.
-    predictor_matrices[4]: E-by-M-by-N-by-T numpy array of baseline values for
+    predictor_matrices[5]: E-by-M-by-N-by-T numpy array of baseline values for
         residual prediction.
 
     :return: target_matrix: If `compare_to_gfs_in_loss == False`, this is an
@@ -1484,6 +1584,10 @@ def data_generator(option_dict):
     num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
+    use_lead_time_as_predictor = option_dict[USE_LEAD_TIME_AS_PRED_KEY]
+    change_model_lead_every_n_batches = option_dict[
+        CHANGE_LEAD_EVERY_N_BATCHES_KEY
+    ]
 
     model_lead_times_days = numpy.array(
         list(model_lead_days_to_freq.keys()),
@@ -1584,6 +1688,7 @@ def data_generator(option_dict):
     num_gfs_hours_for_interp, num_target_times_for_interp = (
         __determine_num_times_for_interp(option_dict)
     )
+    num_batches_provided = 0
 
     while True:
         gfs_predictor_matrix_3d = None
@@ -1593,25 +1698,45 @@ def data_generator(option_dict):
         target_matrix = None
         num_examples_in_memory = 0
 
-        model_lead_time_days = random.choices(
-            model_lead_times_days, weights=model_lead_time_freqs, k=1
-        )[0]
-        gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
-            model_lead_time_days
-        ]
-        target_lag_times_days = model_lead_days_to_target_lags_days[
-            model_lead_time_days
-        ]
-        gfs_target_lead_times_days = model_lead_days_to_gfs_target_leads_days[
-            model_lead_time_days
-        ]
-
         bs = num_examples_per_batch
+
+        change_model_lead_now = (
+            change_model_lead_every_n_batches is not None and
+            numpy.mod(num_batches_provided, change_model_lead_every_n_batches)
+            == 0
+        )
+
+        if change_model_lead_now:
+            model_lead_time_days = random.choices(
+                model_lead_times_days, weights=model_lead_time_freqs, k=1
+            )[0]
 
         while num_examples_in_memory < num_examples_per_batch:
             if gfs_file_index == len(gfs_file_names):
                 random.shuffle(gfs_file_names)
                 gfs_file_index = 0
+
+            if change_model_lead_every_n_batches is None:
+                model_lead_time_days = random.choices(
+                    model_lead_times_days, weights=model_lead_time_freqs, k=1
+                )[0]
+
+            gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
+                model_lead_time_days
+            ]
+            target_lag_times_days = model_lead_days_to_target_lags_days[
+                model_lead_time_days
+            ]
+            gfs_target_lead_times_days = model_lead_days_to_gfs_target_leads_days[
+                model_lead_time_days
+            ]
+
+            if use_lead_time_as_predictor:
+                lead_time_predictors_days = numpy.full(
+                    num_examples_per_batch, model_lead_time_days, dtype=float
+                )
+            else:
+                lead_time_predictors_days = None
 
             (
                 this_gfs_predictor_matrix_3d, this_gfs_predictor_matrix_2d,
@@ -1823,62 +1948,14 @@ def data_generator(option_dict):
             num_examples_in_memory += 1
             gfs_file_index += 1
 
-        if gfs_predictor_matrix_3d is not None:
-            print((
-                'Shape of 3-D GFS predictor matrix and NaN fraction: '
-                '{0:s}, {1:.04f}'
-            ).format(
-                str(gfs_predictor_matrix_3d.shape),
-                numpy.mean(numpy.isnan(gfs_predictor_matrix_3d))
-            ))
-
-            gfs_predictor_matrix_3d[
-                numpy.isnan(gfs_predictor_matrix_3d)
-            ] = sentinel_value
-
-        if gfs_predictor_matrix_2d is not None:
-            print((
-                'Shape of 2-D GFS predictor matrix and NaN fraction: '
-                '{0:s}, {1:.04f}'
-            ).format(
-                str(gfs_predictor_matrix_2d.shape),
-                numpy.mean(numpy.isnan(gfs_predictor_matrix_2d))
-            ))
-
-            gfs_predictor_matrix_2d[
-                numpy.isnan(gfs_predictor_matrix_2d)
-            ] = sentinel_value
-
-        if baseline_prediction_matrix is not None:
-            print((
-                'Shape of baseline prediction matrix and NaN fraction: '
-                '{0:s}, {1:.4f}'
-            ).format(
-                str(baseline_prediction_matrix.shape),
-                numpy.mean(numpy.isnan(baseline_prediction_matrix))
-            ))
-
+        if do_residual_prediction:
             baseline_prediction_matrix = _pad_inner_to_outer_domain(
                 data_matrix=baseline_prediction_matrix,
                 outer_latitude_buffer_deg=outer_latitude_buffer_deg,
                 outer_longitude_buffer_deg=outer_longitude_buffer_deg,
                 is_example_axis_present=True, fill_value=sentinel_value
             )
-
             baseline_prediction_matrix = baseline_prediction_matrix[..., 0, :]
-            print((
-                'Shape of baseline prediction matrix after padding: {0:s}'
-            ).format(
-                str(baseline_prediction_matrix.shape)
-            ))
-
-        print((
-            'Shape of lag/lead-target predictor matrix and NaN fraction: '
-            '{0:s}, {1:.4f}'
-        ).format(
-            str(laglead_target_predictor_matrix.shape),
-            numpy.mean(numpy.isnan(laglead_target_predictor_matrix))
-        ))
 
         laglead_target_predictor_matrix = _pad_inner_to_outer_domain(
             data_matrix=laglead_target_predictor_matrix,
@@ -1886,16 +1963,6 @@ def data_generator(option_dict):
             outer_longitude_buffer_deg=outer_longitude_buffer_deg,
             is_example_axis_present=True, fill_value=sentinel_value
         )
-        print((
-            'Shape of lag/lead-target predictor matrix after padding: {0:s}'
-        ).format(
-            str(laglead_target_predictor_matrix.shape)
-        ))
-
-        if era5_constant_matrix is not None:
-            print('Shape of ERA5-constant predictor matrix: {0:s}'.format(
-                str(era5_constant_matrix.shape)
-            ))
 
         target_matrix = _pad_inner_to_outer_domain(
             data_matrix=target_matrix,
@@ -1903,79 +1970,24 @@ def data_generator(option_dict):
             outer_longitude_buffer_deg=outer_longitude_buffer_deg,
             is_example_axis_present=True, fill_value=0.
         )
-
         target_matrix_with_weights = numpy.concatenate(
             [target_matrix, weight_matrix], axis=-1
         )
 
-        # predictor_matrices = {}
-        # if gfs_predictor_matrix_3d is not None:
-        #     predictor_matrices.update({
-        #         'gfs_3d_inputs': gfs_predictor_matrix_3d.astype('float32')
-        #     })
-        # if gfs_predictor_matrix_2d is not None:
-        #     predictor_matrices.update({
-        #         'gfs_2d_inputs': gfs_predictor_matrix_2d.astype('float32')
-        #     })
-        # if era5_constant_matrix is not None:
-        #     predictor_matrices.update({
-        #         'era5_inputs': era5_constant_matrix.astype('float32')
-        #     })
-        # if laglead_target_predictor_matrix is not None:
-        #     predictor_matrices.update({
-        #         'lagged_target_inputs':
-        #             laglead_target_predictor_matrix.astype('float32')
-        #     })
-        # if baseline_prediction_matrix is not None:
-        #     predictor_matrices.update({
-        #         'predn_baseline_inputs':
-        #             baseline_prediction_matrix.astype('float32')
-        #     })
+        predictor_matrices = __report_data_properties(
+            gfs_predictor_matrix_3d=gfs_predictor_matrix_3d,
+            gfs_predictor_matrix_2d=gfs_predictor_matrix_2d,
+            lead_time_predictors_days=lead_time_predictors_days,
+            era5_constant_matrix=era5_constant_matrix,
+            laglead_target_predictor_matrix=laglead_target_predictor_matrix,
+            baseline_prediction_matrix=baseline_prediction_matrix,
+            target_matrix_with_weights=target_matrix_with_weights,
+            sentinel_value=sentinel_value
+        )
 
-        predictor_matrices = []
-        if gfs_predictor_matrix_3d is not None:
-            predictor_matrices.append(
-                gfs_predictor_matrix_3d.astype('float32')
-            )
-        if gfs_predictor_matrix_2d is not None:
-            predictor_matrices.append(
-                gfs_predictor_matrix_2d.astype('float32')
-            )
-        if era5_constant_matrix is not None:
-            predictor_matrices.append(
-                era5_constant_matrix.astype('float32')
-            )
-        if laglead_target_predictor_matrix is not None:
-            predictor_matrices.append(
-                laglead_target_predictor_matrix.astype('float32')
-            )
-        if baseline_prediction_matrix is not None:
-            predictor_matrices.append(
-                baseline_prediction_matrix.astype('float32')
-            )
-
-        print((
-            'Shape of target matrix (including land mask as last channel): '
-            '{0:s}'
-        ).format(
-            str(target_matrix_with_weights.shape)
-        ))
-
-        print((
-            'Shape of target matrix (including land mask as last channel): '
-            '{0:s}'
-        ).format(
-            str(target_matrix_with_weights.shape)
-        ))
-
-        print('Min and max target values = {0:.4f}, {1:.4f}'.format(
-            numpy.min(target_matrix), numpy.max(target_matrix)
-        ))
         print('MODEL LEAD TIME: {0:d} days'.format(model_lead_time_days))
-
-        # predictor_matrices = [p.astype('float32') for p in predictor_matrices]
-        # predictor_matrices = [p.astype('float16') for p in predictor_matrices]
-        yield tuple(predictor_matrices), target_matrix_with_weights
+        num_batches_provided += 1
+        yield predictor_matrices, target_matrix_with_weights
 
 
 def create_data(option_dict, init_date_string, model_lead_time_days):
@@ -2039,6 +2051,7 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
     targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
+    use_lead_time_as_predictor = option_dict[USE_LEAD_TIME_AS_PRED_KEY]
 
     num_gfs_hours_for_interp, num_target_times_for_interp = (
         __determine_num_times_for_interp(option_dict)
@@ -2053,6 +2066,13 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
     gfs_target_lead_times_days = model_lead_days_to_gfs_target_leads_days[
         model_lead_time_days
     ]
+
+    if use_lead_time_as_predictor:
+        lead_time_predictors_days = numpy.array(
+            [model_lead_time_days], dtype=float
+        )
+    else:
+        lead_time_predictors_days = None
 
     if gfs_normalization_file_name is None:
         gfs_norm_param_table_xarray = None
@@ -2258,60 +2278,13 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
     )
     target_matrix = numpy.expand_dims(target_matrix, axis=0)
 
-    if gfs_predictor_matrix_3d is not None:
-        print((
-            'Shape of 3-D GFS predictor matrix and NaN fraction: '
-            '{0:s}, {1:.04f}'
-        ).format(
-            str(gfs_predictor_matrix_3d.shape),
-            numpy.mean(numpy.isnan(gfs_predictor_matrix_3d))
-        ))
-
-        gfs_predictor_matrix_3d[
-            numpy.isnan(gfs_predictor_matrix_3d)
-        ] = sentinel_value
-
-    if gfs_predictor_matrix_2d is not None:
-        print((
-            'Shape of 2-D GFS predictor matrix and NaN fraction: '
-            '{0:s}, {1:.04f}'
-        ).format(
-            str(gfs_predictor_matrix_2d.shape),
-            numpy.mean(numpy.isnan(gfs_predictor_matrix_2d))
-        ))
-
-        gfs_predictor_matrix_2d[
-            numpy.isnan(gfs_predictor_matrix_2d)
-        ] = sentinel_value
-
-    if baseline_prediction_matrix is not None:
-        print((
-            'Shape of baseline prediction matrix and NaN fraction: '
-            '{0:s}, {1:.4f}'
-        ).format(
-            str(baseline_prediction_matrix.shape),
-            numpy.mean(numpy.isnan(baseline_prediction_matrix))
-        ))
-
-        baseline_prediction_matrix = _pad_inner_to_outer_domain(
-            data_matrix=baseline_prediction_matrix,
-            outer_latitude_buffer_deg=outer_latitude_buffer_deg,
-            outer_longitude_buffer_deg=outer_longitude_buffer_deg,
-            is_example_axis_present=True, fill_value=sentinel_value
-        )
-        baseline_prediction_matrix = baseline_prediction_matrix[..., 0, :]
-
-        print('Shape of baseline prediction matrix after padding: {0:s}'.format(
-            str(baseline_prediction_matrix.shape)
-        ))
-
-    print((
-        'Shape of lag/lead-target predictor matrix and NaN fraction: '
-        '{0:s}, {1:.4f}'
-    ).format(
-        str(laglead_target_predictor_matrix.shape),
-        numpy.mean(numpy.isnan(laglead_target_predictor_matrix))
-    ))
+    baseline_prediction_matrix = _pad_inner_to_outer_domain(
+        data_matrix=baseline_prediction_matrix,
+        outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+        outer_longitude_buffer_deg=outer_longitude_buffer_deg,
+        is_example_axis_present=True, fill_value=sentinel_value
+    )
+    baseline_prediction_matrix = baseline_prediction_matrix[..., 0, :]
 
     laglead_target_predictor_matrix = _pad_inner_to_outer_domain(
         data_matrix=laglead_target_predictor_matrix,
@@ -2319,16 +2292,6 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
         outer_longitude_buffer_deg=outer_longitude_buffer_deg,
         is_example_axis_present=True, fill_value=sentinel_value
     )
-    print((
-        'Shape of lag/lead-target predictor matrix after padding: {0:s}'
-    ).format(
-        str(laglead_target_predictor_matrix.shape)
-    ))
-
-    if era5_constant_matrix is not None:
-        print('Shape of ERA5-constant predictor matrix: {0:s}'.format(
-            str(era5_constant_matrix.shape)
-        ))
 
     target_matrix = _pad_inner_to_outer_domain(
         data_matrix=target_matrix,
@@ -2337,89 +2300,28 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
         is_example_axis_present=True, fill_value=0.
     )
     target_matrix_with_weights = numpy.concatenate(
-        (target_matrix, weight_matrix), axis=-1
+        [target_matrix, weight_matrix], axis=-1
     )
 
-    predictor_matrices = [
-        m for m in [
-            gfs_predictor_matrix_3d, gfs_predictor_matrix_2d,
-            era5_constant_matrix,
-            laglead_target_predictor_matrix, baseline_prediction_matrix
-        ]
-        if m is not None
-    ]
+    predictor_matrices = __report_data_properties(
+        gfs_predictor_matrix_3d=gfs_predictor_matrix_3d,
+        gfs_predictor_matrix_2d=gfs_predictor_matrix_2d,
+        lead_time_predictors_days=lead_time_predictors_days,
+        era5_constant_matrix=era5_constant_matrix,
+        laglead_target_predictor_matrix=laglead_target_predictor_matrix,
+        baseline_prediction_matrix=baseline_prediction_matrix,
+        target_matrix_with_weights=target_matrix_with_weights,
+        sentinel_value=sentinel_value
+    )
 
-    print((
-        'Shape of target matrix (including land mask as last channel): '
-        '{0:s}'
-    ).format(
-        str(target_matrix_with_weights.shape)
-    ))
-
-    predictor_matrices = [p.astype('float32') for p in predictor_matrices]
+    print('MODEL LEAD TIME: {0:d} days'.format(model_lead_time_days))
 
     return {
-        PREDICTOR_MATRICES_KEY: predictor_matrices,
+        PREDICTOR_MATRICES_KEY: list(predictor_matrices),
         TARGETS_AND_WEIGHTS_KEY: target_matrix_with_weights,
         GRID_LATITUDES_KEY: grid_latitudes_deg_n,
         GRID_LONGITUDES_KEY: grid_longitudes_deg_e
     }
-
-
-def data_generator_many_regions(
-        option_dict, num_regions_per_init_time_in_batch):
-    """Generates both training and validation for neural network.
-
-    This particular generator should be used for neural networks that use
-    several geographic domains, with each domain having the same dimensions.
-    The bounding box for each domain should be specified in the first few input
-    args of the dictionary.
-
-    R = number of regions
-
-    :param option_dict: Same as dictionary for `data_generator`, with the
-        following exceptions.
-    option_dict["inner_latitude_limits_deg_n"]: length-R list, where the [i]th
-        element is a length-2 numpy array with meridional limits (deg north) of
-        the bounding box for the [i]th inner domain.
-    option_dict["inner_longitude_limits_deg_e"]: Same but for longitude (deg
-        east).
-
-    :param num_regions_per_init_time_in_batch: Number of regions from one init
-        time (i.e., one GFS run) in a batch.  If you make this value lower
-        (higher), more (fewer) GFS runs will be included in a batch.
-
-    :return: predictor_matrices: See documentation for `data_generator`.
-    :return: target_matrix: Same.
-    """
-
-    # TODO(thunderhoser): This bit is HACKY.
-    inner_latitude_limits_by_region_deg_n = copy.deepcopy(
-        option_dict[INNER_LATITUDE_LIMITS_KEY]
-    )
-    inner_longitude_limits_by_region_deg_e = copy.deepcopy(
-        option_dict[INNER_LONGITUDE_LIMITS_KEY]
-    )
-
-    error_checking.assert_is_list(inner_latitude_limits_by_region_deg_n)
-    error_checking.assert_is_list(inner_longitude_limits_by_region_deg_e)
-    error_checking.assert_equals(
-        len(inner_latitude_limits_by_region_deg_n),
-        len(inner_longitude_limits_by_region_deg_e)
-    )
-
-    num_regions = len(inner_latitude_limits_by_region_deg_n)
-    for i in range(num_regions):
-        option_dict[INNER_LATITUDE_LIMITS_KEY] = (
-            inner_latitude_limits_by_region_deg_n[i]
-        )
-        option_dict[INNER_LONGITUDE_LIMITS_KEY] = (
-            inner_longitude_limits_by_region_deg_e[i]
-        )
-        option_dict = _check_generator_args(option_dict)
-
-    error_checking.assert_is_integer(num_regions_per_init_time_in_batch)
-    error_checking.assert_is_greater(num_regions_per_init_time_in_batch, 0)
 
 
 def find_metafile(model_file_name, raise_error_if_missing=True):
@@ -2452,8 +2354,8 @@ def write_metafile(
         validation_option_dict, loss_function_string,
         metric_function_strings, optimizer_function_string,
         chiu_net_architecture_dict, chiu_net_pp_architecture_dict,
-        chiu_net_pp_flexi_architecture_dict, plateau_patience_epochs,
-        plateau_learning_rate_multiplier, early_stopping_patience_epochs):
+        plateau_patience_epochs, plateau_learning_rate_multiplier,
+        early_stopping_patience_epochs):
     """Writes metadata to Pickle file.
 
     :param pickle_file_name: Path to output file.
@@ -2467,7 +2369,6 @@ def write_metafile(
     :param optimizer_function_string: Same.
     :param chiu_net_architecture_dict: Same.
     :param chiu_net_pp_architecture_dict: Same.
-    :param chiu_net_pp_flexi_architecture_dict: Same.
     :param plateau_patience_epochs: Same.
     :param plateau_learning_rate_multiplier: Same.
     :param early_stopping_patience_epochs: Same.
@@ -2484,7 +2385,6 @@ def write_metafile(
         OPTIMIZER_FUNCTION_KEY: optimizer_function_string,
         CHIU_NET_ARCHITECTURE_KEY: chiu_net_architecture_dict,
         CHIU_NET_PP_ARCHITECTURE_KEY: chiu_net_pp_architecture_dict,
-        CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY: chiu_net_pp_flexi_architecture_dict,
         PLATEAU_PATIENCE_KEY: plateau_patience_epochs,
         PLATEAU_LR_MUTIPLIER_KEY: plateau_learning_rate_multiplier,
         EARLY_STOPPING_PATIENCE_KEY: early_stopping_patience_epochs
@@ -2512,7 +2412,6 @@ def read_metafile(pickle_file_name):
     metadata_dict["optimizer_function_string"]: Same.
     metadata_dict["chiu_net_architecture_dict"]: Same.
     metadata_dict["chiu_net_pp_architecture_dict"]: Same.
-    metadata_dict["chiu_net_pp_flexi_architecture_dict"]: Same.
     metadata_dict["plateau_patience_epochs"]: Same.
     metadata_dict["plateau_learning_rate_multiplier"]: Same.
     metadata_dict["early_stopping_patience_epochs"]: Same.
@@ -2532,8 +2431,6 @@ def read_metafile(pickle_file_name):
         metadata_dict[CHIU_NET_ARCHITECTURE_KEY] = None
     if CHIU_NET_PP_ARCHITECTURE_KEY not in metadata_dict:
         metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] = None
-    if CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY not in metadata_dict:
-        metadata_dict[CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY] = None
 
     tod = metadata_dict[TRAINING_OPTIONS_KEY]
     vod = metadata_dict[VALIDATION_OPTIONS_KEY]
@@ -2565,6 +2462,12 @@ def read_metafile(pickle_file_name):
     if COMPARE_TO_GFS_IN_LOSS_KEY not in tod:
         tod[COMPARE_TO_GFS_IN_LOSS_KEY] = False
         vod[COMPARE_TO_GFS_IN_LOSS_KEY] = False
+    if USE_LEAD_TIME_AS_PRED_KEY not in tod:
+        tod[USE_LEAD_TIME_AS_PRED_KEY] = False
+        vod[USE_LEAD_TIME_AS_PRED_KEY] = False
+    if CHANGE_LEAD_EVERY_N_BATCHES_KEY not in tod:
+        tod[CHANGE_LEAD_EVERY_N_BATCHES_KEY] = None
+        vod[CHANGE_LEAD_EVERY_N_BATCHES_KEY] = None
 
     metadata_dict[TRAINING_OPTIONS_KEY] = tod
     metadata_dict[VALIDATION_OPTIONS_KEY] = vod
@@ -2637,29 +2540,6 @@ def read_model(hdf5_file_name):
         model_object.load_weights(hdf5_file_name)
         return model_object
 
-    chiu_net_pp_flexi_architecture_dict = metadata_dict[
-        CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY
-    ]
-    if chiu_net_pp_flexi_architecture_dict is not None:
-        from ml_for_wildfire_wpo.machine_learning import \
-            chiu_net_pp_flexi_architecture
-
-        arch_dict = chiu_net_pp_flexi_architecture_dict
-
-        for this_key in [
-                chiu_net_pp_flexi_architecture.LOSS_FUNCTION_KEY,
-                chiu_net_pp_flexi_architecture.OPTIMIZER_FUNCTION_KEY
-        ]:
-            arch_dict[this_key] = eval(arch_dict[this_key])
-
-        for this_key in [chiu_net_pp_flexi_architecture.METRIC_FUNCTIONS_KEY]:
-            for k in range(len(arch_dict[this_key])):
-                arch_dict[this_key][k] = eval(arch_dict[this_key][k])
-
-        model_object = chiu_net_pp_flexi_architecture.create_model(arch_dict)
-        model_object.load_weights(hdf5_file_name)
-        return model_object
-
     custom_object_dict = {
         'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
     }
@@ -2685,10 +2565,9 @@ def train_model(
         num_validation_batches_per_epoch, validation_option_dict,
         loss_function_string, metric_function_strings,
         optimizer_function_string, chiu_net_architecture_dict,
-        chiu_net_pp_architecture_dict, chiu_net_pp_flexi_architecture_dict,
-        plateau_patience_epochs, plateau_learning_rate_multiplier,
-        early_stopping_patience_epochs, epoch_and_lead_time_to_freq,
-        output_dir_name):
+        chiu_net_pp_architecture_dict, plateau_patience_epochs,
+        plateau_learning_rate_multiplier, early_stopping_patience_epochs,
+        epoch_and_lead_time_to_freq, output_dir_name):
     """Trains neural net with generator.
 
     :param model_object: Untrained neural net (instance of
@@ -2721,10 +2600,6 @@ def train_model(
     :param chiu_net_pp_architecture_dict: Dictionary with architecture options
         for `chiu_net_pp_architecture.create_model`.  If the model being trained
         is not a Chiu-net++, make this None.
-    :param chiu_net_pp_flexi_architecture_dict: Dictionary with architecture
-        options for `chiu_net_pp_flexi_architecture.create_model`.  If the model
-        being trained is not a Chiu-net++ with flexible lead times, make this
-        None.
     :param plateau_patience_epochs: Training will be deemed to have reached
         "plateau" if validation loss has not decreased in the last N epochs,
         where N = plateau_patience_epochs.
@@ -2777,8 +2652,10 @@ def train_model(
     try:
         history_table_pandas = pandas.read_csv(history_file_name)
         initial_epoch = history_table_pandas['epoch'].max() + 1
+        best_validation_loss = history_table_pandas['val_loss'].min()
     except:
         initial_epoch = 0
+        best_validation_loss = numpy.inf
 
     history_object = keras.callbacks.CSVLogger(
         filename=history_file_name, separator=',', append=True
@@ -2788,6 +2665,8 @@ def train_model(
         save_best_only=True, save_weights_only=True, mode='min',
         save_freq='epoch'
     )
+    checkpoint_object.best = best_validation_loss
+
     early_stopping_object = keras.callbacks.EarlyStopping(
         monitor='val_loss', min_delta=0.,
         patience=early_stopping_patience_epochs, verbose=1, mode='min'
@@ -2824,7 +2703,6 @@ def train_model(
         optimizer_function_string=optimizer_function_string,
         chiu_net_architecture_dict=chiu_net_architecture_dict,
         chiu_net_pp_architecture_dict=chiu_net_pp_architecture_dict,
-        chiu_net_pp_flexi_architecture_dict=chiu_net_pp_flexi_architecture_dict,
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs
