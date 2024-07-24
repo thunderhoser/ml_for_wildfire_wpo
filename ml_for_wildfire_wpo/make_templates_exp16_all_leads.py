@@ -202,19 +202,22 @@ DEFAULT_OPTION_DICT = {
 PREDICTOR_TIME_STRATEGIES = [
     'all-daily-valid-times-up-to-target-time',
     'different-valid-times-up-to-target-time',
-    'different-valid-times-up-to-target-time-plus2days'
+    'different-valid-times-up-to-target-time-plus2days',
+    'same-valid-times-for-every-model-lead'
 ]
 
 PREDICTOR_TIME_STRATEGY_TO_NUM_GFS_HOURS = {
     'all-daily-valid-times-up-to-target-time': 11,
     'different-valid-times-up-to-target-time': 8,
-    'different-valid-times-up-to-target-time-plus2days': 12
+    'different-valid-times-up-to-target-time-plus2days': 12,
+    'same-valid-times-for-every-model-lead': 11
 }
 
 PREDICTOR_TIME_STRATEGY_TO_NUM_TARGET_DAYS = {
     'all-daily-valid-times-up-to-target-time': 20,
     'different-valid-times-up-to-target-time': 10,
-    'different-valid-times-up-to-target-time-plus2days': 12
+    'different-valid-times-up-to-target-time-plus2days': 12,
+    'same-valid-times-for-every-model-lead': 20
 }
 
 
@@ -246,6 +249,10 @@ def _run():
             chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
                 [265, 537, num_target_days, 6], dtype=int
             ),
+            chiu_net_pp_arch.USE_LEAD_TIME_AS_PRED_KEY: (
+                PREDICTOR_TIME_STRATEGIES[i] ==
+                'same-valid-times-for-every-model-lead'
+            )
         })
 
         model_object = chiu_net_pp_arch.create_model(option_dict)
@@ -289,7 +296,6 @@ def _run():
             optimizer_function_string=OPTIMIZER_FUNCTION_STRING,
             chiu_net_architecture_dict=None,
             chiu_net_pp_architecture_dict=option_dict,
-            chiu_net_pp_flexi_architecture_dict=None,
             plateau_patience_epochs=10,
             plateau_learning_rate_multiplier=0.6,
             early_stopping_patience_epochs=50

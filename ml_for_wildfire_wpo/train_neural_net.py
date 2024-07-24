@@ -32,6 +32,7 @@ def _run(template_file_name, output_dir_name,
          gfs_target_leads_days_by_model_lead, compare_to_gfs_in_loss,
          target_normalization_file_name, targets_use_quantile_norm,
          num_examples_per_batch, sentinel_value, do_residual_prediction,
+         use_lead_time_as_predictor, change_model_lead_every_n_batches,
          gfs_dir_name_for_training, target_dir_name_for_training,
          gfs_forecast_target_dir_name_for_training,
          init_date_limit_strings_for_training,
@@ -73,6 +74,8 @@ def _run(template_file_name, output_dir_name,
     :param num_examples_per_batch: Same.
     :param sentinel_value: Same.
     :param do_residual_prediction: Same.
+    :param use_lead_time_as_predictor: Same.
+    :param change_model_lead_every_n_batches: Same.
     :param gfs_dir_name_for_training: Same.
     :param target_dir_name_for_training: Same.
     :param gfs_forecast_target_dir_name_for_training: Same.
@@ -166,6 +169,9 @@ def _run(template_file_name, output_dir_name,
             model_lead_times_days, this_array
         ))
 
+    if change_model_lead_every_n_batches < 0:
+        change_model_lead_every_n_batches = None
+
     training_option_dict = {
         neural_net.INNER_LATITUDE_LIMITS_KEY: inner_latitude_limits_deg_n,
         neural_net.INNER_LONGITUDE_LIMITS_KEY: inner_longitude_limits_deg_e,
@@ -193,6 +199,9 @@ def _run(template_file_name, output_dir_name,
         neural_net.BATCH_SIZE_KEY: num_examples_per_batch,
         neural_net.SENTINEL_VALUE_KEY: sentinel_value,
         neural_net.DO_RESIDUAL_PREDICTION_KEY: do_residual_prediction,
+        neural_net.USE_LEAD_TIME_AS_PRED_KEY: use_lead_time_as_predictor,
+        neural_net.CHANGE_LEAD_EVERY_N_BATCHES_KEY:
+            change_model_lead_every_n_batches,
         neural_net.INIT_DATE_LIMITS_KEY: init_date_limit_strings_for_training,
         neural_net.GFS_DIRECTORY_KEY: gfs_dir_name_for_training,
         neural_net.TARGET_DIRECTORY_KEY: target_dir_name_for_training,
@@ -231,8 +240,6 @@ def _run(template_file_name, output_dir_name,
         chiu_net_architecture_dict=mmd[neural_net.CHIU_NET_ARCHITECTURE_KEY],
         chiu_net_pp_architecture_dict=
         mmd[neural_net.CHIU_NET_PP_ARCHITECTURE_KEY],
-        chiu_net_pp_flexi_architecture_dict=
-        mmd[neural_net.CHIU_NET_PP_FLEXI_ARCHITECTURE_KEY],
         plateau_patience_epochs=plateau_patience_epochs,
         plateau_learning_rate_multiplier=plateau_learning_rate_multiplier,
         early_stopping_patience_epochs=early_stopping_patience_epochs,
@@ -348,6 +355,12 @@ if __name__ == '__main__':
         do_residual_prediction=bool(getattr(
             INPUT_ARG_OBJECT, training_args.DO_RESIDUAL_PRED_ARG_NAME
         )),
+        use_lead_time_as_predictor=bool(getattr(
+            INPUT_ARG_OBJECT, training_args.USE_LEAD_TIME_AS_PRED_ARG_NAME
+        )),
+        change_model_lead_every_n_batches=getattr(
+            INPUT_ARG_OBJECT, training_args.CHANGE_LEAD_EVERY_N_BATCHES_ARG_NAME
+        ),
         gfs_dir_name_for_training=getattr(
             INPUT_ARG_OBJECT, training_args.GFS_TRAINING_DIR_ARG_NAME
         ),
