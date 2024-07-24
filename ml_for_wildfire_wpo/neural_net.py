@@ -175,6 +175,9 @@ def __report_data_properties(
                 predictor_matrices[k]
             )
 
+    print(numpy.nanmin(laglead_target_predictor_matrix, axis=(0, 1, 2)))
+    print(numpy.nanmax(laglead_target_predictor_matrix, axis=(0, 1, 2)))
+
     if baseline_prediction_matrix is not None:
         these_min = numpy.nanmin(
             baseline_prediction_matrix, axis=(0, 1, 2)
@@ -1799,7 +1802,7 @@ def data_generator(option_dict):
                     longitude_limits_deg_e=inner_longitude_limits_deg_e,
                     target_field_names=target_field_names,
                     norm_param_table_xarray=None,
-                    use_quantile_norm=targets_use_quantile_norm
+                    use_quantile_norm=False
                 )
             else:
                 this_baseline_prediction_matrix = None
@@ -1853,7 +1856,7 @@ def data_generator(option_dict):
                     longitude_limits_deg_e=inner_longitude_limits_deg_e,
                     target_field_names=target_field_names,
                     norm_param_table_xarray=target_norm_param_table_xarray,
-                    use_quantile_norm=gfs_use_quantile_norm
+                    use_quantile_norm=targets_use_quantile_norm
                 )
 
                 if new_matrix is None:
@@ -2217,7 +2220,7 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
             longitude_limits_deg_e=inner_longitude_limits_deg_e,
             target_field_names=target_field_names,
             norm_param_table_xarray=None,
-            use_quantile_norm=targets_use_quantile_norm
+            use_quantile_norm=False
         )
 
         baseline_prediction_matrix = numpy.expand_dims(
@@ -2237,7 +2240,7 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
             longitude_limits_deg_e=inner_longitude_limits_deg_e,
             target_field_names=target_field_names,
             norm_param_table_xarray=target_norm_param_table_xarray,
-            use_quantile_norm=gfs_use_quantile_norm
+            use_quantile_norm=targets_use_quantile_norm
         )[0]
 
         laglead_target_predictor_matrix = numpy.concatenate(
