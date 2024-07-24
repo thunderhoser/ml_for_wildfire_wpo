@@ -1100,6 +1100,8 @@ def _read_lagged_targets_1example(
         for f in target_file_names
     ], axis=-2)
 
+    target_field_matrix = target_field_matrix.astype('float32')
+
     return target_field_matrix, desired_row_indices, desired_column_indices
 
 
@@ -1604,6 +1606,8 @@ def data_generator(option_dict):
             model_lead_time_days
         ]
 
+        bs = num_examples_per_batch
+
         while num_examples_in_memory < num_examples_per_batch:
             if gfs_file_index == len(gfs_file_names):
                 random.shuffle(gfs_file_names)
@@ -1626,24 +1630,25 @@ def data_generator(option_dict):
                 num_lead_times_for_interp=num_gfs_hours_for_interp
             )
 
-            (
-                this_laglead_target_predictor_matrix,
-                desired_target_row_indices,
-                desired_target_column_indices
-            ) = _read_lagged_targets_1example(
-                gfs_init_date_string=gfs_io.file_name_to_date(
-                    gfs_file_names[gfs_file_index]
-                ),
-                target_dir_name=target_dir_name,
-                target_lag_times_days=target_lag_times_days,
-                desired_row_indices=desired_target_row_indices,
-                desired_column_indices=desired_target_column_indices,
-                latitude_limits_deg_n=inner_latitude_limits_deg_n,
-                longitude_limits_deg_e=inner_longitude_limits_deg_e,
-                target_field_names=target_field_names,
-                norm_param_table_xarray=target_norm_param_table_xarray,
-                use_quantile_norm=targets_use_quantile_norm
-            )
+            if this_gfs_predictor_matrix_3d is not None:
+                if gfs_predictor_matrix_3d is None:
+                    these_dim = (bs,) + this_gfs_predictor_matrix_3d.shape
+                    gfs_predictor_matrix_3d = numpy.full(these_dim, numpy.nan)
+
+                gfs_predictor_matrix_3d[num_examples_in_memory, ...] = (
+                    this_gfs_predictor_matrix_3d
+                )
+                del this_gfs_predictor_matrix_3d
+
+            if this_gfs_predictor_matrix_2d is not None:
+                if gfs_predictor_matrix_2d is None:
+                    these_dim = (bs,) + this_gfs_predictor_matrix_2d.shape
+                    gfs_predictor_matrix_2d = numpy.full(these_dim, numpy.nan)
+
+                gfs_predictor_matrix_2d[num_examples_in_memory, ...] = (
+                    this_gfs_predictor_matrix_2d
+                )
+                del this_gfs_predictor_matrix_2d
 
             if do_residual_prediction:
                 (
@@ -1666,6 +1671,37 @@ def data_generator(option_dict):
                 )
             else:
                 this_baseline_prediction_matrix = None
+
+            if this_baseline_prediction_matrix is not None:
+                if baseline_prediction_matrix is None:
+                    these_dim = (bs,) + this_baseline_prediction_matrix.shape
+                    baseline_prediction_matrix = numpy.full(
+                        these_dim, numpy.nan
+                    )
+
+                baseline_prediction_matrix[num_examples_in_memory, ...] = (
+                    this_baseline_prediction_matrix
+                )
+                del this_baseline_prediction_matrix
+
+            (
+                this_laglead_target_predictor_matrix,
+                desired_target_row_indices,
+                desired_target_column_indices
+            ) = _read_lagged_targets_1example(
+                gfs_init_date_string=gfs_io.file_name_to_date(
+                    gfs_file_names[gfs_file_index]
+                ),
+                target_dir_name=target_dir_name,
+                target_lag_times_days=target_lag_times_days,
+                desired_row_indices=desired_target_row_indices,
+                desired_column_indices=desired_target_column_indices,
+                latitude_limits_deg_n=inner_latitude_limits_deg_n,
+                longitude_limits_deg_e=inner_longitude_limits_deg_e,
+                target_field_names=target_field_names,
+                norm_param_table_xarray=target_norm_param_table_xarray,
+                use_quantile_norm=targets_use_quantile_norm
+            )
 
             if gfs_forecast_target_dir_name is not None:
                 (
@@ -1693,9 +1729,10 @@ def data_generator(option_dict):
                     continue
 
                 this_laglead_target_predictor_matrix = numpy.concatenate(
-                    (this_laglead_target_predictor_matrix, new_matrix),
+                    [this_laglead_target_predictor_matrix, new_matrix],
                     axis=-2
                 )
+                del new_matrix
 
             if num_target_times_for_interp is not None:
                 source_lead_times_days = numpy.concatenate([
@@ -1711,6 +1748,20 @@ def data_generator(option_dict):
                         num_target_lead_times=num_target_times_for_interp
                     )
                 )
+
+                this_laglead_target_predictor_matrix = (
+                    this_laglead_target_predictor_matrix.astype('float32')
+                )
+
+            if laglead_target_predictor_matrix is None:
+                these_dim = (bs,) + this_laglead_target_predictor_matrix.shape
+                laglead_target_predictor_matrix = numpy.full(
+                    these_dim, numpy.nan
+                )
+
+            laglead_target_predictor_matrix[num_examples_in_memory, ...] = (
+                this_laglead_target_predictor_matrix
+            )
 
             target_file_name = _find_target_files_needed_1example(
                 gfs_init_date_string=
@@ -1760,61 +1811,14 @@ def data_generator(option_dict):
                 this_target_matrix = numpy.concatenate(
                     [this_target_matrix, new_target_matrix], axis=-1
                 )
-
-            if this_gfs_predictor_matrix_3d is not None:
-                if gfs_predictor_matrix_3d is None:
-                    these_dim = (
-                        (num_examples_per_batch,) +
-                        this_gfs_predictor_matrix_3d.shape
-                    )
-                    gfs_predictor_matrix_3d = numpy.full(these_dim, numpy.nan)
-
-                gfs_predictor_matrix_3d[num_examples_in_memory, ...] = (
-                    this_gfs_predictor_matrix_3d
-                )
-
-            if this_gfs_predictor_matrix_2d is not None:
-                if gfs_predictor_matrix_2d is None:
-                    these_dim = (
-                        (num_examples_per_batch,) +
-                        this_gfs_predictor_matrix_2d.shape
-                    )
-                    gfs_predictor_matrix_2d = numpy.full(these_dim, numpy.nan)
-
-                gfs_predictor_matrix_2d[num_examples_in_memory, ...] = (
-                    this_gfs_predictor_matrix_2d
-                )
-
-            if this_baseline_prediction_matrix is not None:
-                if baseline_prediction_matrix is None:
-                    these_dim = (
-                        (num_examples_per_batch,) +
-                        this_baseline_prediction_matrix.shape
-                    )
-                    baseline_prediction_matrix = numpy.full(these_dim, numpy.nan)
-
-                baseline_prediction_matrix[num_examples_in_memory, ...] = (
-                    this_baseline_prediction_matrix
-                )
-
-            if laglead_target_predictor_matrix is None:
-                these_dim = (
-                    (num_examples_per_batch,) +
-                    this_laglead_target_predictor_matrix.shape
-                )
-                laglead_target_predictor_matrix = numpy.full(these_dim, numpy.nan)
-
-            laglead_target_predictor_matrix[num_examples_in_memory, ...] = (
-                this_laglead_target_predictor_matrix
-            )
+                del new_target_matrix
 
             if target_matrix is None:
-                these_dim = (
-                    (num_examples_per_batch,) + this_target_matrix.shape
-                )
+                these_dim = (bs,) + this_target_matrix.shape
                 target_matrix = numpy.full(these_dim, numpy.nan)
 
             target_matrix[num_examples_in_memory, ...] = this_target_matrix
+            del this_target_matrix
 
             num_examples_in_memory += 1
             gfs_file_index += 1
@@ -1901,7 +1905,7 @@ def data_generator(option_dict):
         )
 
         target_matrix_with_weights = numpy.concatenate(
-            (target_matrix, weight_matrix), axis=-1
+            [target_matrix, weight_matrix], axis=-1
         )
 
         # predictor_matrices = {}
@@ -2227,6 +2231,10 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
                 DAYS_TO_HOURS * source_lead_times_days,
                 num_target_lead_times=num_target_times_for_interp
             )
+        )
+
+        laglead_target_predictor_matrix = (
+            laglead_target_predictor_matrix.astype('float32')
         )
 
     laglead_target_predictor_matrix = numpy.expand_dims(
