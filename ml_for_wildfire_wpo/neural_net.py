@@ -2535,6 +2535,8 @@ def read_model(hdf5_file_name):
             chiu_net_pp_architecture
 
         arch_dict = chiu_net_pp_architecture_dict
+        if chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY not in arch_dict:
+            arch_dict[chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY] = False
 
         for this_key in [
                 chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
