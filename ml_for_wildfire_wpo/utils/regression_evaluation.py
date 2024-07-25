@@ -453,7 +453,7 @@ def _get_scores_one_replicate(
         min_relia_bin_edge_by_target, max_relia_bin_edge_by_target,
         min_relia_bin_edge_prctile_by_target,
         max_relia_bin_edge_prctile_by_target,
-        per_grid_cell):
+        per_grid_cell, keep_it_simple=False):
     """Computes scores for one bootstrap replicate.
 
     E = number of examples
@@ -477,6 +477,7 @@ def _get_scores_one_replicate(
     :param min_relia_bin_edge_prctile_by_target: Same.
     :param max_relia_bin_edge_prctile_by_target: Same.
     :param per_grid_cell: Same.
+    :param keep_it_simple: Same.
     :return: result_table_xarray: Same as input but with values filled for [i]th
         bootstrap replicate, where i = `replicate_index`.
     """
@@ -603,6 +604,9 @@ def _get_scores_one_replicate(
             per_grid_cell=per_grid_cell,
             weights=weight_matrix
         )
+
+        if keep_it_simple:
+            continue
 
         if num_examples == 0:
             min_bin_edge = 0.
@@ -933,7 +937,7 @@ def get_scores_with_bootstrapping(
         min_relia_bin_edge_by_target, max_relia_bin_edge_by_target,
         min_relia_bin_edge_prctile_by_target,
         max_relia_bin_edge_prctile_by_target,
-        per_grid_cell):
+        per_grid_cell, keep_it_simple=False):
     """Computes all scores with bootstrapping.
 
     T = number of target fields
@@ -957,6 +961,8 @@ def get_scores_with_bootstrapping(
     :param per_grid_cell: Boolean flag.  If True, will compute a separate set of
         scores at each grid cell.  If False, will compute one set of scores for
         the whole domain.
+    :param keep_it_simple: Boolean flag.  If True, will avoid Kolmogorov-Smirnov
+        test and attributes diagram.
     :return: result_table_xarray: xarray table with results (variable and
         dimension names should make the table self-explanatory).
     """
@@ -966,6 +972,7 @@ def get_scores_with_bootstrapping(
     error_checking.assert_is_greater(num_bootstrap_reps, 0)
     error_checking.assert_is_string_list(target_field_names)
     error_checking.assert_is_boolean(per_grid_cell)
+    error_checking.assert_is_boolean(keep_it_simple)
 
     num_target_fields = len(target_field_names)
     expected_dim = numpy.array([num_target_fields], dtype=int)
@@ -1262,7 +1269,8 @@ def get_scores_with_bootstrapping(
             min_relia_bin_edge_prctile_by_target,
             max_relia_bin_edge_prctile_by_target=
             max_relia_bin_edge_prctile_by_target,
-            per_grid_cell=per_grid_cell
+            per_grid_cell=per_grid_cell,
+            keep_it_simple=keep_it_simple
         )
 
     return result_table_xarray

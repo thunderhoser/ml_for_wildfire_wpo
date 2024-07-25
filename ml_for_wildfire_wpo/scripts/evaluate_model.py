@@ -19,6 +19,7 @@ MAX_RELIA_BIN_EDGES_ARG_NAME = 'max_relia_bin_edge_by_target'
 MIN_RELIA_BIN_EDGES_PRCTILE_ARG_NAME = 'min_relia_bin_edge_prctile_by_target'
 MAX_RELIA_BIN_EDGES_PRCTILE_ARG_NAME = 'max_relia_bin_edge_prctile_by_target'
 PER_GRID_CELL_ARG_NAME = 'per_grid_cell'
+KEEP_IT_SIMPLE_ARG_NAME = 'keep_it_simple'
 OUTPUT_FILE_ARG_NAME = 'output_file_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -59,6 +60,10 @@ MAX_RELIA_BIN_EDGES_PRCTILE_HELP_STRING = (
 PER_GRID_CELL_HELP_STRING = (
     'Boolean flag.  If 1, will compute a separate set of scores at each grid '
     'cell.  If 0, will compute one set of scores for the whole domain.'
+)
+KEEP_IT_SIMPLE_HELP_STRING = (
+    'Boolean flag.  If 1, will avoid Kolmogorov-Smirnov test and attributes '
+    'diagram.'
 )
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Evaluation scores will be written here by '
@@ -109,6 +114,10 @@ INPUT_ARG_PARSER.add_argument(
     help=PER_GRID_CELL_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + KEEP_IT_SIMPLE_ARG_NAME, type=int, required=True,
+    help=KEEP_IT_SIMPLE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
     help=OUTPUT_FILE_HELP_STRING
 )
@@ -119,7 +128,7 @@ def _run(prediction_dir_name, init_date_limit_strings, num_bootstrap_reps,
          min_relia_bin_edge_by_target, max_relia_bin_edge_by_target,
          min_relia_bin_edge_prctile_by_target,
          max_relia_bin_edge_prctile_by_target,
-         per_grid_cell, output_file_name):
+         per_grid_cell, keep_it_simple, output_file_name):
     """Evaluates model.
 
     This is effectively the main method.
@@ -134,6 +143,7 @@ def _run(prediction_dir_name, init_date_limit_strings, num_bootstrap_reps,
     :param min_relia_bin_edge_prctile_by_target: Same.
     :param max_relia_bin_edge_prctile_by_target: Same.
     :param per_grid_cell: Same.
+    :param keep_it_simple: Same.
     :param output_file_name: Same.
     """
 
@@ -173,7 +183,8 @@ def _run(prediction_dir_name, init_date_limit_strings, num_bootstrap_reps,
         min_relia_bin_edge_prctile_by_target,
         max_relia_bin_edge_prctile_by_target=
         max_relia_bin_edge_prctile_by_target,
-        per_grid_cell=per_grid_cell
+        per_grid_cell=per_grid_cell,
+        keep_it_simple=keep_it_simple
     )
     print(SEPARATOR_STRING)
 
@@ -251,5 +262,6 @@ if __name__ == '__main__':
             dtype=float
         ),
         per_grid_cell=bool(getattr(INPUT_ARG_OBJECT, PER_GRID_CELL_ARG_NAME)),
+        keep_it_simple=bool(getattr(INPUT_ARG_OBJECT, KEEP_IT_SIMPLE_ARG_NAME)),
         output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )
