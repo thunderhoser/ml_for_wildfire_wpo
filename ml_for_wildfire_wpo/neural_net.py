@@ -2028,6 +2028,16 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
     option_dict[INIT_DATE_LIMITS_KEY] = [init_date_string] * 2
     option_dict[BATCH_SIZE_KEY] = 32
 
+    all_model_leads_days = numpy.array(
+        list(option_dict[MODEL_LEAD_TO_TARGET_LAGS_KEY].keys()),
+        dtype=int
+    )
+    all_model_leads_days = numpy.unique(all_model_leads_days)
+    dummy_frequencies = numpy.full(len(all_model_leads_days), 0.1)
+    option_dict[MODEL_LEAD_TO_FREQ_KEY] = dict(
+        zip(all_model_leads_days, dummy_frequencies)
+    )
+
     option_dict = _check_generator_args(option_dict)
 
     inner_latitude_limits_deg_n = option_dict[INNER_LATITUDE_LIMITS_KEY]
