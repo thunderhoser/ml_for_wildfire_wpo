@@ -17,6 +17,7 @@ GFS_DIRECTORY_ARG_NAME = 'input_gfs_directory_name'
 TARGET_DIR_ARG_NAME = 'input_target_dir_name'
 GFS_FCST_TARGET_DIR_ARG_NAME = 'input_gfs_fcst_target_dir_name'
 DATE_LIMITS_ARG_NAME = 'init_date_limit_strings'
+MODEL_LEAD_TIME_ARG_NAME = 'model_lead_time_days'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 MODEL_FILE_HELP_STRING = (
@@ -39,6 +40,7 @@ DATE_LIMITS_HELP_STRING = (
     'Length-2 list with first and last GFS model runs (init times in format '
     '"yyyymmdd") to be used.'
 )
+MODEL_LEAD_TIME_HELP_STRING = 'Model lead time.'
 OUTPUT_DIR_HELP_STRING = (
     'Name of output directory.  Results will be written here by '
     '`prediction_io.write_file`, to exact locations determined by '
@@ -70,11 +72,15 @@ INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
+INPUT_ARG_PARSER.add_argument(
+    '--' + MODEL_LEAD_TIME_ARG_NAME, type=int, required=True,
+    help=MODEL_LEAD_TIME_HELP_STRING
+)
 
 
 def _run(model_file_name, gfs_directory_name, target_dir_name,
          gfs_forecast_target_dir_name, init_date_limit_strings,
-         output_dir_name):
+         model_lead_time_days, output_dir_name):
     """Applies trained neural net -- inference time!
 
     This is effectively the main method.
@@ -84,6 +90,7 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     :param target_dir_name: Same.
     :param gfs_forecast_target_dir_name: Same.
     :param init_date_limit_strings: Same.
+    :param model_lead_time_days: Same.
     :param output_dir_name: Same.
     """
 
@@ -132,7 +139,8 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
         try:
             data_dict = neural_net.create_data(
                 option_dict=validation_option_dict,
-                init_date_string=this_init_date_string
+                init_date_string=this_init_date_string,
+                model_lead_time_days=model_lead_time_days
             )
             print(SEPARATOR_STRING)
         except:
@@ -202,5 +210,8 @@ if __name__ == '__main__':
             INPUT_ARG_OBJECT, GFS_FCST_TARGET_DIR_ARG_NAME
         ),
         init_date_limit_strings=getattr(INPUT_ARG_OBJECT, DATE_LIMITS_ARG_NAME),
+        model_lead_time_days=getattr(
+            INPUT_ARG_OBJECT, MODEL_LEAD_TIME_ARG_NAME
+        ),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
