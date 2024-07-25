@@ -159,9 +159,24 @@ def _find_lead_time(prediction_file_name_by_model):
         mmd = neural_net.read_metafile(model_metafile_name)
         training_option_dict = mmd[neural_net.TRAINING_OPTIONS_KEY]
 
-        this_lead_time_days = (
-            training_option_dict[neural_net.TARGET_LEAD_TIME_KEY]
-        )
+        try:
+            this_lead_time_days = training_option_dict['target_lead_time_days']
+        except KeyError:
+            this_lead_time_days = -1
+
+            for this_subdir_name in prediction_file_name_by_model[i].split('/'):
+                if 'lead-time-days' in this_subdir_name:
+                    this_lead_time_days = int(
+                        this_subdir_name.split('lead-time-days=')[-1]
+                    )
+                    break
+
+                if 'day_lead' in this_subdir_name:
+                    this_lead_time_days = int(
+                        this_subdir_name.split('day_lead')[0]
+                    )
+                    break
+
         if lead_time_days is None:
             lead_time_days = this_lead_time_days + 0
             continue
