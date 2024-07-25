@@ -144,12 +144,6 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     ))
 
     for this_init_date_string in init_date_strings:
-        data_dict = neural_net.create_data(
-            option_dict=validation_option_dict,
-            init_date_string=this_init_date_string,
-            model_lead_time_days=model_lead_time_days
-        )
-
         try:
             data_dict = neural_net.create_data(
                 option_dict=validation_option_dict,
