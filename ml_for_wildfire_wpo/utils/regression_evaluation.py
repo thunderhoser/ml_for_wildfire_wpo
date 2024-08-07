@@ -3,8 +3,8 @@
 import copy
 import numpy
 import xarray
+from numba import njit
 from scipy.stats import ks_2samp
-from gewittergefahr.gg_utils import histograms
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.io import prediction_io
@@ -52,6 +52,37 @@ INV_RELIABILITY_COUNT_KEY = 'inv_reliability_count'
 
 MODEL_FILE_KEY = 'model_file_name'
 PREDICTION_FILES_KEY = 'prediction_file_names'
+
+
+@njit
+def __find_examples_in_each_bin(example_to_bin_indices, num_bins):
+    """Creates list of data examples in each bin.
+
+    E = number of examples
+    B = number of bins
+
+    :param example_to_bin_indices: length-E numpy array indexing examples to
+        bins.  example_to_bin_indices[i] = j indicates that the (i)th example is
+        a member of the (j)th bin.
+    :param num_bins: Total number of bins (B in the above definitions).
+    :return: example_indices_by_bin: length-B list, where the (j)th element is a
+        1-D numpy array with the indices of examples belonging to the (j)th bin.
+    """
+
+    bin_sizes = numpy.zeros(num_bins, dtype=numpy.int64)
+    for j in example_to_bin_indices:
+        bin_sizes[j] += 1
+
+    example_indices_by_bin = [
+        numpy.empty(bs, dtype=numpy.int64) for bs in bin_sizes
+    ]
+
+    bin_counters = numpy.zeros(num_bins, dtype=numpy.int64)
+    for i, j in enumerate(example_to_bin_indices):
+        example_indices_by_bin[j][bin_counters[j]] = i
+        bin_counters[j] += 1
+
+    return example_indices_by_bin
 
 
 def __weighted_stdev(data_values, weights):
@@ -416,30 +447,39 @@ def _get_rel_curve_one_scalar(
     # max_bin_edge = max([max_bin_edge, numpy.finfo(float).eps])
     # min_bin_edge = min([min_bin_edge, 0.])
 
-    bin_index_by_example = histograms.create_histogram(
-        input_values=target_values if invert else predicted_values,
-        num_bins=num_bins, min_value=min_bin_edge, max_value=max_bin_edge
-    )[0]
+    # bin_index_by_example = histograms.create_histogram(
+    #     input_values=target_values if invert else predicted_values,
+    #     num_bins=num_bins, min_value=min_bin_edge, max_value=max_bin_edge
+    # )[0]
+
+    bin_cutoffs = numpy.linspace(min_bin_edge, max_bin_edge, num=num_bins + 1)
+    example_to_bin_indices = numpy.digitize(
+        target_values if invert else predicted_values, bin_cutoffs, right=False
+    ) - 1
+    example_to_bin_indices = numpy.clip(example_to_bin_indices, 0, num_bins - 1)
+
+    example_indices_by_bin = __find_examples_in_each_bin(
+        example_to_bin_indices=example_to_bin_indices,
+        num_bins=num_bins
+    )
 
     mean_predictions = numpy.full(num_bins, numpy.nan)
     mean_observations = numpy.full(num_bins, numpy.nan)
     example_counts = numpy.full(num_bins, numpy.nan)
 
-    for i in range(num_bins):
-        these_example_indices = numpy.where(bin_index_by_example == i)[0]
-
-        if numpy.sum(weights[these_example_indices]) < TOLERANCE:
-            example_counts[i] = 0.
+    for j in range(num_bins):
+        if numpy.sum(weights[example_indices_by_bin[j]]) < TOLERANCE:
+            example_counts[j] = 0.
             continue
 
-        example_counts[i] = numpy.sum(weights[these_example_indices])
-        mean_predictions[i] = numpy.average(
-            predicted_values[these_example_indices],
-            weights=weights[these_example_indices]
+        example_counts[j] = numpy.sum(weights[example_indices_by_bin[j]])
+        mean_predictions[j] = numpy.average(
+            predicted_values[example_indices_by_bin[j]],
+            weights=weights[example_indices_by_bin[j]]
         )
-        mean_observations[i] = numpy.average(
-            target_values[these_example_indices],
-            weights=weights[these_example_indices]
+        mean_observations[j] = numpy.average(
+            target_values[example_indices_by_bin[j]],
+            weights=weights[example_indices_by_bin[j]]
         )
 
     return mean_predictions, mean_observations, example_counts
