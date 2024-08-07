@@ -150,7 +150,7 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             raise_error_if_missing=False
         )
 
-        if os.path.isfile(output_file_name):
+        if os.path.isfile(output_file_name) and os.path.getsize(output_file_name) > 2e8:
             continue
 
         try:
