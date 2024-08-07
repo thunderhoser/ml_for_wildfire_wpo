@@ -1,5 +1,6 @@
 """Methods for computing PIT (probability integral transform) histogram."""
 
+from multiprocessing import Pool
 import numpy
 import xarray
 from scipy.stats import percentileofscore
@@ -8,6 +9,7 @@ from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.utils import regression_evaluation as regression_eval
 
 TOLERANCE = 1e-6
+NUM_SLICES_FOR_MULTIPROCESSING = 24
 
 LOW_PIT_THRESHOLD = 1. / 3
 HIGH_PIT_THRESHOLD = 2. / 3
@@ -25,6 +27,68 @@ EXAMPLE_COUNT_KEY = 'example_count'
 
 MODEL_FILE_KEY = 'model_file_name'
 PREDICTION_FILES_KEY = 'prediction_file_names'
+
+
+def __get_slices_for_multiprocessing(num_scalar_examples):
+    """Returns slices for multiprocessing.
+
+    Each slice consists of many scalar examples (one scalar example = one time
+    at one grid point).
+
+    K = number of slices
+
+    :param num_scalar_examples: Total number of scalar examples.
+    :return: start_indices: length-K numpy array with index of each start
+        example.
+    :return: end_indices: length-K numpy array with index of each end example.
+    """
+
+    slice_indices_normalized = numpy.linspace(
+        0, 1, num=NUM_SLICES_FOR_MULTIPROCESSING + 1, dtype=float
+    )
+
+    start_indices = numpy.round(
+        num_scalar_examples * slice_indices_normalized[:-1]
+    ).astype(int)
+
+    end_indices = numpy.round(
+        num_scalar_examples * slice_indices_normalized[1:]
+    ).astype(int)
+
+    return start_indices, end_indices
+
+
+def __compute_pit_values_1field(prediction_matrix_2d, target_values_1d):
+    """Computes PIT values for one field.
+
+    E = number of scalar examples (num_times * num_grid_points)
+    S = ensemble size
+
+    :param prediction_matrix_2d: E-by-S numpy array of predictions.
+    :param target_values_1d: length-E numpy array of target values.
+    :return: pit_values_1d: length-E numpy array of PIT values.
+    """
+
+    num_scalar_examples = len(target_values_1d)
+    pit_values_1d = numpy.full(num_scalar_examples, numpy.nan)
+
+    for i in range(num_scalar_examples):
+        if numpy.mod(i, 10000) == 0:
+            print((
+                'Have computed PIT value for {0:d} of {1:d} scalar examples...'
+            ).format(
+                i, num_scalar_examples
+            ))
+
+        pit_values_1d[i] = 0.01 * percentileofscore(
+            a=prediction_matrix_2d[i, :], score=target_values_1d[i], kind='mean'
+        )
+
+    print('Computed PIT value for all {0:d} scalar examples!'.format(
+        num_scalar_examples
+    ))
+
+    return pit_values_1d
 
 
 def _get_low_mid_hi_bins(bin_edges):
@@ -77,7 +141,7 @@ def _get_low_mid_hi_bins(bin_edges):
 
 def _compute_pit_histogram_1field(
         target_matrix, prediction_matrix, weight_matrix, result_table_xarray,
-        field_index):
+        field_index, do_multiprocessing=True):
     """Computes PIT histogram for one target field.
 
     E = number of examples
@@ -92,6 +156,8 @@ def _compute_pit_histogram_1field(
         from this method will be stored in the table.
     :param field_index: Field index.  If `field_index == j`, this means we are
         working on the [j]th target field in the table.
+    :param do_multiprocessing: Boolean flag.  If True, will do multi-threaded
+        processing to make this go faster.
     :return: result_table_xarray: Same as input, except populated with results
         for the given target field.
     """
@@ -108,23 +174,35 @@ def _compute_pit_histogram_1field(
         prediction_matrix, (num_scalar_examples, ensemble_size)
     )
 
-    pit_values_1d = numpy.full(num_scalar_examples, numpy.nan)
-
-    for i in range(num_scalar_examples):
-        if numpy.mod(i, 10000) == 0:
-            print((
-                'Have computed PIT value for {0:d} of {1:d} scalar examples...'
-            ).format(
-                i, num_scalar_examples
-            ))
-
-        pit_values_1d[i] = 0.01 * percentileofscore(
-            a=prediction_matrix_2d[i, :], score=target_values_1d[i], kind='mean'
+    if do_multiprocessing:
+        start_indices, end_indices = __get_slices_for_multiprocessing(
+            num_scalar_examples=len(target_values_1d)
         )
 
-    print('Computed PIT value for all {0:d} scalar examples!'.format(
-        num_scalar_examples
-    ))
+        argument_list = []
+        for s, e in zip(start_indices, end_indices):
+            argument_list.append((
+                prediction_matrix_2d[s:e, :],
+                target_values_1d[s:e]
+            ))
+
+        pit_values_1d = numpy.full(len(target_values_1d), numpy.nan)
+        with Pool() as pool_object:
+            subarrays = pool_object.starmap(
+                __compute_pit_values_1field, argument_list
+            )
+
+            for k in range(len(start_indices)):
+                s = start_indices[k]
+                e = end_indices[k]
+                pit_values_1d[s:e] = subarrays[k]
+
+            assert not numpy.any(numpy.isnan(pit_values_1d))
+    else:
+        pit_values_1d = __compute_pit_values_1field(
+            prediction_matrix_2d=prediction_matrix_2d,
+            target_values_1d=target_values_1d
+        )
 
     # Compute histogram.
     num_bins = len(result_table_xarray.coords[BIN_CENTER_DIM].values)
