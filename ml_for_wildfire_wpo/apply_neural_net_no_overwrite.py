@@ -150,8 +150,13 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             raise_error_if_missing=False
         )
 
-        if os.path.isfile(output_file_name) and os.path.getsize(output_file_name) > 2e8:
-            continue
+        if os.path.isfile(output_file_name):
+            try:
+                prediction_table_xarray = prediction_io.read_file(output_file_name)
+                field_names = prediction_table_xarray[prediction_io.FIELD_NAME_KEY].values
+                continue
+            except:
+                pass
 
         try:
             data_dict = neural_net.create_data(
