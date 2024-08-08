@@ -469,16 +469,12 @@ def _print_ranking_all_metrics(metric_matrix_5d, target_field_names,
                     regression_eval.KGE_KEY
             ]:
                 values_linear = -1 * values_linear
-                values_linear[numpy.isnan(values_linear)] = -numpy.inf
             elif METRIC_NAMES[m] == regression_eval.BIAS_KEY:
                 values_linear = numpy.absolute(values_linear)
-                values_linear[numpy.isnan(values_linear)] = numpy.inf
             elif METRIC_NAMES[m] == ss_utils.SSRAT_KEY:
                 values_linear = numpy.absolute(1. - values_linear)
-                values_linear[numpy.isnan(values_linear)] = numpy.inf
-            else:
-                values_linear[numpy.isnan(values_linear)] = numpy.inf
 
+            values_linear[numpy.isnan(values_linear)] = numpy.inf
             metric_rank_matrix_5d[..., f, m] = numpy.reshape(
                 rankdata(values_linear, method='average'),
                 metric_rank_matrix_5d.shape[:-2]
