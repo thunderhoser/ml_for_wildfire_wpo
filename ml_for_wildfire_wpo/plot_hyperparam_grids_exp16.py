@@ -90,7 +90,7 @@ SELECTED_MARKER_INDICES = numpy.array([0, 0, 0], dtype=int)
 MAIN_COLOUR_MAP_OBJECT = pyplot.get_cmap(name='viridis', lut=20)
 MONO_FRACTION_COLOUR_MAP_OBJECT = pyplot.get_cmap(name='cividis', lut=20)
 SSRAT_COLOUR_MAP_NAME = 'seismic'
-BIAS_COLOUR_MAP_NAME = 'seismic'
+BIAS_COLOUR_MAP_OBJECT = pyplot.get_cmap(name='seismic', lut=20)
 
 NAN_COLOUR = numpy.full(3, 152. / 255)
 MAIN_COLOUR_MAP_OBJECT.set_bad(NAN_COLOUR)
@@ -215,35 +215,6 @@ def _get_ssrat_colour_scheme(max_colour_value):
 
     colour_map_object = matplotlib.colors.ListedColormap(rgb_matrix)
     colour_map_object.set_bad(NAN_COLOUR)
-    colour_norm_object = matplotlib.colors.BoundaryNorm(
-        bias_values, colour_map_object.N
-    )
-
-    return colour_map_object, colour_norm_object
-
-
-def _get_bias_colour_scheme(colour_map_name, max_colour_value):
-    """Returns colour scheme for frequency bias.
-
-    :param colour_map_name: Name of colour scheme (must be accepted by
-        `matplotlib.pyplot.get_cmap`).
-    :param max_colour_value: Max value in colour scheme.
-    :return: colour_map_object: Colour map (instance of `matplotlib.pyplot.cm`).
-    :return: colour_norm_object: Colour-normalizer (maps from data space to
-        colour-bar space, which goes from 0...1).  This is an instance of
-        `matplotlib.colors.Normalize`.
-    """
-
-    orig_colour_map_object = pyplot.get_cmap(colour_map_name)
-
-    negative_values = numpy.linspace(0, 1, num=1001, dtype=float)
-    positive_values = numpy.linspace(1, max_colour_value, num=1001, dtype=float)
-    bias_values = numpy.concatenate((negative_values, positive_values))
-
-    normalized_values = numpy.linspace(0, 1, num=len(bias_values), dtype=float)
-    rgb_matrix = orig_colour_map_object(normalized_values)[:, :-1]
-
-    colour_map_object = matplotlib.colors.ListedColormap(rgb_matrix)
     colour_norm_object = matplotlib.colors.BoundaryNorm(
         bias_values, colour_map_object.N
     )
@@ -564,7 +535,7 @@ def _run(experiment_dir_name, model_lead_time_days, target_field_names):
 
     y_tick_labels = ['{0:d}'.format(c) for c in FINE_TUNING_START_EPOCHS_AXIS1]
     x_tick_labels = ['{0:d}'.format(d) for d in RAMPUP_EPOCH_COUNTS_AXIS2]
-    
+
     y_axis_label = 'Fine-tuning start epoch'
     x_axis_label = 'Number of rampup epochs'
 
@@ -691,13 +662,11 @@ def _run(experiment_dir_name, model_lead_time_days, target_field_names):
                     max_colour_value = _finite_percentile(
                         numpy.absolute(metric_matrix_5d[..., f, m]), 97.5
                     )
-
-                    colour_map_object, colour_norm_object = (
-                        _get_bias_colour_scheme(
-                            colour_map_name=BIAS_COLOUR_MAP_NAME,
-                            max_colour_value=max_colour_value
-                        )
+                    colour_norm_object = matplotlib.colors.Normalize(
+                        vmin=-1 * max_colour_value, vmax=max_colour_value,
+                        clip=False
                     )
+                    colour_map_object = BIAS_COLOUR_MAP_OBJECT
 
                     best_linear_index = numpy.nanargmin(
                         numpy.ravel(numpy.absolute(metric_matrix_5d[..., f, m]))
