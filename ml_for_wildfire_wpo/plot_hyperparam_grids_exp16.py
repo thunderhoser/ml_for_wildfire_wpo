@@ -85,7 +85,18 @@ BLACK_COLOUR = numpy.full(3, 0.)
 
 SELECTED_MARKER_TYPE = 'o'
 SELECTED_MARKER_SIZE_GRID_CELLS = 0.175
-SELECTED_MARKER_INDICES = numpy.array([0, 0, 0], dtype=int)
+LEAD_TIME_DAYS_TO_SELECTED_MARKER_INDICES = {
+    1: numpy.array([0, 4, 2], dtype=int),
+    2: numpy.array([0, 4, 2], dtype=int),
+    3: numpy.array([0, 4, 2], dtype=int),
+    4: numpy.array([1, 0, 1], dtype=int),
+    5: numpy.array([1, 0, 1], dtype=int),
+    6: numpy.array([0, 2, 0], dtype=int),
+    7: numpy.array([1, 0, 1], dtype=int),
+    8: numpy.array([0, 2, 0], dtype=int),
+    9: numpy.array([0, 2, 0], dtype=int),
+    10: numpy.array([3, 3, 2], dtype=int)
+}
 
 MAIN_COLOUR_MAP_OBJECT = pyplot.get_cmap(name='viridis', lut=20)
 MONO_FRACTION_COLOUR_MAP_OBJECT = pyplot.get_cmap(name='cividis', lut=20)
@@ -629,6 +640,10 @@ def _run(experiment_dir_name, model_lead_time_days, target_field_names):
         directory_name=output_dir_name
     )
 
+    selected_marker_indices = LEAD_TIME_DAYS_TO_SELECTED_MARKER_INDICES[
+        model_lead_time_days
+    ]
+
     for f in range(num_fields):
         for m in range(num_metrics):
             panel_file_names = [''] * length_axis3
@@ -734,9 +749,9 @@ def _run(experiment_dir_name, model_lead_time_days, target_field_names):
                         markeredgecolor=marker_colour
                     )
 
-                if SELECTED_MARKER_INDICES[2] == k:
+                if selected_marker_indices[2] == k:
                     axes_object.plot(
-                        SELECTED_MARKER_INDICES[1], SELECTED_MARKER_INDICES[0],
+                        selected_marker_indices[1], selected_marker_indices[0],
                         linestyle='None', marker=SELECTED_MARKER_TYPE,
                         markersize=marker_size_px, markeredgewidth=0,
                         markerfacecolor=marker_colour,
@@ -758,8 +773,8 @@ def _run(experiment_dir_name, model_lead_time_days, target_field_names):
 
                 panel_file_names[k] = '{0:s}/{1:s}_{2:s}_{3:s}.jpg'.format(
                     output_dir_name,
-                    METRIC_NAMES[m].replace('_', '-'),
                     target_field_names[f].replace('_', '-'),
+                    METRIC_NAMES[m].replace('_', '-'),
                     PREDICTOR_TIME_STRATEGIES_AXIS3[k].replace('_', '-')
                 )
 
@@ -780,8 +795,8 @@ def _run(experiment_dir_name, model_lead_time_days, target_field_names):
             ))
             concat_figure_file_name = '{0:s}/{1:s}_{2:s}.jpg'.format(
                 output_dir_name,
-                METRIC_NAMES[m].replace('_', '-'),
-                target_field_names[f].replace('_', '-')
+                target_field_names[f].replace('_', '-'),
+                METRIC_NAMES[m].replace('_', '-')
             )
 
             print('Concatenating panels to: "{0:s}"...'.format(
