@@ -610,6 +610,18 @@ def _run(experiment_dir_name, model_lead_time_days, target_field_names):
             )
             print(SEPARATOR_STRING)
 
+    print(
+        'List below is based on metric-averaged and field-averaged rankings!'
+    )
+
+    _print_ranking_all_metrics(
+        metric_matrix_5d=metric_matrix_5d,
+        target_field_names=target_field_names,
+        main_field_index=None,
+        main_metric_index=None
+    )
+    print(SEPARATOR_STRING)
+
     for f in range(num_fields):
         print((
             'List below is based on metric-averaged rankings for {0:s}!'
