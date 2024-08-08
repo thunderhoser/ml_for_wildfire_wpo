@@ -373,10 +373,10 @@ def _read_metrics_one_model(model_dir_name, model_lead_time_days,
     this_ss_table_xarray = ss_utils.read_results(this_file_name)
     sstx = this_ss_table_xarray
 
-    metric_dict[ss_utils.SSREL_KEY] = numpy.mean(
+    metric_dict[ss_utils.SSREL_KEY] = (
         sstx[ss_utils.SSREL_KEY].values[field_indices]
     )
-    metric_dict[ss_utils.SSRAT_KEY] = numpy.mean(
+    metric_dict[ss_utils.SSRAT_KEY] = (
         sstx[ss_utils.SSRAT_KEY].values[field_indices]
     )
 
@@ -386,7 +386,7 @@ def _read_metrics_one_model(model_dir_name, model_lead_time_days,
     this_pit_table_xarray = pith_utils.read_results(this_file_name)
     pitx = this_pit_table_xarray
 
-    metric_dict[pith_utils.PIT_DEVIATION_KEY] = numpy.mean(
+    metric_dict[pith_utils.PIT_DEVIATION_KEY] = (
         pitx[pith_utils.PIT_DEVIATION_KEY].values[field_indices]
     )
 
@@ -396,7 +396,7 @@ def _read_metrics_one_model(model_dir_name, model_lead_time_days,
     this_dt_table_xarray = dt_utils.read_results(this_file_name)
     dtx = this_dt_table_xarray
 
-    metric_dict[dt_utils.MONO_FRACTION_KEY] = numpy.mean(
+    metric_dict[dt_utils.MONO_FRACTION_KEY] = (
         dtx[dt_utils.MONO_FRACTION_KEY].values[field_indices]
     )
 
