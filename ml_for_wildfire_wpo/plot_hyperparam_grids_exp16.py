@@ -95,6 +95,7 @@ BIAS_COLOUR_MAP_OBJECT = pyplot.get_cmap(name='seismic', lut=20)
 NAN_COLOUR = numpy.full(3, 152. / 255)
 MAIN_COLOUR_MAP_OBJECT.set_bad(NAN_COLOUR)
 MONO_FRACTION_COLOUR_MAP_OBJECT.set_bad(NAN_COLOUR)
+BIAS_COLOUR_MAP_OBJECT.set_bad(NAN_COLOUR)
 
 FONT_SIZE = 26
 pyplot.rc('font', size=FONT_SIZE)
