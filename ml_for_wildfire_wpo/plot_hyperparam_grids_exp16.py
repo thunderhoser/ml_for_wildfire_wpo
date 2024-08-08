@@ -92,7 +92,7 @@ MONO_FRACTION_COLOUR_MAP_OBJECT = pyplot.get_cmap(name='cividis', lut=20)
 SSRAT_COLOUR_MAP_NAME = 'seismic'
 BIAS_COLOUR_MAP_NAME = 'seismic'
 
-NAN_COLOUR = numpy.full(3, 0.)
+NAN_COLOUR = numpy.full(3, 152. / 255)
 MAIN_COLOUR_MAP_OBJECT.set_bad(NAN_COLOUR)
 MONO_FRACTION_COLOUR_MAP_OBJECT.set_bad(NAN_COLOUR)
 
@@ -563,10 +563,8 @@ def _run(experiment_dir_name, model_lead_time_days, target_field_names):
     num_metrics = len(METRIC_NAMES)
 
     y_tick_labels = ['{0:d}'.format(c) for c in FINE_TUNING_START_EPOCHS_AXIS1]
-    x_tick_labels = [
-        '{0:.3f}'.format(d) for d in RAMPUP_EPOCH_COUNTS_AXIS2
-    ]
-
+    x_tick_labels = ['{0:d}'.format(d) for d in RAMPUP_EPOCH_COUNTS_AXIS2]
+    
     y_axis_label = 'Fine-tuning start epoch'
     x_axis_label = 'Number of rampup epochs'
 
