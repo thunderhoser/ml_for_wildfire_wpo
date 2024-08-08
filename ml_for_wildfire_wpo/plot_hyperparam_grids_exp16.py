@@ -782,7 +782,7 @@ def _run(experiment_dir_name, model_lead_time_days, target_field_names):
                     '{0:s} for {1:s}\nPredictor times = {2:s}'
                 ).format(
                     METRIC_NAMES_FANCY[m],
-                    TARGET_FIELD_TO_ABBREV[f],
+                    TARGET_FIELD_TO_ABBREV[target_field_names[f]],
                     PREDICTOR_TIME_STRATEGIES_FANCY_AXIS3[k].lower()[0] +
                     PREDICTOR_TIME_STRATEGIES_FANCY_AXIS3[k][1:]
                 )
