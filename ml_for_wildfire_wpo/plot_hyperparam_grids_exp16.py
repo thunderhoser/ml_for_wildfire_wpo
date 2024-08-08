@@ -19,7 +19,9 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import file_system_utils
 import gg_plotting_utils
+import imagemagick_utils
 import canadian_fwi_utils
 import regression_evaluation as regression_eval
 import spread_skill_utils as ss_utils
@@ -441,7 +443,8 @@ def _print_ranking_1field_1metric(metric_matrix_5d, field_index, field_name,
             metric_matrix_5d[i, j, k, field_index, metric_index],
             FINE_TUNING_START_EPOCHS_AXIS1[i],
             RAMPUP_EPOCH_COUNTS_AXIS2[j],
-            PREDICTOR_TIME_STRATEGIES_FANCY_AXIS3[k].lower()
+            PREDICTOR_TIME_STRATEGIES_FANCY_AXIS3[k].lower()[0] +
+            PREDICTOR_TIME_STRATEGIES_FANCY_AXIS3[k][1:]
         ))
 
 
@@ -524,7 +527,8 @@ def _print_ranking_all_metrics(metric_matrix_5d, target_field_names,
             ).format(
                 FINE_TUNING_START_EPOCHS_AXIS1[i],
                 RAMPUP_EPOCH_COUNTS_AXIS2[j],
-                PREDICTOR_TIME_STRATEGIES_FANCY_AXIS3[k].lower(),
+                PREDICTOR_TIME_STRATEGIES_FANCY_AXIS3[k].lower()[0] +
+                PREDICTOR_TIME_STRATEGIES_FANCY_AXIS3[k][1:],
                 TARGET_FIELD_TO_ABBREV[target_field_names[f]],
                 mrm[i, j, k, f, names.index(regression_eval.MAE_KEY)],
                 mrm[i, j, k, f, names.index(regression_eval.MSE_KEY)],
@@ -618,35 +622,214 @@ def _run(experiment_dir_name, model_lead_time_days, target_field_names):
     )
     print(SEPARATOR_STRING)
 
+    # for f in range(num_fields):
+    #     print((
+    #         'List below is based on metric-averaged rankings for {0:s}!'
+    #     ).format(
+    #         TARGET_FIELD_TO_ABBREV[target_field_names[f]]
+    #     ))
+    #
+    #     _print_ranking_all_metrics(
+    #         metric_matrix_5d=metric_matrix_5d,
+    #         target_field_names=target_field_names,
+    #         main_field_index=f,
+    #         main_metric_index=None
+    #     )
+    #     print(SEPARATOR_STRING)
+    #
+    # for m in range(num_metrics):
+    #     print((
+    #         'List below is based on field-averaged rankings for {0:s}!'
+    #     ).format(
+    #         METRIC_NAMES[m]
+    #     ))
+    #
+    #     _print_ranking_all_metrics(
+    #         metric_matrix_5d=metric_matrix_5d,
+    #         target_field_names=target_field_names,
+    #         main_field_index=None,
+    #         main_metric_index=m
+    #     )
+    #     print(SEPARATOR_STRING)
+
+    output_dir_name = '{0:s}/hyperparam_grids/lead_time_{1:02d}days'.format(
+        experiment_dir_name, model_lead_time_days
+    )
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=output_dir_name
+    )
+
     for f in range(num_fields):
-        print((
-            'List below is based on metric-averaged rankings for {0:s}!'
-        ).format(
-            TARGET_FIELD_TO_ABBREV[target_field_names[f]]
-        ))
+        for m in range(num_metrics):
+            panel_file_names = [''] * length_axis3
 
-        _print_ranking_all_metrics(
-            metric_matrix_5d=metric_matrix_5d,
-            target_field_names=target_field_names,
-            main_field_index=f,
-            main_metric_index=None
-        )
-        print(SEPARATOR_STRING)
+            for k in range(length_axis3):
+                if METRIC_NAMES[m] in [
+                        dt_utils.MONO_FRACTION_KEY,
+                        regression_eval.CORRELATION_KEY,
+                        regression_eval.KGE_KEY
+                ]:
+                    max_colour_value = _finite_percentile(
+                        metric_matrix_5d[..., f, m], 100
+                    )
+                    min_colour_value = _finite_percentile(
+                        metric_matrix_5d[..., f, m], 5
+                    )
+                    colour_norm_object = matplotlib.colors.Normalize(
+                        vmin=min_colour_value, vmax=max_colour_value, clip=False
+                    )
 
-    for m in range(num_metrics):
-        print((
-            'List below is based on field-averaged rankings for {0:s}!'
-        ).format(
-            METRIC_NAMES[m]
-        ))
+                    if METRIC_NAMES[m] == dt_utils.MONO_FRACTION_KEY:
+                        colour_map_object = MONO_FRACTION_COLOUR_MAP_OBJECT
+                    else:
+                        colour_map_object = MAIN_COLOUR_MAP_OBJECT
 
-        _print_ranking_all_metrics(
-            metric_matrix_5d=metric_matrix_5d,
-            target_field_names=target_field_names,
-            main_field_index=None,
-            main_metric_index=m
-        )
-        print(SEPARATOR_STRING)
+                    best_linear_index = numpy.nanargmax(
+                        numpy.ravel(metric_matrix_5d[..., f, m])
+                    )
+                    marker_colour = BLACK_COLOUR
+
+                elif METRIC_NAMES[m] == regression_eval.BIAS_KEY:
+                    max_colour_value = _finite_percentile(
+                        numpy.absolute(metric_matrix_5d[..., f, m]), 97.5
+                    )
+
+                    colour_map_object, colour_norm_object = (
+                        _get_bias_colour_scheme(
+                            colour_map_name=BIAS_COLOUR_MAP_NAME,
+                            max_colour_value=max_colour_value
+                        )
+                    )
+
+                    best_linear_index = numpy.nanargmin(
+                        numpy.ravel(numpy.absolute(metric_matrix_5d[..., f, m]))
+                    )
+                    marker_colour = BLACK_COLOUR
+
+                elif METRIC_NAMES[m] == ss_utils.SSRAT_KEY:
+                    this_offset = _finite_percentile(
+                        numpy.absolute(metric_matrix_5d[..., f, m] - 1.), 97.5
+                    )
+                    colour_map_object, colour_norm_object = (
+                        _get_ssrat_colour_scheme(
+                            max_colour_value=1. + this_offset
+                        )
+                    )
+
+                    best_linear_index = numpy.nanargmin(numpy.absolute(
+                        numpy.ravel(metric_matrix_5d[..., f, m]) - 1.
+                    ))
+                    marker_colour = BLACK_COLOUR
+
+                else:
+                    max_colour_value = _finite_percentile(
+                        metric_matrix_5d[..., f, m], 95
+                    )
+                    min_colour_value = _finite_percentile(
+                        metric_matrix_5d[..., f, m], 0
+                    )
+                    colour_norm_object = matplotlib.colors.Normalize(
+                        vmin=min_colour_value, vmax=max_colour_value, clip=False
+                    )
+                    colour_map_object = MAIN_COLOUR_MAP_OBJECT
+
+                    best_linear_index = numpy.nanargmin(
+                        numpy.ravel(metric_matrix_5d[..., f, m])
+                    )
+                    marker_colour = WHITE_COLOUR
+
+                figure_object, axes_object = _plot_scores_2d(
+                    score_matrix=metric_matrix_5d[..., k, f, m],
+                    colour_map_object=colour_map_object,
+                    colour_norm_object=colour_norm_object,
+                    x_tick_labels=x_tick_labels,
+                    y_tick_labels=y_tick_labels
+                )
+
+                best_indices = numpy.unravel_index(
+                    best_linear_index, metric_matrix_5d[..., f, m].shape
+                )
+
+                figure_width_px = (
+                    figure_object.get_size_inches()[0] * figure_object.dpi
+                )
+                marker_size_px = figure_width_px * (
+                    BEST_MARKER_SIZE_GRID_CELLS / metric_matrix_5d.shape[1]
+                )
+
+                if best_indices[2] == k:
+                    axes_object.plot(
+                        best_indices[1], best_indices[0],
+                        linestyle='None', marker=BEST_MARKER_TYPE,
+                        markersize=marker_size_px, markeredgewidth=0,
+                        markerfacecolor=marker_colour,
+                        markeredgecolor=marker_colour
+                    )
+
+                if SELECTED_MARKER_INDICES[2] == k:
+                    axes_object.plot(
+                        SELECTED_MARKER_INDICES[1], SELECTED_MARKER_INDICES[0],
+                        linestyle='None', marker=SELECTED_MARKER_TYPE,
+                        markersize=marker_size_px, markeredgewidth=0,
+                        markerfacecolor=marker_colour,
+                        markeredgecolor=marker_colour
+                    )
+
+                axes_object.set_xlabel(x_axis_label)
+                axes_object.set_ylabel(y_axis_label)
+
+                title_string = (
+                    '{0:s} for {1:s}\nPredictor times = {2:s}'
+                ).format(
+                    METRIC_NAMES_FANCY[m],
+                    TARGET_FIELD_TO_ABBREV[f],
+                    PREDICTOR_TIME_STRATEGIES_FANCY_AXIS3[k].lower()[0] +
+                    PREDICTOR_TIME_STRATEGIES_FANCY_AXIS3[k][1:]
+                )
+                axes_object.set_title(title_string)
+
+                panel_file_names[k] = '{0:s}/{1:s}_{2:s}_{3:s}.jpg'.format(
+                    output_dir_name,
+                    METRIC_NAMES[m].replace('_', '-'),
+                    target_field_names[f].replace('_', '-'),
+                    PREDICTOR_TIME_STRATEGIES_AXIS3[k].replace('_', '-')
+                )
+
+                print('Saving figure to: "{0:s}"...'.format(
+                    panel_file_names[k]
+                ))
+                figure_object.savefig(
+                    panel_file_names[k], dpi=FIGURE_RESOLUTION_DPI,
+                    pad_inches=0, bbox_inches='tight'
+                )
+                pyplot.close(figure_object)
+
+            num_panel_rows = int(numpy.floor(
+                numpy.sqrt(length_axis3)
+            ))
+            num_panel_columns = int(numpy.ceil(
+                float(length_axis3) / num_panel_rows
+            ))
+            concat_figure_file_name = '{0:s}/{1:s}_{2:s}.jpg'.format(
+                output_dir_name,
+                METRIC_NAMES[m].replace('_', '-'),
+                target_field_names[f].replace('_', '-')
+            )
+
+            print('Concatenating panels to: "{0:s}"...'.format(
+                concat_figure_file_name
+            ))
+            imagemagick_utils.concatenate_images(
+                input_file_names=panel_file_names,
+                output_file_name=concat_figure_file_name,
+                num_panel_rows=num_panel_rows,
+                num_panel_columns=num_panel_columns
+            )
+            imagemagick_utils.resize_image(
+                input_file_name=concat_figure_file_name,
+                output_file_name=concat_figure_file_name,
+                output_size_pixels=int(1e7)
+            )
 
 
 if __name__ == '__main__':
