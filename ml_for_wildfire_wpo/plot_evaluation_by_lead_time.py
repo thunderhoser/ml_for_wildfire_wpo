@@ -18,6 +18,9 @@ import file_system_utils
 import error_checking
 import canadian_fwi_utils
 import regression_evaluation as regression_eval
+import spread_skill_utils as ss_utils
+import discard_test_utils as dt_utils
+import pit_histogram_utils as pith_utils
 
 DEFAULT_FONT_SIZE = 30
 pyplot.rc('font', size=DEFAULT_FONT_SIZE)
@@ -77,7 +80,11 @@ METRIC_NAME_TO_FANCY_VERBOSE = {
     regression_eval.MAE_SKILL_SCORE_KEY: 'MAE skill score',
     regression_eval.MSE_SKILL_SCORE_KEY: 'MSE skill score',
     regression_eval.DWMSE_SKILL_SCORE_KEY: 'DWMSE skill score',
-    regression_eval.KGE_KEY: 'Kling-Gupta efficiency'
+    regression_eval.KGE_KEY: 'Kling-Gupta efficiency',
+    ss_utils.SSRAT_KEY: 'Spread-skill ratio',
+    ss_utils.SSREL_KEY: 'Spread-skill reliability',
+    dt_utils.MONO_FRACTION_KEY: 'Monotonicity fraction',
+    pith_utils.PIT_DEVIATION_KEY: 'PIT deviation'
 }
 
 METRIC_NAME_TO_FANCY_ABBREV = {
@@ -90,7 +97,11 @@ METRIC_NAME_TO_FANCY_ABBREV = {
     regression_eval.MAE_SKILL_SCORE_KEY: 'MAE skill score',
     regression_eval.MSE_SKILL_SCORE_KEY: 'MSE skill score',
     regression_eval.DWMSE_SKILL_SCORE_KEY: 'DWMSE skill score',
-    regression_eval.KGE_KEY: 'KGE'
+    regression_eval.KGE_KEY: 'KGE',
+    ss_utils.SSRAT_KEY: 'SSRAT',
+    ss_utils.SSREL_KEY: 'SSREL',
+    dt_utils.MONO_FRACTION_KEY: 'MF',
+    pith_utils.PIT_DEVIATION_KEY: 'PITD'
 }
 
 # TODO(thunderhoser): Allow baseline to be unspecified.
@@ -98,6 +109,9 @@ METRIC_NAME_TO_FANCY_ABBREV = {
 
 MODEL_EVAL_FILES_ARG_NAME = 'model_eval_file_name_by_lead'
 BASELINE_EVAL_FILES_ARG_NAME = 'baseline_eval_file_name_by_lead'
+MODEL_SS_FILES_ARG_NAME = 'model_ss_file_name_by_lead'
+MODEL_DT_FILES_ARG_NAME = 'model_dt_file_name_by_lead'
+MODEL_PITH_FILES_ARG_NAME = 'model_pith_file_name_by_lead'
 LEAD_TIMES_ARG_NAME = 'lead_times_days'
 MODEL_DESCRIPTION_ARG_NAME = 'model_description_string'
 BASELINE_DESCRIPTION_ARG_NAME = 'baseline_description_string'
@@ -112,6 +126,30 @@ MODEL_EVAL_FILES_HELP_STRING = (
 )
 BASELINE_EVAL_FILES_HELP_STRING = 'Same as {0:s} but for baseline.'.format(
     MODEL_EVAL_FILES_ARG_NAME
+)
+MODEL_SS_FILES_HELP_STRING = (
+    '1-D list of paths to spread-skill files for model.  This list must have '
+    'the same length as {0:s}.  Each file will be read by '
+    '`spread_skill_utils.read_results`.  If you do not want to plot SSRAT and '
+    'SSREL, leave this argument alone.'
+).format(
+    LEAD_TIMES_ARG_NAME
+)
+MODEL_DT_FILES_HELP_STRING = (
+    '1-D list of paths to discard-test files for model.  This list must have '
+    'the same length as {0:s}.  Each file will be read by '
+    '`discard_test_utils.read_results`.  If you do not want to plot MF, leave '
+    'this argument alone.'
+).format(
+    LEAD_TIMES_ARG_NAME
+)
+MODEL_PITH_FILES_HELP_STRING = (
+    '1-D list of paths to PIT-histogram files for model.  This list must have '
+    'the same length as {0:s}.  Each file will be read by '
+    '`pit_histogram_utils.read_results`.  If you do not want to plot PITD, '
+    'leave this argument alone.'
+).format(
+    LEAD_TIMES_ARG_NAME
 )
 LEAD_TIMES_HELP_STRING = '1-D list of lead times.'
 MODEL_DESCRIPTION_HELP_STRING = (
@@ -132,6 +170,18 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + BASELINE_EVAL_FILES_ARG_NAME, type=str, nargs='+', required=True,
     help=BASELINE_EVAL_FILES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + MODEL_SS_FILES_ARG_NAME, type=str, nargs='+', required=False,
+    default=[''], help=MODEL_SS_FILES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + MODEL_DT_FILES_ARG_NAME, type=str, nargs='+', required=False,
+    default=[''], help=MODEL_DT_FILES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + MODEL_PITH_FILES_ARG_NAME, type=str, nargs='+', required=False,
+    default=[''], help=MODEL_PITH_FILES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + LEAD_TIMES_ARG_NAME, type=int, nargs='+', required=True,
@@ -163,11 +213,13 @@ def _plot_one_metric(
 
     :param model_metric_matrix: L-by-T-by-B numpy array of metric values for
         model.
-    :param baseline_metric_matrix: Same but for baseline.
+    :param baseline_metric_matrix: Same but for baseline.  If there is no
+        baseline, make this None.
     :param target_field_names: length-T list of target fields.
     :param metric_name: Name of metric.
     :param model_description_string: String description of model.
-    :param baseline_description_string: String description of baseline.
+    :param baseline_description_string: String description of baseline.  If
+        there is no baseline, make this None.
     :param lead_times_days: length-L numpy array of lead times.
     :param title_string: Figure title.
     :param output_file_name_prefix: Beginning of path to output files.
@@ -204,29 +256,30 @@ def _plot_one_metric(
             FIELD_NAME_TO_FANCY[FIRST_TARGET_FIELD_NAMES[i]]
         ))
 
-    for i in range(len(FIRST_TARGET_FIELD_NAMES)):
-        j = numpy.where(
-            numpy.array(target_field_names) == FIRST_TARGET_FIELD_NAMES[i]
-        )[0][0]
+    if baseline_metric_matrix is not None:
+        for i in range(len(FIRST_TARGET_FIELD_NAMES)):
+            j = numpy.where(
+                numpy.array(target_field_names) == FIRST_TARGET_FIELD_NAMES[i]
+            )[0][0]
 
-        this_handle = axes_object.plot(
-            lead_times_days,
-            numpy.mean(baseline_metric_matrix[:, j, ...], axis=-1),
-            color=LINE_COLOURS[i],
-            linestyle='dashed',
-            linewidth=BASELINE_LINE_WIDTH,
-            marker=BASELINE_MARKER_TYPE,
-            markersize=MARKER_SIZE,
-            markerfacecolor=LINE_COLOURS[i],
-            markeredgecolor=LINE_COLOURS[i],
-            markeredgewidth=0
-        )[0]
+            this_handle = axes_object.plot(
+                lead_times_days,
+                numpy.mean(baseline_metric_matrix[:, j, ...], axis=-1),
+                color=LINE_COLOURS[i],
+                linestyle='dashed',
+                linewidth=BASELINE_LINE_WIDTH,
+                marker=BASELINE_MARKER_TYPE,
+                markersize=MARKER_SIZE,
+                markerfacecolor=LINE_COLOURS[i],
+                markeredgecolor=LINE_COLOURS[i],
+                markeredgewidth=0
+            )[0]
 
-        legend_handles.append(this_handle)
-        legend_strings.append('{0:s} {1:s}'.format(
-            baseline_description_string,
-            FIELD_NAME_TO_FANCY[FIRST_TARGET_FIELD_NAMES[i]]
-        ))
+            legend_handles.append(this_handle)
+            legend_strings.append('{0:s} {1:s}'.format(
+                baseline_description_string,
+                FIELD_NAME_TO_FANCY[FIRST_TARGET_FIELD_NAMES[i]]
+            ))
 
     axes_object.set_ylabel(metric_name)
     axes_object.set_xlim([
@@ -240,7 +293,7 @@ def _plot_one_metric(
         bbox_to_anchor=(0.5, -0.1),
         fancybox=True,
         shadow=True,
-        ncol=2
+        ncol=1 + int(baseline_metric_matrix is not None)
     )
 
     axes_object.set_xticks(lead_times_days)
@@ -287,29 +340,30 @@ def _plot_one_metric(
             FIELD_NAME_TO_FANCY[SECOND_TARGET_FIELD_NAMES[i]]
         ))
 
-    for i in range(len(SECOND_TARGET_FIELD_NAMES)):
-        j = numpy.where(
-            numpy.array(target_field_names) == SECOND_TARGET_FIELD_NAMES[i]
-        )[0][0]
+    if baseline_metric_matrix is not None:
+        for i in range(len(SECOND_TARGET_FIELD_NAMES)):
+            j = numpy.where(
+                numpy.array(target_field_names) == SECOND_TARGET_FIELD_NAMES[i]
+            )[0][0]
 
-        this_handle = axes_object.plot(
-            lead_times_days,
-            numpy.mean(baseline_metric_matrix[:, j, ...], axis=-1),
-            color=LINE_COLOURS[i],
-            linestyle='dashed',
-            linewidth=BASELINE_LINE_WIDTH,
-            marker=BASELINE_MARKER_TYPE,
-            markersize=MARKER_SIZE,
-            markerfacecolor=LINE_COLOURS[i],
-            markeredgecolor=LINE_COLOURS[i],
-            markeredgewidth=0
-        )[0]
+            this_handle = axes_object.plot(
+                lead_times_days,
+                numpy.mean(baseline_metric_matrix[:, j, ...], axis=-1),
+                color=LINE_COLOURS[i],
+                linestyle='dashed',
+                linewidth=BASELINE_LINE_WIDTH,
+                marker=BASELINE_MARKER_TYPE,
+                markersize=MARKER_SIZE,
+                markerfacecolor=LINE_COLOURS[i],
+                markeredgecolor=LINE_COLOURS[i],
+                markeredgewidth=0
+            )[0]
 
-        legend_handles.append(this_handle)
-        legend_strings.append('{0:s} {1:s}'.format(
-            baseline_description_string,
-            FIELD_NAME_TO_FANCY[SECOND_TARGET_FIELD_NAMES[i]]
-        ))
+            legend_handles.append(this_handle)
+            legend_strings.append('{0:s} {1:s}'.format(
+                baseline_description_string,
+                FIELD_NAME_TO_FANCY[SECOND_TARGET_FIELD_NAMES[i]]
+            ))
 
     axes_object.set_ylabel(metric_name)
     axes_object.set_xlabel('Lead time (days)')
@@ -324,7 +378,7 @@ def _plot_one_metric(
         bbox_to_anchor=(0.5, -0.1),
         fancybox=True,
         shadow=True,
-        ncol=2
+        ncol=1 + int(baseline_metric_matrix is not None)
     )
 
     axes_object.set_xticks(lead_times_days)
@@ -342,6 +396,8 @@ def _plot_one_metric(
 
 
 def _run(model_eval_file_name_by_lead, baseline_eval_file_name_by_lead,
+         model_ss_file_name_by_lead, model_dt_file_name_by_lead,
+         model_pith_file_name_by_lead,
          lead_times_days, model_description_string, baseline_description_string,
          output_dir_name):
     """Plots evaluation metrics as a function of lead time.
@@ -351,6 +407,9 @@ def _run(model_eval_file_name_by_lead, baseline_eval_file_name_by_lead,
     :param model_eval_file_name_by_lead: See documentation at top of this
         script.
     :param baseline_eval_file_name_by_lead: Same.
+    :param model_ss_file_name_by_lead: Same.
+    :param model_dt_file_name_by_lead: Same.
+    :param model_pith_file_name_by_lead: Same.
     :param lead_times_days: Same.
     :param model_description_string: Same.
     :param baseline_description_string: Same.
@@ -369,6 +428,39 @@ def _run(model_eval_file_name_by_lead, baseline_eval_file_name_by_lead,
         numpy.array(baseline_eval_file_name_by_lead),
         exact_dimensions=numpy.array([num_lead_times], dtype=int)
     )
+
+    if (
+            len(model_ss_file_name_by_lead) == 1 and
+            model_ss_file_name_by_lead[0] == ''
+    ):
+        model_ss_file_name_by_lead = None
+    else:
+        error_checking.assert_is_numpy_array(
+            numpy.array(model_ss_file_name_by_lead),
+            exact_dimensions=numpy.array([num_lead_times], dtype=int)
+        )
+
+    if (
+            len(model_dt_file_name_by_lead) == 1 and
+            model_dt_file_name_by_lead[0] == ''
+    ):
+        model_dt_file_name_by_lead = None
+    else:
+        error_checking.assert_is_numpy_array(
+            numpy.array(model_dt_file_name_by_lead),
+            exact_dimensions=numpy.array([num_lead_times], dtype=int)
+        )
+
+    if (
+            len(model_pith_file_name_by_lead) == 1 and
+            model_pith_file_name_by_lead[0] == ''
+    ):
+        model_pith_file_name_by_lead = None
+    else:
+        error_checking.assert_is_numpy_array(
+            numpy.array(model_pith_file_name_by_lead),
+            exact_dimensions=numpy.array([num_lead_times], dtype=int)
+        )
 
     file_system_utils.mkdir_recursive_if_necessary(
         directory_name=output_dir_name
@@ -495,6 +587,119 @@ def _run(model_eval_file_name_by_lead, baseline_eval_file_name_by_lead,
             )
         )
 
+    if model_ss_file_name_by_lead is not None:
+        spread_skill_tables_xarray = [xarray.Dataset()] * num_lead_times
+
+        for i in range(num_lead_times):
+            print('Reading data from: "{0:s}"...'.format(
+                model_ss_file_name_by_lead[i]
+            ))
+            spread_skill_tables_xarray[i] = ss_utils.read_results(
+                model_ss_file_name_by_lead[i]
+            )
+            spread_skill_tables_xarray[i] = spread_skill_tables_xarray[i].sel({
+                ss_utils.FIELD_DIM: target_field_names
+            })
+
+        for this_metric_name in [ss_utils.SSRAT_KEY, ss_utils.SSREL_KEY]:
+            model_metric_matrix = numpy.stack([
+                numpy.expand_dims(sstx[this_metric_name].values, axis=-1)
+                for sstx in spread_skill_tables_xarray
+            ], axis=0)
+
+            _plot_one_metric(
+                model_metric_matrix=model_metric_matrix,
+                baseline_metric_matrix=None,
+                target_field_names=target_field_names,
+                metric_name=METRIC_NAME_TO_FANCY_ABBREV[this_metric_name],
+                model_description_string=model_description_string,
+                baseline_description_string=None,
+                lead_times_days=lead_times_days,
+                title_string=METRIC_NAME_TO_FANCY_VERBOSE[this_metric_name],
+                output_file_name_prefix='{0:s}/{1:s}'.format(
+                    output_dir_name,
+                    METRIC_NAME_TO_FANCY_ABBREV[this_metric_name].lower().replace(
+                        ' ', '_'
+                    )
+                )
+            )
+
+    if model_dt_file_name_by_lead is not None:
+        discard_test_tables_xarray = [xarray.Dataset()] * num_lead_times
+
+        for i in range(num_lead_times):
+            print('Reading data from: "{0:s}"...'.format(
+                model_dt_file_name_by_lead[i]
+            ))
+            discard_test_tables_xarray[i] = dt_utils.read_results(
+                model_dt_file_name_by_lead[i]
+            )
+            discard_test_tables_xarray[i] = discard_test_tables_xarray[i].sel({
+                dt_utils.FIELD_DIM: target_field_names
+            })
+
+        for this_metric_name in [dt_utils.MONO_FRACTION_KEY]:
+            model_metric_matrix = numpy.stack([
+                numpy.expand_dims(dttx[this_metric_name].values, axis=-1)
+                for dttx in discard_test_tables_xarray
+            ], axis=0)
+
+            _plot_one_metric(
+                model_metric_matrix=model_metric_matrix,
+                baseline_metric_matrix=None,
+                target_field_names=target_field_names,
+                metric_name=METRIC_NAME_TO_FANCY_ABBREV[this_metric_name],
+                model_description_string=model_description_string,
+                baseline_description_string=None,
+                lead_times_days=lead_times_days,
+                title_string=METRIC_NAME_TO_FANCY_VERBOSE[this_metric_name],
+                output_file_name_prefix='{0:s}/{1:s}'.format(
+                    output_dir_name,
+                    METRIC_NAME_TO_FANCY_ABBREV[this_metric_name].lower().replace(
+                        ' ', '_'
+                    )
+                )
+            )
+
+    if model_pith_file_name_by_lead is not None:
+        pit_histogram_tables_xarray = [xarray.Dataset()] * num_lead_times
+
+        for i in range(num_lead_times):
+            print('Reading data from: "{0:s}"...'.format(
+                model_pith_file_name_by_lead[i]
+            ))
+            pit_histogram_tables_xarray[i] = pith_utils.read_results(
+                model_pith_file_name_by_lead[i]
+            )
+            pit_histogram_tables_xarray[i] = (
+                pit_histogram_tables_xarray[i].sel({
+                    pith_utils.FIELD_DIM: target_field_names
+                })
+            )
+
+        for this_metric_name in [pith_utils.PIT_DEVIATION_KEY]:
+            model_metric_matrix = numpy.stack([
+                numpy.expand_dims(ptx[this_metric_name].values, axis=-1)
+                for ptx in pit_histogram_tables_xarray
+            ], axis=0)
+
+            _plot_one_metric(
+                model_metric_matrix=model_metric_matrix,
+                baseline_metric_matrix=None,
+                target_field_names=target_field_names,
+                metric_name=METRIC_NAME_TO_FANCY_ABBREV[this_metric_name],
+                model_description_string=model_description_string,
+                baseline_description_string=None,
+                lead_times_days=lead_times_days,
+                title_string=METRIC_NAME_TO_FANCY_VERBOSE[this_metric_name],
+                output_file_name_prefix='{0:s}/{1:s}'.format(
+                    output_dir_name,
+                    METRIC_NAME_TO_FANCY_ABBREV[this_metric_name].lower().replace(
+                        ' ', '_'
+                    )
+                )
+            )
+
 
 if __name__ == '__main__':
     INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
@@ -505,6 +710,15 @@ if __name__ == '__main__':
         ),
         baseline_eval_file_name_by_lead=getattr(
             INPUT_ARG_OBJECT, BASELINE_EVAL_FILES_ARG_NAME
+        ),
+        model_ss_file_name_by_lead=getattr(
+            INPUT_ARG_OBJECT, MODEL_SS_FILES_ARG_NAME
+        ),
+        model_dt_file_name_by_lead=getattr(
+            INPUT_ARG_OBJECT, MODEL_DT_FILES_ARG_NAME
+        ),
+        model_pith_file_name_by_lead=getattr(
+            INPUT_ARG_OBJECT, MODEL_PITH_FILES_ARG_NAME
         ),
         lead_times_days=numpy.array(
             getattr(INPUT_ARG_OBJECT, LEAD_TIMES_ARG_NAME), dtype=int
