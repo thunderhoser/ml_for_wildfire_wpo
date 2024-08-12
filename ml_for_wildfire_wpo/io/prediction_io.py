@@ -1,6 +1,7 @@
 """Input/output methods for predictions."""
 
 import os
+import copy
 import numpy
 import xarray
 import netCDF4
@@ -395,7 +396,9 @@ def subset_by_location(
         )
     )
 
-    eval_weight_matrix = prediction_table_xarray[WEIGHT_KEY].values
+    eval_weight_matrix = copy.deepcopy(
+        prediction_table_xarray[WEIGHT_KEY].values
+    )
     radius_degrees_lat = radius_metres * METRES_TO_DEGREES_LAT
 
     keep_location_matrix = numpy.logical_and(
@@ -434,6 +437,8 @@ def subset_by_location(
 
     eval_weight_matrix[keep_location_matrix == False] = 0.
     good_rows, good_columns = numpy.where(keep_location_matrix)
+    good_rows = numpy.unique(good_rows)
+    good_columns = numpy.unique(good_columns)
 
     new_prediction_table_xarray = prediction_table_xarray.isel(
         {ROW_DIM: good_rows}
