@@ -46,8 +46,6 @@ def _subset_predictions_by_location(
         smaller grid and maybe with different evaluation weights.
     """
 
-    # TODO(thunderhoser): Still need to test this!!
-
     num_tables = len(prediction_tables_xarray)
     new_prediction_tables_xarray = [xarray.Dataset()] * num_tables
 
@@ -69,6 +67,8 @@ def _subset_predictions_by_location(
             )
 
             good_rows, good_columns = numpy.where(keep_location_matrix)
+            good_rows = numpy.unique(good_rows)
+            good_columns = numpy.unique(good_columns)
             continue
 
         new_prediction_tables_xarray[k] = prediction_tables_xarray[k].isel(
@@ -119,6 +119,17 @@ def _train_one_model(prediction_tables_xarray):
         ptx[prediction_io.WEIGHT_KEY].values[good_spatial_inds]
         for ptx in prediction_tables_xarray
     ])
+
+    percentile_levels = numpy.linspace(0, 100, num=11, dtype=float)
+    print((
+        'Num training pixels/samples = {0:d}/{1:d}; '
+        'percentiles {2:s} of sample weights = {3:s}'
+    ).format(
+        len(good_spatial_inds[0]),
+        len(predicted_values),
+        str(percentile_levels),
+        str(numpy.percentile(eval_weights, percentile_levels))
+    ))
 
     model_object = IsotonicRegression(
         increasing=True, out_of_bounds='clip', y_min=0.
