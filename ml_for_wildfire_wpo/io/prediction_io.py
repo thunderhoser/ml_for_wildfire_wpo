@@ -5,6 +5,7 @@ import numpy
 import xarray
 import netCDF4
 from geopy.distance import geodesic
+from gewittergefahr.gg_utils import grids
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from gewittergefahr.gg_utils import file_system_utils
@@ -383,10 +384,17 @@ def subset_by_location(
         recompute_weights_by_inverse_sq_dist = False
 
     # Do actual stuff.
-    latitude_matrix_deg_n = prediction_table_xarray[LATITUDE_KEY].values
-    longitude_matrix_deg_e = lng_conversion.convert_lng_positive_in_west(
+    grid_latitudes_deg_n = prediction_table_xarray[LATITUDE_KEY].values
+    grid_longitudes_deg_e = lng_conversion.convert_lng_positive_in_west(
         prediction_table_xarray[LONGITUDE_KEY].values
     )
+    latitude_matrix_deg_n, longitude_matrix_deg_e = (
+        grids.latlng_vectors_to_matrices(
+            unique_latitudes_deg=grid_latitudes_deg_n,
+            unique_longitudes_deg=grid_longitudes_deg_e
+        )
+    )
+
     eval_weight_matrix = prediction_table_xarray[WEIGHT_KEY].values
     radius_degrees_lat = radius_metres * METRES_TO_DEGREES_LAT
 
