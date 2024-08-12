@@ -5,6 +5,7 @@ import sys
 import numpy
 import xarray
 import netCDF4
+from geopy.distance import geodesic
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -24,6 +25,7 @@ COLUMN_DIM = 'grid_column'
 FIELD_DIM = 'field'
 FIELD_CHAR_DIM = 'field_char'
 ENSEMBLE_MEMBER_DIM = 'ensemble_member'
+DUMMY_ENSEMBLE_MEMBER_DIM = 'dummy_ensemble_member'
 
 MODEL_FILE_KEY = 'model_file_name'
 INIT_DATE_KEY = 'init_date_string'
@@ -34,6 +36,8 @@ WEIGHT_KEY = 'evaluation_weight'
 LATITUDE_KEY = 'latitude_deg_n'
 LONGITUDE_KEY = 'longitude_deg_e'
 FIELD_NAME_KEY = 'field_name'
+
+METRES_TO_DEGREES_LAT = 1. / (60. * 1852)
 
 
 def find_file(directory_name, init_date_string, raise_error_if_missing=True):
@@ -308,3 +312,139 @@ def write_file(
     )
 
     dataset_object.close()
+
+
+def take_ensemble_mean(prediction_table_xarray):
+    """Takes ensemble mean for each atomic example.
+
+    One atomic example = one init time, one valid time, one field, one pixel
+
+    :param prediction_table_xarray: xarray table in format returned by
+        `prediction_io.read_file`.
+    :return: prediction_table_xarray: Same but with only one prediction (the
+        ensemble mean) per atomic example.
+    """
+
+    ptx = prediction_table_xarray
+    ensemble_size = len(ptx.coords[ENSEMBLE_MEMBER_DIM].values)
+    if ensemble_size == 1:
+        return ptx
+
+    ptx = ptx.assign_coords({
+        DUMMY_ENSEMBLE_MEMBER_DIM: numpy.array([0], dtype=int)
+    })
+
+    these_dim = (ROW_DIM, COLUMN_DIM, FIELD_DIM, DUMMY_ENSEMBLE_MEMBER_DIM)
+
+    ptx = ptx.assign({
+        PREDICTION_KEY: (
+            these_dim,
+            numpy.mean(ptx[PREDICTION_KEY].values, axis=-1, keepdims=True)
+        )
+    })
+
+    ptx = ptx.rename({DUMMY_ENSEMBLE_MEMBER_DIM: ENSEMBLE_MEMBER_DIM})
+    prediction_table_xarray = ptx
+    return prediction_table_xarray
+
+
+def subset_by_location(
+        prediction_table_xarray, desired_latitude_deg_n,
+        desired_longitude_deg_e, radius_metres,
+        recompute_weights_by_inverse_dist,
+        recompute_weights_by_inverse_sq_dist):
+    """Subsets prediction table by location.
+
+    M = number of rows in original grid
+    N = number of columns in original grid
+
+    :param prediction_table_xarray: xarray table in format returned by
+        `prediction_io.read_file`.
+    :param desired_latitude_deg_n: Desired latitude (deg north).
+    :param desired_longitude_deg_e: Desired longitude (deg east).
+    :param radius_metres: Will take all grid points within this radius around
+        the desired point.
+    :param recompute_weights_by_inverse_dist: Boolean flag.  If True, will
+        recompute evaluation weights, scaling by inverse distance to desired
+        point.
+    :param recompute_weights_by_inverse_sq_dist: Boolean flag.  If True, will
+        recompute evaluation weights, scaling by inverse *squared* distance to
+        desired point.
+    :return: new_prediction_table_xarray: Same as input but maybe with fewer
+        examples.
+    :return: keep_location_matrix: M-by-N numpy array of Boolean flags.
+    """
+
+    # Check input args.
+    error_checking.assert_is_valid_latitude(
+        desired_latitude_deg_n, allow_nan=False
+    )
+    desired_longitude_deg_e = lng_conversion.convert_lng_positive_in_west(
+        longitudes_deg=desired_longitude_deg_e, allow_nan=False
+    )
+
+    error_checking.assert_is_greater(radius_metres, 0.)
+    error_checking.assert_is_boolean(recompute_weights_by_inverse_dist)
+    error_checking.assert_is_boolean(recompute_weights_by_inverse_sq_dist)
+    if recompute_weights_by_inverse_dist:
+        recompute_weights_by_inverse_sq_dist = False
+
+    # Do actual stuff.
+    latitude_matrix_deg_n = prediction_table_xarray[LATITUDE_KEY].values
+    longitude_matrix_deg_e = lng_conversion.convert_lng_positive_in_west(
+        prediction_table_xarray[LONGITUDE_KEY].values
+    )
+    eval_weight_matrix = prediction_table_xarray[WEIGHT_KEY].values
+    radius_degrees_lat = radius_metres * METRES_TO_DEGREES_LAT
+
+    keep_location_matrix = numpy.logical_and(
+        numpy.absolute(latitude_matrix_deg_n - desired_latitude_deg_n) <=
+        radius_degrees_lat,
+        numpy.absolute(longitude_matrix_deg_e - desired_longitude_deg_e) <=
+        radius_degrees_lat
+    )
+
+    num_grid_rows = keep_location_matrix.shape[0]
+    num_grid_columns = keep_location_matrix.shape[1]
+    desired_point = (desired_latitude_deg_n, desired_longitude_deg_e)
+
+    for i in range(num_grid_rows):
+        for j in range(num_grid_columns):
+            if not keep_location_matrix[i, j]:
+                continue
+
+            this_point = (
+                latitude_matrix_deg_n[i, j], longitude_matrix_deg_e[i, j]
+            )
+            this_distance_metres = geodesic(desired_point, this_point).meters
+
+            if this_distance_metres > radius_metres:
+                keep_location_matrix[i, j] = False
+                continue
+
+            if recompute_weights_by_inverse_dist:
+                mult_factor = 1. - this_distance_metres / radius_metres
+                eval_weight_matrix[i, j] *= mult_factor
+                continue
+
+            if recompute_weights_by_inverse_sq_dist:
+                mult_factor = (1. - this_distance_metres / radius_metres) ** 2
+                eval_weight_matrix[i, j] *= mult_factor
+
+    eval_weight_matrix[keep_location_matrix == False] = 0.
+    good_rows, good_columns = numpy.where(keep_location_matrix)
+
+    new_prediction_table_xarray = prediction_table_xarray.isel(
+        {ROW_DIM: good_rows}
+    )
+    new_prediction_table_xarray = new_prediction_table_xarray.isel(
+        {COLUMN_DIM: good_columns}
+    )
+    new_prediction_table_xarray = new_prediction_table_xarray.assign({
+        WEIGHT_KEY: (
+            new_prediction_table_xarray[WEIGHT_KEY].dims,
+            eval_weight_matrix[good_rows, :][:, good_columns]
+        )
+    })
+
+    return new_prediction_table_xarray, keep_location_matrix
