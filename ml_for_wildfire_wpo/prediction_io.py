@@ -441,6 +441,9 @@ def subset_by_location(
 
     eval_weight_matrix[keep_location_matrix == False] = 0.
     good_rows, good_columns = numpy.where(keep_location_matrix)
+    good_rows = numpy.unique(good_rows)
+    good_columns = numpy.unique(good_columns)
+
     print(keep_location_matrix.shape)
     print(good_rows)
     print(good_columns)
