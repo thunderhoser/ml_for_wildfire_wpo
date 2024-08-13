@@ -26,6 +26,7 @@ HIGH_BIN_BIAS_KEY = 'high_bin_pit_bias'
 EXAMPLE_COUNT_KEY = 'example_count'
 
 MODEL_FILE_KEY = 'model_file_name'
+ISOTONIC_MODEL_FILE_KEY = 'isotonic_model_file_name'
 PREDICTION_FILES_KEY = 'prediction_file_names'
 
 
@@ -254,7 +255,8 @@ def _compute_pit_histogram_1field(
     return result_table_xarray
 
 
-def compute_pit_histograms(prediction_file_names, target_field_names, num_bins):
+def compute_pit_histograms(prediction_file_names, target_field_names, num_bins,
+                           isotonic_model_file_name=None):
     """Computes the PIT histogram independently for each target field.
 
     T = number of target fields
@@ -264,6 +266,10 @@ def compute_pit_histograms(prediction_file_names, target_field_names, num_bins):
         file will be read by `prediction_io.read_file`.
     :param target_field_names: length-T list of field names.
     :param num_bins: Number of bins (B in the above discussion).
+    :param isotonic_model_file_name: Path to file with isotonic-regression
+        model, which will be used to bias-correct predictions before evaluation.
+        Will be read by `isotonic_regression.read_file`.  If you do not want to
+        bias-correct, make this None.
     :return: result_table_xarray: xarray table with results (variable and
         dimension names should make the table self-explanatory).
     """
@@ -280,6 +286,7 @@ def compute_pit_histograms(prediction_file_names, target_field_names, num_bins):
         target_matrix, prediction_matrix, weight_matrix, model_file_name
     ) = regression_eval.read_inputs(
         prediction_file_names=prediction_file_names,
+        isotonic_model_file_name=isotonic_model_file_name,
         target_field_names=target_field_names,
         mask_pixel_if_weight_below=-1.
     )
@@ -326,6 +333,9 @@ def compute_pit_histograms(prediction_file_names, target_field_names, num_bins):
         data_vars=main_data_dict, coords=metadata_dict
     )
     result_table_xarray.attrs[MODEL_FILE_KEY] = model_file_name
+    result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = (
+        isotonic_model_file_name
+    )
     result_table_xarray.attrs[PREDICTION_FILES_KEY] = ' '.join([
         '{0:s}'.format(f) for f in prediction_file_names
     ])
@@ -365,4 +375,8 @@ def read_results(netcdf_file_name):
         xarray table should make values self-explanatory.
     """
 
-    return xarray.open_dataset(netcdf_file_name)
+    result_table_xarray = xarray.open_dataset(netcdf_file_name)
+    if ISOTONIC_MODEL_FILE_KEY not in result_table_xarray.attrs:
+        result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = None
+
+    return result_table_xarray
