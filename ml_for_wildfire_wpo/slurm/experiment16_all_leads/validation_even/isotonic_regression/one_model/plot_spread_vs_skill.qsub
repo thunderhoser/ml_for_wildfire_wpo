@@ -48,6 +48,6 @@ MODEL_LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10")
 
 for model_lead_time_days in "${MODEL_LEAD_TIMES_DAYS[@]}"; do
     python3 -u "${CODE_DIR_NAME}/plot_spread_vs_skill.py" \
-    --input_file_name="${model_dir_name}/validation_lead-time-days=${model_lead_time_days}/spread_vs_skill.nc" \
-    --output_dir_name="${model_dir_name}/validation_lead-time-days=${model_lead_time_days}/spread_vs_skill"
+    --input_file_name="${model_dir_name}/isotonic_regression/one_model_for_all/validation_lead-time-days=${model_lead_time_days}/spread_vs_skill.nc" \
+    --output_dir_name="${model_dir_name}/isotonic_regression/one_model_for_all/validation_lead-time-days=${model_lead_time_days}/spread_vs_skill"
 done

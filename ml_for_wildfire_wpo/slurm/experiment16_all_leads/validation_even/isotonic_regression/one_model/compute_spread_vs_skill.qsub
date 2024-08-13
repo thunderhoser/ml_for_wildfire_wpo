@@ -54,5 +54,6 @@ for model_lead_time_days in "${MODEL_LEAD_TIMES_DAYS[@]}"; do
     --num_bins_by_target 100 100 100 100 100 100 100 \
     --min_bin_edge_prctile_by_target 0 0 0 0 0 0 0 \
     --max_bin_edge_prctile_by_target 99.9 99.9 99.9 99.9 99.9 99.9 99.9 \
-    --output_file_name="${model_dir_name}/validation_lead-time-days=${model_lead_time_days}/spread_vs_skill.nc"
+    --isotonic_model_file_name="${model_dir_name}/isotonic_regression/one_model_for_all/isotonic_regression.dill" \
+    --output_file_name="${model_dir_name}/isotonic_regression/one_model_for_all/validation_lead-time-days=${model_lead_time_days}/spread_vs_skill.nc"
 done

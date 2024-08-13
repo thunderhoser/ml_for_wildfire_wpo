@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_pit_histograms"
+#SBATCH --job-name="plot_evaluation_ungridded"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="gpuwf"
@@ -18,7 +18,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_pit_histograms_%A_%a.out
+#SBATCH --output=plot_evaluation_ungridded_%A_%a.out
 
 conda init
 conda activate base
@@ -47,7 +47,13 @@ echo $model_dir_name
 MODEL_LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10")
 
 for model_lead_time_days in "${MODEL_LEAD_TIMES_DAYS[@]}"; do
-    python3 -u "${CODE_DIR_NAME}/plot_pit_histograms.py" \
-    --input_file_name="${model_dir_name}/isotonic_regression/one_model_for_all/validation_lead-time-days=${model_lead_time_days}/pit_histograms.nc" \
-    --output_dir_name="${model_dir_name}/isotonic_regression/one_model_for_all/validation_lead-time-days=${model_lead_time_days}/pit_histograms"
+    python3 -u "${CODE_DIR_NAME}/plot_ungridded_evaluation.py" \
+    --input_eval_file_names "${model_dir_name}/isotonic_regression/one_model_per_lead_time/validation_lead-time-days=${model_lead_time_days}/ungridded_evaluation.nc" \
+    --line_styles "solid" \
+    --line_colours "217_95_2" \
+    --set_descriptions "model" \
+    --plot_full_error_distributions=1 \
+    --confidence_level=0.95 \
+    --report_metrics_in_titles=1 \
+    --output_dir_name="${model_dir_name}/isotonic_regression/one_model_per_lead_time/validation_lead-time-days=${model_lead_time_days}/ungridded_evaluation"
 done
