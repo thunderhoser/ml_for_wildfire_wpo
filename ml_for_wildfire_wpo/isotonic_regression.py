@@ -268,13 +268,6 @@ def train_model_suite(
     )
 
     for f in range(num_fields):
-        these_prediction_tables_xarray = [
-            ptx.isel({
-                prediction_io.FIELD_DIM: numpy.array([f], dtype=int)
-            })
-            for ptx in prediction_tables_xarray
-        ]
-
         for i in range(num_model_grid_rows):
             for j in range(num_model_grid_columns):
                 if (
@@ -298,6 +291,13 @@ def train_model_suite(
                     f + 1,
                     num_fields
                 ))
+
+                these_prediction_tables_xarray = [
+                    ptx.isel({
+                        prediction_io.FIELD_DIM: numpy.array([f], dtype=int)
+                    })
+                    for ptx in prediction_tables_xarray
+                ]
 
                 if one_model_per_pixel:
                     these_prediction_tables_xarray = (
