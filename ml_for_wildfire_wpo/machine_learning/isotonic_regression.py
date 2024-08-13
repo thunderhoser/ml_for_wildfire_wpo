@@ -5,6 +5,7 @@ import dill
 import numpy
 import xarray
 from sklearn.isotonic import IsotonicRegression
+from gewittergefahr.gg_utils import grids
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.io import prediction_io
@@ -191,8 +192,8 @@ def train_model_suite(
 
     # Check input args.
     error_checking.assert_is_boolean(one_model_per_pixel)
-    latitude_matrix_deg_n = None
-    longitude_matrix_deg_e = None
+    grid_latitudes_deg_n = None
+    grid_longitudes_deg_e = None
     orig_eval_weight_matrix = None
     field_names = []
 
@@ -202,18 +203,18 @@ def train_model_suite(
         )
         ptx = prediction_tables_xarray[k]
 
-        if latitude_matrix_deg_n is None:
-            latitude_matrix_deg_n = ptx[prediction_io.LATITUDE_KEY].values
-            longitude_matrix_deg_e = ptx[prediction_io.LONGITUDE_KEY].values
+        if grid_latitudes_deg_n is None:
+            grid_latitudes_deg_n = ptx[prediction_io.LATITUDE_KEY].values
+            grid_longitudes_deg_e = ptx[prediction_io.LONGITUDE_KEY].values
             orig_eval_weight_matrix = ptx[prediction_io.WEIGHT_KEY].values
             field_names = ptx[prediction_io.FIELD_NAME_KEY].values.tolist()
 
         assert numpy.allclose(
-            latitude_matrix_deg_n, ptx[prediction_io.LATITUDE_KEY].values,
+            grid_latitudes_deg_n, ptx[prediction_io.LATITUDE_KEY].values,
             atol=TOLERANCE
         )
         assert numpy.allclose(
-            longitude_matrix_deg_e, ptx[prediction_io.LONGITUDE_KEY].values,
+            grid_longitudes_deg_e, ptx[prediction_io.LONGITUDE_KEY].values,
             atol=TOLERANCE
         )
         assert numpy.allclose(
@@ -221,6 +222,13 @@ def train_model_suite(
             atol=TOLERANCE
         )
         assert field_names == ptx[prediction_io.FIELD_NAME_KEY].values.tolist()
+
+    latitude_matrix_deg_n, longitude_matrix_deg_e = (
+        grids.latlng_vectors_to_matrices(
+            unique_latitudes_deg=grid_latitudes_deg_n,
+            unique_longitudes_deg=grid_longitudes_deg_e
+        )
+    )
 
     if not one_model_per_pixel:
         pixel_radius_metres = None
@@ -330,14 +338,19 @@ def apply_model_suite(prediction_table_xarray, model_dict):
     ptx = prediction_table_xarray
 
     if one_model_per_pixel:
+        pred_latitude_matrix_deg_n, pred_longitude_matrix_deg_e = (
+            grids.latlng_vectors_to_matrices(
+                unique_latitudes_deg=ptx[prediction_io.LATITUDE_KEY].values,
+                unique_longitudes_deg=ptx[prediction_io.LONGITUDE_KEY].values
+            )
+        )
+
         assert numpy.allclose(
-            model_latitude_matrix_deg_n,
-            ptx[prediction_io.LATITUDE_KEY].values,
+            model_latitude_matrix_deg_n, pred_latitude_matrix_deg_n,
             atol=TOLERANCE
         )
         assert numpy.allclose(
-            model_longitude_matrix_deg_e,
-            ptx[prediction_io.LONGITUDE_KEY].values,
+            model_longitude_matrix_deg_e, pred_longitude_matrix_deg_e,
             atol=TOLERANCE
         )
         assert (
