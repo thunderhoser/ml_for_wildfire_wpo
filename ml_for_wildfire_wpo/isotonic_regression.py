@@ -114,6 +114,9 @@ def _train_one_model(prediction_tables_xarray):
     good_spatial_inds = numpy.where(
         eval_weight_matrix >= MASK_PIXEL_IF_WEIGHT_BELOW
     )
+    if len(good_spatial_inds[0]) == 0:
+        print('Num training pixels/samples = 0/0')
+        return None
 
     predicted_values = numpy.concatenate([
         ptx[prediction_io.PREDICTION_KEY].values[..., 0, 0][good_spatial_inds]
@@ -129,10 +132,12 @@ def _train_one_model(prediction_tables_xarray):
     ])
 
     percentile_levels = numpy.linspace(0, 100, num=11, dtype=float)
-    print('Num training pixels/samples = {0:d}/{1:d}'.format(
-        len(good_spatial_inds[0]), len(predicted_values)
-    ))
-    print('Percentiles {0:s} of sample weights = {1:s}'.format(
+    print((
+        'Num training pixels/samples = {0:d}/{1:d}; '
+        'percentiles {2:s} of sample weights = {3:s}'
+    ).format(
+        len(good_spatial_inds[0]),
+        len(predicted_values),
         str(percentile_levels),
         str(numpy.percentile(eval_weights, percentile_levels))
     ))
