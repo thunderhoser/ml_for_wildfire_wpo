@@ -107,6 +107,9 @@ def _train_one_model(prediction_tables_xarray):
     good_spatial_inds = numpy.where(
         eval_weight_matrix >= MASK_PIXEL_IF_WEIGHT_BELOW
     )
+    if len(good_spatial_inds[0]) == 0:
+        print('Num training pixels/samples = 0/0')
+        return None
 
     predicted_values = numpy.concatenate([
         ptx[prediction_io.PREDICTION_KEY].values[..., 0, 0][good_spatial_inds]

@@ -436,6 +436,7 @@ def subset_by_location(
                 eval_weight_matrix[i, j] *= mult_factor
 
     eval_weight_matrix[keep_location_matrix == False] = 0.
+    eval_weight_matrix[numpy.isnan(eval_weight_matrix)] = 0.
     good_rows, good_columns = numpy.where(keep_location_matrix)
     good_rows = numpy.unique(good_rows)
     good_columns = numpy.unique(good_columns)
