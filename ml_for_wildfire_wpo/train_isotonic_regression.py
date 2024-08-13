@@ -1,0 +1,173 @@
+"""Trains isotonic-regression model for bias correction."""
+
+import os
+import sys
+import argparse
+import xarray
+
+THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
+    os.path.join(os.getcwd(), os.path.expanduser(__file__))
+))
+sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
+
+import prediction_io
+import isotonic_regression
+
+SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
+
+SENTINEL_VALUE = -1e6
+
+INPUT_DIR_ARG_NAME = 'input_prediction_dir_name'
+INIT_DATE_LIMITS_ARG_NAME = 'init_date_limit_strings'
+ONE_MODEL_PER_PIXEL_ARG_NAME = 'one_model_per_pixel'
+PIXEL_RADIUS_ARG_NAME = 'pixel_radius_metres'
+WEIGHT_BY_INV_DIST_ARG_NAME = 'weight_pixels_by_inverse_dist'
+WEIGHT_BY_INV_SQ_DIST_ARG_NAME = 'weight_pixels_by_inverse_sq_dist'
+OUTPUT_FILE_ARG_NAME = 'output_file_name'
+
+INPUT_DIR_HELP_STRING = (
+    'Path to input directory, containing non-bias-corrected predictions.  '
+    'Files therein will be found by `prediction_io.find_file` and read by '
+    '`prediction_io.read_file`.'
+)
+INIT_DATE_LIMITS_HELP_STRING = (
+    'List of two initialization dates, specifying the beginning and end of the '
+    'isotonic-regression-training period.  Date format is "yyyymmdd".'
+)
+ONE_MODEL_PER_PIXEL_HELP_STRING = (
+    'Boolean flag.  If 1 (0), will train one IR model per pixel (one IR model '
+    'for the whole domain).'
+)
+PIXEL_RADIUS_HELP_STRING = (
+    '[used only if {0:s} == 1] When training the model for pixel P, will use '
+    'all pixels within this radius.'
+).format(
+    ONE_MODEL_PER_PIXEL_ARG_NAME
+)
+WEIGHT_BY_INV_DIST_HELP_STRING = (
+    '[used only if {0:s} == 1] Boolean flag.  If 1, when training the model '
+    'for pixel P, will weight every other pixel by the inverse of its distance '
+    'to P.'
+).format(
+    ONE_MODEL_PER_PIXEL_ARG_NAME
+)
+WEIGHT_BY_INV_SQ_DIST_HELP_STRING = (
+    '[used only if {0:s} == 1] Boolean flag.  If 1, when training the model '
+    'for pixel P, will weight every other pixel by the inverse of its '
+    '*squared* distance to P.'
+).format(
+    ONE_MODEL_PER_PIXEL_ARG_NAME
+)
+OUTPUT_FILE_HELP_STRING = (
+    'Path to output file.  The suite of trained IR models will be saved here, '
+    'in Dill format.'
+)
+
+INPUT_ARG_PARSER = argparse.ArgumentParser()
+INPUT_ARG_PARSER.add_argument(
+    '--' + INPUT_DIR_ARG_NAME, type=str, required=True,
+    help=INPUT_DIR_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + INIT_DATE_LIMITS_ARG_NAME, type=str, nargs=2, required=True,
+    help=INIT_DATE_LIMITS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + ONE_MODEL_PER_PIXEL_ARG_NAME, type=int, required=True,
+    help=ONE_MODEL_PER_PIXEL_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + PIXEL_RADIUS_ARG_NAME, type=float, required=False, default=-1.,
+    help=PIXEL_RADIUS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + WEIGHT_BY_INV_DIST_ARG_NAME, type=int, required=False, default=1,
+    help=WEIGHT_BY_INV_DIST_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + WEIGHT_BY_INV_SQ_DIST_ARG_NAME, type=int, required=False, default=0,
+    help=WEIGHT_BY_INV_SQ_DIST_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
+    help=OUTPUT_FILE_HELP_STRING
+)
+
+
+def _run(prediction_dir_name, init_date_limit_strings, one_model_per_pixel,
+         pixel_radius_metres, weight_pixels_by_inverse_dist,
+         weight_pixels_by_inverse_sq_dist, output_file_name):
+    """Trains isotonic-regression model for bias correction.
+
+    This is effectively the main method.
+
+    :param prediction_dir_name: See documentation at top of this script.
+    :param init_date_limit_strings: Same.
+    :param one_model_per_pixel: Same.
+    :param pixel_radius_metres: Same.
+    :param weight_pixels_by_inverse_dist: Same.
+    :param weight_pixels_by_inverse_sq_dist: Same.
+    :param output_file_name: Same.
+    """
+
+    if pixel_radius_metres <= 0:
+        pixel_radius_metres = None
+
+    prediction_file_names = prediction_io.find_files_for_period(
+        directory_name=prediction_dir_name,
+        first_init_date_string=init_date_limit_strings[0],
+        last_init_date_string=init_date_limit_strings[1],
+        raise_error_if_any_missing=False,
+        raise_error_if_all_missing=True
+    )
+
+    num_files = len(prediction_file_names)
+    prediction_tables_xarray = [xarray.Dataset()] * num_files
+
+    for k in range(num_files):
+        print('Reading data from: "{0:s}"...'.format(prediction_file_names[k]))
+        prediction_tables_xarray[k] = prediction_io.read_file(
+            prediction_file_names[k]
+        )
+        prediction_tables_xarray[k] = prediction_io.take_ensemble_mean(
+            prediction_tables_xarray[k]
+        )
+
+    print(SEPARATOR_STRING)
+
+    isotonic_model_dict = isotonic_regression.train_model_suite(
+        prediction_tables_xarray=prediction_tables_xarray,
+        one_model_per_pixel=one_model_per_pixel,
+        pixel_radius_metres=pixel_radius_metres,
+        weight_pixels_by_inverse_dist=weight_pixels_by_inverse_dist,
+        weight_pixels_by_inverse_sq_dist=weight_pixels_by_inverse_sq_dist
+    )
+    print(SEPARATOR_STRING)
+
+    print('Writing IR-model suite to: "{0:s}"...'.format(output_file_name))
+    isotonic_regression.write_file(
+        dill_file_name=output_file_name,
+        model_dict=isotonic_model_dict
+    )
+
+
+if __name__ == '__main__':
+    INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
+
+    _run(
+        prediction_dir_name=getattr(INPUT_ARG_OBJECT, INPUT_DIR_ARG_NAME),
+        init_date_limit_strings=getattr(
+            INPUT_ARG_OBJECT, INIT_DATE_LIMITS_ARG_NAME
+        ),
+        one_model_per_pixel=bool(
+            getattr(INPUT_ARG_OBJECT, ONE_MODEL_PER_PIXEL_ARG_NAME)
+        ),
+        pixel_radius_metres=getattr(INPUT_ARG_OBJECT, PIXEL_RADIUS_ARG_NAME),
+        weight_pixels_by_inverse_dist=bool(
+            getattr(INPUT_ARG_OBJECT, WEIGHT_BY_INV_DIST_ARG_NAME)
+        ),
+        weight_pixels_by_inverse_sq_dist=bool(
+            getattr(INPUT_ARG_OBJECT, WEIGHT_BY_INV_SQ_DIST_ARG_NAME)
+        ),
+        output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
+    )

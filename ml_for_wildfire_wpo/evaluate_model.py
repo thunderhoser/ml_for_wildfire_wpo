@@ -28,6 +28,7 @@ MIN_RELIA_BIN_EDGES_PRCTILE_ARG_NAME = 'min_relia_bin_edge_prctile_by_target'
 MAX_RELIA_BIN_EDGES_PRCTILE_ARG_NAME = 'max_relia_bin_edge_prctile_by_target'
 PER_GRID_CELL_ARG_NAME = 'per_grid_cell'
 KEEP_IT_SIMPLE_ARG_NAME = 'keep_it_simple'
+ISOTONIC_MODEL_FILE_ARG_NAME = 'isotonic_model_file_name'
 OUTPUT_FILE_ARG_NAME = 'output_file_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -72,6 +73,11 @@ PER_GRID_CELL_HELP_STRING = (
 KEEP_IT_SIMPLE_HELP_STRING = (
     'Boolean flag.  If 1, will avoid Kolmogorov-Smirnov test and attributes '
     'diagram.'
+)
+ISOTONIC_MODEL_FILE_HELP_STRING = (
+    'Path to file with isotonic-regression model, which will be used to bias-'
+    'correct predictions before evaluation.  If you do not want IR, leave this '
+    'argument alone.'
 )
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Evaluation scores will be written here by '
@@ -126,6 +132,10 @@ INPUT_ARG_PARSER.add_argument(
     help=KEEP_IT_SIMPLE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + ISOTONIC_MODEL_FILE_ARG_NAME, type=str, required=False, default='',
+    help=ISOTONIC_MODEL_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
     help=OUTPUT_FILE_HELP_STRING
 )
@@ -136,7 +146,8 @@ def _run(prediction_dir_name, init_date_limit_strings, num_bootstrap_reps,
          min_relia_bin_edge_by_target, max_relia_bin_edge_by_target,
          min_relia_bin_edge_prctile_by_target,
          max_relia_bin_edge_prctile_by_target,
-         per_grid_cell, keep_it_simple, output_file_name):
+         per_grid_cell, keep_it_simple, isotonic_model_file_name,
+         output_file_name):
     """Evaluates model.
 
     This is effectively the main method.
@@ -152,6 +163,7 @@ def _run(prediction_dir_name, init_date_limit_strings, num_bootstrap_reps,
     :param max_relia_bin_edge_prctile_by_target: Same.
     :param per_grid_cell: Same.
     :param keep_it_simple: Same.
+    :param isotonic_model_file_name: Same.
     :param output_file_name: Same.
     """
 
@@ -173,6 +185,9 @@ def _run(prediction_dir_name, init_date_limit_strings, num_bootstrap_reps,
         min_relia_bin_edge_prctile_by_target = None
         max_relia_bin_edge_prctile_by_target = None
 
+    if isotonic_model_file_name == '':
+        isotonic_model_file_name = None
+
     prediction_file_names = prediction_io.find_files_for_period(
         directory_name=prediction_dir_name,
         first_init_date_string=init_date_limit_strings[0],
@@ -182,6 +197,7 @@ def _run(prediction_dir_name, init_date_limit_strings, num_bootstrap_reps,
 
     result_table_xarray = regression_eval.get_scores_with_bootstrapping(
         prediction_file_names=prediction_file_names,
+        isotonic_model_file_name=isotonic_model_file_name,
         num_bootstrap_reps=num_bootstrap_reps,
         target_field_names=target_field_names,
         num_relia_bins_by_target=num_relia_bins_by_target,
@@ -271,5 +287,8 @@ if __name__ == '__main__':
         ),
         per_grid_cell=bool(getattr(INPUT_ARG_OBJECT, PER_GRID_CELL_ARG_NAME)),
         keep_it_simple=bool(getattr(INPUT_ARG_OBJECT, KEEP_IT_SIMPLE_ARG_NAME)),
+        isotonic_model_file_name=getattr(
+            INPUT_ARG_OBJECT, ISOTONIC_MODEL_FILE_ARG_NAME
+        ),
         output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )

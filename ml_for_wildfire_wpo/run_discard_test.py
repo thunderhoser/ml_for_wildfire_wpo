@@ -19,6 +19,7 @@ INPUT_DIR_ARG_NAME = 'input_prediction_dir_name'
 INIT_DATE_LIMITS_ARG_NAME = 'init_date_limit_strings'
 TARGET_FIELDS_ARG_NAME = 'target_field_names'
 DISCARD_FRACTIONS_ARG_NAME = 'discard_fractions'
+ISOTONIC_MODEL_FILE_ARG_NAME = 'isotonic_model_file_name'
 OUTPUT_FILE_ARG_NAME = 'output_file_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -34,6 +35,11 @@ TARGET_FIELDS_HELP_STRING = 'List of target fields to be evaluated.'
 DISCARD_FRACTIONS_HELP_STRING = (
     'List of discard fractions, ranging from (0, 1).  This script will '
     'automatically use 0 as the lowest discard fraction.'
+)
+ISOTONIC_MODEL_FILE_HELP_STRING = (
+    'Path to file with isotonic-regression model, which will be used to bias-'
+    'correct predictions before evaluation.  If you do not want IR, leave this '
+    'argument alone.'
 )
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Evaluation scores will be written here by '
@@ -58,13 +64,17 @@ INPUT_ARG_PARSER.add_argument(
     help=DISCARD_FRACTIONS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + ISOTONIC_MODEL_FILE_ARG_NAME, type=str, required=False, default='',
+    help=ISOTONIC_MODEL_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
     help=OUTPUT_FILE_HELP_STRING
 )
 
 
 def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
-         discard_fractions, output_file_name):
+         discard_fractions, isotonic_model_file_name, output_file_name):
     """Runs discard test for each target field.
 
     This is effectively the main method.
@@ -73,8 +83,12 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
     :param init_date_limit_strings: Same.
     :param target_field_names: Same.
     :param discard_fractions: Same.
+    :param isotonic_model_file_name: Same.
     :param output_file_name: Same.
     """
+
+    if isotonic_model_file_name == '':
+        isotonic_model_file_name = None
 
     prediction_file_names = prediction_io.find_files_for_period(
         directory_name=prediction_dir_name,
@@ -85,6 +99,7 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
 
     result_table_xarray = dt_utils.run_discard_test(
         prediction_file_names=prediction_file_names,
+        isotonic_model_file_name=isotonic_model_file_name,
         target_field_names=target_field_names,
         discard_fractions=discard_fractions,
         error_function=dt_utils.get_rmse_error_func_1field(),
@@ -126,6 +141,9 @@ if __name__ == '__main__':
         ),
         discard_fractions=numpy.array(
             getattr(INPUT_ARG_OBJECT, DISCARD_FRACTIONS_ARG_NAME), dtype=float
+        ),
+        isotonic_model_file_name=getattr(
+            INPUT_ARG_OBJECT, ISOTONIC_MODEL_FILE_ARG_NAME
         ),
         output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )
