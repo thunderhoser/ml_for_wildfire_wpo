@@ -9,7 +9,7 @@ SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
 SENTINEL_VALUE = -1e6
 
-INPUT_DIR_ARG_NAME = 'input_prediction_dir_name'
+INPUT_DIRS_ARG_NAME = 'input_prediction_dir_names'
 INIT_DATE_LIMITS_ARG_NAME = 'init_date_limit_strings'
 ONE_MODEL_PER_PIXEL_ARG_NAME = 'one_model_per_pixel'
 PIXEL_RADIUS_ARG_NAME = 'pixel_radius_metres'
@@ -17,10 +17,10 @@ WEIGHT_BY_INV_DIST_ARG_NAME = 'weight_pixels_by_inverse_dist'
 WEIGHT_BY_INV_SQ_DIST_ARG_NAME = 'weight_pixels_by_inverse_sq_dist'
 OUTPUT_FILE_ARG_NAME = 'output_file_name'
 
-INPUT_DIR_HELP_STRING = (
-    'Path to input directory, containing non-bias-corrected predictions.  '
-    'Files therein will be found by `prediction_io.find_file` and read by '
-    '`prediction_io.read_file`.'
+INPUT_DIRS_HELP_STRING = (
+    'List of paths to input directories, each containing non-bias-corrected '
+    'predictions.  Files therein will be found by `prediction_io.find_file` '
+    'and read by `prediction_io.read_file`.'
 )
 INIT_DATE_LIMITS_HELP_STRING = (
     'List of two initialization dates, specifying the beginning and end of the '
@@ -57,8 +57,8 @@ OUTPUT_FILE_HELP_STRING = (
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
-    '--' + INPUT_DIR_ARG_NAME, type=str, required=True,
-    help=INPUT_DIR_HELP_STRING
+    '--' + INPUT_DIRS_ARG_NAME, type=str, nargs='+', required=True,
+    help=INPUT_DIRS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + INIT_DATE_LIMITS_ARG_NAME, type=str, nargs=2, required=True,
@@ -86,14 +86,14 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
-def _run(prediction_dir_name, init_date_limit_strings, one_model_per_pixel,
+def _run(prediction_dir_names, init_date_limit_strings, one_model_per_pixel,
          pixel_radius_metres, weight_pixels_by_inverse_dist,
          weight_pixels_by_inverse_sq_dist, output_file_name):
     """Trains isotonic-regression model for bias correction.
 
     This is effectively the main method.
 
-    :param prediction_dir_name: See documentation at top of this script.
+    :param prediction_dir_names: See documentation at top of this script.
     :param init_date_limit_strings: Same.
     :param one_model_per_pixel: Same.
     :param pixel_radius_metres: Same.
@@ -105,13 +105,15 @@ def _run(prediction_dir_name, init_date_limit_strings, one_model_per_pixel,
     if pixel_radius_metres <= 0:
         pixel_radius_metres = None
 
-    prediction_file_names = prediction_io.find_files_for_period(
-        directory_name=prediction_dir_name,
-        first_init_date_string=init_date_limit_strings[0],
-        last_init_date_string=init_date_limit_strings[1],
-        raise_error_if_any_missing=False,
-        raise_error_if_all_missing=True
-    )
+    prediction_file_names = []
+    for this_dir_name in prediction_dir_names:
+        prediction_file_names += prediction_io.find_files_for_period(
+            directory_name=this_dir_name,
+            first_init_date_string=init_date_limit_strings[0],
+            last_init_date_string=init_date_limit_strings[1],
+            raise_error_if_any_missing=False,
+            raise_error_if_all_missing=True
+        )
 
     num_files = len(prediction_file_names)
     prediction_tables_xarray = [xarray.Dataset()] * num_files
@@ -147,7 +149,7 @@ if __name__ == '__main__':
     INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
 
     _run(
-        prediction_dir_name=getattr(INPUT_ARG_OBJECT, INPUT_DIR_ARG_NAME),
+        prediction_dir_names=getattr(INPUT_ARG_OBJECT, INPUT_DIRS_ARG_NAME),
         init_date_limit_strings=getattr(
             INPUT_ARG_OBJECT, INIT_DATE_LIMITS_ARG_NAME
         ),
