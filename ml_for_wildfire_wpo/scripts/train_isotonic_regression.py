@@ -1,6 +1,7 @@
 """Trains isotonic-regression model for bias correction."""
 
 import argparse
+import numpy
 import xarray
 from ml_for_wildfire_wpo.io import prediction_io
 from ml_for_wildfire_wpo.machine_learning import isotonic_regression
@@ -15,6 +16,7 @@ ONE_MODEL_PER_PIXEL_ARG_NAME = 'one_model_per_pixel'
 PIXEL_RADIUS_ARG_NAME = 'pixel_radius_metres'
 WEIGHT_BY_INV_DIST_ARG_NAME = 'weight_pixels_by_inverse_dist'
 WEIGHT_BY_INV_SQ_DIST_ARG_NAME = 'weight_pixels_by_inverse_sq_dist'
+TARGET_FIELDS_ARG_NAME = 'target_field_names'
 OUTPUT_FILE_ARG_NAME = 'output_file_name'
 
 INPUT_DIRS_HELP_STRING = (
@@ -50,6 +52,11 @@ WEIGHT_BY_INV_SQ_DIST_HELP_STRING = (
 ).format(
     ONE_MODEL_PER_PIXEL_ARG_NAME
 )
+TARGET_FIELDS_HELP_STRING = (
+    '1-D list of target fields for which to train IR models.  Each field name '
+    'must be accepted by `canadian_fwi_utils.check_field_name`.  If you want '
+    'to train for all target fields, leave this argument alone.'
+)
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  The suite of trained IR models will be saved here, '
     'in Dill format.'
@@ -81,6 +88,10 @@ INPUT_ARG_PARSER.add_argument(
     help=WEIGHT_BY_INV_SQ_DIST_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + TARGET_FIELDS_ARG_NAME, type=str, nargs='+', required=False,
+    default=[''], help=TARGET_FIELDS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
     help=OUTPUT_FILE_HELP_STRING
 )
@@ -88,7 +99,8 @@ INPUT_ARG_PARSER.add_argument(
 
 def _run(prediction_dir_names, init_date_limit_strings, one_model_per_pixel,
          pixel_radius_metres, weight_pixels_by_inverse_dist,
-         weight_pixels_by_inverse_sq_dist, output_file_name):
+         weight_pixels_by_inverse_sq_dist, target_field_names,
+         output_file_name):
     """Trains isotonic-regression model for bias correction.
 
     This is effectively the main method.
@@ -99,11 +111,14 @@ def _run(prediction_dir_names, init_date_limit_strings, one_model_per_pixel,
     :param pixel_radius_metres: Same.
     :param weight_pixels_by_inverse_dist: Same.
     :param weight_pixels_by_inverse_sq_dist: Same.
+    :param target_field_names: Same.
     :param output_file_name: Same.
     """
 
     if pixel_radius_metres <= 0:
         pixel_radius_metres = None
+    if len(target_field_names) == 1 and target_field_names[0] == '':
+        target_field_names = None
 
     prediction_file_names = []
     for this_dir_name in prediction_dir_names:
@@ -125,6 +140,20 @@ def _run(prediction_dir_names, init_date_limit_strings, one_model_per_pixel,
         )
         prediction_tables_xarray[k] = prediction_io.take_ensemble_mean(
             prediction_tables_xarray[k]
+        )
+
+        if target_field_names is None:
+            continue
+
+        good_indices = numpy.array([
+            numpy.where(
+                prediction_tables_xarray[k][prediction_io.FIELD_NAME_KEY] == f
+            )[0][0]
+            for f in target_field_names
+        ], dtype=int)
+
+        prediction_tables_xarray[k] = prediction_tables_xarray[k].isel(
+            {prediction_io.FIELD_DIM: good_indices}
         )
 
     print(SEPARATOR_STRING)
@@ -163,5 +192,6 @@ if __name__ == '__main__':
         weight_pixels_by_inverse_sq_dist=bool(
             getattr(INPUT_ARG_OBJECT, WEIGHT_BY_INV_SQ_DIST_ARG_NAME)
         ),
+        target_field_names=getattr(INPUT_ARG_OBJECT, TARGET_FIELDS_ARG_NAME),
         output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )

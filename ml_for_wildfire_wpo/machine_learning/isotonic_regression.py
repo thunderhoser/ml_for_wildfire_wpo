@@ -1,6 +1,7 @@
 """Isotonic regression."""
 
 import os
+from multiprocessing import Pool
 import dill
 import numpy
 import xarray
@@ -12,7 +13,8 @@ from ml_for_wildfire_wpo.io import prediction_io
 
 TOLERANCE = 1e-6
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.01
-MASK_PIXEL_IF_ORIG_WEIGHT_BELOW = 0.05
+MASK_PIXEL_IF_ORIG_WEIGHT_BELOW = 0.001
+NUM_SLICES_FOR_MULTIPROCESSING = 24
 
 MODELS_KEY = 'model_object_matrix'
 LATITUDES_KEY = 'latitude_matrix_deg_e'
@@ -26,6 +28,33 @@ ALL_KEYS = [
     MODELS_KEY, LATITUDES_KEY, LONGITUDES_KEY, FIELD_NAMES_KEY,
     PIXEL_RADIUS_KEY, WEIGHT_BY_INV_DIST_KEY, WEIGHT_BY_INV_SQ_DIST_KEY
 ]
+
+
+def __get_slices_for_multiprocessing(num_grid_rows):
+    """Returns slices for multiprocessing.
+
+    Each "slice" consists of several grid rows.
+
+    K = number of slices
+
+    :param num_grid_rows: Total number of grid rows.
+    :return: start_rows: length-K numpy array with index of each start row.
+    :return: end_rows: length-K numpy array with index of each end row.
+    """
+
+    slice_indices_normalized = numpy.linspace(
+        0, 1, num=NUM_SLICES_FOR_MULTIPROCESSING + 1, dtype=float
+    )
+
+    start_rows = numpy.round(
+        num_grid_rows * slice_indices_normalized[:-1]
+    ).astype(int)
+
+    end_rows = numpy.round(
+        num_grid_rows * slice_indices_normalized[1:]
+    ).astype(int)
+
+    return start_rows, end_rows
 
 
 def _subset_predictions_by_location(
@@ -144,11 +173,101 @@ def _train_one_model(prediction_tables_xarray):
     return model_object
 
 
+def _train_one_model_per_pixel(
+        prediction_tables_xarray, train_for_grid_rows, pixel_radius_metres,
+        weight_pixels_by_inverse_dist, weight_pixels_by_inverse_sq_dist):
+    """Trains one IR model per pixel, using multiprocessing.
+
+    m = number of grid rows for which to train a model
+    N = number of columns in full grid
+    F = number of target fields
+
+    :param prediction_tables_xarray: See documentation for `train_model_suite`.
+    :param train_for_grid_rows: length-m numpy array of row indices.  Models
+        will be trained only for these rows.
+    :param pixel_radius_metres: See documentation for `train_model_suite`.
+    :param weight_pixels_by_inverse_dist: Same.
+    :param weight_pixels_by_inverse_sq_dist: Same.
+    :return: model_object_matrix: Same.
+    """
+
+    ptx = prediction_tables_xarray[0]
+    grid_latitudes_deg_n = ptx[prediction_io.LATITUDE_KEY].values
+    grid_longitudes_deg_e = ptx[prediction_io.LONGITUDE_KEY].values
+    orig_eval_weight_matrix = ptx[prediction_io.WEIGHT_KEY].values
+    field_names = ptx[prediction_io.FIELD_NAME_KEY].values.tolist()
+
+    latitude_matrix_deg_n, longitude_matrix_deg_e = (
+        grids.latlng_vectors_to_matrices(
+            unique_latitudes_deg=grid_latitudes_deg_n,
+            unique_longitudes_deg=grid_longitudes_deg_e
+        )
+    )
+
+    num_target_rows = len(train_for_grid_rows)
+    num_columns = latitude_matrix_deg_n.shape[1]
+    num_fields = len(field_names)
+    model_object_matrix = numpy.full(
+        (num_target_rows, num_columns, num_fields),
+        '', dtype=object
+    )
+
+    for f in range(num_fields):
+        for i in range(num_target_rows):
+            i_new = train_for_grid_rows[i]
+
+            for j in range(num_columns):
+                if (
+                        orig_eval_weight_matrix[i_new, j] <
+                        MASK_PIXEL_IF_ORIG_WEIGHT_BELOW
+                ):
+                    model_object_matrix[i, j, f] = None
+                    continue
+
+                print((
+                    'Training isotonic-regression model for '
+                    '{0:d}th of {1:d} grid rows, '
+                    '{2:d}th of {3:d} columns, '
+                    '{4:d}th of {5:d} fields...'
+                ).format(
+                    i + 1, num_target_rows,
+                    j + 1, num_columns,
+                    f + 1, num_fields
+                ))
+
+                these_prediction_tables_xarray = [
+                    ptx.isel({
+                        prediction_io.FIELD_DIM: numpy.array([f], dtype=int)
+                    })
+                    for ptx in prediction_tables_xarray
+                ]
+
+                these_prediction_tables_xarray = (
+                    _subset_predictions_by_location(
+                        prediction_tables_xarray=these_prediction_tables_xarray,
+                        desired_latitude_deg_n=latitude_matrix_deg_n[i, j],
+                        desired_longitude_deg_e=longitude_matrix_deg_e[i, j],
+                        pixel_radius_metres=pixel_radius_metres,
+                        weight_pixels_by_inverse_dist=
+                        weight_pixels_by_inverse_dist,
+                        weight_pixels_by_inverse_sq_dist=
+                        weight_pixels_by_inverse_sq_dist
+                    )
+                )
+
+                model_object_matrix[i_new, j, f] = _train_one_model(
+                    these_prediction_tables_xarray
+                )
+
+    return model_object_matrix
+
+
 def train_model_suite(
         prediction_tables_xarray, one_model_per_pixel,
         pixel_radius_metres=None,
         weight_pixels_by_inverse_dist=None,
-        weight_pixels_by_inverse_sq_dist=None):
+        weight_pixels_by_inverse_sq_dist=None,
+        do_multiprocessing=True):
     """Trains one model suite.
 
     The model suite will contain either [1] one model per target field or
@@ -176,6 +295,10 @@ def train_model_suite(
         [used only if `one_model_per_pixel == True`]
         Boolean flag.  If True, when training the model for pixel P, will weight
         every other pixel by the inverse of its *squared* distance to P.
+    :param do_multiprocessing: [used only if `one_model_per_pixel == True`]
+        Boolean flag.  If True, will do multi-threaded processing to make this
+        go faster.
+
     :return: model_dict: Dictionary with the following keys.
     model_dict["model_object_matrix"]: M-by-N-by-F numpy array of trained
         isotonic-regression models (instances of
@@ -195,6 +318,11 @@ def train_model_suite(
 
     # Check input args.
     error_checking.assert_is_boolean(one_model_per_pixel)
+    if not one_model_per_pixel:
+        do_multiprocessing = False
+
+    error_checking.assert_is_boolean(do_multiprocessing)
+
     grid_latitudes_deg_n = None
     grid_longitudes_deg_e = None
     orig_eval_weight_matrix = None
@@ -260,14 +388,42 @@ def train_model_suite(
         '', dtype=object
     )
 
-    for f in range(num_fields):
-        these_prediction_tables_xarray = [
-            ptx.isel({
-                prediction_io.FIELD_DIM: numpy.array([f], dtype=int)
-            })
-            for ptx in prediction_tables_xarray
-        ]
+    if do_multiprocessing:
+        start_rows, end_rows = __get_slices_for_multiprocessing(
+            num_grid_rows=num_model_grid_rows
+        )
 
+        argument_list = []
+        for s, e in zip(start_rows, end_rows):
+            argument_list.append((
+                prediction_tables_xarray,
+                numpy.linspace(s, e, num=e - s + 1, dtype=int),
+                pixel_radius_metres,
+                weight_pixels_by_inverse_dist,
+                weight_pixels_by_inverse_sq_dist
+            ))
+
+            with Pool() as pool_object:
+                subarrays = pool_object.starmap(
+                    _train_one_model_per_pixel, argument_list
+                )
+
+                for k in range(len(start_rows)):
+                    s = start_rows[k]
+                    e = end_rows[k]
+                    model_object_matrix[s:e, ...] = subarrays[k]
+
+        return {
+            MODELS_KEY: model_object_matrix,
+            LATITUDES_KEY: model_latitude_matrix_deg_n,
+            LONGITUDES_KEY: model_longitude_matrix_deg_e,
+            FIELD_NAMES_KEY: field_names,
+            PIXEL_RADIUS_KEY: pixel_radius_metres,
+            WEIGHT_BY_INV_DIST_KEY: weight_pixels_by_inverse_dist,
+            WEIGHT_BY_INV_SQ_DIST_KEY: weight_pixels_by_inverse_sq_dist
+        }
+
+    for f in range(num_fields):
         for i in range(num_model_grid_rows):
             for j in range(num_model_grid_columns):
                 if (
@@ -291,6 +447,13 @@ def train_model_suite(
                     f + 1,
                     num_fields
                 ))
+
+                these_prediction_tables_xarray = [
+                    ptx.isel({
+                        prediction_io.FIELD_DIM: numpy.array([f], dtype=int)
+                    })
+                    for ptx in prediction_tables_xarray
+                ]
 
                 if one_model_per_pixel:
                     these_prediction_tables_xarray = (
