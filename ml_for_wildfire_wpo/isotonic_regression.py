@@ -404,7 +404,7 @@ def train_model_suite(
         for s, e in zip(start_rows, end_rows):
             argument_list.append((
                 prediction_tables_xarray,
-                numpy.linspace(s, e, num=e - s + 1, dtype=int),
+                numpy.linspace(s, e - 1, num=e - s, dtype=int),
                 pixel_radius_metres,
                 weight_pixels_by_inverse_dist,
                 weight_pixels_by_inverse_sq_dist
