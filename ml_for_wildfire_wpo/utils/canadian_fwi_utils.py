@@ -103,3 +103,13 @@ def subset_by_column(fwi_table_xarray, desired_column_indices):
     return fwi_table_xarray.isel(
         {LONGITUDE_DIM: desired_column_indices}
     )
+
+
+def fwi_to_dsr(fwi_value_or_array):
+    """Converts fire-weather index (FWI) to daily severity rating (DSR).
+
+    :param fwi_value_or_array: FWI (either a single value or a numpy array).
+    :return: dsr_value_or_array: DSR (same shape as input).
+    """
+
+    return 0.0272 * numpy.power(fwi_value_or_array, 1.77)

@@ -10,6 +10,7 @@ from gewittergefahr.gg_utils import grids
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.io import prediction_io
+from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 
 TOLERANCE = 1e-6
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.01
@@ -245,8 +246,9 @@ def _train_one_model_per_pixel(
                 these_prediction_tables_xarray = (
                     _subset_predictions_by_location(
                         prediction_tables_xarray=these_prediction_tables_xarray,
-                        desired_latitude_deg_n=latitude_matrix_deg_n[i, j],
-                        desired_longitude_deg_e=longitude_matrix_deg_e[i, j],
+                        desired_latitude_deg_n=latitude_matrix_deg_n[i_new, j],
+                        desired_longitude_deg_e=
+                        longitude_matrix_deg_e[i_new, j],
                         pixel_radius_metres=pixel_radius_metres,
                         weight_pixels_by_inverse_dist=
                         weight_pixels_by_inverse_dist,
@@ -255,7 +257,7 @@ def _train_one_model_per_pixel(
                     )
                 )
 
-                model_object_matrix[i_new, j, f] = _train_one_model(
+                model_object_matrix[i, j, f] = _train_one_model(
                     these_prediction_tables_xarray
                 )
 
@@ -403,15 +405,15 @@ def train_model_suite(
                 weight_pixels_by_inverse_sq_dist
             ))
 
-            with Pool() as pool_object:
-                subarrays = pool_object.starmap(
-                    _train_one_model_per_pixel, argument_list
-                )
+        with Pool() as pool_object:
+            subarrays = pool_object.starmap(
+                _train_one_model_per_pixel, argument_list
+            )
 
-                for k in range(len(start_rows)):
-                    s = start_rows[k]
-                    e = end_rows[k]
-                    model_object_matrix[s:e, ...] = subarrays[k]
+            for k in range(len(start_rows)):
+                s = start_rows[k]
+                e = end_rows[k]
+                model_object_matrix[s:e, ...] = subarrays[k]
 
         return {
             MODELS_KEY: model_object_matrix,
@@ -529,7 +531,16 @@ def apply_model_suite(prediction_table_xarray, model_dict):
     num_model_grid_columns = model_latitude_matrix_deg_n.shape[1]
     prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
 
+    constrain_dsr = (
+        canadian_fwi_utils.FWI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
+        and
+        canadian_fwi_utils.DSR_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
+    )
+
     for f in range(num_fields):
+        if constrain_dsr and field_names[f] == canadian_fwi_utils.DSR_NAME:
+            continue
+
         f_new = numpy.where(
             ptx[prediction_io.FIELD_NAME_KEY].values == field_names[f]
         )[0][0]
@@ -573,6 +584,21 @@ def apply_model_suite(prediction_table_xarray, model_dict):
                     prediction_matrix[..., f, :] = numpy.reshape(
                         new_predictions, these_dims
                     )
+
+    if constrain_dsr:
+        fwi_index = numpy.where(
+            ptx[prediction_io.FIELD_NAME_KEY].values ==
+            canadian_fwi_utils.FWI_NAME
+        )[0][0]
+
+        dsr_index = numpy.where(
+            ptx[prediction_io.FIELD_NAME_KEY].values ==
+            canadian_fwi_utils.FWI_NAME
+        )[0][0]
+
+        prediction_matrix[..., dsr_index, :] = canadian_fwi_utils.fwi_to_dsr(
+            prediction_matrix[..., fwi_index, :]
+        )
 
     return ptx.assign({
         prediction_io.PREDICTION_KEY: (
