@@ -410,15 +410,15 @@ def train_model_suite(
                 weight_pixels_by_inverse_sq_dist
             ))
 
-            with Pool() as pool_object:
-                subarrays = pool_object.starmap(
-                    _train_one_model_per_pixel, argument_list
-                )
+        with Pool() as pool_object:
+            subarrays = pool_object.starmap(
+                _train_one_model_per_pixel, argument_list
+            )
 
-                for k in range(len(start_rows)):
-                    s = start_rows[k]
-                    e = end_rows[k]
-                    model_object_matrix[s:e, ...] = subarrays[k]
+            for k in range(len(start_rows)):
+                s = start_rows[k]
+                e = end_rows[k]
+                model_object_matrix[s:e, ...] = subarrays[k]
 
         return {
             MODELS_KEY: model_object_matrix,
