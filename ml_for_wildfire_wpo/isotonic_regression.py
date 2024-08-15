@@ -600,7 +600,7 @@ def apply_model_suite(prediction_table_xarray, model_dict):
 
         dsr_index = numpy.where(
             ptx[prediction_io.FIELD_NAME_KEY].values ==
-            canadian_fwi_utils.FWI_NAME
+            canadian_fwi_utils.DSR_NAME
         )[0][0]
 
         prediction_matrix[..., dsr_index, :] = canadian_fwi_utils.fwi_to_dsr(
