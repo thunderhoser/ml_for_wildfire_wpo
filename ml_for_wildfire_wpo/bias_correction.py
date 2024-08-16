@@ -6,6 +6,7 @@ mean, and uncertainty calibration, for bias-correcting the ensemble spread.
 
 import os
 import sys
+import time
 from multiprocessing import Pool
 import dill
 import numpy
@@ -192,7 +193,7 @@ def _train_one_model(prediction_tables_xarray):
 def _train_one_model_per_pixel(
         prediction_tables_xarray, train_for_grid_rows, pixel_radius_metres,
         weight_pixels_by_inverse_dist, weight_pixels_by_inverse_sq_dist):
-    """Trains one IR model per pixel, using multiprocessing.
+    """Trains one model per pixel, using multiprocessing.
 
     m = number of grid rows for which to train a model
     N = number of columns in full grid
@@ -204,7 +205,9 @@ def _train_one_model_per_pixel(
     :param pixel_radius_metres: See documentation for `train_model_suite`.
     :param weight_pixels_by_inverse_dist: Same.
     :param weight_pixels_by_inverse_sq_dist: Same.
-    :return: model_object_matrix: Same.
+    :return: model_object_matrix: m-by-N-by-F numpy array of trained
+        bias-correction models (instances of
+        `sklearn.isotonic.IsotonicRegression`).
     """
 
     ptx = prediction_tables_xarray[0]
@@ -229,15 +232,15 @@ def _train_one_model_per_pixel(
     )
 
     for f in range(num_fields):
-        for i in range(num_target_rows):
-            i_new = train_for_grid_rows[i]
+        for i_model in range(num_target_rows):
+            i_pred = train_for_grid_rows[i_model]
 
             for j in range(num_columns):
                 if (
-                        orig_eval_weight_matrix[i_new, j] <
+                        orig_eval_weight_matrix[i_pred, j] <
                         MASK_PIXEL_IF_ORIG_WEIGHT_BELOW
                 ):
-                    model_object_matrix[i, j, f] = None
+                    model_object_matrix[i_model, j, f] = None
                     continue
 
                 print((
@@ -246,7 +249,7 @@ def _train_one_model_per_pixel(
                     '{2:d}th of {3:d} columns, '
                     '{4:d}th of {5:d} fields...'
                 ).format(
-                    i + 1, num_target_rows,
+                    i_model + 1, num_target_rows,
                     j + 1, num_columns,
                     f + 1, num_fields
                 ))
@@ -261,9 +264,9 @@ def _train_one_model_per_pixel(
                 these_prediction_tables_xarray = (
                     _subset_predictions_by_location(
                         prediction_tables_xarray=these_prediction_tables_xarray,
-                        desired_latitude_deg_n=latitude_matrix_deg_n[i_new, j],
+                        desired_latitude_deg_n=latitude_matrix_deg_n[i_pred, j],
                         desired_longitude_deg_e=
-                        longitude_matrix_deg_e[i_new, j],
+                        longitude_matrix_deg_e[i_pred, j],
                         pixel_radius_metres=pixel_radius_metres,
                         weight_pixels_by_inverse_dist=
                         weight_pixels_by_inverse_dist,
@@ -272,11 +275,136 @@ def _train_one_model_per_pixel(
                     )
                 )
 
-                model_object_matrix[i, j, f] = _train_one_model(
+                model_object_matrix[i_model, j, f] = _train_one_model(
                     these_prediction_tables_xarray
                 )
 
     return model_object_matrix
+
+
+def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
+                               apply_to_grid_rows, verbose):
+    """Applies one model per pixel, using multiprocessing.
+
+    m = number of grid rows for which to train a model
+    N = number of columns in full grid
+    F = number of target fields
+    S = ensemble size
+
+    :param prediction_table_xarray: xarray table in format returned by
+        `prediction_io.read_file`, containing uncorrected predictions.
+    :param model_dict: Dictionary created by `train_model_suite`.
+    :param apply_to_grid_rows: length-m numpy array of row indices.  Models
+        will be applied only to these rows.
+    :param verbose: Boolean flag.
+    :return: prediction_matrix: m-by-N-by-F-by-S numpy array of bias-corrected
+        predictions.
+    """
+
+    field_names = model_dict[FIELD_NAMES_KEY]
+    model_object_matrix = model_dict[MODELS_KEY]
+    do_uncertainty_calibration = model_dict[DO_UNCERTAINTY_CALIB_KEY]
+
+    num_fields = len(field_names)
+    num_target_rows = len(apply_to_grid_rows)
+    num_columns = model_object_matrix.shape[1]
+
+    ptx = prediction_table_xarray
+    prediction_matrix = (
+        ptx[prediction_io.PREDICTION_KEY].values[:, apply_to_grid_rows, ...]
+    )
+
+    if do_uncertainty_calibration:
+        mean_prediction_matrix = numpy.mean(prediction_matrix, axis=-1)
+        prediction_stdev_matrix = numpy.std(
+            prediction_matrix, axis=-1, ddof=1
+        )
+    else:
+        mean_prediction_matrix = numpy.array([], dtype=float)
+        prediction_stdev_matrix = numpy.array([], dtype=float)
+
+    constrain_dsr = (
+        canadian_fwi_utils.FWI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
+        and
+        canadian_fwi_utils.DSR_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
+    )
+
+    for f_model in range(num_fields):
+        if constrain_dsr and field_names[f_model] == canadian_fwi_utils.DSR_NAME:
+            continue
+
+        f_pred = numpy.where(
+            ptx[prediction_io.FIELD_NAME_KEY].values == field_names[f_model]
+        )[0][0]
+        prediction_matrix_this_field = (
+            ptx[prediction_io.PREDICTION_KEY].values[..., f_pred, :]
+        )
+
+        for i_pred in range(num_target_rows):
+            i_model = apply_to_grid_rows[i_pred]
+
+            for j in range(num_columns):
+                if model_object_matrix[i_model, j, f_model] is None:
+                    continue
+
+                if verbose:
+                    print((
+                        'Applying bias-correction model for '
+                        '{0:d}th of {1:d} grid rows, '
+                        '{2:d}th of {3:d} columns, '
+                        '{4:d}th of {5:d} fields...'
+                    ).format(
+                        i_pred + 1, num_target_rows,
+                        j + 1, num_columns,
+                        f_model + 1, num_fields
+                    ))
+
+                if do_uncertainty_calibration:
+                    orig_stdev = prediction_stdev_matrix[i_pred, j, f_pred]
+                    new_stdev = numpy.sqrt(
+                        model_object_matrix[i_model, j, f_model].predict(
+                            orig_stdev ** 2
+                        )
+                    )
+                    stdev_inflation_factor = new_stdev / orig_stdev
+
+                    if numpy.isnan(stdev_inflation_factor):
+                        stdev_inflation_factor = 1.
+
+                    stdev_inflation_factor = numpy.minimum(
+                        stdev_inflation_factor, MAX_STDEV_INFLATION_FACTOR
+                    )
+
+                    prediction_matrix[i_pred, j, f_pred, :] = (
+                        mean_prediction_matrix[i_pred, j, f_pred] +
+                        stdev_inflation_factor * (
+                            prediction_matrix[i_pred, j, f_pred, :] -
+                            mean_prediction_matrix[i_pred, j, f_pred]
+                        )
+                    )
+                else:
+                    prediction_matrix[i_pred, j, f_pred, :] = (
+                        model_object_matrix[i_model, j, f_model].predict(
+                            prediction_matrix_this_field[i_pred, j, :]
+                        )
+                    )
+
+    if constrain_dsr:
+        fwi_index = numpy.where(
+            ptx[prediction_io.FIELD_NAME_KEY].values ==
+            canadian_fwi_utils.FWI_NAME
+        )[0][0]
+
+        dsr_index = numpy.where(
+            ptx[prediction_io.FIELD_NAME_KEY].values ==
+            canadian_fwi_utils.DSR_NAME
+        )[0][0]
+
+        prediction_matrix[..., dsr_index, :] = canadian_fwi_utils.fwi_to_dsr(
+            prediction_matrix[..., fwi_index, :]
+        )
+
+    return prediction_matrix
 
 
 def train_model_suite(
@@ -341,6 +469,8 @@ def train_model_suite(
     model_dict["pixel_radius_metres"]: Same as input arg.
     model_dict["weight_pixels_by_inverse_dist"]: Same as input arg.
     model_dict["weight_pixels_by_inverse_sq_dist"]: Same as input arg.
+    model_dict["do_uncertainty_calibration"]: Same as input arg.
+    model_dict["do_iso_reg_before_uncertainty_calib"]: Same as input arg.
     """
 
     # TODO(thunderhoser): Add option to subset by season -- probably.
@@ -523,14 +653,22 @@ def train_model_suite(
     }
 
 
-def apply_model_suite(prediction_table_xarray, model_dict):
+def apply_model_suite(prediction_table_xarray, model_dict, verbose,
+                      do_multiprocessing=True):
     """Applies model suite to new data in inference mode.
 
     :param prediction_table_xarray: xarray table in format returned by
         `prediction_io.read_file`.
     :param model_dict: Dictionary in format created by `train_model_suite`.
+    :param verbose: Boolean flag.
+    :param do_multiprocessing: [used only if there is one model per pixel]
+        Boolean flag.  If True, will do multi-threaded processing to make this
+        go faster.
     :return: prediction_table_xarray: Same as input but with new predictions.
     """
+
+    exec_start_time_unix_sec = time.time()
+    error_checking.assert_is_boolean(verbose)
 
     field_names = model_dict[FIELD_NAMES_KEY]
     model_latitude_matrix_deg_n = model_dict[LATITUDES_KEY]
@@ -561,11 +699,51 @@ def apply_model_suite(prediction_table_xarray, model_dict):
             set(field_names) ==
             set(ptx[prediction_io.FIELD_NAME_KEY].values.tolist())
         )
+    else:
+        do_multiprocessing = False
+
+    error_checking.assert_is_boolean(do_multiprocessing)
+    prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
+
+    if do_multiprocessing:
+        start_rows, end_rows = __get_slices_for_multiprocessing(
+            num_grid_rows=model_latitude_matrix_deg_n.shape[0]
+        )
+
+        argument_list = []
+        for s, e in zip(start_rows, end_rows):
+            argument_list.append((
+                prediction_table_xarray,
+                model_dict,
+                numpy.linspace(s, e - 1, num=e - s, dtype=int),
+                verbose
+            ))
+
+        with Pool() as pool_object:
+            subarrays = pool_object.starmap(
+                _apply_one_model_per_pixel, argument_list
+            )
+
+            for k in range(len(start_rows)):
+                s = start_rows[k]
+                e = end_rows[k]
+                prediction_matrix[s:e, ...] = subarrays[k]
+
+        ptx = ptx.assign({
+            prediction_io.PREDICTION_KEY: (
+                ptx[prediction_io.PREDICTION_KEY].dims,
+                prediction_matrix
+            )
+        })
+
+        print('Applying bias-correction model took {0:.4f} seconds.'.format(
+            time.time() - exec_start_time_unix_sec
+        ))
+        return ptx
 
     num_fields = len(field_names)
     num_model_grid_rows = model_latitude_matrix_deg_n.shape[0]
     num_model_grid_columns = model_latitude_matrix_deg_n.shape[1]
-    prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
 
     if do_uncertainty_calibration:
         ensemble_size = prediction_matrix.shape[-1]
@@ -585,44 +763,45 @@ def apply_model_suite(prediction_table_xarray, model_dict):
         canadian_fwi_utils.DSR_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
     )
 
-    for f in range(num_fields):
-        if constrain_dsr and field_names[f] == canadian_fwi_utils.DSR_NAME:
+    for f_model in range(num_fields):
+        if constrain_dsr and field_names[f_model] == canadian_fwi_utils.DSR_NAME:
             continue
 
-        f_new = numpy.where(
-            ptx[prediction_io.FIELD_NAME_KEY].values == field_names[f]
+        f_pred = numpy.where(
+            ptx[prediction_io.FIELD_NAME_KEY].values == field_names[f_model]
         )[0][0]
         prediction_matrix_this_field = (
-            ptx[prediction_io.PREDICTION_KEY].values[..., f_new, :]
+            ptx[prediction_io.PREDICTION_KEY].values[..., f_pred, :]
         )
 
         for i in range(num_model_grid_rows):
             for j in range(num_model_grid_columns):
                 if (
                         one_model_per_pixel and
-                        model_object_matrix[i, j, f] is None
+                        model_object_matrix[i, j, f_model] is None
                 ):
                     continue
 
-                print((
-                    'Applying bias-correctiob model for '
-                    '{0:d}th of {1:d} grid rows, '
-                    '{2:d}th of {3:d} columns, '
-                    '{4:d}th of {5:d} fields...'
-                ).format(
-                    i + 1,
-                    num_model_grid_rows,
-                    j + 1,
-                    num_model_grid_columns,
-                    f + 1,
-                    num_fields
-                ))
+                if verbose:
+                    print((
+                        'Applying bias-correction model for '
+                        '{0:d}th of {1:d} grid rows, '
+                        '{2:d}th of {3:d} columns, '
+                        '{4:d}th of {5:d} fields...'
+                    ).format(
+                        i + 1,
+                        num_model_grid_rows,
+                        j + 1,
+                        num_model_grid_columns,
+                        f_model + 1,
+                        num_fields
+                    ))
 
                 if do_uncertainty_calibration:
                     if one_model_per_pixel:
-                        orig_stdev = prediction_stdev_matrix[i, j, f_new]
+                        orig_stdev = prediction_stdev_matrix[i, j, f_pred]
                         new_stdev = numpy.sqrt(
-                            model_object_matrix[i, j, f].predict(
+                            model_object_matrix[i, j, f_model].predict(
                                 orig_stdev ** 2
                             )
                         )
@@ -635,19 +814,19 @@ def apply_model_suite(prediction_table_xarray, model_dict):
                             stdev_inflation_factor, MAX_STDEV_INFLATION_FACTOR
                         )
 
-                        prediction_matrix[i, j, f_new, :] = (
-                            mean_prediction_matrix[i, j, f_new] +
+                        prediction_matrix[i, j, f_pred, :] = (
+                            mean_prediction_matrix[i, j, f_pred] +
                             stdev_inflation_factor * (
-                                prediction_matrix[i, j, f_new, :] -
-                                mean_prediction_matrix[i, j, f_new]
+                                prediction_matrix[i, j, f_pred, :] -
+                                mean_prediction_matrix[i, j, f_pred]
                             )
                         )
                     else:
-                        orig_stdev_matrix = prediction_stdev_matrix[..., f_new]
+                        orig_stdev_matrix = prediction_stdev_matrix[..., f_pred]
                         these_dims = orig_stdev_matrix.shape
 
                         new_stdevs = numpy.sqrt(
-                            model_object_matrix[i, j, f].predict(
+                            model_object_matrix[i, j, f_model].predict(
                                 numpy.ravel(orig_stdev_matrix ** 2)
                             )
                         )
@@ -667,13 +846,13 @@ def apply_model_suite(prediction_table_xarray, model_dict):
                             stdev_inflation_matrix, axis=-1
                         )
                         this_mean_pred_matrix = numpy.expand_dims(
-                            mean_prediction_matrix[..., f_new], axis=-1
+                            mean_prediction_matrix[..., f_pred], axis=-1
                         )
 
-                        prediction_matrix[..., f_new, :] = (
+                        prediction_matrix[..., f_pred, :] = (
                             this_mean_pred_matrix +
                             stdev_inflation_matrix * (
-                                prediction_matrix[..., f_new, :] -
+                                prediction_matrix[..., f_pred, :] -
                                 this_mean_pred_matrix
                             )
                         )
@@ -681,17 +860,17 @@ def apply_model_suite(prediction_table_xarray, model_dict):
                     continue
 
                 if one_model_per_pixel:
-                    prediction_matrix[i, j, f_new, :] = (
-                        model_object_matrix[i, j, f].predict(
+                    prediction_matrix[i, j, f_pred, :] = (
+                        model_object_matrix[i, j, f_model].predict(
                             prediction_matrix_this_field[i, j, :]
                         )
                     )
                 else:
                     these_dims = prediction_matrix_this_field.shape
-                    new_predictions = model_object_matrix[i, j, f].predict(
+                    new_predictions = model_object_matrix[i, j, f_model].predict(
                         numpy.ravel(prediction_matrix_this_field)
                     )
-                    prediction_matrix[..., f_new, :] = numpy.reshape(
+                    prediction_matrix[..., f_pred, :] = numpy.reshape(
                         new_predictions, these_dims
                     )
 
@@ -710,12 +889,17 @@ def apply_model_suite(prediction_table_xarray, model_dict):
             prediction_matrix[..., fwi_index, :]
         )
 
-    return ptx.assign({
+    ptx = ptx.assign({
         prediction_io.PREDICTION_KEY: (
             ptx[prediction_io.PREDICTION_KEY].dims,
             prediction_matrix
         )
     })
+
+    print('Applying bias-correction model took {0:.4f} seconds.'.format(
+        time.time() - exec_start_time_unix_sec
+    ))
+    return ptx
 
 
 def write_file(dill_file_name, model_dict):
