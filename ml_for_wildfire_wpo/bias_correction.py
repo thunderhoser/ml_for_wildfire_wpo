@@ -385,6 +385,9 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
                         )
                     )
                 else:
+                    if verbose:
+                        print(prediction_matrix_this_field[i_pred, j, :].shape)
+
                     prediction_matrix[i_pred, j, f_pred, :] = (
                         model_object_matrix[i_model, j, f_model].predict(
                             prediction_matrix_this_field[i_pred, j, :]
