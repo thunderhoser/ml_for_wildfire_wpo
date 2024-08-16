@@ -48,9 +48,9 @@ MODEL_LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10")
 
 for model_lead_time_days in "${MODEL_LEAD_TIMES_DAYS[@]}"; do
     python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
-    --input_evaluation_file_name="${model_dir_name}/isotonic_regression/one_model/validation_lead-time-days=${model_lead_time_days}/gridded_evaluation.nc" \
+    --input_evaluation_file_name="${model_dir_name}/isotonic_regression/one_model_for_all/validation_lead-time-days=${model_lead_time_days}/gridded_evaluation.nc" \
     --metric_names "target_standard_deviation" "prediction_standard_deviation" "target_mean" "prediction_mean" "root_mean_squared_error" "mse_bias" "mse_variance" "mse_skill_score" "dual_weighted_mean_squared_error" "dwmse_skill_score" "kolmogorov_smirnov_statistic" "kolmogorov_smirnov_p_value" "mean_absolute_error" "mae_skill_score" "bias" "correlation" "kling_gupta_efficiency" \
     --min_colour_percentiles 0.1  0.1  0.0   0.0   0.1  0.1  0.1  0.0   0.1  0.0   0.1  0.1  0.1  0.0   0.1  0.0 0.0 \
     --max_colour_percentiles 99.5 99.5 100.0 100.0 99.5 99.5 99.5 100.0 99.0 100.0 99.9 99.9 99.5 100.0 99.5 100 100 \
-    --output_dir_name="${model_dir_name}/isotonic_regression/one_model/validation_lead-time-days=${model_lead_time_days}/gridded_evaluation"
+    --output_dir_name="${model_dir_name}/isotonic_regression/one_model_for_all/validation_lead-time-days=${model_lead_time_days}/gridded_evaluation"
 done

@@ -52,4 +52,4 @@ python3 -u "${CODE_DIR_NAME}/train_isotonic_regression.py" \
 --init_date_limit_strings "20210101" "20211210" \
 --one_model_per_pixel=0 \
 --target_field_names ${target_field_name} \
---output_file_name="${model_dir_name}/isotonic_regression/one_model/isotonic_regression_${target_field_name_dashed}.dill"
+--output_file_name="${model_dir_name}/isotonic_regression/one_model_for_all/isotonic_regression_${target_field_name_dashed}.dill"
