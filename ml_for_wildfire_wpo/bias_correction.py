@@ -27,7 +27,8 @@ import canadian_fwi_utils
 TOLERANCE = 1e-6
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.01
 MASK_PIXEL_IF_ORIG_WEIGHT_BELOW = 0.001
-NUM_SLICES_FOR_MULTIPROCESSING = 24
+# NUM_SLICES_FOR_MULTIPROCESSING = 24
+NUM_SLICES_FOR_MULTIPROCESSING = 12
 MAX_STDEV_INFLATION_FACTOR = 1000.
 
 MODELS_KEY = 'model_object_matrix'
@@ -344,27 +345,27 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
             i_model = apply_to_grid_rows[i_pred]
 
             for j in range(num_columns):
-                print('i_model = {0:d}, j = {1:d}, f_model = {2:d}'.format(
-                    i_model, j, f_model
-                ))
+                # print('i_model = {0:d}, j = {1:d}, f_model = {2:d}'.format(
+                #     i_model, j, f_model
+                # ))
 
                 if model_object_matrix[i_model, j, f_model] is None:
                     continue
 
-                if verbose:
-                    print((
-                        'Applying bias-correction model for '
-                        '{0:d}th of {1:d} grid rows, '
-                        '{2:d}th of {3:d} columns, '
-                        '{4:d}th of {5:d} fields...'
-                    ).format(
-                        i_pred + 1, num_target_rows,
-                        j + 1, num_columns,
-                        f_model + 1, num_fields
-                    ))
-                    print('GODDAMN MATRIX SHAPE = {0:s}'.format(
-                        str(prediction_matrix[i_pred, j, f_pred, :].shape)
-                    ))
+                # if verbose:
+                #     print((
+                #         'Applying bias-correction model for '
+                #         '{0:d}th of {1:d} grid rows, '
+                #         '{2:d}th of {3:d} columns, '
+                #         '{4:d}th of {5:d} fields...'
+                #     ).format(
+                #         i_pred + 1, num_target_rows,
+                #         j + 1, num_columns,
+                #         f_model + 1, num_fields
+                #     ))
+                #     print('GODDAMN MATRIX SHAPE = {0:s}'.format(
+                #         str(prediction_matrix[i_pred, j, f_pred, :].shape)
+                #     ))
 
                 if do_uncertainty_calibration:
                     orig_stdev = prediction_stdev_matrix[i_pred, j, f_pred]
@@ -723,6 +724,7 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
                 s, e - 1, num=e - s, dtype=int
             )
             this_ptx = ptx.isel({prediction_io.ROW_DIM: these_row_indices})
+            print(this_ptx)
 
             argument_list.append((
                 this_ptx,
