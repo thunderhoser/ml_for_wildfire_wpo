@@ -343,6 +343,54 @@ def take_ensemble_mean(prediction_table_xarray):
     return prediction_table_xarray
 
 
+def prep_for_uncertainty_calib_training(prediction_table_xarray):
+    """Prepares predictions to train uncertainty calibration.
+
+    Specifically, for every atomic example, this method replaces the full
+    ensemble with the ensemble variance and replaces the target with the squared
+    error of the ensemble mean.
+
+    One atomic example = one init time, one valid time, one field, one pixel
+
+    :param prediction_table_xarray: xarray table in format returned by
+        `prediction_io.read_file`.
+    :return: prediction_table_xarray: Same but with the aforementioned changes.
+    """
+
+    ptx = prediction_table_xarray
+    ensemble_size = len(ptx.coords[ENSEMBLE_MEMBER_DIM].values)
+    assert ensemble_size > 1
+
+    prediction_variance_matrix = numpy.var(
+        ptx[PREDICTION_KEY].values, axis=-1, ddof=1, keepdims=True
+    )
+    squared_error_matrix = (
+        numpy.mean(ptx[PREDICTION_KEY].values, axis=-1) -
+        ptx[TARGET_KEY].values
+    ) ** 2
+
+    ptx = ptx.assign_coords({
+        DUMMY_ENSEMBLE_MEMBER_DIM: numpy.array([0], dtype=int)
+    })
+
+    these_dim = (ROW_DIM, COLUMN_DIM, FIELD_DIM, DUMMY_ENSEMBLE_MEMBER_DIM)
+
+    ptx = ptx.assign({
+        PREDICTION_KEY: (
+            these_dim,
+            prediction_variance_matrix
+        ),
+        TARGET_KEY:(
+            (ROW_DIM, COLUMN_DIM, FIELD_DIM),
+            squared_error_matrix
+        )
+    })
+
+    ptx = ptx.rename({DUMMY_ENSEMBLE_MEMBER_DIM: ENSEMBLE_MEMBER_DIM})
+    prediction_table_xarray = ptx
+    return prediction_table_xarray
+
+
 def subset_by_location(
         prediction_table_xarray, desired_latitude_deg_n,
         desired_longitude_deg_e, radius_metres,

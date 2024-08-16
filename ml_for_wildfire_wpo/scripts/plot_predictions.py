@@ -14,7 +14,7 @@ from ml_for_wildfire_wpo.io import border_io
 from ml_for_wildfire_wpo.io import prediction_io
 from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 from ml_for_wildfire_wpo.machine_learning import neural_net
-from ml_for_wildfire_wpo.machine_learning import isotonic_regression
+from ml_for_wildfire_wpo.machine_learning import bias_correction
 from ml_for_wildfire_wpo.plotting import fwi_plotting
 from ml_for_wildfire_wpo.plotting import plotting_utils
 
@@ -53,6 +53,7 @@ INIT_DATE_ARG_NAME = 'init_date_string'
 MAX_VALUES_ARG_NAME = 'max_diff_value_by_field'
 MAX_PERCENTILES_ARG_NAME = 'max_diff_prctile_by_field'
 ISOTONIC_MODEL_FILE_ARG_NAME = 'isotonic_model_file_name'
+UNCERTAINTY_CALIB_MODEL_FILE_ARG_NAME = 'uncertainty_calib_model_file_name'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 INPUT_DIRS_HELP_STRING = (
@@ -95,8 +96,13 @@ MAX_PERCENTILES_HELP_STRING = (
 )
 ISOTONIC_MODEL_FILE_HELP_STRING = (
     'Path to file with isotonic-regression model, which will be used to bias-'
-    'correct predictions before plotting.  If you do not want IR, leave this '
-    'argument alone.'
+    'correct ensemble means before plotting.  If you do not want IR, leave '
+    'this argument alone.'
+)
+UNCERTAINTY_CALIB_MODEL_FILE_HELP_STRING = (
+    'Path to file with uncertainty-calibration model, which will be used to '
+    'bias-correct ensemble spreads before plotting.  If you do not want UC, '
+    'leave this argument alone.'
 )
 OUTPUT_DIR_HELP_STRING = (
     'Name of output directory.  Figures will be saved here.'
@@ -135,6 +141,10 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + ISOTONIC_MODEL_FILE_ARG_NAME, type=str, required=False, default='',
     help=ISOTONIC_MODEL_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + UNCERTAINTY_CALIB_MODEL_FILE_ARG_NAME, type=str, required=False,
+    default='', help=UNCERTAINTY_CALIB_MODEL_FILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
@@ -202,7 +212,8 @@ def _plot_predictions_one_model(
         init_date_string, lead_time_days, max_diff_value_by_field,
         border_latitudes_deg_n, border_longitudes_deg_e,
         model_description_string, fancy_model_description_string,
-        plot_actual, output_dir_name, isotonic_model_dict=None):
+        plot_actual, output_dir_name, isotonic_model_dict=None,
+        uncertainty_calib_model_dict=None):
     """Plots all predictions (i.e., all predicted fields) for one model.
 
     P = number of points in borders
@@ -226,8 +237,11 @@ def _plot_predictions_one_model(
     :param output_dir_name: Path to output directory.  Figures will be saved
         here.
     :param isotonic_model_dict: Dictionary returned by
-        `isotonic_regression.read_file`.  If you do not want to bias-correct,
-        make this None.
+        `bias_corection.read_file`.  If you do not want to bias-correct ensemble
+        means, make this None.
+    :param uncertainty_calib_model_dict: Dictionary returned by
+        `bias_corection.read_file`.  If you do not want to bias-correct ensemble
+        spreads, make this None.
     """
 
     init_date_unix_sec = time_conversion.string_to_unix_sec(
@@ -238,9 +252,14 @@ def _plot_predictions_one_model(
     prediction_table_xarray = prediction_io.read_file(prediction_file_name)
 
     if isotonic_model_dict is not None:
-        prediction_table_xarray = isotonic_regression.apply_model_suite(
+        prediction_table_xarray = bias_correction.apply_model_suite(
             prediction_table_xarray=prediction_table_xarray,
             model_dict=isotonic_model_dict
+        )
+    if uncertainty_calib_model_dict is not None:
+        prediction_table_xarray = bias_correction.apply_model_suite(
+            prediction_table_xarray=prediction_table_xarray,
+            model_dict=uncertainty_calib_model_dict
         )
 
     ptx = prediction_table_xarray
@@ -630,7 +649,8 @@ def _plot_one_field(
 def _run(prediction_dir_name_by_model, description_string_by_model,
          ensemble_percentiles, field_names, init_date_string,
          max_diff_value_by_field, max_diff_percentile_by_field,
-         isotonic_model_file_name, output_dir_name):
+         isotonic_model_file_name, uncertainty_calib_model_file_name,
+         output_dir_name):
     """Plots NN-based predictions and targets (actual values).
 
     This is effectively the main method.
@@ -643,6 +663,7 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
     :param max_diff_value_by_field: Same.
     :param max_diff_percentile_by_field: Same.
     :param isotonic_model_file_name: Same.
+    :param uncertainty_calib_model_file_name: Same.
     :param output_dir_name: Same.
     """
 
@@ -683,6 +704,8 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
     # Check other input args.
     if isotonic_model_file_name == '':
         isotonic_model_file_name = None
+    if uncertainty_calib_model_file_name == '':
+        uncertainty_calib_model_file_name = None
 
     if len(ensemble_percentiles) == 1 and ensemble_percentiles[0] < 0:
         ensemble_percentiles = numpy.array([])
@@ -729,8 +752,26 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
         print('Reading isotonic-regression model from: "{0:s}"...'.format(
             isotonic_model_file_name
         ))
-        isotonic_model_dict = isotonic_regression.read_file(
+        isotonic_model_dict = bias_correction.read_file(
             isotonic_model_file_name
+        )
+        assert not isotonic_model_dict[bias_correction.DO_UNCERTAINTY_CALIB_KEY]
+
+    if uncertainty_calib_model_file_name is None:
+        uncertainty_calib_model_dict = None
+    else:
+        print('Reading uncertainty-calibration model from: "{0:s}"...'.format(
+            uncertainty_calib_model_file_name
+        ))
+        uncertainty_calib_model_dict = bias_correction.read_file(
+            uncertainty_calib_model_file_name
+        )
+        ucmd = uncertainty_calib_model_dict
+
+        assert ucmd[bias_correction.DO_UNCERTAINTY_CALIB_KEY]
+        assert (
+            ucmd[bias_correction.DO_IR_BEFORE_UC_KEY] ==
+            (isotonic_model_file_name is not None)
         )
 
     if max_diff_value_by_field is None:
@@ -742,9 +783,14 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
             for i in range(num_models):
                 ptx = prediction_io.read_file(prediction_file_name_by_model[i])
                 if isotonic_model_dict is not None:
-                    ptx = isotonic_regression.apply_model_suite(
+                    ptx = bias_correction.apply_model_suite(
                         prediction_table_xarray=ptx,
                         model_dict=isotonic_model_dict
+                    )
+                if uncertainty_calib_model_dict is not None:
+                    ptx = bias_correction.apply_model_suite(
+                        prediction_table_xarray=ptx,
+                        model_dict=uncertainty_calib_model_dict
                     )
 
                 field_index = numpy.where(
@@ -802,6 +848,7 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
         _plot_predictions_one_model(
             prediction_file_name=prediction_file_name_by_model[i],
             isotonic_model_dict=isotonic_model_dict,
+            uncertainty_calib_model_dict=uncertainty_calib_model_dict,
             field_names=field_names,
             ensemble_percentiles=ensemble_percentiles,
             init_date_string=init_date_string,
@@ -840,6 +887,9 @@ if __name__ == '__main__':
         ),
         isotonic_model_file_name=getattr(
             INPUT_ARG_OBJECT, ISOTONIC_MODEL_FILE_ARG_NAME
+        ),
+        uncertainty_calib_model_file_name=getattr(
+            INPUT_ARG_OBJECT, UNCERTAINTY_CALIB_MODEL_FILE_ARG_NAME
         ),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )

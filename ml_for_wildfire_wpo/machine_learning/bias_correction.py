@@ -1,6 +1,9 @@
-"""Isotonic regression."""
+"""Training and inference code for bias-correction models.
 
-import os
+This module includes both isotonic regression, for bias-correcting the ensemble
+mean, and uncertainty calibration, for bias-correcting the ensemble spread.
+"""
+
 from multiprocessing import Pool
 import dill
 import numpy
@@ -16,6 +19,7 @@ TOLERANCE = 1e-6
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.01
 MASK_PIXEL_IF_ORIG_WEIGHT_BELOW = 0.001
 NUM_SLICES_FOR_MULTIPROCESSING = 24
+MAX_STDEV_INFLATION_FACTOR = 1000.
 
 MODELS_KEY = 'model_object_matrix'
 LATITUDES_KEY = 'latitude_matrix_deg_e'
@@ -24,10 +28,13 @@ FIELD_NAMES_KEY = 'field_names'
 PIXEL_RADIUS_KEY = 'pixel_radius_metres'
 WEIGHT_BY_INV_DIST_KEY = 'weight_pixels_by_inverse_dist'
 WEIGHT_BY_INV_SQ_DIST_KEY = 'weight_pixels_by_inverse_sq_dist'
+DO_UNCERTAINTY_CALIB_KEY = 'do_uncertainty_calibration'
+DO_IR_BEFORE_UC_KEY = 'do_iso_reg_before_uncertainty_calib'
 
 ALL_KEYS = [
     MODELS_KEY, LATITUDES_KEY, LONGITUDES_KEY, FIELD_NAMES_KEY,
-    PIXEL_RADIUS_KEY, WEIGHT_BY_INV_DIST_KEY, WEIGHT_BY_INV_SQ_DIST_KEY
+    PIXEL_RADIUS_KEY, WEIGHT_BY_INV_DIST_KEY, WEIGHT_BY_INV_SQ_DIST_KEY,
+    DO_UNCERTAINTY_CALIB_KEY, DO_IR_BEFORE_UC_KEY
 ]
 
 
@@ -226,7 +233,7 @@ def _train_one_model_per_pixel(
                     continue
 
                 print((
-                    'Training isotonic-regression model for '
+                    'Training bias-correction model for '
                     '{0:d}th of {1:d} grid rows, '
                     '{2:d}th of {3:d} columns, '
                     '{4:d}th of {5:d} fields...'
@@ -266,9 +273,11 @@ def _train_one_model_per_pixel(
 
 def train_model_suite(
         prediction_tables_xarray, one_model_per_pixel,
+        do_uncertainty_calibration,
         pixel_radius_metres=None,
         weight_pixels_by_inverse_dist=None,
         weight_pixels_by_inverse_sq_dist=None,
+        do_iso_reg_before_uncertainty_calib=None,
         do_multiprocessing=True):
     """Trains one model suite.
 
@@ -286,6 +295,13 @@ def train_model_suite(
     :param one_model_per_pixel: Boolean flag.  If True, will train one model per
         target field per pixel.  If False, will just train one model per target
         field.
+    :param do_uncertainty_calibration: Boolean flag.  If True, this method will
+        [1] assume that every "prediction" in `prediction_tables_xarray` is the
+        ensemble variance; [2] assume that every "target" in
+        `prediction_tables_xarray` is the squared error of the ensemble mean;
+        [3] train IR models to adjust the ensemble variance, i.e., to do
+        uncertainty calibration.  If False, this method will do standard
+        isotonic regression, correcting only the ensemble mean.
     :param pixel_radius_metres: [used only if `one_model_per_pixel == True`]
         When training the model for pixel P, will use all pixels within this
         radius.
@@ -297,13 +313,17 @@ def train_model_suite(
         [used only if `one_model_per_pixel == True`]
         Boolean flag.  If True, when training the model for pixel P, will weight
         every other pixel by the inverse of its *squared* distance to P.
+    :param do_iso_reg_before_uncertainty_calib:
+        [used only if `do_uncertainty_calibration == True`]
+        Boolean flag, indicating whether isotonic regression has been done
+        before uncertainty calibration.
     :param do_multiprocessing: [used only if `one_model_per_pixel == True`]
         Boolean flag.  If True, will do multi-threaded processing to make this
         go faster.
 
     :return: model_dict: Dictionary with the following keys.
     model_dict["model_object_matrix"]: M-by-N-by-F numpy array of trained
-        isotonic-regression models (instances of
+        bias-correction models (instances of
         `sklearn.isotonic.IsotonicRegression`).
     model_dict["latitude_matrix_deg_e"]: M-by-N numpy array of latitudes (deg
         north).
@@ -320,6 +340,7 @@ def train_model_suite(
 
     # Check input args.
     error_checking.assert_is_boolean(one_model_per_pixel)
+    error_checking.assert_is_boolean(do_uncertainty_calibration)
     if not one_model_per_pixel:
         do_multiprocessing = False
 
@@ -331,9 +352,9 @@ def train_model_suite(
     field_names = []
 
     for k in range(len(prediction_tables_xarray)):
-        prediction_tables_xarray[k] = prediction_io.take_ensemble_mean(
-            prediction_tables_xarray[k]
-        )
+        # prediction_tables_xarray[k] = prediction_io.take_ensemble_mean(
+        #     prediction_tables_xarray[k]
+        # )
         ptx = prediction_tables_xarray[k]
 
         if grid_latitudes_deg_n is None:
@@ -367,6 +388,8 @@ def train_model_suite(
         pixel_radius_metres = None
         weight_pixels_by_inverse_dist = None
         weight_pixels_by_inverse_sq_dist = None
+    if not do_uncertainty_calibration:
+        do_iso_reg_before_uncertainty_calib = None
 
     # Do actual stuff.
     num_model_grid_rows = (
@@ -422,7 +445,9 @@ def train_model_suite(
             FIELD_NAMES_KEY: field_names,
             PIXEL_RADIUS_KEY: pixel_radius_metres,
             WEIGHT_BY_INV_DIST_KEY: weight_pixels_by_inverse_dist,
-            WEIGHT_BY_INV_SQ_DIST_KEY: weight_pixels_by_inverse_sq_dist
+            WEIGHT_BY_INV_SQ_DIST_KEY: weight_pixels_by_inverse_sq_dist,
+            DO_UNCERTAINTY_CALIB_KEY: do_uncertainty_calibration,
+            DO_IR_BEFORE_UC_KEY: do_iso_reg_before_uncertainty_calib
         }
 
     for f in range(num_fields):
@@ -437,7 +462,7 @@ def train_model_suite(
                     continue
 
                 print((
-                    'Training isotonic-regression model for '
+                    'Training bias-correction model for '
                     '{0:d}th of {1:d} grid rows, '
                     '{2:d}th of {3:d} columns, '
                     '{4:d}th of {5:d} fields...'
@@ -484,7 +509,9 @@ def train_model_suite(
         FIELD_NAMES_KEY: field_names,
         PIXEL_RADIUS_KEY: pixel_radius_metres,
         WEIGHT_BY_INV_DIST_KEY: weight_pixels_by_inverse_dist,
-        WEIGHT_BY_INV_SQ_DIST_KEY: weight_pixels_by_inverse_sq_dist
+        WEIGHT_BY_INV_SQ_DIST_KEY: weight_pixels_by_inverse_sq_dist,
+        DO_UNCERTAINTY_CALIB_KEY: do_uncertainty_calibration,
+        DO_IR_BEFORE_UC_KEY: do_iso_reg_before_uncertainty_calib
     }
 
 
@@ -501,6 +528,7 @@ def apply_model_suite(prediction_table_xarray, model_dict):
     model_latitude_matrix_deg_n = model_dict[LATITUDES_KEY]
     model_longitude_matrix_deg_e = model_dict[LONGITUDES_KEY]
     model_object_matrix = model_dict[MODELS_KEY]
+    do_uncertainty_calibration = model_dict[DO_UNCERTAINTY_CALIB_KEY]
 
     one_model_per_pixel = model_latitude_matrix_deg_n.size > 1
     ptx = prediction_table_xarray
@@ -531,6 +559,18 @@ def apply_model_suite(prediction_table_xarray, model_dict):
     num_model_grid_columns = model_latitude_matrix_deg_n.shape[1]
     prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
 
+    if do_uncertainty_calibration:
+        ensemble_size = prediction_matrix.shape[-1]
+        assert ensemble_size > 1
+
+        mean_prediction_matrix = numpy.mean(prediction_matrix, axis=-1)
+        prediction_stdev_matrix = numpy.std(
+            prediction_matrix, axis=-1, ddof=1
+        )
+    else:
+        mean_prediction_matrix = numpy.array([], dtype=float)
+        prediction_stdev_matrix = numpy.array([], dtype=float)
+
     constrain_dsr = (
         canadian_fwi_utils.FWI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
         and
@@ -557,7 +597,7 @@ def apply_model_suite(prediction_table_xarray, model_dict):
                     continue
 
                 print((
-                    'Applying isotonic-regression model for '
+                    'Applying bias-correctiob model for '
                     '{0:d}th of {1:d} grid rows, '
                     '{2:d}th of {3:d} columns, '
                     '{4:d}th of {5:d} fields...'
@@ -570,8 +610,70 @@ def apply_model_suite(prediction_table_xarray, model_dict):
                     num_fields
                 ))
 
+                if do_uncertainty_calibration:
+                    if one_model_per_pixel:
+                        orig_stdev = prediction_stdev_matrix[i, j, f_new]
+                        new_stdev = numpy.sqrt(
+                            model_object_matrix[i, j, f].predict(
+                                orig_stdev ** 2
+                            )
+                        )
+                        stdev_inflation_factor = new_stdev / orig_stdev
+
+                        if numpy.isnan(stdev_inflation_factor):
+                            stdev_inflation_factor = 1.
+
+                        stdev_inflation_factor = numpy.minimum(
+                            stdev_inflation_factor, MAX_STDEV_INFLATION_FACTOR
+                        )
+
+                        prediction_matrix[i, j, f_new, :] = (
+                            mean_prediction_matrix[i, j, f_new] +
+                            stdev_inflation_factor * (
+                                prediction_matrix[i, j, f_new, :] -
+                                mean_prediction_matrix[i, j, f_new]
+                            )
+                        )
+                    else:
+                        orig_stdev_matrix = prediction_stdev_matrix[..., f_new]
+                        these_dims = orig_stdev_matrix.shape
+
+                        new_stdevs = numpy.sqrt(
+                            model_object_matrix[i, j, f].predict(
+                                numpy.ravel(orig_stdev_matrix ** 2)
+                            )
+                        )
+                        new_stdev_matrix = numpy.reshape(new_stdevs, these_dims)
+                        stdev_inflation_matrix = (
+                            new_stdev_matrix / orig_stdev_matrix
+                        )
+
+                        stdev_inflation_matrix[
+                            numpy.isnan(stdev_inflation_matrix)
+                        ] = 1.
+                        stdev_inflation_matrix = numpy.minimum(
+                            stdev_inflation_matrix, MAX_STDEV_INFLATION_FACTOR
+                        )
+
+                        stdev_inflation_matrix = numpy.expand_dims(
+                            stdev_inflation_matrix, axis=-1
+                        )
+                        this_mean_pred_matrix = numpy.expand_dims(
+                            mean_prediction_matrix[..., f_new], axis=-1
+                        )
+
+                        prediction_matrix[..., f_new, :] = (
+                            this_mean_pred_matrix +
+                            stdev_inflation_matrix * (
+                                prediction_matrix[..., f_new, :] -
+                                this_mean_pred_matrix
+                            )
+                        )
+
+                    continue
+
                 if one_model_per_pixel:
-                    prediction_matrix[i, j, f, :] = (
+                    prediction_matrix[i, j, f_new, :] = (
                         model_object_matrix[i, j, f].predict(
                             prediction_matrix_this_field[i, j, :]
                         )
@@ -581,7 +683,7 @@ def apply_model_suite(prediction_table_xarray, model_dict):
                     new_predictions = model_object_matrix[i, j, f].predict(
                         numpy.ravel(prediction_matrix_this_field)
                     )
-                    prediction_matrix[..., f, :] = numpy.reshape(
+                    prediction_matrix[..., f_new, :] = numpy.reshape(
                         new_predictions, these_dims
                     )
 
@@ -593,7 +695,7 @@ def apply_model_suite(prediction_table_xarray, model_dict):
 
         dsr_index = numpy.where(
             ptx[prediction_io.FIELD_NAME_KEY].values ==
-            canadian_fwi_utils.FWI_NAME
+            canadian_fwi_utils.DSR_NAME
         )[0][0]
 
         prediction_matrix[..., dsr_index, :] = canadian_fwi_utils.fwi_to_dsr(
@@ -608,32 +710,8 @@ def apply_model_suite(prediction_table_xarray, model_dict):
     })
 
 
-def find_file(model_dir_name, raise_error_if_missing=True):
-    """Finds Dill file with suite of isotonic-regression models.
-
-    :param model_dir_name: Name of directory.
-    :param raise_error_if_missing: Boolean flag.  If file is missing and
-        `raise_error_if_missing == True`, will throw error.  If file is missing
-        and `raise_error_if_missing == False`, will return *expected* file path.
-    :return: dill_file_name: Path to Dill file with model.
-    """
-
-    error_checking.assert_is_string(model_dir_name)
-    error_checking.assert_is_boolean(raise_error_if_missing)
-
-    dill_file_name = '{0:s}/isotonic_regression.dill'.format(model_dir_name)
-
-    if raise_error_if_missing and not os.path.isfile(dill_file_name):
-        error_string = 'Cannot find file.  Expected at: "{0:s}"'.format(
-            dill_file_name
-        )
-        raise ValueError(error_string)
-
-    return dill_file_name
-
-
 def write_file(dill_file_name, model_dict):
-    """Writes suite of isotonic-regression models to Dill file.
+    """Writes suite of bias-correction models to Dill file.
 
     :param dill_file_name: Path to output file.
     :param model_dict: Dictionary in format created by `train_model_suite`.
@@ -647,7 +725,7 @@ def write_file(dill_file_name, model_dict):
 
 
 def read_file(dill_file_name):
-    """Reads suite of isotonic-regression models from Dill file.
+    """Reads suite of bias-correction models from Dill file.
 
     :param dill_file_name: Path to input file.
     :return: model_dict: Dictionary in format created by `train_model_suite`.
@@ -658,6 +736,11 @@ def read_file(dill_file_name):
     dill_file_handle = open(dill_file_name, 'rb')
     model_dict = dill.load(dill_file_handle)
     dill_file_handle.close()
+
+    if DO_UNCERTAINTY_CALIB_KEY not in model_dict:
+        model_dict[DO_UNCERTAINTY_CALIB_KEY] = False
+    if DO_IR_BEFORE_UC_KEY not in model_dict:
+        model_dict[DO_IR_BEFORE_UC_KEY] = False
 
     missing_keys = list(set(ALL_KEYS) - set(model_dict.keys()))
     if len(missing_keys) == 0:

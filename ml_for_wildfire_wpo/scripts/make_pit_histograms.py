@@ -11,6 +11,7 @@ INIT_DATE_LIMITS_ARG_NAME = 'init_date_limit_strings'
 TARGET_FIELDS_ARG_NAME = 'target_field_names'
 NUM_BINS_ARG_NAME = 'num_bins'
 ISOTONIC_MODEL_FILE_ARG_NAME = 'isotonic_model_file_name'
+UNCERTAINTY_CALIB_MODEL_FILE_ARG_NAME = 'uncertainty_calib_model_file_name'
 OUTPUT_FILE_ARG_NAME = 'output_file_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -28,6 +29,11 @@ ISOTONIC_MODEL_FILE_HELP_STRING = (
     'Path to file with isotonic-regression model, which will be used to bias-'
     'correct predictions before evaluation.  If you do not want IR, leave this '
     'argument alone.'
+)
+UNCERTAINTY_CALIB_MODEL_FILE_HELP_STRING = (
+    'Path to file with uncertainty-calibration model, which will be used to '
+    'bias-correct uncertainties before evaluation.  If you do not want UC, '
+    'leave this argument alone.'
 )
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Evaluation scores will be written here by '
@@ -55,13 +61,18 @@ INPUT_ARG_PARSER.add_argument(
     help=ISOTONIC_MODEL_FILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + UNCERTAINTY_CALIB_MODEL_FILE_ARG_NAME, type=str, required=False,
+    default='', help=UNCERTAINTY_CALIB_MODEL_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
     help=OUTPUT_FILE_HELP_STRING
 )
 
 
 def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
-         num_bins, isotonic_model_file_name, output_file_name):
+         num_bins, isotonic_model_file_name, uncertainty_calib_model_file_name,
+         output_file_name):
     """Computes PIT (prob integral transform) histogram for each target field.
 
     This is effectively the main method.
@@ -71,11 +82,14 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
     :param target_field_names: Same.
     :param num_bins: Same.
     :param isotonic_model_file_name: Same.
+    :param uncertainty_calib_model_file_name: Same.
     :param output_file_name: Same.
     """
 
     if isotonic_model_file_name == '':
         isotonic_model_file_name = None
+    if uncertainty_calib_model_file_name == '':
+        uncertainty_calib_model_file_name = None
 
     prediction_file_names = prediction_io.find_files_for_period(
         directory_name=prediction_dir_name,
@@ -87,6 +101,7 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
     result_table_xarray = pith_utils.compute_pit_histograms(
         prediction_file_names=prediction_file_names,
         isotonic_model_file_name=isotonic_model_file_name,
+        uncertainty_calib_model_file_name=uncertainty_calib_model_file_name,
         target_field_names=target_field_names,
         num_bins=num_bins
     )
@@ -128,6 +143,9 @@ if __name__ == '__main__':
         num_bins=getattr(INPUT_ARG_OBJECT, NUM_BINS_ARG_NAME),
         isotonic_model_file_name=getattr(
             INPUT_ARG_OBJECT, ISOTONIC_MODEL_FILE_ARG_NAME
+        ),
+        uncertainty_calib_model_file_name=getattr(
+            INPUT_ARG_OBJECT, UNCERTAINTY_CALIB_MODEL_FILE_ARG_NAME
         ),
         output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )
