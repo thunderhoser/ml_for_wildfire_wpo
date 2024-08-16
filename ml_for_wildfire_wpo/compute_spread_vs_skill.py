@@ -26,6 +26,7 @@ MAX_BIN_EDGES_ARG_NAME = 'max_bin_edge_by_target'
 MIN_BIN_EDGES_PRCTILE_ARG_NAME = 'min_bin_edge_prctile_by_target'
 MAX_BIN_EDGES_PRCTILE_ARG_NAME = 'max_bin_edge_prctile_by_target'
 ISOTONIC_MODEL_FILE_ARG_NAME = 'isotonic_model_file_name'
+UNCERTAINTY_CALIB_MODEL_FILE_ARG_NAME = 'uncertainty_calib_model_file_name'
 OUTPUT_FILE_ARG_NAME = 'output_file_name'
 
 INPUT_DIR_HELP_STRING = (
@@ -68,6 +69,11 @@ ISOTONIC_MODEL_FILE_HELP_STRING = (
     'Path to file with isotonic-regression model, which will be used to bias-'
     'correct predictions before evaluation.  If you do not want IR, leave this '
     'argument alone.'
+)
+UNCERTAINTY_CALIB_MODEL_FILE_HELP_STRING = (
+    'Path to file with uncertainty-calibration model, which will be used to '
+    'bias-correct uncertainties before evaluation.  If you do not want UC, '
+    'leave this argument alone.'
 )
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Evaluation scores will be written here by '
@@ -114,6 +120,10 @@ INPUT_ARG_PARSER.add_argument(
     help=ISOTONIC_MODEL_FILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + UNCERTAINTY_CALIB_MODEL_FILE_ARG_NAME, type=str, required=False,
+    default='', help=UNCERTAINTY_CALIB_MODEL_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_FILE_ARG_NAME, type=str, required=True,
     help=OUTPUT_FILE_HELP_STRING
 )
@@ -122,7 +132,8 @@ INPUT_ARG_PARSER.add_argument(
 def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
          num_bins_by_target, min_bin_edge_by_target, max_bin_edge_by_target,
          min_bin_edge_prctile_by_target, max_bin_edge_prctile_by_target,
-         isotonic_model_file_name, output_file_name):
+         isotonic_model_file_name, uncertainty_calib_model_file_name,
+         output_file_name):
     """Computes spread-skill relationship for multiple target fields.
 
     This is effectively the main method.
@@ -136,11 +147,14 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
     :param min_bin_edge_prctile_by_target: Same.
     :param max_bin_edge_prctile_by_target: Same.
     :param isotonic_model_file_name: Same.
+    :param uncertainty_calib_model_file_name: Same.
     :param output_file_name: Same.
     """
 
     if isotonic_model_file_name == '':
         isotonic_model_file_name = None
+    if uncertainty_calib_model_file_name == '':
+        uncertainty_calib_model_file_name = None
 
     if (
             (len(min_bin_edge_by_target) == 1 and
@@ -170,6 +184,7 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
     result_table_xarray = ss_utils.get_spread_vs_skill(
         prediction_file_names=prediction_file_names,
         isotonic_model_file_name=isotonic_model_file_name,
+        uncertainty_calib_model_file_name=uncertainty_calib_model_file_name,
         target_field_names=target_field_names,
         num_bins_by_target=num_bins_by_target,
         min_bin_edge_by_target=min_bin_edge_by_target,
@@ -226,6 +241,9 @@ if __name__ == '__main__':
         ),
         isotonic_model_file_name=getattr(
             INPUT_ARG_OBJECT, ISOTONIC_MODEL_FILE_ARG_NAME
+        ),
+        uncertainty_calib_model_file_name=getattr(
+            INPUT_ARG_OBJECT, UNCERTAINTY_CALIB_MODEL_FILE_ARG_NAME
         ),
         output_file_name=getattr(INPUT_ARG_OBJECT, OUTPUT_FILE_ARG_NAME)
     )

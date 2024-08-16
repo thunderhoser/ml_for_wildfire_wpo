@@ -1,4 +1,4 @@
-"""Trains isotonic-regression model to bias-correct ensemble mean."""
+"""Trains uncertainty-calibration model to bias-correct ensemble spread."""
 
 import os
 import sys
@@ -19,6 +19,7 @@ SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 SENTINEL_VALUE = -1e6
 
 INPUT_DIRS_ARG_NAME = 'input_prediction_dir_names'
+ISOTONIC_MODEL_FILES_ARG_NAME = 'isotonic_model_file_names'
 INIT_DATE_LIMITS_ARG_NAME = 'init_date_limit_strings'
 ONE_MODEL_PER_PIXEL_ARG_NAME = 'one_model_per_pixel'
 PIXEL_RADIUS_ARG_NAME = 'pixel_radius_metres'
@@ -32,12 +33,21 @@ INPUT_DIRS_HELP_STRING = (
     'predictions.  Files therein will be found by `prediction_io.find_file` '
     'and read by `prediction_io.read_file`.'
 )
+ISOTONIC_MODEL_FILES_HELP_STRING = (
+    '[optional] List of paths to isotonic-regression models, with the same '
+    'length as `{0:s}`.  This allows you to train uncertainty calibration only '
+    'for models where the ensemble mean has already been bias-corrected via '
+    'isotonic regression.  If you do not want to include isotonic regression, '
+    'leave this argument alone.'
+).format(
+    INPUT_DIRS_ARG_NAME
+)
 INIT_DATE_LIMITS_HELP_STRING = (
     'List of two initialization dates, specifying the beginning and end of the '
     'training period.  Date format is "yyyymmdd".'
 )
 ONE_MODEL_PER_PIXEL_HELP_STRING = (
-    'Boolean flag.  If 1 (0), will train one IR model per pixel (one IR model '
+    'Boolean flag.  If 1 (0), will train one UC model per pixel (one UC model '
     'for the whole domain).'
 )
 PIXEL_RADIUS_HELP_STRING = (
@@ -66,7 +76,7 @@ TARGET_FIELDS_HELP_STRING = (
     'to train for all target fields, leave this argument alone.'
 )
 OUTPUT_FILE_HELP_STRING = (
-    'Path to output file.  The suite of trained IR models will be saved here, '
+    'Path to output file.  The suite of trained UC models will be saved here, '
     'in Dill format.'
 )
 
@@ -74,6 +84,10 @@ INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
     '--' + INPUT_DIRS_ARG_NAME, type=str, nargs='+', required=True,
     help=INPUT_DIRS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + ISOTONIC_MODEL_FILES_ARG_NAME, type=str, nargs='+', required=False,
+    default=[''], help=ISOTONIC_MODEL_FILES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + INIT_DATE_LIMITS_ARG_NAME, type=str, nargs=2, required=True,
@@ -105,15 +119,16 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
-def _run(prediction_dir_names, init_date_limit_strings, one_model_per_pixel,
-         pixel_radius_metres, weight_pixels_by_inverse_dist,
-         weight_pixels_by_inverse_sq_dist, target_field_names,
-         output_file_name):
-    """Trains isotonic-regression model to bias-correct ensemble mean
+def _run(prediction_dir_names, isotonic_model_file_names,
+         init_date_limit_strings, one_model_per_pixel, pixel_radius_metres,
+         weight_pixels_by_inverse_dist, weight_pixels_by_inverse_sq_dist,
+         target_field_names, output_file_name):
+    """Trains uncertainty-calibration model to bias-correct ensemble spread.
 
     This is effectively the main method.
 
     :param prediction_dir_names: See documentation at top of this script.
+    :param isotonic_model_file_names: Same.
     :param init_date_limit_strings: Same.
     :param one_model_per_pixel: Same.
     :param pixel_radius_metres: Same.
@@ -122,6 +137,15 @@ def _run(prediction_dir_names, init_date_limit_strings, one_model_per_pixel,
     :param target_field_names: Same.
     :param output_file_name: Same.
     """
+
+    if (
+            len(isotonic_model_file_names) == 1 and
+            isotonic_model_file_names[0] == ''
+    ):
+        isotonic_model_file_names = None
+
+    if isotonic_model_file_names is not None:
+        assert len(isotonic_model_file_names) == len(prediction_dir_names)
 
     if pixel_radius_metres <= 0:
         pixel_radius_metres = None
@@ -146,8 +170,27 @@ def _run(prediction_dir_names, init_date_limit_strings, one_model_per_pixel,
         prediction_tables_xarray[k] = prediction_io.read_file(
             prediction_file_names[k]
         )
-        prediction_tables_xarray[k] = prediction_io.take_ensemble_mean(
-            prediction_tables_xarray[k]
+
+        if isotonic_model_file_names is not None:
+            print('Reading IR model from: "{0:s}"...'.format(
+                isotonic_model_file_names[k]
+            ))
+            this_ir_model_dict = bias_correction.read_file(
+                isotonic_model_file_names[k]
+            )
+            assert not this_ir_model_dict[
+                bias_correction.DO_UNCERTAINTY_CALIB_KEY
+            ]
+
+            prediction_tables_xarray[k] = bias_correction.apply_model_suite(
+                prediction_table_xarray=prediction_tables_xarray[k],
+                model_dict=this_ir_model_dict
+            )
+
+        prediction_tables_xarray[k] = (
+            prediction_io.prep_for_uncertainty_calib_training(
+                prediction_tables_xarray[k]
+            )
         )
 
         if target_field_names is None:
@@ -172,7 +215,9 @@ def _run(prediction_dir_names, init_date_limit_strings, one_model_per_pixel,
         pixel_radius_metres=pixel_radius_metres,
         weight_pixels_by_inverse_dist=weight_pixels_by_inverse_dist,
         weight_pixels_by_inverse_sq_dist=weight_pixels_by_inverse_sq_dist,
-        do_uncertainty_calibration=False
+        do_uncertainty_calibration=True,
+        do_iso_reg_before_uncertainty_calib=
+        isotonic_model_file_names is not None
     )
     print(SEPARATOR_STRING)
 
@@ -187,6 +232,9 @@ if __name__ == '__main__':
 
     _run(
         prediction_dir_names=getattr(INPUT_ARG_OBJECT, INPUT_DIRS_ARG_NAME),
+        isotonic_model_file_names=getattr(
+            INPUT_ARG_OBJECT, ISOTONIC_MODEL_FILES_ARG_NAME
+        ),
         init_date_limit_strings=getattr(
             INPUT_ARG_OBJECT, INIT_DATE_LIMITS_ARG_NAME
         ),

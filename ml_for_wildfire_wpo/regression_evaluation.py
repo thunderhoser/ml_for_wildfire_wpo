@@ -19,7 +19,7 @@ import prediction_io
 import canadian_fwi_io
 import canadian_fwi_utils
 import neural_net
-import isotonic_regression
+import bias_correction
 
 # TODO(thunderhoser): Allow multiple lead times.
 
@@ -61,6 +61,7 @@ INV_RELIABILITY_COUNT_KEY = 'inv_reliability_count'
 
 MODEL_FILE_KEY = 'model_file_name'
 ISOTONIC_MODEL_FILE_KEY = 'isotonic_model_file_name'
+UNCERTAINTY_CALIB_MODEL_FILE_KEY = 'uncertainty_calib_model_file_name'
 PREDICTION_FILES_KEY = 'prediction_file_names'
 
 
@@ -899,6 +900,7 @@ def confidence_interval_to_polygon(
 
 
 def read_inputs(prediction_file_names, isotonic_model_file_name,
+                uncertainty_calib_model_file_name,
                 target_field_names, mask_pixel_if_weight_below=0.05):
     """Reads inputs (predictions and targets) from many files.
 
@@ -911,6 +913,7 @@ def read_inputs(prediction_file_names, isotonic_model_file_name,
     :param prediction_file_names: See documentation for
         `get_scores_with_bootstrapping`.
     :param isotonic_model_file_name: Same.
+    :param uncertainty_calib_model_file_name: Same.
     :param target_field_names: length-T list of field names desired.
     :param mask_pixel_if_weight_below: Masking threshold.  For any pixel with an
         evaluation weight below this threshold, both the prediction and target
@@ -940,8 +943,26 @@ def read_inputs(prediction_file_names, isotonic_model_file_name,
         print('Reading isotonic-regression model from: "{0:s}"...'.format(
             isotonic_model_file_name
         ))
-        isotonic_model_dict = isotonic_regression.read_file(
+        isotonic_model_dict = bias_correction.read_file(
             isotonic_model_file_name
+        )
+        assert not isotonic_model_dict[bias_correction.DO_UNCERTAINTY_CALIB_KEY]
+
+    if uncertainty_calib_model_file_name is None:
+        uncertainty_calib_model_dict = None
+    else:
+        print('Reading uncertainty-calibration model from: "{0:s}"...'.format(
+            uncertainty_calib_model_file_name
+        ))
+        uncertainty_calib_model_dict = bias_correction.read_file(
+            uncertainty_calib_model_file_name
+        )
+        ucmd = uncertainty_calib_model_dict
+
+        assert ucmd[bias_correction.DO_UNCERTAINTY_CALIB_KEY]
+        assert (
+            ucmd[bias_correction.DO_IR_BEFORE_UC_KEY] ==
+            (isotonic_model_file_name is not None)
         )
 
     for i in range(num_times):
@@ -952,9 +973,17 @@ def read_inputs(prediction_file_names, isotonic_model_file_name,
 
         if isotonic_model_dict is not None:
             this_prediction_table_xarray = (
-                isotonic_regression.apply_model_suite(
+                bias_correction.apply_model_suite(
                     prediction_table_xarray=this_prediction_table_xarray,
                     model_dict=isotonic_model_dict
+                )
+            )
+
+        if uncertainty_calib_model_dict is not None:
+            this_prediction_table_xarray = (
+                bias_correction.apply_model_suite(
+                    prediction_table_xarray=this_prediction_table_xarray,
+                    model_dict=uncertainty_calib_model_dict
                 )
             )
 
@@ -1007,7 +1036,8 @@ def get_scores_with_bootstrapping(
         min_relia_bin_edge_by_target, max_relia_bin_edge_by_target,
         min_relia_bin_edge_prctile_by_target,
         max_relia_bin_edge_prctile_by_target,
-        per_grid_cell, keep_it_simple=False, isotonic_model_file_name=None):
+        per_grid_cell, keep_it_simple=False, isotonic_model_file_name=None,
+        uncertainty_calib_model_file_name=None):
     """Computes all scores with bootstrapping.
 
     T = number of target fields
@@ -1035,8 +1065,12 @@ def get_scores_with_bootstrapping(
         test and attributes diagram.
     :param isotonic_model_file_name: Path to file with isotonic-regression
         model, which will be used to bias-correct predictions before evaluation.
-        Will be read by `isotonic_regression.read_file`.  If you do not want to
+        Will be read by `bias_correction.read_file`.  If you do not want to
         bias-correct, make this None.
+    :param uncertainty_calib_model_file_name: Path to file with uncertainty-
+        calibration model, which will be used to bias-correct uncertainties
+        before evaluation.  Will be read by `bias_correction.read_file`.  If
+        you do not want to bias-correct uncertainties, make this None.
     :return: result_table_xarray: xarray table with results (variable and
         dimension names should make the table self-explanatory).
     """
@@ -1100,6 +1134,7 @@ def get_scores_with_bootstrapping(
     ) = read_inputs(
         prediction_file_names=prediction_file_names,
         isotonic_model_file_name=isotonic_model_file_name,
+        uncertainty_calib_model_file_name=uncertainty_calib_model_file_name,
         target_field_names=target_field_names,
         mask_pixel_if_weight_below=-1.
     )
@@ -1309,6 +1344,9 @@ def get_scores_with_bootstrapping(
     result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = (
         isotonic_model_file_name
     )
+    result_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = (
+        uncertainty_calib_model_file_name
+    )
     result_table_xarray.attrs[PREDICTION_FILES_KEY] = ' '.join([
         '{0:s}'.format(f) for f in prediction_file_names
     ])
@@ -1387,5 +1425,7 @@ def read_file(netcdf_file_name):
 
     if ISOTONIC_MODEL_FILE_KEY not in result_table_xarray.attrs:
         result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = None
+    if UNCERTAINTY_CALIB_MODEL_FILE_KEY not in result_table_xarray.attrs:
+        result_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = None
 
     return result_table_xarray

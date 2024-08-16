@@ -29,6 +29,7 @@ MEAN_UNCERTAINTY_KEY = 'mean_uncertainty'
 
 MODEL_FILE_KEY = 'model_file_name'
 ISOTONIC_MODEL_FILE_KEY = 'isotonic_model_file_name'
+UNCERTAINTY_CALIB_MODEL_FILE_KEY = 'uncertainty_calib_model_file_name'
 PREDICTION_FILES_KEY = 'prediction_file_names'
 
 ERROR_FUNCTION_KEY = 'error_function_name'
@@ -176,7 +177,8 @@ def run_discard_test(
         prediction_file_names, target_field_names, discard_fractions,
         error_function, error_function_string,
         uncertainty_function, uncertainty_function_string,
-        is_error_pos_oriented, isotonic_model_file_name=None):
+        is_error_pos_oriented, isotonic_model_file_name=None,
+        uncertainty_calib_model_file_name=None):
     """Runs the discard test independently for each target field.
 
     E = number of examples
@@ -216,8 +218,12 @@ def run_discard_test(
         is positively (negatively) oriented.
     :param isotonic_model_file_name: Path to file with isotonic-regression
         model, which will be used to bias-correct predictions before evaluation.
-        Will be read by `isotonic_regression.read_file`.  If you do not want to
+        Will be read by `bias_correction.read_file`.  If you do not want to
         bias-correct, make this None.
+    :param uncertainty_calib_model_file_name: Path to file with uncertainty-
+        calibration model, which will be used to bias-correct uncertainties
+        before evaluation.  Will be read by `bias_correction.read_file`.
+        If you do not want to bias-correct uncertainties, make this None.
     :return: result_table_xarray: xarray table with results (variable and
         dimension names should make the table self-explanatory).
     """
@@ -247,6 +253,7 @@ def run_discard_test(
     ) = regression_eval.read_inputs(
         prediction_file_names=prediction_file_names,
         isotonic_model_file_name=isotonic_model_file_name,
+        uncertainty_calib_model_file_name=uncertainty_calib_model_file_name,
         target_field_names=target_field_names,
         mask_pixel_if_weight_below=-1.
     )
@@ -294,6 +301,9 @@ def run_discard_test(
     result_table_xarray.attrs[MODEL_FILE_KEY] = model_file_name
     result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = (
         isotonic_model_file_name
+    )
+    result_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = (
+        uncertainty_calib_model_file_name
     )
     result_table_xarray.attrs[PREDICTION_FILES_KEY] = ' '.join([
         '{0:s}'.format(f) for f in prediction_file_names
@@ -345,5 +355,7 @@ def read_results(netcdf_file_name):
     result_table_xarray = xarray.open_dataset(netcdf_file_name)
     if ISOTONIC_MODEL_FILE_KEY not in result_table_xarray.attrs:
         result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = None
+    if UNCERTAINTY_CALIB_MODEL_FILE_KEY not in result_table_xarray.attrs:
+        result_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = None
 
     return result_table_xarray
