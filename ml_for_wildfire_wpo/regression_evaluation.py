@@ -976,7 +976,7 @@ def read_inputs(prediction_file_names, isotonic_model_file_name,
                 bias_correction.apply_model_suite(
                     prediction_table_xarray=this_prediction_table_xarray,
                     model_dict=isotonic_model_dict,
-                    verbose=False
+                    verbose=True
                 )
             )
 
