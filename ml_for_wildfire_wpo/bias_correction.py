@@ -678,6 +678,9 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
     exec_start_time_unix_sec = time.time()
     error_checking.assert_is_boolean(verbose)
 
+    # TODO(thunderhoser): HACK.
+    do_multiprocessing = False
+
     field_names = model_dict[FIELD_NAMES_KEY]
     model_latitude_matrix_deg_n = model_dict[LATITUDES_KEY]
     model_longitude_matrix_deg_e = model_dict[LONGITUDES_KEY]
