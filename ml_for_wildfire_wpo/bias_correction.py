@@ -301,6 +301,11 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
         predictions.
     """
 
+    # TODO(thunderhoser): This method assumes that `prediction_table_xarray`
+    # has already been subset to the relevant rows, whereas
+    # `_train_one_model_per_pixel` does not make the assumption, because
+    # surrounding information (spatial context) is always needed for training.
+
     field_names = model_dict[FIELD_NAMES_KEY]
     model_object_matrix = model_dict[MODELS_KEY]
     do_uncertainty_calibration = model_dict[DO_UNCERTAINTY_CALIB_KEY]
@@ -310,9 +315,7 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
     num_columns = model_object_matrix.shape[1]
 
     ptx = prediction_table_xarray
-    prediction_matrix = (
-        ptx[prediction_io.PREDICTION_KEY].values[:, apply_to_grid_rows, ...]
-    )
+    prediction_matrix = ptx[prediction_io.PREDICTION_KEY].values
 
     if do_uncertainty_calibration:
         mean_prediction_matrix = numpy.mean(prediction_matrix, axis=-1)
@@ -336,7 +339,6 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
         f_pred = numpy.where(
             ptx[prediction_io.FIELD_NAME_KEY].values == field_names[f_model]
         )[0][0]
-        prediction_matrix_this_field = prediction_matrix[..., f_pred, :]
 
         for i_pred in range(num_target_rows):
             i_model = apply_to_grid_rows[i_pred]
@@ -360,9 +362,8 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
                         j + 1, num_columns,
                         f_model + 1, num_fields
                     ))
-                    print(do_uncertainty_calibration)
                     print('GODDAMN MATRIX SHAPE = {0:s}'.format(
-                        str(prediction_matrix_this_field[i_pred, j, :].shape)
+                        str(prediction_matrix[i_pred, j, f_pred, :].shape)
                     ))
 
                 if do_uncertainty_calibration:
@@ -389,12 +390,9 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
                         )
                     )
                 else:
-                    if verbose:
-                        print(prediction_matrix_this_field[i_pred, j, :].shape)
-
                     prediction_matrix[i_pred, j, f_pred, :] = (
                         model_object_matrix[i_model, j, f_model].predict(
-                            prediction_matrix_this_field[i_pred, j, :]
+                            prediction_matrix[i_pred, j, f_pred, :]
                         )
                     )
 
@@ -721,10 +719,15 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
 
         argument_list = []
         for s, e in zip(start_rows, end_rows):
+            these_row_indices = numpy.linspace(
+                s, e - 1, num=e - s, dtype=int
+            )
+            this_ptx = ptx.isel({prediction_io.ROW_DIM: these_row_indices})
+
             argument_list.append((
-                prediction_table_xarray,
+                this_ptx,
                 model_dict,
-                numpy.linspace(s, e - 1, num=e - s, dtype=int),
+                these_row_indices,
                 verbose
             ))
 
