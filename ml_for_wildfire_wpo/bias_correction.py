@@ -336,14 +336,16 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
         f_pred = numpy.where(
             ptx[prediction_io.FIELD_NAME_KEY].values == field_names[f_model]
         )[0][0]
-        prediction_matrix_this_field = (
-            ptx[prediction_io.PREDICTION_KEY].values[..., f_pred, :]
-        )
+        prediction_matrix_this_field = prediction_matrix[..., f_pred, :]
 
         for i_pred in range(num_target_rows):
             i_model = apply_to_grid_rows[i_pred]
 
             for j in range(num_columns):
+                print('i_model = {0:d}, j = {1:d}, f_model = {2:d}'.format(
+                    i_model, j, f_model
+                ))
+
                 if model_object_matrix[i_model, j, f_model] is None:
                     continue
 
