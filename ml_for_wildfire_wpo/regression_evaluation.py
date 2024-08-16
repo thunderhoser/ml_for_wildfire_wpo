@@ -975,7 +975,8 @@ def read_inputs(prediction_file_names, isotonic_model_file_name,
             this_prediction_table_xarray = (
                 bias_correction.apply_model_suite(
                     prediction_table_xarray=this_prediction_table_xarray,
-                    model_dict=isotonic_model_dict
+                    model_dict=isotonic_model_dict,
+                    verbose=False
                 )
             )
 
@@ -983,7 +984,8 @@ def read_inputs(prediction_file_names, isotonic_model_file_name,
             this_prediction_table_xarray = (
                 bias_correction.apply_model_suite(
                     prediction_table_xarray=this_prediction_table_xarray,
-                    model_dict=uncertainty_calib_model_dict
+                    model_dict=uncertainty_calib_model_dict,
+                    verbose=False
                 )
             )
 
