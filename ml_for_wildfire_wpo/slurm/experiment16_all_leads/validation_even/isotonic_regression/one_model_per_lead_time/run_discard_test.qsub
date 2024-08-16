@@ -49,10 +49,9 @@ MODEL_LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10")
 
 for model_lead_time_days in "${MODEL_LEAD_TIMES_DAYS[@]}"; do
     python3 -u "${CODE_DIR_NAME}/run_discard_test.py" \
-    --input_prediction_dir_name="${model_dir_name}/validation_lead-time-days=${model_lead_time_days}" \
+    --input_prediction_dir_name="${model_dir_name}/isotonic_regression/one_model_per_lead_time/validation_lead-time-days=${model_lead_time_days}" \
     --init_date_limit_strings "20210101" "20211210" \
     --target_field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" \
     --discard_fractions 0.05 0.10 0.15 0.20 0.25 0.30 0.35 0.40 0.45 0.50 0.55 0.60 0.65 0.70 0.75 0.80 0.85 0.90 0.95 \
-    --isotonic_model_file_name="${model_dir_name}/isotonic_regression/one_model_per_lead_time/isotonic_regression_lead-time-days=${model_lead_time_days}.dill" \
     --output_file_name="${model_dir_name}/isotonic_regression/one_model_per_lead_time/validation_lead-time-days=${model_lead_time_days}/discard_test.nc"
 done

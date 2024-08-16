@@ -202,7 +202,9 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             grid_longitudes_deg_e=grid_longitudes_deg_e,
             field_names=target_field_names,
             init_date_string=this_init_date_string,
-            model_file_name=model_file_name
+            model_file_name=model_file_name,
+            isotonic_model_file_name=None,
+            uncertainty_calib_model_file_name=None
         )
         print(SEPARATOR_STRING)
 
