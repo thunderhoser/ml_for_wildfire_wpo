@@ -307,7 +307,9 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
         plateau_learning_rate_multiplier=0.6,
         early_stopping_patience_epochs=50,
         metric_function_strings=[],
-        optimizer_function_string='keras.optimizers.Nadam()'
+        optimizer_function_string='keras.optimizers.Nadam()',
+        chiu_net_architecture_dict=None,
+        chiu_net_pp_architecture_dict=None
     )
 
     # Write prediction file.
@@ -331,7 +333,9 @@ def _run(daily_gfs_dir_name, canadian_fwi_dir_name,
         era5ct.coords[era5_constant_utils.LONGITUDE_DIM].values,
         field_names=TARGET_FIELD_NAMES,
         init_date_string=init_date_string,
-        model_file_name=fake_model_file_name
+        model_file_name=fake_model_file_name,
+        isotonic_model_file_name=None,
+        uncertainty_calib_model_file_name=None
     )
 
 

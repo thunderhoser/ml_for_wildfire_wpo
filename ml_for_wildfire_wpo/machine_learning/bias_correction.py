@@ -336,10 +336,6 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
             i_model = apply_to_grid_rows[i_pred]
 
             for j in range(num_columns):
-                print('i_model = {0:d}, j = {1:d}, f_model = {2:d}'.format(
-                    i_model, j, f_model
-                ))
-
                 if model_object_matrix[i_model, j, f_model] is None:
                     continue
 
@@ -353,9 +349,6 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
                         i_pred + 1, num_target_rows,
                         j + 1, num_columns,
                         f_model + 1, num_fields
-                    ))
-                    print('GODDAMN MATRIX SHAPE = {0:s}'.format(
-                        str(prediction_matrix[i_pred, j, f_pred, :].shape)
                     ))
 
                 if do_uncertainty_calibration:
@@ -653,7 +646,7 @@ def train_model_suite(
 
 
 def apply_model_suite(prediction_table_xarray, model_dict, verbose,
-                      do_multiprocessing=True):
+                      do_multiprocessing=False):
     """Applies model suite to new data in inference mode.
 
     :param prediction_table_xarray: xarray table in format returned by
