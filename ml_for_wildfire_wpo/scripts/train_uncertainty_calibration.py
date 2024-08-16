@@ -176,7 +176,8 @@ def _run(prediction_dir_names, isotonic_model_file_names,
 
             prediction_tables_xarray[k] = bias_correction.apply_model_suite(
                 prediction_table_xarray=prediction_tables_xarray[k],
-                model_dict=this_ir_model_dict
+                model_dict=this_ir_model_dict,
+                verbose=True
             )
 
         prediction_tables_xarray[k] = (

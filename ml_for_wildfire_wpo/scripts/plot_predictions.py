@@ -254,12 +254,14 @@ def _plot_predictions_one_model(
     if isotonic_model_dict is not None:
         prediction_table_xarray = bias_correction.apply_model_suite(
             prediction_table_xarray=prediction_table_xarray,
-            model_dict=isotonic_model_dict
+            model_dict=isotonic_model_dict,
+            verbose=True
         )
     if uncertainty_calib_model_dict is not None:
         prediction_table_xarray = bias_correction.apply_model_suite(
             prediction_table_xarray=prediction_table_xarray,
-            model_dict=uncertainty_calib_model_dict
+            model_dict=uncertainty_calib_model_dict,
+            verbose=True
         )
 
     ptx = prediction_table_xarray
@@ -785,12 +787,14 @@ def _run(prediction_dir_name_by_model, description_string_by_model,
                 if isotonic_model_dict is not None:
                     ptx = bias_correction.apply_model_suite(
                         prediction_table_xarray=ptx,
-                        model_dict=isotonic_model_dict
+                        model_dict=isotonic_model_dict,
+                        verbose=True
                     )
                 if uncertainty_calib_model_dict is not None:
                     ptx = bias_correction.apply_model_suite(
                         prediction_table_xarray=ptx,
-                        model_dict=uncertainty_calib_model_dict
+                        model_dict=uncertainty_calib_model_dict,
+                        verbose=True
                     )
 
                 field_index = numpy.where(
