@@ -360,6 +360,9 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
                         j + 1, num_columns,
                         f_model + 1, num_fields
                     ))
+                    print(do_uncertainty_calibration)
+                    print(prediction_matrix_this_field[i_pred, j, :].shape)
+
 
                 if do_uncertainty_calibration:
                     orig_stdev = prediction_stdev_matrix[i_pred, j, f_pred]
