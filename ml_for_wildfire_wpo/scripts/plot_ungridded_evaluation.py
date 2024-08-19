@@ -553,6 +553,9 @@ def _run(evaluation_file_names, line_styles, line_colour_strings,
         isotonic_model_file_name = evaluation_tables_xarray[i].attrs[
             regression_eval.ISOTONIC_MODEL_FILE_KEY
         ]
+        uncertainty_calib_model_file_name = evaluation_tables_xarray[i].attrs[
+            regression_eval.UNCERTAINTY_CALIB_MODEL_FILE_KEY
+        ]
         num_times = len(prediction_file_names)
         error_matrix = numpy.array([], dtype=float)
 
@@ -565,6 +568,8 @@ def _run(evaluation_file_names, line_styles, line_colour_strings,
                 regression_eval.read_inputs(
                     prediction_file_names=[prediction_file_names[j]],
                     isotonic_model_file_name=isotonic_model_file_name,
+                    uncertainty_calib_model_file_name=
+                    uncertainty_calib_model_file_name,
                     target_field_names=target_field_names
                 )[:2]
             )

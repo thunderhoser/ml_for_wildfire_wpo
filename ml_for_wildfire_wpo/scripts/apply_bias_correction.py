@@ -104,17 +104,9 @@ def _run(input_dir_name, init_date_limit_strings, isotonic_model_file_name,
         uncertainty_calib_model_dict = bias_correction.read_file(
             uncertainty_calib_model_file_name
         )
+
         ucmd = uncertainty_calib_model_dict
-
         assert ucmd[bias_correction.DO_UNCERTAINTY_CALIB_KEY]
-
-        # TODO(thunderhoser): This is not perfect error-checking.  It would
-        # be acceptable to do only IR, write IR-corrected predictions, then read
-        # in the IR-corrected predictions and apply UC.
-        assert (
-            ucmd[bias_correction.DO_IR_BEFORE_UC_KEY] ==
-            (isotonic_model_file_name is not None)
-        )
 
     input_file_names = prediction_io.find_files_for_period(
         directory_name=input_dir_name,
@@ -144,6 +136,13 @@ def _run(input_dir_name, init_date_limit_strings, isotonic_model_file_name,
                 tptx.attrs[prediction_io.UNCERTAINTY_CALIB_MODEL_FILE_KEY]
                 is None
             )
+
+            ucmd = uncertainty_calib_model_dict
+            if ucmd[bias_correction.DO_IR_BEFORE_UC_KEY]:
+                assert (
+                    isotonic_model_file_name is not None or
+                    tptx.attrs[prediction_io.ISOTONIC_MODEL_FILE_KEY] is not None
+                )
 
         if isotonic_model_dict is not None:
             this_prediction_table_xarray = bias_correction.apply_model_suite(

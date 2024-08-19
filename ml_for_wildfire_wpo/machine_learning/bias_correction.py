@@ -929,7 +929,7 @@ def read_file(dill_file_name):
     if DO_UNCERTAINTY_CALIB_KEY not in model_dict:
         model_dict[DO_UNCERTAINTY_CALIB_KEY] = False
     if DO_IR_BEFORE_UC_KEY not in model_dict:
-        model_dict[DO_IR_BEFORE_UC_KEY] = False
+        model_dict[DO_IR_BEFORE_UC_KEY] = None
 
     missing_keys = list(set(ALL_KEYS) - set(model_dict.keys()))
     if len(missing_keys) == 0:
