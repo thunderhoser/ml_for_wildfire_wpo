@@ -283,7 +283,8 @@ def write_file(
     dataset_object.setncattr(MODEL_FILE_KEY, model_file_name)
     dataset_object.setncattr(
         ISOTONIC_MODEL_FILE_KEY,
-        '' if isotonic_model_file_name is None else isotonic_model_file_name
+        '' if isotonic_model_file_name is None
+        else isotonic_model_file_name
     )
     dataset_object.setncattr(
         UNCERTAINTY_CALIB_MODEL_FILE_KEY,
