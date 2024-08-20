@@ -1,0 +1,53 @@
+#!/bin/bash
+
+#SBATCH --job-name="concat_uncertainty_calibration_files"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=01:00:00
+#SBATCH --array=0-3
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=concat_uncertainty_calibration_files_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch2/STI/mdl-sti/Ryan.Lagerquist/ml_for_wildfire_models/experiment16_all_leads"
+
+SECOND_LEAD_TIME_START_EPOCHS=("020" "040" "080" "020")
+RAMPUP_EPOCH_COUNTS=("030" "010" "040" "050")
+PREDICTOR_TIME_STRATEGIES=("all-daily-valid-times-up-to-target-time" "different-valid-times-up-to-target-time" "different-valid-times-up-to-target-time-plus2days" "different-valid-times-up-to-target-time-plus2days")
+
+second_lead_time_start_epoch=${SECOND_LEAD_TIME_START_EPOCHS[$SLURM_ARRAY_TASK_ID]}
+num_rampup_epochs=${RAMPUP_EPOCH_COUNTS[$SLURM_ARRAY_TASK_ID]}
+predictor_time_strategy=${PREDICTOR_TIME_STRATEGIES[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/second-lead-time-start-epoch=${second_lead_time_start_epoch}_num-rampup-epochs=${num_rampup_epochs}_predictor-time-strategy=${predictor_time_strategy}"
+echo $model_dir_name
+
+MODEL_LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10")
+
+for model_lead_time_days in "${MODEL_LEAD_TIMES_DAYS[@]}"; do
+    python3 -u "${CODE_DIR_NAME}/concat_bias_correction_files.py" \
+    --input_file_names "${model_dir_name}/isotonic_regression/one_model_per_lead_time/uncertainty_calibration/uncertainty_calibration/uncertainty_calibration_fine-fuel-moisture-code_lead-time-days=${model_lead_time_days}.dill" "${model_dir_name}/isotonic_regression/one_model_per_lead_time/uncertainty_calibration/uncertainty_calibration/uncertainty_calibration_duff-moisture-code_lead-time-days=${model_lead_time_days}.dill" "${model_dir_name}/isotonic_regression/one_model_per_lead_time/uncertainty_calibration/uncertainty_calibration/uncertainty_calibration_drought-code_lead-time-days=${model_lead_time_days}.dill" "${model_dir_name}/isotonic_regression/one_model_per_lead_time/uncertainty_calibration/uncertainty_calibration/uncertainty_calibration_initial-spread-index_lead-time-days=${model_lead_time_days}.dill" "${model_dir_name}/isotonic_regression/one_model_per_lead_time/uncertainty_calibration/uncertainty_calibration/uncertainty_calibration_buildup-index_lead-time-days=${model_lead_time_days}.dill" "${model_dir_name}/isotonic_regression/one_model_per_lead_time/uncertainty_calibration/uncertainty_calibration/uncertainty_calibration_fire-weather-index_lead-time-days=${model_lead_time_days}.dill" "${model_dir_name}/isotonic_regression/one_model_per_lead_time/uncertainty_calibration/uncertainty_calibration/uncertainty_calibration_daily-severity-rating_lead-time-days=${model_lead_time_days}.dill" \
+    --output_file_name="${model_dir_name}/isotonic_regression/one_model_per_lead_time/uncertainty_calibration/uncertainty_calibration/uncertainty_calibration_lead-time-days=${model_lead_time_days}.dill"
+done
