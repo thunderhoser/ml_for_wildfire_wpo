@@ -976,7 +976,7 @@ def read_inputs(prediction_file_names, isotonic_model_file_name,
                 bias_correction.apply_model_suite(
                     prediction_table_xarray=this_prediction_table_xarray,
                     model_dict=isotonic_model_dict,
-                    verbose=True
+                    verbose=False
                 )
             )
 
@@ -1344,10 +1344,12 @@ def get_scores_with_bootstrapping(
     )
     result_table_xarray.attrs[MODEL_FILE_KEY] = model_file_name
     result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = (
-        isotonic_model_file_name
+        '' if isotonic_model_file_name is None
+        else isotonic_model_file_name
     )
     result_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = (
-        uncertainty_calib_model_file_name
+        '' if uncertainty_calib_model_file_name is None
+        else uncertainty_calib_model_file_name
     )
     result_table_xarray.attrs[PREDICTION_FILES_KEY] = ' '.join([
         '{0:s}'.format(f) for f in prediction_file_names
@@ -1426,8 +1428,13 @@ def read_file(netcdf_file_name):
     )
 
     if ISOTONIC_MODEL_FILE_KEY not in result_table_xarray.attrs:
-        result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = None
+        result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = ''
     if UNCERTAINTY_CALIB_MODEL_FILE_KEY not in result_table_xarray.attrs:
+        result_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = ''
+
+    if result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] == '':
+        result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = None
+    if result_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] == '':
         result_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = None
 
     return result_table_xarray

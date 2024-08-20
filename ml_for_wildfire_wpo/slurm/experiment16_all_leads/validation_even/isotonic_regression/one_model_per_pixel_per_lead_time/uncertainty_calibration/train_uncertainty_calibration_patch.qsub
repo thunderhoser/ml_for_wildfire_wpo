@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="train_isotonic_regression"
+#SBATCH --job-name="train_uncertainty_calibration"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="gpuwf"
@@ -11,14 +11,14 @@
 ##SBATCH --ntasks=1
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
-#SBATCH --time=36:00:00
-#SBATCH --array=6
+#SBATCH --time=30:00:00
+#SBATCH --array=2,6,10,14,18,22,26
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=train_isotonic_regression_%A_%a.out
+#SBATCH --output=train_uncertainty_calibration_%A_%a.out
 
 conda init
 conda activate base
@@ -50,12 +50,12 @@ echo $model_dir_name
 MODEL_LEAD_TIMES_DAYS=("10")
 
 for model_lead_time_days in "${MODEL_LEAD_TIMES_DAYS[@]}"; do
-    python3 -u "${CODE_DIR_NAME}/train_isotonic_regression.py" \
-    --input_prediction_dir_names "${model_dir_name}/validation_lead-time-days=${model_lead_time_days}" \
+    python3 -u "${CODE_DIR_NAME}/train_uncertainty_calibration.py" \
+    --input_prediction_dir_names "${model_dir_name}/isotonic_regression/one_model_per_pixel_per_lead_time/validation_lead-time-days=${model_lead_time_days}" \
     --init_date_limit_strings "20210101" "20211210" \
     --one_model_per_pixel=1 \
     --pixel_radius_metres=100000 \
     --weight_pixels_by_inverse_dist=1 \
     --target_field_names ${target_field_name} \
-    --output_file_name="${model_dir_name}/isotonic_regression/one_model_per_pixel_per_lead_time/isotonic_regression_${target_field_name_dashed}_lead-time-days=${model_lead_time_days}.dill"
+    --output_file_name="${model_dir_name}/isotonic_regression/one_model_per_pixel_per_lead_time/uncertainty_calibration/uncertainty_calibration_${target_field_name_dashed}_lead-time-days=${model_lead_time_days}.dill"
 done

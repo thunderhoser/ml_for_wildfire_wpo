@@ -349,10 +349,12 @@ def compute_pit_histograms(
     )
     result_table_xarray.attrs[MODEL_FILE_KEY] = model_file_name
     result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = (
-        isotonic_model_file_name
+        '' if isotonic_model_file_name is None
+        else isotonic_model_file_name
     )
     result_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = (
-        uncertainty_calib_model_file_name
+        '' if uncertainty_calib_model_file_name is None
+        else uncertainty_calib_model_file_name
     )
     result_table_xarray.attrs[PREDICTION_FILES_KEY] = ' '.join([
         '{0:s}'.format(f) for f in prediction_file_names
@@ -394,9 +396,15 @@ def read_results(netcdf_file_name):
     """
 
     result_table_xarray = xarray.open_dataset(netcdf_file_name)
+
     if ISOTONIC_MODEL_FILE_KEY not in result_table_xarray.attrs:
-        result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = None
+        result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = ''
     if UNCERTAINTY_CALIB_MODEL_FILE_KEY not in result_table_xarray.attrs:
+        result_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = ''
+
+    if result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] == '':
+        result_table_xarray.attrs[ISOTONIC_MODEL_FILE_KEY] = None
+    if result_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] == '':
         result_table_xarray.attrs[UNCERTAINTY_CALIB_MODEL_FILE_KEY] = None
 
     return result_table_xarray
