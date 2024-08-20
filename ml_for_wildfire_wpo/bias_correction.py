@@ -389,6 +389,8 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
                         )
                     )
 
+    prediction_matrix = numpy.maximum(prediction_matrix, 0.)
+
     if constrain_dsr:
         fwi_index = numpy.where(
             ptx[prediction_io.FIELD_NAME_KEY].values ==
@@ -840,38 +842,12 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
                             new_stdev_matrix / orig_stdev_matrix
                         )
 
-                        print('Min/max/NaN-min/NaN-max for orig_stdev_matrix = {0:.4f}, {1:.4f}, {2:.4f}, {3:.4f}'.format(
-                            numpy.min(orig_stdev_matrix),
-                            numpy.max(orig_stdev_matrix),
-                            numpy.nanmin(orig_stdev_matrix),
-                            numpy.nanmax(orig_stdev_matrix)
-                        ))
-                        print('Min/max/NaN-min/NaN-max for new_stdev_matrix = {0:.4f}, {1:.4f}, {2:.4f}, {3:.4f}'.format(
-                            numpy.min(new_stdev_matrix),
-                            numpy.max(new_stdev_matrix),
-                            numpy.nanmin(new_stdev_matrix),
-                            numpy.nanmax(new_stdev_matrix)
-                        ))
-                        print('Min/max/NaN-min/NaN-max for stdev_inflation_matrix = {0:.4f}, {1:.4f}, {2:.4f}, {3:.4f}'.format(
-                            numpy.min(stdev_inflation_matrix),
-                            numpy.max(stdev_inflation_matrix),
-                            numpy.nanmin(stdev_inflation_matrix),
-                            numpy.nanmax(stdev_inflation_matrix)
-                        ))
-
                         stdev_inflation_matrix[
                             numpy.isnan(stdev_inflation_matrix)
                         ] = 1.
                         stdev_inflation_matrix = numpy.minimum(
                             stdev_inflation_matrix, MAX_STDEV_INFLATION_FACTOR
                         )
-
-                        print('Min/max/NaN-min/NaN-max for stdev_inflation_matrix = {0:.4f}, {1:.4f}, {2:.4f}, {3:.4f}'.format(
-                            numpy.min(stdev_inflation_matrix),
-                            numpy.max(stdev_inflation_matrix),
-                            numpy.nanmin(stdev_inflation_matrix),
-                            numpy.nanmax(stdev_inflation_matrix)
-                        ))
 
                         stdev_inflation_matrix = numpy.expand_dims(
                             stdev_inflation_matrix, axis=-1
@@ -880,8 +856,6 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
                             mean_prediction_matrix[..., f_pred], axis=-1
                         )
 
-                        print(numpy.any(numpy.isnan(prediction_matrix[..., f_pred, :])))
-
                         prediction_matrix[..., f_pred, :] = (
                             this_mean_pred_matrix +
                             stdev_inflation_matrix * (
@@ -889,9 +863,6 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
                                 this_mean_pred_matrix
                             )
                         )
-
-                        print(numpy.any(numpy.isnan(prediction_matrix[..., f_pred, :])))
-                        print('\n\n')
 
                     continue
 
@@ -909,6 +880,8 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
                     prediction_matrix[..., f_pred, :] = numpy.reshape(
                         new_predictions, these_dims
                     )
+
+    prediction_matrix = numpy.maximum(prediction_matrix, 0.)
 
     if constrain_dsr:
         fwi_index = numpy.where(
