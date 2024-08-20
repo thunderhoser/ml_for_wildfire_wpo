@@ -866,6 +866,14 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
                             stdev_inflation_matrix, MAX_STDEV_INFLATION_FACTOR
                         )
 
+                        print('Min/max/NaN-min/NaN-max for stdev_inflation_matrix = {0:.4f}, {1:.4f}, {2:.4f}, {3:.4f}'.format(
+                            numpy.min(stdev_inflation_matrix),
+                            numpy.max(stdev_inflation_matrix),
+                            numpy.nanmin(stdev_inflation_matrix),
+                            numpy.nanmax(stdev_inflation_matrix)
+                        ))
+                        print('\n\n')
+
                         stdev_inflation_matrix = numpy.expand_dims(
                             stdev_inflation_matrix, axis=-1
                         )
