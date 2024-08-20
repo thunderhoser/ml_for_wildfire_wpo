@@ -355,9 +355,9 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
                     orig_stdev = prediction_stdev_matrix[i_pred, j, f_pred]
                     new_stdev = numpy.sqrt(
                         model_object_matrix[i_model, j, f_model].predict(
-                            orig_stdev ** 2
+                            numpy.array([orig_stdev], dtype=float) ** 2
                         )
-                    )
+                    )[0]
                     stdev_inflation_factor = new_stdev / orig_stdev
 
                     if numpy.isnan(stdev_inflation_factor):
@@ -380,6 +380,8 @@ def _apply_one_model_per_pixel(prediction_table_xarray, model_dict,
                             prediction_matrix[i_pred, j, f_pred, :]
                         )
                     )
+
+    prediction_matrix = numpy.maximum(prediction_matrix, 0.)
 
     if constrain_dsr:
         fwi_index = numpy.where(
@@ -799,9 +801,9 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
                         orig_stdev = prediction_stdev_matrix[i, j, f_pred]
                         new_stdev = numpy.sqrt(
                             model_object_matrix[i, j, f_model].predict(
-                                orig_stdev ** 2
+                                numpy.array([orig_stdev], dtype=float) ** 2
                             )
-                        )
+                        )[0]
                         stdev_inflation_factor = new_stdev / orig_stdev
 
                         if numpy.isnan(stdev_inflation_factor):
@@ -870,6 +872,8 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
                     prediction_matrix[..., f_pred, :] = numpy.reshape(
                         new_predictions, these_dims
                     )
+
+    prediction_matrix = numpy.maximum(prediction_matrix, 0.)
 
     if constrain_dsr:
         fwi_index = numpy.where(
