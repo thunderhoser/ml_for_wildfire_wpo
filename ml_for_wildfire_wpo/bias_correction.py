@@ -872,7 +872,6 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
                             numpy.nanmin(stdev_inflation_matrix),
                             numpy.nanmax(stdev_inflation_matrix)
                         ))
-                        print('\n\n')
 
                         stdev_inflation_matrix = numpy.expand_dims(
                             stdev_inflation_matrix, axis=-1
@@ -881,6 +880,8 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
                             mean_prediction_matrix[..., f_pred], axis=-1
                         )
 
+                        print(numpy.any(numpy.isnan(prediction_matrix[..., f_pred, :])))
+
                         prediction_matrix[..., f_pred, :] = (
                             this_mean_pred_matrix +
                             stdev_inflation_matrix * (
@@ -888,6 +889,9 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose,
                                 this_mean_pred_matrix
                             )
                         )
+
+                        print(numpy.any(numpy.isnan(prediction_matrix[..., f_pred, :])))
+                        print('\n\n')
 
                     continue
 
