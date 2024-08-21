@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="apply_isotonic_regression"
+#SBATCH --job-name="apply_isotonic_regression_marshall_fire"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="gpuwf"
@@ -12,13 +12,13 @@
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
 #SBATCH --time=08:00:00
-#SBATCH --array=0-39%20
+#SBATCH --array=0-39
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=apply_isotonic_regression_%A_%a.out
+#SBATCH --output=apply_isotonic_regression_marshall_fire_%A_%a.out
 
 conda init
 conda activate base
@@ -48,6 +48,6 @@ echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/apply_bias_correction.py" \
 --input_prediction_dir_name="${model_dir_name}/validation_lead-time-days=${model_lead_time_days}" \
---init_date_limit_strings "20210101" "20211210" \
---isotonic_model_file_name="${model_dir_name}/isotonic_regression/one_model_per_lead_time/isotonic_regression_lead-time-days=${model_lead_time_days}.dill" \
---output_prediction_dir_name="${model_dir_name}/isotonic_regression/one_model_per_lead_time/validation_lead-time-days=${model_lead_time_days}"
+--init_date_limit_strings "20211215" "20220101" \
+--isotonic_model_file_name="${model_dir_name}/isotonic_regression/one_model_per_pixel_per_lead_time/isotonic_regression_lead-time-days=${model_lead_time_days}.dill" \
+--output_prediction_dir_name="${model_dir_name}/isotonic_regression/one_model_per_pixel_per_lead_time/validation_lead-time-days=${model_lead_time_days}"

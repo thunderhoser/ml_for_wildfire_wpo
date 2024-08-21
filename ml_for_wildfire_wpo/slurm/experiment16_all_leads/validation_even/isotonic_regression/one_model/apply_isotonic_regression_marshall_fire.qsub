@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="apply_isotonic_regression"
+#SBATCH --job-name="apply_isotonic_regression_marshall_fire"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="gpuwf"
@@ -11,14 +11,14 @@
 ##SBATCH --ntasks=1
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
-#SBATCH --time=01:00:00
-#SBATCH --array=0-49
+#SBATCH --time=08:00:00
+#SBATCH --array=0-39
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=apply_isotonic_regression_%A_%a.out
+#SBATCH --output=apply_isotonic_regression_marshall_fire_%A_%a.out
 
 conda init
 conda activate base
@@ -38,21 +38,16 @@ RAMPUP_EPOCH_COUNTS=("030" "010" "040" "050" "030" "010" "040" "050" "030" "010"
 PREDICTOR_TIME_STRATEGIES=("all-daily-valid-times-up-to-target-time" "different-valid-times-up-to-target-time" "different-valid-times-up-to-target-time-plus2days" "different-valid-times-up-to-target-time-plus2days" "all-daily-valid-times-up-to-target-time" "different-valid-times-up-to-target-time" "different-valid-times-up-to-target-time-plus2days" "different-valid-times-up-to-target-time-plus2days" "all-daily-valid-times-up-to-target-time" "different-valid-times-up-to-target-time" "different-valid-times-up-to-target-time-plus2days" "different-valid-times-up-to-target-time-plus2days" "all-daily-valid-times-up-to-target-time" "different-valid-times-up-to-target-time" "different-valid-times-up-to-target-time-plus2days" "different-valid-times-up-to-target-time-plus2days" "all-daily-valid-times-up-to-target-time" "different-valid-times-up-to-target-time" "different-valid-times-up-to-target-time-plus2days" "different-valid-times-up-to-target-time-plus2days" "all-daily-valid-times-up-to-target-time" "different-valid-times-up-to-target-time" "different-valid-times-up-to-target-time-plus2days" "different-valid-times-up-to-target-time-plus2days" "all-daily-valid-times-up-to-target-time" "different-valid-times-up-to-target-time" "different-valid-times-up-to-target-time-plus2days" "different-valid-times-up-to-target-time-plus2days" "all-daily-valid-times-up-to-target-time" "different-valid-times-up-to-target-time" "different-valid-times-up-to-target-time-plus2days" "different-valid-times-up-to-target-time-plus2days" "all-daily-valid-times-up-to-target-time" "different-valid-times-up-to-target-time" "different-valid-times-up-to-target-time-plus2days" "different-valid-times-up-to-target-time-plus2days" "all-daily-valid-times-up-to-target-time" "different-valid-times-up-to-target-time" "different-valid-times-up-to-target-time-plus2days" "different-valid-times-up-to-target-time-plus2days")
 MODEL_LEAD_TIMES_DAYS=("01" "01" "01" "01" "02" "02" "02" "02" "03" "03" "03" "03" "04" "04" "04" "04" "05" "05" "05" "05" "06" "06" "06" "06" "07" "07" "07" "07" "08" "08" "08" "08" "09" "09" "09" "09" "10" "10" "10" "10")
 
-BEST_INDEX=38
-
-second_lead_time_start_epoch=${SECOND_LEAD_TIME_START_EPOCHS[$BEST_INDEX]}
-num_rampup_epochs=${RAMPUP_EPOCH_COUNTS[$BEST_INDEX]}
-predictor_time_strategy=${PREDICTOR_TIME_STRATEGIES[$BEST_INDEX]}
-model_lead_time_days=${MODEL_LEAD_TIMES_DAYS[$BEST_INDEX]}
+second_lead_time_start_epoch=${SECOND_LEAD_TIME_START_EPOCHS[$SLURM_ARRAY_TASK_ID]}
+num_rampup_epochs=${RAMPUP_EPOCH_COUNTS[$SLURM_ARRAY_TASK_ID]}
+predictor_time_strategy=${PREDICTOR_TIME_STRATEGIES[$SLURM_ARRAY_TASK_ID]}
+model_lead_time_days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}
 
 model_dir_name="${TOP_MODEL_DIR_NAME}/second-lead-time-start-epoch=${second_lead_time_start_epoch}_num-rampup-epochs=${num_rampup_epochs}_predictor-time-strategy=${predictor_time_strategy}"
 echo $model_dir_name
 
-FIRST_DATE_STRINGS=("20210101" "20210108" "20210115" "20210122" "20210129" "20210205" "20210212" "20210219" "20210226" "20210305" "20210312" "20210319" "20210326" "20210402" "20210409" "20210416" "20210423" "20210430" "20210507" "20210514" "20210521" "20210528" "20210604" "20210611" "20210618" "20210625" "20210702" "20210709" "20210716" "20210723" "20210730" "20210806" "20210813" "20210820" "20210827" "20210903" "20210910" "20210917" "20210924" "20211001" "20211008" "20211015" "20211022" "20211029" "20211105" "20211112" "20211119" "20211126" "20211203" "20211210")
-LAST_DATE_STRINGS=("20210107" "20210114" "20210121" "20210128" "20210204" "20210211" "20210218" "20210225" "20210304" "20210311" "20210318" "20210325" "20210401" "20210408" "20210415" "20210422" "20210429" "20210506" "20210513" "20210520" "20210527" "20210603" "20210610" "20210617" "20210624" "20210701" "20210708" "20210715" "20210722" "20210729" "20210805" "20210812" "20210819" "20210826" "20210902" "20210909" "20210916" "20210923" "20210930" "20211007" "20211014" "20211021" "20211028" "20211104" "20211111" "20211118" "20211125" "20211202" "20211209" "20211210")
-
 python3 -u "${CODE_DIR_NAME}/apply_bias_correction.py" \
 --input_prediction_dir_name="${model_dir_name}/validation_lead-time-days=${model_lead_time_days}" \
---init_date_limit_strings ${FIRST_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]} ${LAST_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]} \
---isotonic_model_file_name="${model_dir_name}/isotonic_regression/one_model_per_pixel_per_lead_time/isotonic_regression_lead-time-days=${model_lead_time_days}.dill" \
---output_prediction_dir_name="${model_dir_name}/isotonic_regression/one_model_per_pixel_per_lead_time/validation_lead-time-days=${model_lead_time_days}"
+--init_date_limit_strings "20211215" "20220101" \
+--isotonic_model_file_name="${model_dir_name}/isotonic_regression/one_model_for_all/isotonic_regression.dill" \
+--output_prediction_dir_name="${model_dir_name}/isotonic_regression/one_model_for_all/validation_lead-time-days=${model_lead_time_days}"
