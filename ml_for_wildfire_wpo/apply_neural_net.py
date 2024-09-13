@@ -26,6 +26,7 @@ TARGET_DIR_ARG_NAME = 'input_target_dir_name'
 GFS_FCST_TARGET_DIR_ARG_NAME = 'input_gfs_fcst_target_dir_name'
 DATE_LIMITS_ARG_NAME = 'init_date_limit_strings'
 MODEL_LEAD_TIME_ARG_NAME = 'model_lead_time_days'
+TAKE_ENSEMBLE_MEAN_ARG_NAME = 'take_ensemble_mean'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 MODEL_FILE_HELP_STRING = (
@@ -49,6 +50,10 @@ DATE_LIMITS_HELP_STRING = (
     '"yyyymmdd") to be used.'
 )
 MODEL_LEAD_TIME_HELP_STRING = 'Model lead time.'
+TAKE_ENSEMBLE_MEAN_HELP_STRING = (
+    'Boolean flag.  If 1, will take ensemble mean instead of storing all '
+    'ensemble members.'
+)
 OUTPUT_DIR_HELP_STRING = (
     'Name of output directory.  Results will be written here by '
     '`prediction_io.write_file`, to exact locations determined by '
@@ -77,18 +82,22 @@ INPUT_ARG_PARSER.add_argument(
     help=DATE_LIMITS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
-    help=OUTPUT_DIR_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
     '--' + MODEL_LEAD_TIME_ARG_NAME, type=int, required=True,
     help=MODEL_LEAD_TIME_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + TAKE_ENSEMBLE_MEAN_ARG_NAME, type=int, required=False, default=0,
+    help=TAKE_ENSEMBLE_MEAN_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
+    help=OUTPUT_DIR_HELP_STRING
 )
 
 
 def _run(model_file_name, gfs_directory_name, target_dir_name,
          gfs_forecast_target_dir_name, init_date_limit_strings,
-         model_lead_time_days, output_dir_name):
+         model_lead_time_days, take_ensemble_mean, output_dir_name):
     """Applies trained neural net -- inference time!
 
     This is effectively the main method.
@@ -99,6 +108,7 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     :param gfs_forecast_target_dir_name: Same.
     :param init_date_limit_strings: Same.
     :param model_lead_time_days: Same.
+    :param take_ensemble_mean: Same.
     :param output_dir_name: Same.
     """
 
@@ -168,6 +178,10 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             num_examples_per_batch=NUM_EXAMPLES_PER_BATCH,
             verbose=True
         )
+        if take_ensemble_mean:
+            prediction_matrix = numpy.mean(
+                prediction_matrix, axis=-1, keepdims=True
+            )
 
         if constrain_dsr:
             predicted_dsr_matrix = 0.0272 * numpy.power(
@@ -222,6 +236,9 @@ if __name__ == '__main__':
         init_date_limit_strings=getattr(INPUT_ARG_OBJECT, DATE_LIMITS_ARG_NAME),
         model_lead_time_days=getattr(
             INPUT_ARG_OBJECT, MODEL_LEAD_TIME_ARG_NAME
+        ),
+        take_ensemble_mean=bool(
+            getattr(INPUT_ARG_OBJECT, TAKE_ENSEMBLE_MEAN_ARG_NAME)
         ),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
