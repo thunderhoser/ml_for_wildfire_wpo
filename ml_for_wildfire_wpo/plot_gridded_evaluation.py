@@ -7,6 +7,7 @@ import numpy
 import matplotlib
 matplotlib.use('agg')
 from matplotlib import pyplot
+import matplotlib.colors
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -59,7 +60,9 @@ METRIC_NAME_TO_VERBOSE = {
     regression_eval.BIAS_KEY: 'bias',
     regression_eval.CORRELATION_KEY: 'correlation',
     regression_eval.KGE_KEY: 'Kling-Gupta efficiency',
-    regression_eval.RELIABILITY_KEY: 'reliability'
+    regression_eval.RELIABILITY_KEY: 'reliability',
+    regression_eval.SSRAT_KEY: 'spread-skill ratio',
+    regression_eval.SSDIFF_KEY: 'spread-skill difference'
 }
 
 METRIC_NAME_TO_COLOUR_MAP_OBJECT = {
@@ -80,7 +83,9 @@ METRIC_NAME_TO_COLOUR_MAP_OBJECT = {
     regression_eval.BIAS_KEY: pyplot.get_cmap('seismic'),
     regression_eval.CORRELATION_KEY: pyplot.get_cmap('seismic'),
     regression_eval.KGE_KEY: pyplot.get_cmap('seismic'),
-    regression_eval.RELIABILITY_KEY: pyplot.get_cmap('viridis')
+    regression_eval.RELIABILITY_KEY: pyplot.get_cmap('viridis'),
+    regression_eval.SSRAT_KEY: pyplot.get_cmap('seismic'),
+    regression_eval.SSDIFF_KEY: pyplot.get_cmap('seismic')
 }
 
 METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING = {
@@ -101,7 +106,9 @@ METRIC_NAME_TO_COLOUR_NORM_TYPE_STRING = {
     regression_eval.BIAS_KEY: 'diverging',
     regression_eval.CORRELATION_KEY: 'diverging',
     regression_eval.KGE_KEY: 'diverging_weird',
-    regression_eval.RELIABILITY_KEY: 'sequential'
+    regression_eval.RELIABILITY_KEY: 'sequential',
+    regression_eval.SSRAT_KEY: 'ssrat',
+    regression_eval.SSDIFF_KEY: 'diverging'
 }
 
 NAN_COLOUR = numpy.full(3, 152. / 255)
@@ -169,6 +176,34 @@ INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
+
+
+def _get_ssrat_colour_scheme(max_colour_value):
+    """Returns colour scheme for spread-skill ratio (SSRAT).
+
+    :param max_colour_value: Max value in colour scheme.
+    :return: colour_map_object: Colour map (instance of `matplotlib.pyplot.cm`).
+    :return: colour_norm_object: Colour-normalizer (maps from data space to
+        colour-bar space, which goes from 0...1).  This is an instance of
+        `matplotlib.colors.Normalize`.
+    """
+
+    orig_colour_map_object = pyplot.get_cmap('seismic')
+
+    negative_values = numpy.linspace(0, 1, num=1001, dtype=float)
+    positive_values = numpy.linspace(1, max_colour_value, num=1001, dtype=float)
+    bias_values = numpy.concatenate((negative_values, positive_values))
+
+    normalized_values = numpy.linspace(0, 1, num=len(bias_values), dtype=float)
+    rgb_matrix = orig_colour_map_object(normalized_values)[:, :-1]
+
+    colour_map_object = matplotlib.colors.ListedColormap(rgb_matrix)
+    colour_map_object.set_bad(NAN_COLOUR)
+    colour_norm_object = matplotlib.colors.BoundaryNorm(
+        bias_values, colour_map_object.N
+    )
+
+    return colour_map_object, colour_norm_object
 
 
 def _plot_one_score(
@@ -425,6 +460,13 @@ def _run(input_file_name, metric_names, min_colour_percentiles,
                         max_colour_percentiles[i]
                     )
                     min_colour_value = -1 * max_colour_value
+                elif colour_norm_type_string == 'ssrat':
+                    this_offset = numpy.nanpercentile(
+                        numpy.absolute(score_matrix_for_cnorm - 1.),
+                        max_colour_percentiles[i]
+                    )
+                    max_colour_value = 1. + this_offset
+                    min_colour_value = 0.
                 else:
                     max_colour_value = numpy.nanpercentile(
                         score_matrix_for_cnorm, max_colour_percentiles[i]
@@ -439,9 +481,15 @@ def _run(input_file_name, metric_names, min_colour_percentiles,
                     max_colour_value,
                     min_colour_value + TOLERANCE
                 ])
-                colour_norm_object = pyplot.Normalize(
-                    vmin=min_colour_value, vmax=max_colour_value
-                )
+
+                if colour_norm_type_string == 'ssrat':
+                    colour_map_object, colour_norm_object = (
+                        _get_ssrat_colour_scheme(max_colour_value)
+                    )
+                else:
+                    colour_norm_object = pyplot.Normalize(
+                        vmin=min_colour_value, vmax=max_colour_value
+                    )
 
             title_string = (
                 '{0:s}{1:s} for {2:s}\nMin/avg/max = {3:.2g}, {4:.2g}, {5:.2g}'
