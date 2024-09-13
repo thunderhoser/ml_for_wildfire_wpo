@@ -1,11 +1,33 @@
 """Miscellaneous helper methods."""
 
 import numpy
+from scipy.ndimage.morphology import binary_dilation
 from gewittergefahr.gg_utils import number_rounding
 from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from gewittergefahr.gg_utils import error_checking
 
 TOLERANCE = 1e-6
+
+
+def _check_2d_binary_matrix(binary_matrix):
+    """Error-checks 2-D binary matrix.
+
+    :param binary_matrix: 2-D numpy array, containing either Boolean flags or
+        integers in 0...1.
+    :return: is_boolean: Boolean flag, indicating whether or not matrix is
+        Boolean.
+    """
+
+    error_checking.assert_is_numpy_array(binary_matrix, num_dimensions=2)
+
+    try:
+        error_checking.assert_is_boolean_numpy_array(binary_matrix)
+        return True
+    except TypeError:
+        error_checking.assert_is_integer_numpy_array(binary_matrix)
+        error_checking.assert_is_geq_numpy_array(binary_matrix, 0)
+        error_checking.assert_is_leq_numpy_array(binary_matrix, 1)
+        return False
 
 
 def desired_latitudes_to_rows(
@@ -220,3 +242,47 @@ def split_array_by_nan(input_array):
         input_array[i] for i in
         numpy.ma.clump_unmasked(numpy.ma.masked_invalid(input_array))
     ]
+
+
+def get_structure_matrix(buffer_distance_px):
+    """Creates structure matrix for dilation or erosion.
+
+    :param buffer_distance_px: Buffer distance (number of pixels).
+    :return: structure_matrix: 2-D numpy array of Boolean flags.
+    """
+
+    error_checking.assert_is_geq(buffer_distance_px, 0.)
+
+    half_grid_size_px = int(numpy.ceil(buffer_distance_px))
+    pixel_offsets = numpy.linspace(
+        -half_grid_size_px, half_grid_size_px,
+        num=2 * half_grid_size_px + 1,
+        dtype=float
+    )
+
+    column_offset_matrix, row_offset_matrix = numpy.meshgrid(
+        pixel_offsets, pixel_offsets
+    )
+    distance_matrix_px = numpy.sqrt(
+        row_offset_matrix ** 2 + column_offset_matrix ** 2
+    )
+    return distance_matrix_px <= buffer_distance_px
+
+
+def dilate_binary_matrix(binary_matrix, buffer_distance_px):
+    """Dilates binary matrix.
+
+    :param binary_matrix: See doc for `check_2d_binary_matrix`.
+    :param buffer_distance_px: Buffer distance (pixels).
+    :return: dilated_binary_matrix: Dilated version of input.
+    """
+
+    _check_2d_binary_matrix(binary_matrix)
+    error_checking.assert_is_geq(buffer_distance_px, 0.)
+
+    structure_matrix = get_structure_matrix(buffer_distance_px)
+    dilated_binary_matrix = binary_dilation(
+        binary_matrix.astype(int), structure=structure_matrix, iterations=1,
+        border_value=0
+    )
+    return dilated_binary_matrix.astype(binary_matrix.dtype)

@@ -41,6 +41,8 @@ KS_P_VALUE_KEY = 'kolmogorov_smirnov_p_value'
 MAE_KEY = 'mean_absolute_error'
 MAE_SKILL_SCORE_KEY = 'mae_skill_score'
 BIAS_KEY = 'bias'
+SSRAT_KEY = 'spread_skill_ratio'
+SSDIFF_KEY = 'spread_skill_difference'
 CORRELATION_KEY = 'correlation'
 KGE_KEY = 'kling_gupta_efficiency'
 RELIABILITY_KEY = 'reliability'
@@ -486,6 +488,161 @@ def _get_rel_curve_one_scalar(
         )
 
     return mean_predictions, mean_observations, example_counts
+
+
+def _get_ssrat_one_replicate(
+        full_squared_error_matrix, full_prediction_variance_matrix,
+        full_weight_matrix, example_indices_in_replicate, per_grid_cell):
+    """Computes SSRAT for one bootstrap replicate.
+
+    E = number of examples
+    M = number of rows in grid
+    N = number of columns in grid
+    T = number of target fields
+
+    :param full_squared_error_matrix: E-by-M-by-N-by-T numpy array of squared
+        errors.
+    :param full_prediction_variance_matrix: E-by-M-by-N-by-T numpy array of
+        ensemble variances.
+    :param full_weight_matrix: E-by-M-by-N numpy array of evaluation weights.
+    :param example_indices_in_replicate: See documentation for
+        `_get_scores_one_replicate`.
+    :param per_grid_cell: Same.
+    :return: ssrat_matrix: If `per_grid_cell == True`, this is an M-by-N-by-T
+        numpy array of spread-skill ratios.  Otherwise, this is a length-T numpy
+        array of spread-skill ratios.
+    """
+
+    squared_error_matrix = full_squared_error_matrix[
+        example_indices_in_replicate, ...
+    ]
+    prediction_variance_matrix = full_prediction_variance_matrix[
+        example_indices_in_replicate, ...
+    ]
+    weight_matrix = full_weight_matrix[example_indices_in_replicate, ...]
+
+    num_target_fields = squared_error_matrix.shape[3]
+
+    if per_grid_cell:
+        num_grid_rows = squared_error_matrix.shape[1]
+        num_grid_columns = squared_error_matrix.shape[2]
+        these_dim = ((num_grid_rows, num_grid_columns, num_target_fields))
+    else:
+        these_dim = (num_target_fields,)
+
+    ssrat_matrix = numpy.full(these_dim, numpy.nan)
+
+    for k in range(num_target_fields):
+        if per_grid_cell:
+            numerator = numpy.sqrt(numpy.average(
+                prediction_variance_matrix[..., k],
+                weights=weight_matrix, axis=0
+            ))
+            denominator = numpy.sqrt(numpy.average(
+                squared_error_matrix[..., k],
+                weights=weight_matrix, axis=0
+            ))
+        else:
+            this_flag_matrix = numpy.invert(numpy.logical_or(
+                numpy.isnan(prediction_variance_matrix[..., k]),
+                numpy.isnan(squared_error_matrix[..., k])
+            ))
+
+            these_variances = (
+                prediction_variance_matrix[..., k][this_flag_matrix]
+            )
+            these_squared_errors = (
+                squared_error_matrix[..., k][this_flag_matrix]
+            )
+            these_weights = weight_matrix[this_flag_matrix]
+
+            numerator = numpy.sqrt(numpy.average(
+                these_variances, weights=these_weights
+            ))
+            denominator = numpy.sqrt(numpy.average(
+                these_squared_errors, weights=these_weights
+            ))
+
+        ssrat_matrix[..., k] = numerator / denominator
+
+    return ssrat_matrix
+
+
+def _get_ssdiff_one_replicate(
+        full_squared_error_matrix, full_prediction_variance_matrix,
+        full_weight_matrix, example_indices_in_replicate, per_grid_cell):
+    """Computes SSDIFF for one bootstrap replicate.
+
+    SSDIFF = spread-skill difference = spread minus skill
+
+    M = number of rows in grid
+    N = number of columns in grid
+    T = number of target fields
+
+    :param full_squared_error_matrix: See documentation for
+        `_get_ssrat_one_replicate`.
+    :param full_prediction_variance_matrix: Same.
+    :param full_weight_matrix: Same.
+    :param example_indices_in_replicate: Same.
+    :param per_grid_cell: Same.
+    :return: ssdiff_matrix: If `per_grid_cell == True`, this is an M-by-N-by-T
+        numpy array of spread-skill differences.  Otherwise, this is a length-T
+        numpy array of spread-skill differences.
+    """
+
+    squared_error_matrix = full_squared_error_matrix[
+        example_indices_in_replicate, ...
+    ]
+    prediction_variance_matrix = full_prediction_variance_matrix[
+        example_indices_in_replicate, ...
+    ]
+    weight_matrix = full_weight_matrix[example_indices_in_replicate, ...]
+
+    num_target_fields = squared_error_matrix.shape[3]
+
+    if per_grid_cell:
+        num_grid_rows = squared_error_matrix.shape[1]
+        num_grid_columns = squared_error_matrix.shape[2]
+        these_dim = ((num_grid_rows, num_grid_columns, num_target_fields))
+    else:
+        these_dim = (num_target_fields,)
+
+    ssdiff_matrix = numpy.full(these_dim, numpy.nan)
+
+    for k in range(num_target_fields):
+        if per_grid_cell:
+            numerator = numpy.sqrt(numpy.average(
+                prediction_variance_matrix[..., k],
+                weights=weight_matrix, axis=0
+            ))
+            denominator = numpy.sqrt(numpy.average(
+                squared_error_matrix[..., k],
+                weights=weight_matrix, axis=0
+            ))
+        else:
+            this_flag_matrix = numpy.invert(numpy.logical_or(
+                numpy.isnan(prediction_variance_matrix[..., k]),
+                numpy.isnan(squared_error_matrix[..., k])
+            ))
+
+            these_variances = (
+                prediction_variance_matrix[..., k][this_flag_matrix]
+            )
+            these_squared_errors = (
+                squared_error_matrix[..., k][this_flag_matrix]
+            )
+            these_weights = weight_matrix[this_flag_matrix]
+
+            numerator = numpy.sqrt(numpy.average(
+                these_variances, weights=these_weights
+            ))
+            denominator = numpy.sqrt(numpy.average(
+                these_squared_errors, weights=these_weights
+            ))
+
+        ssdiff_matrix[..., k] = numerator - denominator
+
+    return ssdiff_matrix
 
 
 def _get_scores_one_replicate(
@@ -1024,14 +1181,63 @@ def read_inputs(prediction_file_names, isotonic_model_file_name,
     return target_matrix, prediction_matrix, weight_matrix, model_file_name
 
 
+def _read_inputs_for_ssrat(prediction_file_names, target_field_names):
+    """Reads inputs for calculation of spread-skill ratio (SSRAT).
+
+    :param prediction_file_names: See doc for `read_inputs`.
+    :param target_field_names: Same.
+    :return: prediction_tables_xarray: length-F list of xarray tables in format
+        returned by `prediction_io.read_file`.
+    """
+
+    # TODO(thunderhoser): This is a HACK.
+    # TODO(thunderhoser): This method does *not* do on-the-fly bias correction.
+
+    error_checking.assert_is_string_list(prediction_file_names)
+    error_checking.assert_is_string_list(target_field_names)
+
+    num_times = len(prediction_file_names)
+    prediction_tables_xarray = [xarray.Dataset()] * num_times
+    model_file_name = None
+
+    for i in range(num_times):
+        print('Reading data from: "{0:s}"...'.format(prediction_file_names[i]))
+        prediction_tables_xarray[i] = prediction_io.read_file(
+            prediction_file_names[i]
+        )
+        prediction_tables_xarray[i] = (
+            prediction_io.prep_for_uncertainty_calib_training(
+                prediction_tables_xarray[i]
+            )
+        )
+
+        pt_i = prediction_tables_xarray[i]
+        if model_file_name is None:
+            model_file_name = copy.deepcopy(
+                pt_i.attrs[prediction_io.MODEL_FILE_KEY]
+            )
+
+        assert model_file_name == pt_i.attrs[prediction_io.MODEL_FILE_KEY]
+
+        these_indices = numpy.array([
+            numpy.where(pt_i[prediction_io.FIELD_NAME_KEY].values == f)[0][0]
+            for f in target_field_names
+        ], dtype=int)
+
+        pt_i = pt_i.isel({prediction_io.FIELD_DIM: these_indices})
+        prediction_tables_xarray[i] = pt_i
+
+    return prediction_tables_xarray
+
+
 def get_scores_with_bootstrapping(
         prediction_file_names, num_bootstrap_reps,
         target_field_names, num_relia_bins_by_target,
         min_relia_bin_edge_by_target, max_relia_bin_edge_by_target,
         min_relia_bin_edge_prctile_by_target,
         max_relia_bin_edge_prctile_by_target,
-        per_grid_cell, keep_it_simple=False, isotonic_model_file_name=None,
-        uncertainty_calib_model_file_name=None):
+        per_grid_cell, keep_it_simple=False, compute_ssrat=False,
+        isotonic_model_file_name=None, uncertainty_calib_model_file_name=None):
     """Computes all scores with bootstrapping.
 
     T = number of target fields
@@ -1057,6 +1263,8 @@ def get_scores_with_bootstrapping(
         the whole domain.
     :param keep_it_simple: Boolean flag.  If True, will avoid Kolmogorov-Smirnov
         test and attributes diagram.
+    :param compute_ssrat: Boolean flag.  If True, will compute spread-skill
+        ratio (SSRAT) and spread-skill difference (SSDIFF).
     :param isotonic_model_file_name: Path to file with isotonic-regression
         model, which will be used to bias-correct predictions before evaluation.
         Will be read by `bias_correction.read_file`.  If you do not want to
@@ -1122,6 +1330,78 @@ def get_scores_with_bootstrapping(
                 max_relia_bin_edge_by_target[j],
                 min_relia_bin_edge_by_target[j]
             )
+
+    if compute_ssrat:
+        prediction_tables_xarray = _read_inputs_for_ssrat(
+            prediction_file_names=prediction_file_names,
+            target_field_names=target_field_names
+        )
+
+        prediction_variance_matrix = numpy.stack([
+            ptx[prediction_io.PREDICTION_KEY].values[..., 0]
+            for ptx in prediction_tables_xarray
+        ], axis=0)
+
+        squared_error_matrix = numpy.stack([
+            ptx[prediction_io.TARGET_KEY].values
+            for ptx in prediction_tables_xarray
+        ], axis=0)
+
+        weight_matrix = numpy.stack([
+            ptx[prediction_io.WEIGHT_KEY].values
+            for ptx in prediction_tables_xarray
+        ], axis=0)
+
+        if per_grid_cell:
+            num_grid_rows = squared_error_matrix.shape[1]
+            num_grid_columns = squared_error_matrix.shape[2]
+            these_dim = (
+                num_grid_rows, num_grid_columns,
+                num_target_fields, num_bootstrap_reps
+            )
+        else:
+            these_dim = (num_target_fields, num_bootstrap_reps)
+
+        ssrat_matrix = numpy.full(these_dim, numpy.nan)
+        ssdiff_matrix = numpy.full(these_dim, numpy.nan)
+        num_examples = squared_error_matrix.shape[0]
+        example_indices = numpy.linspace(
+            0, num_examples - 1, num=num_examples, dtype=int
+        )
+
+        for i in range(num_bootstrap_reps):
+            if num_bootstrap_reps == 1:
+                these_indices = example_indices
+            else:
+                these_indices = numpy.random.choice(
+                    example_indices, size=num_examples, replace=True
+                )
+
+            print((
+                'Computing SSRAT and SSDIFF for {0:d}th of {1:d} bootstrap '
+                'replicates...'
+            ).format(
+                i + 1, num_bootstrap_reps
+            ))
+
+            ssrat_matrix[..., i] = _get_ssrat_one_replicate(
+                full_squared_error_matrix=squared_error_matrix,
+                full_prediction_variance_matrix=prediction_variance_matrix,
+                full_weight_matrix=weight_matrix,
+                example_indices_in_replicate=these_indices,
+                per_grid_cell=per_grid_cell
+            )
+
+            ssdiff_matrix[..., i] = _get_ssdiff_one_replicate(
+                full_squared_error_matrix=squared_error_matrix,
+                full_prediction_variance_matrix=prediction_variance_matrix,
+                full_weight_matrix=weight_matrix,
+                example_indices_in_replicate=these_indices,
+                per_grid_cell=per_grid_cell
+            )
+    else:
+        ssrat_matrix = None
+        ssdiff_matrix = None
 
     (
         target_matrix, prediction_matrix, weight_matrix, model_file_name
@@ -1233,6 +1513,13 @@ def get_scores_with_bootstrapping(
             these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         )
     }
+
+    if compute_ssrat:
+        new_dict = {
+            SSRAT_KEY: (these_dim_keys, ssrat_matrix),
+            SSDIFF_KEY: (these_dim_keys, ssdiff_matrix)
+        }
+        main_data_dict.update(new_dict)
 
     if per_grid_cell:
         these_dimensions = (
