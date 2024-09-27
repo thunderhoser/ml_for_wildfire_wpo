@@ -56,5 +56,6 @@ for model_lead_time_days in "${MODEL_LEAD_TIMES_DAYS[@]}"; do
     --min_relia_bin_edge_by_target 0 0 0 0 0 0 0 \
     --max_relia_bin_edge_by_target 99 1000 2500 65 1000 130 150 \
     --per_grid_cell=0 \
+    --keep_it_simple=1 \
     --output_file_name="${model_dir_name}/validation_lead-time-days=${model_lead_time_days}/ungridded_evaluation.nc"
 done
