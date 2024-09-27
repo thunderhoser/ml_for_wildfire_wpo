@@ -45,7 +45,7 @@ use_residual_blocks=${RESIDUAL_BLOCK_FLAGS[$BEST_MODEL_INDEX]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=${training_strategy}_spectral-complexity=${spectral_complexity}_use-residual-blocks=${use_residual_blocks}"
 echo $model_dir_name
 
-python3 -u "${CODE_DIR_NAME}/plot_ungridded_evaluation.py" \
+python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
 --input_evaluation_file_name="${model_dir_name}/training_lead-time-days=02/gridded_evaluation.nc" \
 --metric_names "bias" \
 --min_colour_percentiles 0.1 \
