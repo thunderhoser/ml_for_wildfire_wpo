@@ -477,10 +477,10 @@ def train_model_suite_per_pixel(
     # Check input args.
     error_checking.assert_is_boolean(do_uncertainty_calibration)
     error_checking.assert_is_boolean(do_multiprocessing)
-    if not do_uncertainty_calibration:
+    if do_uncertainty_calibration:
+        error_checking.assert_is_boolean(do_iso_reg_before_uncertainty_calib)
+    else:
         do_iso_reg_before_uncertainty_calib = None
-
-    error_checking.assert_is_boolean(do_iso_reg_before_uncertainty_calib)
 
     # TODO(thunderhoser): This bit could be modularized.
     grid_latitudes_deg_n = None
@@ -636,11 +636,12 @@ def train_model_suite_not_per_pixel(
         do_multiprocessing = False
 
     error_checking.assert_is_boolean(do_uncertainty_calibration)
-    if not do_uncertainty_calibration:
+    if do_uncertainty_calibration:
+        error_checking.assert_is_boolean(do_iso_reg_before_uncertainty_calib)
+    else:
         do_iso_reg_before_uncertainty_calib = None
 
     error_checking.assert_is_boolean(do_multiprocessing)
-    error_checking.assert_is_boolean(do_iso_reg_before_uncertainty_calib)
 
     # TODO(thunderhoser): Modularize this shit.
     grid_latitudes_deg_n = None
