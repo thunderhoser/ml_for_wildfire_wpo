@@ -18,7 +18,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_evaluation_by_lead_time_%A.out
+#SBATCH --output=plot_evaluation_by_lead_time_%A_%a.out
 
 conda init
 conda activate base
