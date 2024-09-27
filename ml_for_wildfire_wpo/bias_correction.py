@@ -720,7 +720,8 @@ def train_model_suite_not_per_pixel(
                 argument_list.append((
                     prediction_tables_xarray_1field,
                     cluster_table_xarray_1field,
-                    slice_to_cluster_ids[this_slice]
+                    slice_to_cluster_ids[this_slice],
+                    field_names[f]
                 ))
 
             with Pool() as pool_object:
