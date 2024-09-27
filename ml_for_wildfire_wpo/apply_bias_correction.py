@@ -156,16 +156,14 @@ def _run(input_dir_name, init_date_limit_strings, isotonic_model_file_name,
             this_prediction_table_xarray = bias_correction.apply_model_suite(
                 prediction_table_xarray=this_prediction_table_xarray,
                 model_dict=isotonic_model_dict,
-                verbose=True,
-                do_multiprocessing=False
+                verbose=True
             )
 
         if uncertainty_calib_model_dict is not None:
             this_prediction_table_xarray = bias_correction.apply_model_suite(
                 prediction_table_xarray=this_prediction_table_xarray,
                 model_dict=uncertainty_calib_model_dict,
-                verbose=True,
-                do_multiprocessing=False
+                verbose=True
             )
 
         this_init_date_string = prediction_io.file_name_to_date(
