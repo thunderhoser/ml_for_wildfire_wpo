@@ -1,18 +1,17 @@
-"""Trains isotonic-regression model to bias-correct ensemble mean."""
+"""Trains isotonic-regression model(s) to bias-correct ensemble mean."""
 
 import argparse
 import numpy
 import xarray
 from ml_for_wildfire_wpo.io import prediction_io
+from ml_for_wildfire_wpo.utils import bias_clustering
 from ml_for_wildfire_wpo.machine_learning import bias_correction
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
-SENTINEL_VALUE = -1e6
-
 INPUT_DIRS_ARG_NAME = 'input_prediction_dir_names'
 INIT_DATE_LIMITS_ARG_NAME = 'init_date_limit_strings'
-ONE_MODEL_PER_PIXEL_ARG_NAME = 'one_model_per_pixel'
+BIAS_CLUSTERING_FILE_ARG_NAME = 'input_bias_clustering_file_name'
 PIXEL_RADIUS_ARG_NAME = 'pixel_radius_metres'
 WEIGHT_BY_INV_DIST_ARG_NAME = 'weight_pixels_by_inverse_dist'
 WEIGHT_BY_INV_SQ_DIST_ARG_NAME = 'weight_pixels_by_inverse_sq_dist'
@@ -28,38 +27,42 @@ INIT_DATE_LIMITS_HELP_STRING = (
     'List of two initialization dates, specifying the beginning and end of the '
     'training period.  Date format is "yyyymmdd".'
 )
-ONE_MODEL_PER_PIXEL_HELP_STRING = (
-    'Boolean flag.  If 1 (0), will train one IR model per pixel (one IR model '
-    'for the whole domain).'
+BIAS_CLUSTERING_FILE_HELP_STRING = (
+    'Path to file with bias-clustering (readable by '
+    '`bias_clustering.read_file`).  If you one want one model per target field '
+    'per cluster, you must specify this argument.  Otherwise, leave this '
+    'argument alone.'
 )
 PIXEL_RADIUS_HELP_STRING = (
-    '[used only if {0:s} == 1] When training the model for pixel P, will use '
-    'all pixels within this radius.'
-).format(
-    ONE_MODEL_PER_PIXEL_ARG_NAME
+    'Radius of influence for per-pixel models (when training the model for '
+    'pixel P, will use all pixels within this radius).  If you one want one '
+    'model per target field per pixel, you must specify this argument.  '
+    'Otherwise, leave this argument alone.'
 )
 WEIGHT_BY_INV_DIST_HELP_STRING = (
-    '[used only if {0:s} == 1] Boolean flag.  If 1, when training the model '
-    'for pixel P, will weight every other pixel by the inverse of its distance '
-    'to P.'
+    '[used only if `{0:s}` is specified] Boolean flag.  If 1, when training '
+    'the model for pixel P, will weight every other pixel by the inverse of '
+    'its distance to P.'
 ).format(
-    ONE_MODEL_PER_PIXEL_ARG_NAME
+    PIXEL_RADIUS_ARG_NAME
 )
 WEIGHT_BY_INV_SQ_DIST_HELP_STRING = (
-    '[used only if {0:s} == 1] Boolean flag.  If 1, when training the model '
-    'for pixel P, will weight every other pixel by the inverse of its '
-    '*squared* distance to P.'
+    '[used only if `{0:s}` is specified] Boolean flag.  If 1, when training '
+    'the model for pixel P, will weight every other pixel by the inverse of '
+    'its squared distance to P.'
 ).format(
-    ONE_MODEL_PER_PIXEL_ARG_NAME
+    PIXEL_RADIUS_ARG_NAME
 )
 TARGET_FIELDS_HELP_STRING = (
-    '1-D list of target fields for which to train UC models.  Each field name '
-    'must be accepted by `canadian_fwi_utils.check_field_name`.  If you want '
-    'to train for all target fields, leave this argument alone.'
+    '1-D list of target fields for which to train models (each name must be '
+    'accepted by `canadian_fwi_utils.check_field_name`).  Depending on other '
+    'input args, this script will train one model per target field, one per '
+    'field per pixel, or one per field per cluster.  If you want to use all '
+    'target fields, leave this argument alone.'
 )
 OUTPUT_FILE_HELP_STRING = (
-    'Path to output file.  The suite of trained IR models will be saved here, '
-    'in Dill format.'
+    'Path to output file.  The suite of trained isotonic-regression models '
+    'will be written here, in Dill format, by `bias_correction.write_file`.'
 )
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
@@ -72,8 +75,8 @@ INPUT_ARG_PARSER.add_argument(
     help=INIT_DATE_LIMITS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + ONE_MODEL_PER_PIXEL_ARG_NAME, type=int, required=True,
-    help=ONE_MODEL_PER_PIXEL_HELP_STRING
+    '--' + BIAS_CLUSTERING_FILE_ARG_NAME, type=str, required=False, default='',
+    help=BIAS_CLUSTERING_FILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + PIXEL_RADIUS_ARG_NAME, type=float, required=False, default=-1.,
@@ -97,17 +100,17 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
-def _run(prediction_dir_names, init_date_limit_strings, one_model_per_pixel,
-         pixel_radius_metres, weight_pixels_by_inverse_dist,
-         weight_pixels_by_inverse_sq_dist, target_field_names,
-         output_file_name):
-    """Trains isotonic-regression model to bias-correct ensemble mean
+def _run(prediction_dir_names, init_date_limit_strings,
+         bias_clustering_file_name, pixel_radius_metres,
+         weight_pixels_by_inverse_dist, weight_pixels_by_inverse_sq_dist,
+         target_field_names, output_file_name):
+    """Trains isotonic-regression model(s) to bias-correct ensemble mean.
 
     This is effectively the main method.
 
     :param prediction_dir_names: See documentation at top of this script.
     :param init_date_limit_strings: Same.
-    :param one_model_per_pixel: Same.
+    :param bias_clustering_file_name: Same.
     :param pixel_radius_metres: Same.
     :param weight_pixels_by_inverse_dist: Same.
     :param weight_pixels_by_inverse_sq_dist: Same.
@@ -119,6 +122,16 @@ def _run(prediction_dir_names, init_date_limit_strings, one_model_per_pixel,
         pixel_radius_metres = None
     if len(target_field_names) == 1 and target_field_names[0] == '':
         target_field_names = None
+
+    if bias_clustering_file_name == '':
+        cluster_table_xarray = None
+    else:
+        print('Reading bias clusters from file: "{0:s}"...'.format(
+            bias_clustering_file_name
+        ))
+        cluster_table_xarray = bias_clustering.read_file(
+            bias_clustering_file_name
+        )
 
     prediction_file_names = []
     for this_dir_name in prediction_dir_names:
@@ -158,14 +171,23 @@ def _run(prediction_dir_names, init_date_limit_strings, one_model_per_pixel,
 
     print(SEPARATOR_STRING)
 
-    model_dict = bias_correction.train_model_suite(
-        prediction_tables_xarray=prediction_tables_xarray,
-        one_model_per_pixel=one_model_per_pixel,
-        pixel_radius_metres=pixel_radius_metres,
-        weight_pixels_by_inverse_dist=weight_pixels_by_inverse_dist,
-        weight_pixels_by_inverse_sq_dist=weight_pixels_by_inverse_sq_dist,
-        do_uncertainty_calibration=False
-    )
+    if pixel_radius_metres is None:
+        model_dict = bias_correction.train_model_suite_not_per_pixel(
+            prediction_tables_xarray=prediction_tables_xarray,
+            do_uncertainty_calibration=False,
+            cluster_table_xarray=cluster_table_xarray,
+            do_multiprocessing=True
+        )
+    else:
+        model_dict = bias_correction.train_model_suite_per_pixel(
+            prediction_tables_xarray=prediction_tables_xarray,
+            do_uncertainty_calibration=False,
+            pixel_radius_metres=pixel_radius_metres,
+            weight_pixels_by_inverse_dist=weight_pixels_by_inverse_dist,
+            weight_pixels_by_inverse_sq_dist=weight_pixels_by_inverse_sq_dist,
+            do_multiprocessing=True
+        )
+
     print(SEPARATOR_STRING)
 
     print('Writing model suite to: "{0:s}"...'.format(output_file_name))
@@ -182,8 +204,8 @@ if __name__ == '__main__':
         init_date_limit_strings=getattr(
             INPUT_ARG_OBJECT, INIT_DATE_LIMITS_ARG_NAME
         ),
-        one_model_per_pixel=bool(
-            getattr(INPUT_ARG_OBJECT, ONE_MODEL_PER_PIXEL_ARG_NAME)
+        bias_clustering_file_name=getattr(
+            INPUT_ARG_OBJECT, BIAS_CLUSTERING_FILE_ARG_NAME
         ),
         pixel_radius_metres=getattr(INPUT_ARG_OBJECT, PIXEL_RADIUS_ARG_NAME),
         weight_pixels_by_inverse_dist=bool(

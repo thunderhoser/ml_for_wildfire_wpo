@@ -50,8 +50,9 @@ INPUT_FILE_HELP_STRING = (
 )
 MIN_CLUSTER_SIZE_HELP_STRING = 'Minimum cluster size (number of pixels).'
 TARGET_FIELD_HELP_STRING = (
-    'Name of target field (must be accepted by `canadian_fwi_utils.check_field_name`).'
-    '  Will cluster biases only for this field.'
+    'Name of target field (must be accepted by '
+    '`canadian_fwi_utils.check_field_name`).  Will cluster biases only for '
+    'this field.'
 )
 BIAS_DISCRETIZATION_INTERVALS_HELP_STRING = (
     'List of bias-discretization intervals for the given target field.'

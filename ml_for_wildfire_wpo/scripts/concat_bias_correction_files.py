@@ -45,121 +45,126 @@ def _run(input_file_names, output_file_name):
 
     num_input_files = len(input_file_names)
 
-    model_latitude_matrix_deg_n = None
-    model_longitude_matrix_deg_e = None
+    grid_latitudes_deg_n = None
+    grid_longitudes_deg_e = None
+    cluster_id_matrices = [numpy.array([], dtype=int)] * num_input_files
     field_names = [None] * num_input_files
+    model_dicts = [dict()] * num_input_files
     pixel_radius_metres = None
     weight_pixels_by_inverse_dist = None
     weight_pixels_by_inverse_sq_dist = None
     do_uncertainty_calibration = None
     do_iso_reg_before_uncertainty_calib = None
-    model_object_matrix = None
 
     for k in range(num_input_files):
         print('Reading models from: "{0:s}"...'.format(input_file_names[k]))
-        this_model_dict = bias_correction.read_file(input_file_names[k])
+        this_model_and_metadata_dict = bias_correction.read_file(
+            input_file_names[k]
+        )
+        tmmd = this_model_and_metadata_dict
 
         if k == 0:
-            model_latitude_matrix_deg_n = this_model_dict[
-                bias_correction.LATITUDES_KEY
+            grid_latitudes_deg_n = tmmd[
+                bias_correction.GRID_LATITUDES_KEY
             ]
-            model_longitude_matrix_deg_e = this_model_dict[
-                bias_correction.LONGITUDES_KEY
+            grid_longitudes_deg_e = tmmd[
+                bias_correction.GRID_LONGITUDES_KEY
             ]
-            pixel_radius_metres = this_model_dict[
+            pixel_radius_metres = tmmd[
                 bias_correction.PIXEL_RADIUS_KEY
             ]
-            weight_pixels_by_inverse_dist = this_model_dict[
+            weight_pixels_by_inverse_dist = tmmd[
                 bias_correction.WEIGHT_BY_INV_DIST_KEY
             ]
-            weight_pixels_by_inverse_sq_dist = this_model_dict[
+            weight_pixels_by_inverse_sq_dist = tmmd[
                 bias_correction.WEIGHT_BY_INV_SQ_DIST_KEY
             ]
-            do_uncertainty_calibration = this_model_dict[
+            do_uncertainty_calibration = tmmd[
                 bias_correction.DO_UNCERTAINTY_CALIB_KEY
             ]
-            do_iso_reg_before_uncertainty_calib = this_model_dict[
+            do_iso_reg_before_uncertainty_calib = tmmd[
                 bias_correction.DO_IR_BEFORE_UC_KEY
             ]
 
-            num_rows = model_latitude_matrix_deg_n.shape[0]
-            num_columns = model_latitude_matrix_deg_n.shape[1]
-            model_object_matrix = numpy.full(
-                (num_rows, num_columns, num_input_files),
-                '', dtype=object
-            )
-
         assert numpy.allclose(
-            model_latitude_matrix_deg_n,
-            this_model_dict[bias_correction.LATITUDES_KEY],
+            grid_latitudes_deg_n,
+            tmmd[bias_correction.GRID_LATITUDES_KEY],
             atol=TOLERANCE, equal_nan=True
         )
         assert numpy.allclose(
-            model_longitude_matrix_deg_e,
-            this_model_dict[bias_correction.LONGITUDES_KEY],
+            grid_longitudes_deg_e,
+            tmmd[bias_correction.GRID_LONGITUDES_KEY],
             atol=TOLERANCE, equal_nan=True
         )
 
-        these_field_names = this_model_dict[bias_correction.FIELD_NAMES_KEY]
+        these_field_names = tmmd[bias_correction.FIELD_NAMES_KEY]
         assert len(these_field_names) == 1
         field_names[k] = these_field_names[0]
 
         if pixel_radius_metres is None:
-            assert this_model_dict[bias_correction.PIXEL_RADIUS_KEY] is None
+            assert tmmd[bias_correction.PIXEL_RADIUS_KEY] is None
         else:
             assert numpy.isclose(
                 pixel_radius_metres,
-                this_model_dict[bias_correction.PIXEL_RADIUS_KEY],
+                tmmd[bias_correction.PIXEL_RADIUS_KEY],
                 atol=TOLERANCE
             )
 
         if weight_pixels_by_inverse_dist is None:
             assert (
-                this_model_dict[bias_correction.WEIGHT_BY_INV_DIST_KEY] is None
+                tmmd[bias_correction.WEIGHT_BY_INV_DIST_KEY] is None
             )
         else:
             assert (
                 weight_pixels_by_inverse_dist ==
-                this_model_dict[bias_correction.WEIGHT_BY_INV_DIST_KEY]
+                tmmd[bias_correction.WEIGHT_BY_INV_DIST_KEY]
             )
 
         if weight_pixels_by_inverse_sq_dist is None:
             assert (
-                this_model_dict[bias_correction.WEIGHT_BY_INV_SQ_DIST_KEY]
+                tmmd[bias_correction.WEIGHT_BY_INV_SQ_DIST_KEY]
                 is None
             )
         else:
             assert (
                 weight_pixels_by_inverse_sq_dist ==
-                this_model_dict[bias_correction.WEIGHT_BY_INV_SQ_DIST_KEY]
+                tmmd[bias_correction.WEIGHT_BY_INV_SQ_DIST_KEY]
             )
 
         assert (
             do_uncertainty_calibration ==
-            this_model_dict[bias_correction.DO_UNCERTAINTY_CALIB_KEY]
+            tmmd[bias_correction.DO_UNCERTAINTY_CALIB_KEY]
         )
 
         if do_iso_reg_before_uncertainty_calib is None:
             assert (
-                this_model_dict[bias_correction.DO_IR_BEFORE_UC_KEY] is None
+                tmmd[bias_correction.DO_IR_BEFORE_UC_KEY] is None
             )
         else:
             assert (
                 do_iso_reg_before_uncertainty_calib ==
-                this_model_dict[bias_correction.DO_IR_BEFORE_UC_KEY]
+                tmmd[bias_correction.DO_IR_BEFORE_UC_KEY]
             )
 
-        model_object_matrix[..., k] = (
-            this_model_dict[bias_correction.MODELS_KEY][..., 0]
+        cluster_id_matrices[k] = (
+            tmmd[bias_correction.CLUSTER_ID_MATRIX_KEY][..., 0]
         )
+        model_dicts[k] = tmmd[bias_correction.MODEL_DICT_KEY]
 
     assert len(set(field_names)) == len(field_names)
 
-    model_dict = {
-        bias_correction.MODELS_KEY: model_object_matrix,
-        bias_correction.LATITUDES_KEY: model_latitude_matrix_deg_n,
-        bias_correction.LONGITUDES_KEY: model_longitude_matrix_deg_e,
+    overall_model_dict = model_dicts[0]
+    for k in range(1, num_input_files):
+        overall_model_dict.update(model_dicts[k])
+
+    cluster_id_matrix = numpy.stack(cluster_id_matrices, axis=-1)
+
+    model_and_metadata_dict = {
+        bias_correction.GRID_LATITUDES_KEY: grid_latitudes_deg_n,
+        bias_correction.GRID_LONGITUDES_KEY: grid_longitudes_deg_e,
         bias_correction.FIELD_NAMES_KEY: field_names,
+        bias_correction.CLUSTER_ID_MATRIX_KEY: cluster_id_matrix,
+        bias_correction.MODEL_DICT_KEY: overall_model_dict,
         bias_correction.PIXEL_RADIUS_KEY: pixel_radius_metres,
         bias_correction.WEIGHT_BY_INV_DIST_KEY:
             weight_pixels_by_inverse_dist,
@@ -173,7 +178,7 @@ def _run(input_file_names, output_file_name):
         output_file_name
     ))
     bias_correction.write_file(
-        dill_file_name=output_file_name, model_dict=model_dict
+        dill_file_name=output_file_name, model_dict=model_and_metadata_dict
     )
 
 
