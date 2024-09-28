@@ -469,10 +469,10 @@ def train_model_suite_per_pixel(
     # Check input args.
     error_checking.assert_is_boolean(do_uncertainty_calibration)
     error_checking.assert_is_boolean(do_multiprocessing)
-    if not do_uncertainty_calibration:
+    if do_uncertainty_calibration:
+        error_checking.assert_is_boolean(do_iso_reg_before_uncertainty_calib)
+    else:
         do_iso_reg_before_uncertainty_calib = None
-
-    error_checking.assert_is_boolean(do_iso_reg_before_uncertainty_calib)
 
     # TODO(thunderhoser): This bit could be modularized.
     grid_latitudes_deg_n = None
@@ -628,11 +628,12 @@ def train_model_suite_not_per_pixel(
         do_multiprocessing = False
 
     error_checking.assert_is_boolean(do_uncertainty_calibration)
-    if not do_uncertainty_calibration:
+    if do_uncertainty_calibration:
+        error_checking.assert_is_boolean(do_iso_reg_before_uncertainty_calib)
+    else:
         do_iso_reg_before_uncertainty_calib = None
 
     error_checking.assert_is_boolean(do_multiprocessing)
-    error_checking.assert_is_boolean(do_iso_reg_before_uncertainty_calib)
 
     # TODO(thunderhoser): Modularize this shit.
     grid_latitudes_deg_n = None
@@ -711,7 +712,8 @@ def train_model_suite_not_per_pixel(
                 argument_list.append((
                     prediction_tables_xarray_1field,
                     cluster_table_xarray_1field,
-                    slice_to_cluster_ids[this_slice]
+                    slice_to_cluster_ids[this_slice],
+                    field_names[f]
                 ))
 
             with Pool() as pool_object:
@@ -722,8 +724,8 @@ def train_model_suite_not_per_pixel(
                 for k in range(len(subdicts)):
                     field_and_cluster_to_model.update(subdicts[k])
 
-        for this_key in field_and_cluster_to_model:
-            assert field_and_cluster_to_model[this_key] is not None
+        # for this_key in field_and_cluster_to_model:
+        #     assert field_and_cluster_to_model[this_key] is not None
 
         return {
             GRID_LATITUDES_KEY: grid_latitudes_deg_n,
@@ -1026,12 +1028,14 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
         this_num_clusters = len(unique_cluster_ids_this_field)
 
         for k in range(this_num_clusters):
+            this_key = (field_names[f], unique_cluster_ids_this_field[k])
+            this_model_object = field_and_cluster_to_model[this_key]
+            if this_model_object is None:
+                continue
+
             i_vals, j_vals = numpy.where(
                 cluster_id_matrix[..., f] == unique_cluster_ids_this_field[k]
             )
-
-            this_key = (field_names[f], unique_cluster_ids_this_field[k])
-            this_model_object = field_and_cluster_to_model[this_key]
 
             if verbose:
                 print((
