@@ -1030,8 +1030,6 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
 
     # Do actual stuff.
     num_fields = len(field_names)
-    print('FIELD NAMES')
-    print(field_names)
 
     for f in range(num_fields):
         if constrain_dsr and field_names[f] == canadian_fwi_utils.DSR_NAME:
@@ -1111,6 +1109,15 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
     prediction_matrix = numpy.maximum(prediction_matrix, 0.)
 
     if constrain_dsr:
+        print('FIELD NAMES')
+        print(field_names)
+        print(numpy.where(
+            field_names == canadian_fwi_utils.FWI_NAME
+        ))
+        print(numpy.where(
+            field_names == canadian_fwi_utils.DSR_NAME
+        ))
+
         fwi_index = numpy.where(
             field_names == canadian_fwi_utils.FWI_NAME
         )[0][0]
