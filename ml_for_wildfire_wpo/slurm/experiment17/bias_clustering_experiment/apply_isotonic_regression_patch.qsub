@@ -60,4 +60,4 @@ python3 -u "${CODE_DIR_NAME}/apply_bias_correction.py" \
 --input_prediction_dir_name="${model_dir_name}/validation_lead-time-days=02" \
 --init_date_limit_strings "20210101" "20211210" \
 --isotonic_model_file_name="${model_dir_name}/training_lead-time-days=02/isotonic_regression/bias-discretization-interval-interval=${bias_discretization_interval_interval}_min-cluster-size-px=${min_cluster_size_px}_buffer-distance-px=${buffer_distance_px}_do-backwards-clustering=${do_backwards_flag}/isotonic_regression.dill" \
---output_prediction_dir_name="${model_dir_name}/validation_lead-time-days=02/isotonic_regression"
+--output_prediction_dir_name="${model_dir_name}/validation_lead-time-days=02/isotonic_regression/bias-discretization-interval-interval=${bias_discretization_interval_interval}_min-cluster-size-px=${min_cluster_size_px}_buffer-distance-px=${buffer_distance_px}_do-backwards-clustering=${do_backwards_flag}"
