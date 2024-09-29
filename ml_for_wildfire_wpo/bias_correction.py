@@ -941,10 +941,10 @@ def apply_model_suite_one_per_pixel(prediction_table_xarray, model_dict,
 
     if constrain_dsr:
         fwi_index = numpy.where(
-            field_names == canadian_fwi_utils.FWI_NAME
+            numpy.array(field_names) == canadian_fwi_utils.FWI_NAME
         )[0][0]
         dsr_index = numpy.where(
-            field_names == canadian_fwi_utils.DSR_NAME
+            numpy.array(field_names) == canadian_fwi_utils.DSR_NAME
         )[0][0]
         prediction_matrix[..., dsr_index, :] = canadian_fwi_utils.fwi_to_dsr(
             prediction_matrix[..., fwi_index, :]
@@ -1109,20 +1109,11 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
     prediction_matrix = numpy.maximum(prediction_matrix, 0.)
 
     if constrain_dsr:
-        print('FIELD NAMES')
-        print(field_names)
-        print(numpy.where(
-            numpy.array(field_names) == canadian_fwi_utils.FWI_NAME
-        ))
-        print(numpy.where(
-            numpy.array(field_names) == canadian_fwi_utils.DSR_NAME
-        ))
-
         fwi_index = numpy.where(
-            field_names == canadian_fwi_utils.FWI_NAME
+            numpy.array(field_names) == canadian_fwi_utils.FWI_NAME
         )[0][0]
         dsr_index = numpy.where(
-            field_names == canadian_fwi_utils.DSR_NAME
+            numpy.array(field_names) == canadian_fwi_utils.DSR_NAME
         )[0][0]
         prediction_matrix[..., dsr_index, :] = canadian_fwi_utils.fwi_to_dsr(
             prediction_matrix[..., fwi_index, :]
