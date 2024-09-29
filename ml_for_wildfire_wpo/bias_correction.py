@@ -1030,6 +1030,7 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
         prediction_matrix_this_field = (
             ptx[prediction_io.PREDICTION_KEY].values[..., f, :]
         )
+        print(prediction_matrix_this_field.shape)
         unique_cluster_ids_this_field = numpy.unique(
             cluster_id_matrix[..., f][cluster_id_matrix[..., f] > 0]
         )
