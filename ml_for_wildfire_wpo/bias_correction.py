@@ -1030,6 +1030,8 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
 
     # Do actual stuff.
     num_fields = len(field_names)
+    print('FIELD NAMES')
+    print(field_names)
 
     for f in range(num_fields):
         if constrain_dsr and field_names[f] == canadian_fwi_utils.DSR_NAME:
