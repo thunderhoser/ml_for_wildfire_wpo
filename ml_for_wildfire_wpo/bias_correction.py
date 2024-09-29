@@ -1030,7 +1030,6 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
         prediction_matrix_this_field = (
             ptx[prediction_io.PREDICTION_KEY].values[..., f, :]
         )
-        print(prediction_matrix_this_field.shape)
         unique_cluster_ids_this_field = numpy.unique(
             cluster_id_matrix[..., f][cluster_id_matrix[..., f] > 0]
         )
@@ -1085,6 +1084,9 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
                     first_term + second_term * (third_term - first_term)
                 )
             else:
+                print(prediction_matrix_this_field[i_vals, j_vals, :].shape)
+                print(prediction_matrix[i_vals, j_vals, f, :].shape)
+
                 prediction_matrix[i_vals, j_vals, f, :] = (
                     this_model_object.predict(
                         prediction_matrix_this_field[i_vals, j_vals, :]
