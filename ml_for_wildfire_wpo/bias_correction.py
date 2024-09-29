@@ -1112,10 +1112,10 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
         print('FIELD NAMES')
         print(field_names)
         print(numpy.where(
-            field_names == canadian_fwi_utils.FWI_NAME
+            numpy.array(field_names) == canadian_fwi_utils.FWI_NAME
         ))
         print(numpy.where(
-            field_names == canadian_fwi_utils.DSR_NAME
+            numpy.array(field_names) == canadian_fwi_utils.DSR_NAME
         ))
 
         fwi_index = numpy.where(
