@@ -352,18 +352,8 @@ def _run(input_file_name, metric_names, min_colour_percentiles,
     etx = evaluation_table_xarray
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
-    # TODO(thunderhoser): This is a HACK.  I should store the weight matrix in
-    # the evaluation file.
-    mean_target_matrix = numpy.mean(
-        etx[regression_eval.TARGET_MEAN_KEY].values[:, :, 0, ...], axis=-1
-    )
-    mean_prediction_matrix = numpy.mean(
-        etx[regression_eval.PREDICTION_MEAN_KEY].values[:, :, 0, ...], axis=-1
-    )
-    mask_out_matrix = numpy.logical_and(
-        mean_target_matrix < TOLERANCE,
-        mean_prediction_matrix < TOLERANCE
-    )
+    eval_weight_matrix = etx[regression_eval.EVAL_WEIGHT_KEY].values
+    mask_out_matrix = eval_weight_matrix < 0.01
 
     for k in range(num_target_fields):
         for i in range(len(metric_names)):

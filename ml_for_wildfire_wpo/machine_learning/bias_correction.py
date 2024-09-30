@@ -915,20 +915,28 @@ def apply_model_suite_one_per_pixel(prediction_table_xarray, model_dict,
                         )
                     )
                 else:
-                    prediction_matrix[i, j, f, :] = (
-                        model_object_matrix[i, j, f].predict(
-                            prediction_matrix_this_field[i, j, :]
-                        )
+                    new_predictions = model_object_matrix[i, j, f].predict(
+                        prediction_matrix_this_field[i, j, :]
                     )
+                    num_dimensions = len(
+                        prediction_matrix_this_field[i, j, :].shape
+                    )
+
+                    while len(new_predictions.shape) < num_dimensions:
+                        new_predictions = numpy.expand_dims(
+                            new_predictions, axis=-1
+                        )
+
+                    prediction_matrix[i, j, f, :] = new_predictions
 
     prediction_matrix = numpy.maximum(prediction_matrix, 0.)
 
     if constrain_dsr:
         fwi_index = numpy.where(
-            field_names == canadian_fwi_utils.FWI_NAME
+            numpy.array(field_names) == canadian_fwi_utils.FWI_NAME
         )[0][0]
         dsr_index = numpy.where(
-            field_names == canadian_fwi_utils.DSR_NAME
+            numpy.array(field_names) == canadian_fwi_utils.DSR_NAME
         )[0][0]
         prediction_matrix[..., dsr_index, :] = canadian_fwi_utils.fwi_to_dsr(
             prediction_matrix[..., fwi_index, :]
@@ -1076,20 +1084,28 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
                     first_term + second_term * (third_term - first_term)
                 )
             else:
-                prediction_matrix[i_vals, j_vals, f, :] = (
-                    this_model_object.predict(
-                        prediction_matrix_this_field[i_vals, j_vals, :]
-                    )
+                new_predictions = this_model_object.predict(
+                    prediction_matrix_this_field[i_vals, j_vals, :]
                 )
+                num_dimensions = len(
+                    prediction_matrix_this_field[i_vals, j_vals, :].shape
+                )
+
+                while len(new_predictions.shape) < num_dimensions:
+                    new_predictions = numpy.expand_dims(
+                        new_predictions, axis=-1
+                    )
+
+                prediction_matrix[i_vals, j_vals, f, :] = new_predictions
 
     prediction_matrix = numpy.maximum(prediction_matrix, 0.)
 
     if constrain_dsr:
         fwi_index = numpy.where(
-            field_names == canadian_fwi_utils.FWI_NAME
+            numpy.array(field_names) == canadian_fwi_utils.FWI_NAME
         )[0][0]
         dsr_index = numpy.where(
-            field_names == canadian_fwi_utils.DSR_NAME
+            numpy.array(field_names) == canadian_fwi_utils.DSR_NAME
         )[0][0]
         prediction_matrix[..., dsr_index, :] = canadian_fwi_utils.fwi_to_dsr(
             prediction_matrix[..., fwi_index, :]
