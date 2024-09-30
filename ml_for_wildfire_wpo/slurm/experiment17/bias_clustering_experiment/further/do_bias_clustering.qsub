@@ -160,7 +160,7 @@ while [ $i -lt ${#TARGET_FIELD_NAMES[@]} ]; do
         elif [[ "${TARGET_FIELD_NAMES[i]}" == "buildup_index" ]]; then
             bias_discretization_intervals=" 0.6000 1.2000 1.8000 2.4000 3.0000 3.6000 4.2000 "
         fi
-    elif [[ "$bias_discretization_interval_interval" == "xxl" ]]; then
+    elif [[ "$bias_discretization_interval_interval" == "xxxl" ]]; then
         if [[ "${TARGET_FIELD_NAMES[i]}" == "fire_weather_index" ]]; then
             bias_discretization_intervals=" 0.4000 0.8000 1.2000 1.6000 2.0000 "
         elif [[ "${TARGET_FIELD_NAMES[i]}" == "daily_severity_rating" ]]; then
