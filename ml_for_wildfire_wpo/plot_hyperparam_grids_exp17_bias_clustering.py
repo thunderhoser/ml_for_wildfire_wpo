@@ -267,8 +267,9 @@ def _print_ranking_all_scores(metric_matrix):
         d = d_sort_indices[k]
         b = b_sort_indices[k]
 
+        print('\n')
         print((
-            r'\n{0:d}th overall ... discretization $\Delta\Delta$ = {1:s} ... '
+            r'{0:d}th overall ... discretization $\Delta\Delta$ = {1:s} ... '
             r'min size = {2:d} ... '
             r'buffer dist = {3:d} px ... '
             r'backwards = {4:d}:'

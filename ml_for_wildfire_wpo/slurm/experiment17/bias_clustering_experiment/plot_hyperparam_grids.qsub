@@ -19,6 +19,7 @@
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
 #SBATCH --output=plot_evaluation_ungridded_%A.out
 
+module load imagemagick/7.1.1-11
 conda init
 conda activate base
 
