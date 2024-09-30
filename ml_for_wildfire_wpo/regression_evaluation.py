@@ -42,6 +42,7 @@ MSE_VARIANCE_KEY = 'mse_variance'
 MSE_SKILL_SCORE_KEY = 'mse_skill_score'
 DWMSE_KEY = 'dual_weighted_mean_squared_error'
 DWMSE_SKILL_SCORE_KEY = 'dwmse_skill_score'
+EVAL_WEIGHT_KEY = 'evaluation_weight'
 
 KS_STATISTIC_KEY = 'kolmogorov_smirnov_statistic'
 KS_P_VALUE_KEY = 'kolmogorov_smirnov_p_value'
@@ -1521,6 +1522,13 @@ def get_scores_with_bootstrapping(
             these_dim_keys, numpy.full(these_dimensions, numpy.nan)
         )
     }
+
+    if per_grid_cell:
+        these_dim_keys = (LATITUDE_DIM, LONGITUDE_DIM)
+        new_dict = {
+            EVAL_WEIGHT_KEY: (these_dim_keys, weight_matrix)
+        }
+        main_data_dict.update(new_dict)
 
     if compute_ssrat:
         new_dict = {
