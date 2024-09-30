@@ -46,5 +46,5 @@ model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=${training_strategy}_spe
 echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/plot_hyperparam_grids_exp17_bias_clustering.py" \
---experiment_dir_name="${model_dir_name}/validation_lead-time-days=02/isotonic_regression" \
+--experiment_dir_name="${model_dir_name}" \
 --output_dir_name="${model_dir_name}/validation_lead-time-days=02/isotonic_regression/hyperparam_grids"

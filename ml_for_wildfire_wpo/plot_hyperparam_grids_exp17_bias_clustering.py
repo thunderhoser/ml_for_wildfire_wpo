@@ -286,12 +286,12 @@ def _print_ranking_all_scores(metric_matrix):
                 '{1:.1f}, {2:.1f}, {3:.1f}, {4:.1f}, {5:.1f}, {6:.1f}'
             ).format(
                 TARGET_FIELD_NAMES[f],
-                rank_matrix[..., f, 0],
-                rank_matrix[..., f, 1],
-                rank_matrix[..., f, 2],
-                rank_matrix[..., f, 3],
-                rank_matrix[..., f, 4],
-                rank_matrix[..., f, 5]
+                rank_matrix[i, m, d, b, f, 0],
+                rank_matrix[i, m, d, b, f, 1],
+                rank_matrix[i, m, d, b, f, 2],
+                rank_matrix[i, m, d, b, f, 3],
+                rank_matrix[i, m, d, b, f, 4],
+                rank_matrix[i, m, d, b, f, 5]
             ))
 
 
