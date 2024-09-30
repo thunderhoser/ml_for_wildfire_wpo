@@ -1,0 +1,61 @@
+#!/bin/bash
+
+#SBATCH --job-name="concat_iso_reg_files_across_fields_patch"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=24:00:00
+#SBATCH --array=0-1
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=concat_iso_reg_files_across_fields_patch_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment17"
+
+TRAINING_STRATEGIES=("20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days")
+SPECTRAL_COMPLEXITIES=("040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100")
+RESIDUAL_BLOCK_FLAGS=("0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1")
+
+BEST_MODEL_INDEX=10
+
+training_strategy=${TRAINING_STRATEGIES[$BEST_MODEL_INDEX]}
+spectral_complexity=${SPECTRAL_COMPLEXITIES[$BEST_MODEL_INDEX]}
+use_residual_blocks=${RESIDUAL_BLOCK_FLAGS[$BEST_MODEL_INDEX]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=${training_strategy}_spectral-complexity=${spectral_complexity}_use-residual-blocks=${use_residual_blocks}"
+echo $model_dir_name
+
+BIAS_DISCRETIZATION_INTERVAL_INTERVALS=("tiny" "tiny" "tiny" "tiny" "tiny" "tiny" "small" "small" "small" "small" "small" "small" "medium" "medium" "medium" "medium" "medium" "medium" "large" "large" "large" "large" "large" "large" "tiny" "tiny" "tiny" "tiny" "tiny" "tiny" "small" "small" "small" "small" "small" "small" "medium" "medium" "medium" "medium" "medium" "medium" "large" "large" "large" "large" "large" "large" "tiny" "tiny" "tiny" "tiny" "tiny" "tiny" "small" "small" "small" "small" "small" "small" "medium" "medium" "medium" "medium" "medium" "medium" "large" "large" "large" "large" "large" "large" "tiny" "tiny" "tiny" "tiny" "tiny" "tiny" "small" "small" "small" "small" "small" "small" "medium" "medium" "medium" "medium" "medium" "medium" "large" "large" "large" "large" "large" "large" "tiny" "tiny" "tiny" "tiny" "tiny" "tiny" "small" "small" "small" "small" "small" "small" "medium" "medium" "medium" "medium" "medium" "medium" "large" "large" "large" "large" "large" "large" "tiny" "tiny" "tiny" "tiny" "tiny" "tiny" "small" "small" "small" "small" "small" "small" "medium" "medium" "medium" "medium" "medium" "medium" "large" "large" "large" "large" "large" "large" "tiny" "tiny" "tiny" "tiny" "tiny" "tiny" "small" "small" "small" "small" "small" "small" "medium" "medium" "medium" "medium" "medium" "medium" "large" "large" "large" "large" "large" "large")
+MIN_CLUSTER_SIZES_PX=("002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "002" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "005" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "010" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "020" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "050" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "100" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200" "200")
+BUFFER_DISTANCES_PX=("0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2" "0" "0" "1" "1" "2" "2")
+DO_BACKWARDS_FLAGS=("0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1")
+
+bias_discretization_interval_interval="${BIAS_DISCRETIZATION_INTERVAL_INTERVALS[$SLURM_ARRAY_TASK_ID]}"
+min_cluster_size_px="${MIN_CLUSTER_SIZES_PX[$SLURM_ARRAY_TASK_ID]}"
+buffer_distance_px="${BUFFER_DISTANCES_PX[$SLURM_ARRAY_TASK_ID]}"
+do_backwards_flag="${DO_BACKWARDS_FLAGS[$SLURM_ARRAY_TASK_ID]}"
+
+python3 -u "${CODE_DIR_NAME}/concat_bias_correction_files.py" \
+--input_file_names "${model_dir_name}/training_lead-time-days=02/isotonic_regression/bias-discretization-interval-interval=${bias_discretization_interval_interval}_min-cluster-size-px=${min_cluster_size_px}_buffer-distance-px=${buffer_distance_px}_do-backwards-clustering=${do_backwards_flag}/isotonic_regression_fire-weather-index.dill" "${model_dir_name}/training_lead-time-days=02/isotonic_regression/bias-discretization-interval-interval=${bias_discretization_interval_interval}_min-cluster-size-px=${min_cluster_size_px}_buffer-distance-px=${buffer_distance_px}_do-backwards-clustering=${do_backwards_flag}/isotonic_regression_daily-severity-rating.dill" "${model_dir_name}/training_lead-time-days=02/isotonic_regression/bias-discretization-interval-interval=${bias_discretization_interval_interval}_min-cluster-size-px=${min_cluster_size_px}_buffer-distance-px=${buffer_distance_px}_do-backwards-clustering=${do_backwards_flag}/isotonic_regression_fine-fuel-moisture-code.dill" "${model_dir_name}/training_lead-time-days=02/isotonic_regression/bias-discretization-interval-interval=${bias_discretization_interval_interval}_min-cluster-size-px=${min_cluster_size_px}_buffer-distance-px=${buffer_distance_px}_do-backwards-clustering=${do_backwards_flag}/isotonic_regression_duff-moisture-code.dill" "${model_dir_name}/training_lead-time-days=02/isotonic_regression/bias-discretization-interval-interval=${bias_discretization_interval_interval}_min-cluster-size-px=${min_cluster_size_px}_buffer-distance-px=${buffer_distance_px}_do-backwards-clustering=${do_backwards_flag}/isotonic_regression_drought-code.dill" "${model_dir_name}/training_lead-time-days=02/isotonic_regression/bias-discretization-interval-interval=${bias_discretization_interval_interval}_min-cluster-size-px=${min_cluster_size_px}_buffer-distance-px=${buffer_distance_px}_do-backwards-clustering=${do_backwards_flag}/isotonic_regression_initial-spread-index.dill" "${model_dir_name}/training_lead-time-days=02/isotonic_regression/bias-discretization-interval-interval=${bias_discretization_interval_interval}_min-cluster-size-px=${min_cluster_size_px}_buffer-distance-px=${buffer_distance_px}_do-backwards-clustering=${do_backwards_flag}/isotonic_regression_buildup-index.dill" \
+--output_file_name="${model_dir_name}/training_lead-time-days=02/isotonic_regression/bias-discretization-interval-interval=${bias_discretization_interval_interval}_min-cluster-size-px=${min_cluster_size_px}_buffer-distance-px=${buffer_distance_px}_do-backwards-clustering=${do_backwards_flag}/isotonic_regression.dill"
