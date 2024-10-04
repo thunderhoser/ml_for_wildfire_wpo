@@ -21,8 +21,6 @@ import canadian_fwi_utils
 import neural_net
 import bias_correction
 
-# TODO(thunderhoser): Allow multiple lead times.
-
 TOLERANCE = 1e-6
 
 RELIABILITY_BIN_DIM = 'reliability_bin'

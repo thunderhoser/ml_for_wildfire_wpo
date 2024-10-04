@@ -19,7 +19,6 @@ import longitude_conversion as lng_conversion
 import file_system_utils
 import error_checking
 
-TOLERANCE = 1e-6
 DATE_FORMAT = '%Y%m%d'
 
 ROW_DIM = 'grid_row'
