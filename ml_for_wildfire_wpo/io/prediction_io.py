@@ -12,7 +12,6 @@ from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 
-TOLERANCE = 1e-6
 DATE_FORMAT = '%Y%m%d'
 
 ROW_DIM = 'grid_row'
