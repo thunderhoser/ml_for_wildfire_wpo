@@ -61,7 +61,7 @@ TARGET_FIELD_NAMES_DASHED=("fire-weather-index" "daily-severity-rating" "fine-fu
 i=0
 
 while [ $i -lt ${#TARGET_FIELD_NAMES[@]} ]; do
-    python3 -u "${CODE_DIR_NAME}/train_isotonic_regression.py" \
+    python3 -u "${CODE_DIR_NAME}/train_isotonic_regression_patch.py" \
     --input_prediction_dir_names "${model_dir_name}/training_lead-time-days=02" \
     --init_date_limit_strings "20190101" "20201210" \
     --input_bias_clustering_file_name="${model_dir_name}/training_lead-time-days=02/isotonic_regression/bias-discretization-interval-interval=${bias_discretization_interval_interval}_min-cluster-size-px=${min_cluster_size_px}_buffer-distance-px=${buffer_distance_px}_do-backwards-clustering=${do_backwards_flag}/bias_clustering_${TARGET_FIELD_NAMES_DASHED[$i]}.nc" \
