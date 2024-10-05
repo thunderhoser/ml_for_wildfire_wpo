@@ -88,6 +88,7 @@ def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
     current_channel_counts = numpy.array(
         [l.shape[-1] for l in input_layer_objects], dtype=float
     )
+    print(current_channel_counts)
 
     num_input_layers = len(input_layer_objects)
     desired_channel_counts = numpy.full(num_input_layers, -1, dtype=int)
@@ -102,9 +103,11 @@ def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
         float(remaining_num_output_channels) /
         numpy.sum(current_channel_counts[:-1])
     )
+    print(this_ratio)
     desired_channel_counts[:-1] = numpy.round(
         current_channel_counts[:-1] * this_ratio
     ).astype(int)
+    print(desired_channel_counts)
 
     while numpy.sum(desired_channel_counts) > num_output_channels:
         desired_channel_counts[numpy.argmax(desired_channel_counts[:-1])] -= 1
