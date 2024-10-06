@@ -220,8 +220,11 @@ def _apply_deepshap_1day(
     grid_longitudes_deg_e = data_dict[neural_net.GRID_LONGITUDES_KEY]
     del data_dict
 
+    # shapley_matrices = explainer_object.shap_values(
+    #     X=predictor_matrices, check_additivity=False
+    # )
     shapley_matrices = explainer_object.shap_values(
-        X=predictor_matrices, check_additivity=False
+        X=predictor_matrices
     )
 
     # TODO(thunderhoser): I'm not sure what this does -- carried over from
