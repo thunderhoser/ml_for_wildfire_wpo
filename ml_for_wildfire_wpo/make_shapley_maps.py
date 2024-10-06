@@ -22,13 +22,14 @@ import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
-tensorflow.compat.v1.keras.backend.set_learning_phase(0)
+# TODO(thunderhoser): This code does not work.  The line itself throws an error.
+# tensorflow.compat.v1.keras.backend.set_learning_phase(0)
 
-# TODO(thunderhoser): Leaving this in leads to an error in
+# TODO(thunderhoser): This code leads to an error in
 # chiu_net_pp_architecture.py.
 # tensorflow.compat.v1.disable_v2_behavior()
 
-# TODO(thunderhoser): Leaving this in leads to the following error:
+# TODO(thunderhoser): This code leads to the following error:
 # module 'keras._tf_keras.keras.backend' has no attribute 'get_session'.
 # tensorflow.compat.v1.disable_eager_execution()
 
@@ -355,7 +356,10 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     del data_dict
 
     # Do actual stuff.
-    explainer_object = shap.DeepExplainer(
+    # explainer_object = shap.DeepExplainer(
+    #     model=model_predict_function, data=baseline_predictor_matrices
+    # )
+    explainer_object = shap.GradientExplainer(
         model=model_predict_function, data=baseline_predictor_matrices
     )
     del baseline_predictor_matrices
