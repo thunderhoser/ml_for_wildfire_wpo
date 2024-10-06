@@ -301,10 +301,10 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
 
     output_layer_object = model_object.output
     output_layer_object = keras.layers.GlobalAveragePooling3D(
-        data_format='channels_first'
+        data_format='channels_last'
     )(output_layer_object)
     output_layer_object = keras.layers.Lambda(
-        lambda x: K.mean(x, axis=1)
+        lambda x: K.mean(x, axis=1), output_shape=(None,)
     )(output_layer_object)
 
     model_predict_function = keras.models.Model(
