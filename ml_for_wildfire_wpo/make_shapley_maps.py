@@ -22,8 +22,16 @@ import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
+K.set_learning_phase(0)
+
+# TODO(thunderhoser): Leaving this in leads to an error in
+# chiu_net_pp_architecture.py.
 # tensorflow.compat.v1.disable_v2_behavior()
-tensorflow.compat.v1.disable_eager_execution()
+
+# TODO(thunderhoser): Leaving this in leads to the following error:
+# module 'keras._tf_keras.keras.backend' has no attribute 'get_session'.
+# tensorflow.compat.v1.disable_eager_execution()
+
 # tensorflow.config.threading.set_inter_op_parallelism_threads(1)
 # tensorflow.config.threading.set_intra_op_parallelism_threads(1)
 
