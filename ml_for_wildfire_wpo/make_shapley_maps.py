@@ -23,7 +23,7 @@ import neural_net
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
 # tensorflow.compat.v1.disable_v2_behavior()
-# tensorflow.compat.v1.disable_eager_execution()
+tensorflow.compat.v1.disable_eager_execution()
 # tensorflow.config.threading.set_inter_op_parallelism_threads(1)
 # tensorflow.config.threading.set_intra_op_parallelism_threads(1)
 
