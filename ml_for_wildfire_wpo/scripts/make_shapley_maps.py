@@ -5,6 +5,9 @@ import numpy
 import tensorflow
 import shap
 import shap.explainers
+import keras.layers
+import keras.models
+from keras import backend as K
 from ml_for_wildfire_wpo.io import region_mask_io
 from ml_for_wildfire_wpo.io import shapley_io
 from ml_for_wildfire_wpo.machine_learning import neural_net
@@ -282,10 +285,22 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     region_mask_matrix = (
         mask_table_xarray[region_mask_io.REGION_MASK_KEY].values
     )
-    model_predict_function = _modify_model_output(
-        model_object=model_object,
-        region_mask_matrix=region_mask_matrix,
-        target_field_index=target_field_index
+    # model_predict_function = _modify_model_output(
+    #     model_object=model_object,
+    #     region_mask_matrix=region_mask_matrix,
+    #     target_field_index=target_field_index
+    # )
+
+    output_layer_object = model_object.output
+    output_layer_object = keras.layers.GlobalAveragePooling3D(
+        data_format='channels_first'
+    )(output_layer_object)
+    output_layer_object = keras.layers.Lambda(
+        lambda x: K.mean(x, axis=1)
+    )(output_layer_object)
+
+    model_predict_function = keras.models.Model(
+        inputs=model_object.input, outputs=output_layer_object
     )
 
     # Read baseline examples.
