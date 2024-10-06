@@ -22,7 +22,7 @@ import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
-K.set_learning_phase(0)
+tensorflow.compat.v1.keras.backend.set_learning_phase(0)
 
 # TODO(thunderhoser): Leaving this in leads to an error in
 # chiu_net_pp_architecture.py.
