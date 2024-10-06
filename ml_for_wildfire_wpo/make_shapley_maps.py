@@ -7,6 +7,9 @@ import numpy
 import tensorflow
 import shap
 import shap.explainers
+import keras.layers
+import keras.models
+from keras import backend as K
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -19,7 +22,7 @@ import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
-# tensorflow.compat.v1.disable_v2_behavior()
+tensorflow.compat.v1.disable_v2_behavior()
 # tensorflow.compat.v1.disable_eager_execution()
 # tensorflow.config.threading.set_inter_op_parallelism_threads(1)
 # tensorflow.config.threading.set_intra_op_parallelism_threads(1)
@@ -290,10 +293,22 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     region_mask_matrix = (
         mask_table_xarray[region_mask_io.REGION_MASK_KEY].values
     )
-    model_predict_function = _modify_model_output(
-        model_object=model_object,
-        region_mask_matrix=region_mask_matrix,
-        target_field_index=target_field_index
+    # model_predict_function = _modify_model_output(
+    #     model_object=model_object,
+    #     region_mask_matrix=region_mask_matrix,
+    #     target_field_index=target_field_index
+    # )
+
+    output_layer_object = model_object.output
+    output_layer_object = keras.layers.GlobalAveragePooling3D(
+        data_format='channels_first'
+    )(output_layer_object)
+    output_layer_object = keras.layers.Lambda(
+        lambda x: K.mean(x, axis=1)
+    )(output_layer_object)
+
+    model_predict_function = keras.models.Model(
+        inputs=model_object.input, outputs=output_layer_object
     )
 
     # Read baseline examples.
