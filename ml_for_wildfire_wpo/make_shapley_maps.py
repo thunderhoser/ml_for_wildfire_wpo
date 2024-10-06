@@ -25,9 +25,7 @@ SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 # TODO(thunderhoser): This code does not work.  The line itself throws an error.
 # tensorflow.compat.v1.keras.backend.set_learning_phase(0)
 
-# TODO(thunderhoser): This code leads to an error in
-# chiu_net_pp_architecture.py.
-# tensorflow.compat.v1.disable_v2_behavior()
+tensorflow.compat.v1.disable_v2_behavior()
 
 # TODO(thunderhoser): This code leads to the following error:
 # module 'keras._tf_keras.keras.backend' has no attribute 'get_session'.
@@ -220,12 +218,14 @@ def _apply_deepshap_1day(
     grid_longitudes_deg_e = data_dict[neural_net.GRID_LONGITUDES_KEY]
     del data_dict
 
-    # shapley_matrices = explainer_object.shap_values(
-    #     X=predictor_matrices, check_additivity=False
-    # )
     shapley_matrices = explainer_object.shap_values(
-        X=predictor_matrices
+        X=predictor_matrices, check_additivity=False
     )
+
+    # Only for GradientExplainer.
+    # shapley_matrices = explainer_object.shap_values(
+    #     X=predictor_matrices
+    # )
 
     # TODO(thunderhoser): I'm not sure what this does -- carried over from
     # rapid-intensification code.
@@ -359,12 +359,12 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     del data_dict
 
     # Do actual stuff.
-    # explainer_object = shap.DeepExplainer(
-    #     model=model_predict_function, data=baseline_predictor_matrices
-    # )
-    explainer_object = shap.GradientExplainer(
+    explainer_object = shap.DeepExplainer(
         model=model_predict_function, data=baseline_predictor_matrices
     )
+    # explainer_object = shap.GradientExplainer(
+    #     model=model_predict_function, data=baseline_predictor_matrices
+    # )
     del baseline_predictor_matrices
 
     num_new_examples = len(new_init_date_strings)
