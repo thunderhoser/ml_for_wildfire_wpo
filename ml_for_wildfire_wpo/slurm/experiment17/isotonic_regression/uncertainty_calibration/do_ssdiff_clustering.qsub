@@ -52,11 +52,11 @@ MODEL_LEAD_TIMES_DAYS=("01" "01" "01" "01" "01" "01" "01" "02" "02" "02" "02" "0
 
 python3 -u "${CODE_DIR_NAME}/do_bias_clustering.py" \
 --input_gridded_eval_file_arg_name="${model_dir_name}/training_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/gridded_evaluation.nc" \
---min_cluster_size_px=${min_cluster_size_px} \
+--min_cluster_size_px=100 \
 --target_field_name="${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" \
 --bias_discretization_intervals "TODO: this will be tricky!" \
---buffer_distance_px=${buffer_distance_px} \
---do_backwards_clustering=${do_backwards_flag} \
+--buffer_distance_px=1 \
+--do_backwards_clustering=1 \
 --cluster_ssdiff_instead_of_bias=1 \
 --main_output_file_name="${model_dir_name}/training_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/uncertainty_calibration/ssdiff_clustering_${TARGET_FIELD_NAMES_DASHED[$SLURM_ARRAY_TASK_ID]}.nc" \
 --output_figure_file_name="${model_dir_name}/training_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/uncertainty_calibration/ssdiff_clustering_${TARGET_FIELD_NAMES_DASHED[$SLURM_ARRAY_TASK_ID]}.jpg"
