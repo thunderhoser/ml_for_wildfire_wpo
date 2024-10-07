@@ -56,6 +56,7 @@ if chiu_net_pp_architecture_dict is not None:
 
     checkpoint_file_name = MODEL_FILE_NAME.replace('model.weights.h5', 'model_checkpoint')
     checkpoint_file_name = checkpoint_file_name.replace('weights.weights.h5', 'model_checkpoint')
+    print(checkpoint_file_name)
 
     import tensorflow
 
