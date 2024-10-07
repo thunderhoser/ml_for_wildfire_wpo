@@ -62,5 +62,6 @@ if chiu_net_pp_architecture_dict is not None:
     checkpoint_object = tensorflow.train.Checkpoint(model=model_object)
     checkpoint_object.restore(checkpoint_file_name).expect_partial()
 
-    model_object.summary()
+    # model_object.summary()
+    print('\n\n\n')
     print(model_object.get_layer(name='output_conv0').get_weights())
