@@ -2512,7 +2512,7 @@ def read_model(hdf5_file_name):
     :return: model_object: Instance of `keras.models.Model`.
     """
 
-    error_checking.assert_file_exists(hdf5_file_name)
+    # error_checking.assert_file_exists(hdf5_file_name)
 
     metafile_name = find_metafile(
         model_file_name=hdf5_file_name, raise_error_if_missing=True
