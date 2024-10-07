@@ -2569,13 +2569,13 @@ def read_model(hdf5_file_name):
         model_object = chiu_net_pp_architecture.create_model(arch_dict)
         # model_object.load_weights(hdf5_file_name)
 
-        checkpoint_file_name = hdf5_file_name.replace('model.weights.h5', 'model_checkpoint')
-        checkpoint_file_name = checkpoint_file_name.replace('weights.weights.h5', 'model_checkpoint')
-
-        import tensorflow
-
-        checkpoint_object = tensorflow.train.Checkpoint(model=model_object)
-        checkpoint_object.restore(checkpoint_file_name).expect_partial()
+        # checkpoint_file_name = hdf5_file_name.replace('model.weights.h5', 'model_checkpoint')
+        # checkpoint_file_name = checkpoint_file_name.replace('weights.weights.h5', 'model_checkpoint')
+        #
+        # import tensorflow
+        #
+        # checkpoint_object = tensorflow.train.Checkpoint(model=model_object)
+        # checkpoint_object.restore(checkpoint_file_name).expect_partial()
         return model_object
 
     return None
