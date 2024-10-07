@@ -54,5 +54,5 @@ python3 -u "${CODE_DIR_NAME}/train_isotonic_regression.py" \
 --input_prediction_dir_names "${model_dir_name}/training_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}" \
 --init_date_limit_strings "20190101" "20190131" \
 --input_bias_clustering_file_name="${model_dir_name}/training_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/bias_clustering_${TARGET_FIELD_NAMES_DASHED[$SLURM_ARRAY_TASK_ID]}.nc" \
---target_field_names "${TARGET_FIELD_NAMES[$i]}" \
+--target_field_names "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" \
 --output_file_name="${model_dir_name}/training_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/isotonic_regression_${TARGET_FIELD_NAMES_DASHED[$SLURM_ARRAY_TASK_ID]}.dill"
