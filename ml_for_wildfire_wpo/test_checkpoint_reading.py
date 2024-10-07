@@ -61,8 +61,16 @@ if chiu_net_pp_architecture_dict is not None:
     import tensorflow
 
     checkpoint_object = tensorflow.train.Checkpoint(model=model_object)
-    checkpoint_manager = tensorflow.train.CheckpointManager(checkpoint_object, checkpoint_file_name, max_to_keep=2)
+    checkpoint_manager = tensorflow.train.CheckpointManager(
+        checkpoint=checkpoint_object,
+        directory=checkpoint_file_name,
+        max_to_keep=2,
+        checkpoint_name='ckpt'
+    )
     print(checkpoint_manager)
+    print(checkpoint_manager.checkpoints)
+    print(checkpoint_manager.latest_checkpoint)
+
     latest_checkpoint = checkpoint_manager.latest_checkpoint
     if latest_checkpoint:
         checkpoint_object.restore(latest_checkpoint).expect_partial()
