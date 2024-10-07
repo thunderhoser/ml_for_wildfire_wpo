@@ -74,7 +74,7 @@ if chiu_net_pp_architecture_dict is not None:
 
     latest_checkpoint = checkpoint_manager.latest_checkpoint
     if latest_checkpoint:
-        checkpoint_object.restore(latest_checkpoint).expect_partial()
+        checkpoint_object.restore(latest_checkpoint)
     else:
         print("No checkpoint found.")
 
