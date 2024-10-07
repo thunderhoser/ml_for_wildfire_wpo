@@ -54,8 +54,8 @@ if chiu_net_pp_architecture_dict is not None:
     # model_object.load_weights(hdf5_file_name)
     print(model_object.get_layer(name='output_conv0').get_weights())
 
-    checkpoint_file_name = MODEL_FILE_NAME.replace('model.weights.h5', 'model_checkpoint')
-    checkpoint_file_name = checkpoint_file_name.replace('weights.weights.h5', 'model_checkpoint')
+    checkpoint_file_name = MODEL_FILE_NAME.replace('model.weights.h5', 'model_checkpoint_new')
+    checkpoint_file_name = checkpoint_file_name.replace('weights.weights.h5', 'model_checkpoint_new')
     print(checkpoint_file_name)
 
     import tensorflow
@@ -63,9 +63,9 @@ if chiu_net_pp_architecture_dict is not None:
     checkpoint_object = tensorflow.train.Checkpoint(model=model_object)
     checkpoint_manager = tensorflow.train.CheckpointManager(
         checkpoint=checkpoint_object,
-        directory=checkpoint_file_name,
+        directory=os.path.split(checkpoint_file_name)[0],
         max_to_keep=2,
-        checkpoint_name='ckpt'
+        checkpoint_name='model_checkpoint_new'
     )
     checkpoint_manager.restore_or_initialize()
     print(checkpoint_manager)
