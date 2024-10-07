@@ -72,11 +72,14 @@ if chiu_net_pp_architecture_dict is not None:
     print(checkpoint_manager.checkpoints)
     print(checkpoint_manager.latest_checkpoint)
 
-    latest_checkpoint = checkpoint_manager.latest_checkpoint
-    if latest_checkpoint:
-        checkpoint_object.restore(latest_checkpoint).expect_partial()
-    else:
-        print("No checkpoint found.")
+    # latest_checkpoint = checkpoint_manager.latest_checkpoint
+    # if latest_checkpoint:
+    #     checkpoint_object.restore(checkpoint_file_name).expect_partial()
+    # else:
+    #     print("No checkpoint found.")
+
+    print(checkpoint_file_name + '/ckpt.data-00000-of-00001')
+    checkpoint_object.restore(checkpoint_file_name + '/ckpt.data-00000-of-00001').expect_partial()
 
     # model_object.summary()
     print('\n\n\n')
