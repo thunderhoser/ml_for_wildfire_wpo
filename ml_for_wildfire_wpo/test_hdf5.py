@@ -10,6 +10,6 @@ with h5py.File(MODEL_FILE_NAME, 'r') as f:
     print(list(f.keys()))
 
     # Access a specific dataset
-    dataset = f['dataset_name']
+    dataset = f['layers']
     data = dataset[:]
     print(data)
