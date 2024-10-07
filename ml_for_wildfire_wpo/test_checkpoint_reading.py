@@ -4,6 +4,7 @@ import os
 import sys
 import re
 import keras
+import tensorflow
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -13,6 +14,8 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 import neural_net
 import custom_losses
 import custom_metrics
+
+tensorflow.compat.v1.disable_v2_behavior()
 
 MODEL_FILE_NAME = '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment17/training-strategy=20-30-daily_spectral-complexity=080_use-residual-blocks=0/model.weights.h5'
 
