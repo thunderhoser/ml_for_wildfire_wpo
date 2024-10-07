@@ -682,9 +682,15 @@ def read_file(netcdf_file_name):
         prediction_table_xarray[FIELD_NAME_KEY].values
     ]
 
-    return prediction_table_xarray.assign({
+    prediction_table_xarray = prediction_table_xarray.assign({
         FIELD_NAME_KEY: (
             prediction_table_xarray[FIELD_NAME_KEY].dims,
             target_field_names
         )
+    })
+
+    num_fields = len(target_field_names)
+    field_indices = numpy.linspace(0, num_fields - 1, num=num_fields, dtype=int)
+    return prediction_table_xarray.assign_coords({
+        FIELD_DIM: field_indices
     })
