@@ -52,6 +52,7 @@ if chiu_net_pp_architecture_dict is not None:
 
     model_object = chiu_net_pp_architecture.create_model(arch_dict)
     # model_object.load_weights(hdf5_file_name)
+    print(model_object.get_layer(name='output_conv0').get_weights())
 
     checkpoint_file_name = MODEL_FILE_NAME.replace('model.weights.h5', 'model_checkpoint')
     checkpoint_file_name = checkpoint_file_name.replace('weights.weights.h5', 'model_checkpoint')
@@ -62,3 +63,4 @@ if chiu_net_pp_architecture_dict is not None:
     checkpoint_object.restore(checkpoint_file_name).expect_partial()
 
     model_object.summary()
+    print(model_object.get_layer(name='output_conv0').get_weights())
