@@ -78,6 +78,9 @@ if chiu_net_pp_architecture_dict is not None:
     # else:
     #     print("No checkpoint found.")
 
+    print(tensorflow.train.latest_checkpoint(checkpoint_file_name))
+    print(tensorflow.train.latest_checkpoint(checkpoint_file_name + '/ckpt'))
+
     print(checkpoint_file_name + '/ckpt.data-00000-of-00001')
     checkpoint_object.restore(checkpoint_file_name + '/ckpt.data-00000-of-00001').expect_partial()
 
