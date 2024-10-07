@@ -9,7 +9,7 @@ import numpy
 import pandas
 import keras
 from scipy.interpolate import interp1d
-from tensorflow.keras.saving import load_model
+# from tensorflow.keras.saving import load_model
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -2562,23 +2562,25 @@ def read_model(hdf5_file_name):
         model_object.load_weights(hdf5_file_name)
         return model_object
 
-    custom_object_dict = {
-        'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
-    }
-    model_object = load_model(
-        hdf5_file_name, custom_objects=custom_object_dict, compile=False
-    )
+    return None
 
-    metric_function_list = [
-        eval(m) for m in metadata_dict[METRIC_FUNCTIONS_KEY]
-    ]
-    model_object.compile(
-        loss=custom_object_dict['loss'],
-        optimizer=eval(metadata_dict[OPTIMIZER_FUNCTION_KEY]),
-        metrics=metric_function_list
-    )
-
-    return model_object
+    # custom_object_dict = {
+    #     'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
+    # }
+    # model_object = load_model(
+    #     hdf5_file_name, custom_objects=custom_object_dict, compile=False
+    # )
+    #
+    # metric_function_list = [
+    #     eval(m) for m in metadata_dict[METRIC_FUNCTIONS_KEY]
+    # ]
+    # model_object.compile(
+    #     loss=custom_object_dict['loss'],
+    #     optimizer=eval(metadata_dict[OPTIMIZER_FUNCTION_KEY]),
+    #     metrics=metric_function_list
+    # )
+    #
+    # return model_object
 
 
 def train_model(
