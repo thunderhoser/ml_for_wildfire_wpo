@@ -1045,5 +1045,8 @@ def create_model(option_dict):
         metrics=metric_functions
     )
 
+    print(model_object.inputs)
+    print(model_object.get_config())
+
     model_object.summary()
     return model_object
