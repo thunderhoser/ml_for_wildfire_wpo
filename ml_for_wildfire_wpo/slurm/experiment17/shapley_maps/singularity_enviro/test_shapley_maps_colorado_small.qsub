@@ -51,7 +51,7 @@ use_residual_blocks=${RESIDUAL_BLOCK_FLAGS[$SLURM_ARRAY_TASK_ID]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=${training_strategy}_spectral-complexity=${spectral_complexity}_use-residual-blocks=${use_residual_blocks}"
 echo $model_dir_name
 
-model_file_name="${model_dir_name}/model.weights.h5"
+model_file_name="${model_dir_name}/weights.weights.h5"
 output_dir_name="${model_dir_name}/validation_lead-time-days=02/shapley_maps/test_for_colorado"
 
 this_directory_name=`pwd`
