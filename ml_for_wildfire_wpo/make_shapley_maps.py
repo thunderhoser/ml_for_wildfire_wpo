@@ -322,7 +322,7 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     model_predict_function = keras.models.Model(
         inputs=model_object.input, outputs=output_layer_object
     )
-    model_predict_function.summary()
+    # model_predict_function.summary()
 
     # Read baseline examples.
     num_baseline_examples = len(baseline_init_date_strings)
