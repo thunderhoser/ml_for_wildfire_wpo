@@ -25,7 +25,7 @@ SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 # TODO(thunderhoser): This code does not work.  The line itself throws an error.
 # tensorflow.compat.v1.keras.backend.set_learning_phase(0)
 
-# tensorflow.compat.v1.disable_v2_behavior()
+tensorflow.compat.v1.disable_v2_behavior()
 
 # TODO(thunderhoser): This code leads to the following error:
 # module 'keras._tf_keras.keras.backend' has no attribute 'get_session'.
