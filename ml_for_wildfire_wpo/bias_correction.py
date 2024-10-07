@@ -1092,13 +1092,17 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
                     first_term + second_term * (third_term - first_term)
                 )
             else:
-                new_predictions = this_model_object.predict(
+                this_prediction_matrix = (
                     prediction_matrix_this_field[i_vals, j_vals, :]
                 )
-                num_dimensions = len(
-                    prediction_matrix_this_field[i_vals, j_vals, :].shape
+                new_predictions = this_model_object.predict(
+                    numpy.ravel(this_prediction_matrix)
+                )
+                new_predictions = numpy.reshape(
+                    new_predictions, this_prediction_matrix.shape
                 )
 
+                num_dimensions = len(this_prediction_matrix.shape)
                 while len(new_predictions.shape) < num_dimensions:
                     new_predictions = numpy.expand_dims(
                         new_predictions, axis=-1
