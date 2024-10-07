@@ -102,7 +102,7 @@ def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
         num_output_channels - half_num_output_channels
     )
     this_ratio = (
-        float(remaining_num_output_channels) //
+        float(remaining_num_output_channels) /
         numpy.sum(current_channel_counts[:-1])
     )
     print(this_ratio)
