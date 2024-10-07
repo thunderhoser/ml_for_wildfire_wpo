@@ -218,14 +218,14 @@ def _apply_deepshap_1day(
     grid_longitudes_deg_e = data_dict[neural_net.GRID_LONGITUDES_KEY]
     del data_dict
 
-    shapley_matrices = explainer_object.shap_values(
-        X=predictor_matrices, check_additivity=False
-    )
+    # shapley_matrices = explainer_object.shap_values(
+    #     X=predictor_matrices, check_additivity=False
+    # )
 
     # Only for GradientExplainer.
-    # shapley_matrices = explainer_object.shap_values(
-    #     X=predictor_matrices
-    # )
+    shapley_matrices = explainer_object.shap_values(
+        X=predictor_matrices
+    )
 
     # TODO(thunderhoser): I'm not sure what this does -- carried over from
     # rapid-intensification code.
@@ -361,12 +361,12 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     # Do actual stuff.
     print(model_predict_function.inputs)
     print(model_predict_function.output)
-    explainer_object = shap.DeepExplainer(
+    # explainer_object = shap.DeepExplainer(
+    #     model=(model_predict_function.inputs, model_predict_function.output), data=baseline_predictor_matrices
+    # )
+    explainer_object = shap.GradientExplainer(
         model=(model_predict_function.inputs, model_predict_function.output), data=baseline_predictor_matrices
     )
-    # explainer_object = shap.GradientExplainer(
-    #     model=model_predict_function, data=baseline_predictor_matrices
-    # )
     del baseline_predictor_matrices
 
     num_new_examples = len(new_init_date_strings)
