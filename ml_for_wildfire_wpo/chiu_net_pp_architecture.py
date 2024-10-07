@@ -72,6 +72,19 @@ LOSS_FUNCTION_KEY = chiu_net_arch.LOSS_FUNCTION_KEY
 METRIC_FUNCTIONS_KEY = chiu_net_arch.METRIC_FUNCTIONS_KEY
 
 
+def __dimension_to_int(dimension_object):
+    """Converts `tensorflow.Dimension` object to integer.
+
+    :param dimension_object: `tensorflow.Dimension` object.
+    :return: dimension_int: Integer.
+    """
+
+    try:
+        return dimension_object.value
+    except:
+        return dimension_object
+
+
 def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
     """Determines number of channels for each input layer to skip connection.
 
@@ -86,7 +99,7 @@ def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
     """
 
     current_channel_counts = numpy.array(
-        [l.shape[-1] for l in input_layer_objects], dtype=float
+        [__dimension_to_int(l.shape[-1]) for l in input_layer_objects], dtype=float
     )
     print(input_layer_objects[0].shape)
     print(type(input_layer_objects[0].shape))
@@ -244,7 +257,7 @@ def _get_2d_conv_block(
             current_layer_object = current_layer_object(this_input_layer_object)
 
         if i == num_conv_layers - 1 and do_residual:
-            if input_layer_object.shape[-1] == num_filters:
+            if __dimension_to_int(input_layer_object.shape[-1]) == num_filters:
                 new_layer_object = input_layer_object
             else:
                 this_name = '{0:s}_preresidual_conv'.format(basic_layer_name)
@@ -332,9 +345,8 @@ def _get_3d_conv_block(
 
     # Do actual stuff.
     current_layer_object = None
-    num_time_steps = input_layer_object.shape[-2]
-    num_filters = input_layer_object.shape[-1]
-    print(type(num_filters))
+    num_time_steps = __dimension_to_int(input_layer_object.shape[-2])
+    num_filters = __dimension_to_int(input_layer_object.shape[-1])
 
     for i in range(num_conv_layers):
         this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
@@ -354,8 +366,9 @@ def _get_3d_conv_block(
             )(input_layer_object)
 
             new_dims = (
-                current_layer_object.shape[1:3] +
-                (current_layer_object.shape[-1],)
+                __dimension_to_int(current_layer_object.shape[1]),
+                __dimension_to_int(current_layer_object.shape[2]),
+                __dimension_to_int(current_layer_object.shape[-1])
             )
 
             this_name = '{0:s}_remove-time-dim'.format(basic_layer_name)
@@ -387,8 +400,9 @@ def _get_3d_conv_block(
             )(input_layer_object)
 
             new_dims = (
-                this_layer_object.shape[1:3] +
-                (this_layer_object.shape[-1],)
+                __dimension_to_int(this_layer_object.shape[1]),
+                __dimension_to_int(this_layer_object.shape[2]),
+                __dimension_to_int(this_layer_object.shape[-1])
             )
 
             this_name = '{0:s}_preresidual_squeeze'.format(basic_layer_name)
@@ -435,12 +449,12 @@ def _pad_2d_layer(source_layer_object, target_layer_object, padding_layer_name):
         spatial dimensions.
     """
 
-    num_source_rows = source_layer_object.shape[1]
-    num_target_rows = target_layer_object.shape[1]
+    num_source_rows = __dimension_to_int(source_layer_object.shape[1])
+    num_target_rows = __dimension_to_int(target_layer_object.shape[1])
     num_padding_rows = num_target_rows - num_source_rows
 
-    num_source_columns = source_layer_object.shape[2]
-    num_target_columns = target_layer_object.shape[2]
+    num_source_columns = __dimension_to_int(source_layer_object.shape[2])
+    num_target_columns = __dimension_to_int(target_layer_object.shape[2])
     num_padding_columns = num_target_columns - num_source_columns
 
     if num_padding_rows + num_padding_columns > 0:
@@ -752,6 +766,7 @@ def create_model(option_dict):
             )
         else:
             orig_dims = gfs_fcst_module_layer_objects[i].shape
+            orig_dims = numpy.array([__dimension_to_int(d) for d in orig_dims], dtype=int)
             new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
 
             this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
