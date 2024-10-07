@@ -685,6 +685,7 @@ def train_model_suite_not_per_pixel(
         ], dtype=int)
 
         print(cluster_table_xarray)
+        print(sort_indices)
 
         cluster_table_xarray = cluster_table_xarray.isel(
             {bias_clustering.FIELD_DIM: sort_indices}
