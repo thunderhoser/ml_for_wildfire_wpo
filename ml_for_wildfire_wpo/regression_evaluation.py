@@ -541,14 +541,12 @@ def _get_ssrat_one_replicate(
 
     for k in range(num_target_fields):
         if per_grid_cell:
-            numerator = numpy.sqrt(numpy.average(
-                prediction_variance_matrix[..., k],
-                weights=weight_matrix, axis=0
-            ))
-            denominator = numpy.sqrt(numpy.average(
-                squared_error_matrix[..., k],
-                weights=weight_matrix, axis=0
-            ))
+            numerator = numpy.sqrt(
+                numpy.mean(prediction_variance_matrix[..., k], axis=0)
+            )
+            denominator = numpy.sqrt(
+                numpy.mean(squared_error_matrix[..., k], axis=0)
+            )
         else:
             this_flag_matrix = numpy.invert(numpy.logical_or(
                 numpy.isnan(prediction_variance_matrix[..., k]),
@@ -618,14 +616,12 @@ def _get_ssdiff_one_replicate(
 
     for k in range(num_target_fields):
         if per_grid_cell:
-            numerator = numpy.sqrt(numpy.average(
-                prediction_variance_matrix[..., k],
-                weights=weight_matrix, axis=0
-            ))
-            denominator = numpy.sqrt(numpy.average(
-                squared_error_matrix[..., k],
-                weights=weight_matrix, axis=0
-            ))
+            numerator = numpy.sqrt(
+                numpy.mean(prediction_variance_matrix[..., k], axis=0)
+            )
+            denominator = numpy.sqrt(
+                numpy.mean(squared_error_matrix[..., k], axis=0)
+            )
         else:
             this_flag_matrix = numpy.invert(numpy.logical_or(
                 numpy.isnan(prediction_variance_matrix[..., k]),
