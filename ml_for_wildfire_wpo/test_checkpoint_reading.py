@@ -67,6 +67,7 @@ if chiu_net_pp_architecture_dict is not None:
         max_to_keep=2,
         checkpoint_name='ckpt'
     )
+    checkpoint_manager.restore_or_initialize()
     print(checkpoint_manager)
     print(checkpoint_manager.checkpoints)
     print(checkpoint_manager.latest_checkpoint)
