@@ -1064,7 +1064,7 @@ def create_model(option_dict):
     import json
 
     print(model_object.inputs)
-    print(json.dumps(model_object.get_config(), indent=4))
+    # print(json.dumps(model_object.get_config(), indent=4))
 
     # model_object.summary()
     return model_object
