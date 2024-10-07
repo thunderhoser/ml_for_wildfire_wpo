@@ -6,7 +6,7 @@ import numpy
 import tensorflow
 from tensorflow.math import lgamma as log_gamma
 from tensorflow.keras import backend as K
-from tensorflow.keras import ops as tf_ops
+# from tensorflow.keras import ops as tf_ops
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -56,7 +56,8 @@ def _get_evidence(input_tensor):
         but containing proper evidence values.
     """
 
-    return K.maximum(tf_ops.softplus(input_tensor), MIN_EVIDENCE)
+    return 0.
+    # return K.maximum(tf_ops.softplus(input_tensor), MIN_EVIDENCE)
 
 
 def __evidential_nll_get_error_tensor(target_tensor, prediction_tensor):
