@@ -334,6 +334,7 @@ def _get_3d_conv_block(
     current_layer_object = None
     num_time_steps = input_layer_object.shape[-2]
     num_filters = input_layer_object.shape[-1]
+    print(num_filters)
 
     for i in range(num_conv_layers):
         this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
