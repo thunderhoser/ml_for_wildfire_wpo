@@ -1,6 +1,7 @@
 """Helper methods for training a neural network to predict fire weather."""
 
 import os
+import re
 import sys
 import time
 import random
@@ -2552,7 +2553,13 @@ def read_model(hdf5_file_name):
                 chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
                 chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
         ]:
-            arch_dict[this_key] = eval(arch_dict[this_key])
+            try:
+                arch_dict[this_key] = eval(arch_dict[this_key])
+            except:
+                arch_dict[this_key] = re.sub(
+                    r"gradient_accumulation_steps=\d+", "", arch_dict[this_key]
+                )
+                arch_dict[this_key] = eval(arch_dict[this_key])
 
         for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
             for k in range(len(arch_dict[this_key])):
