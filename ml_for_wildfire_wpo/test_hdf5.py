@@ -6,10 +6,7 @@ MODEL_FILE_NAME = '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_mo
 
 # Open the file in read mode
 with h5py.File(MODEL_FILE_NAME, 'r') as f:
-    # List all groups and datasets
-    print(list(f.keys()))
-
-    # Access a specific dataset
-    dataset = f['layers']
-    data = dataset[:]
-    print(data)
+    # List all groups and datasets in the file
+    def print_structure(name, obj):
+        print(f"{name}: {type(obj)}")
+    f.visititems(print_structure)
