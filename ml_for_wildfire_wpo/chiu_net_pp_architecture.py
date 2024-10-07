@@ -1045,8 +1045,10 @@ def create_model(option_dict):
         metrics=metric_functions
     )
 
+    import json
+
     print(model_object.inputs)
-    print(model_object.get_config())
+    print(json.dumps(model_object.get_config(), indent=4))
 
     model_object.summary()
     return model_object
