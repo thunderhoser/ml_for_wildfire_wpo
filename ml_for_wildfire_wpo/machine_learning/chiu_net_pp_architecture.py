@@ -6,6 +6,7 @@ The Chiu-net++ is a hybrid between the Chiu net
 
 import numpy
 import keras
+from gewittergefahr.gg_utils import error_checking
 from gewittergefahr.deep_learning import architecture_utils
 from ml_for_wildfire_wpo.machine_learning import \
     chiu_net_architecture as chiu_net_arch
@@ -65,6 +66,19 @@ LOSS_FUNCTION_KEY = chiu_net_arch.LOSS_FUNCTION_KEY
 METRIC_FUNCTIONS_KEY = chiu_net_arch.METRIC_FUNCTIONS_KEY
 
 
+def __dimension_to_int(dimension_object):
+    """Converts `tensorflow.Dimension` object to integer.
+
+    :param dimension_object: `tensorflow.Dimension` object.
+    :return: dimension_int: Integer.
+    """
+
+    try:
+        return dimension_object.value
+    except:
+        return dimension_object
+
+
 def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
     """Determines number of channels for each input layer to skip connection.
 
@@ -79,7 +93,7 @@ def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
     """
 
     current_channel_counts = numpy.array(
-        [l.shape[-1] for l in input_layer_objects], dtype=float
+        [__dimension_to_int(l.shape[-1]) for l in input_layer_objects], dtype=float
     )
 
     num_input_layers = len(input_layer_objects)
@@ -232,7 +246,7 @@ def _get_2d_conv_block(
             current_layer_object = current_layer_object(this_input_layer_object)
 
         if i == num_conv_layers - 1 and do_residual:
-            if input_layer_object.shape[-1] == num_filters:
+            if __dimension_to_int(input_layer_object.shape[-1]) == num_filters:
                 new_layer_object = input_layer_object
             else:
                 this_name = '{0:s}_preresidual_conv'.format(basic_layer_name)
@@ -320,8 +334,8 @@ def _get_3d_conv_block(
 
     # Do actual stuff.
     current_layer_object = None
-    num_time_steps = input_layer_object.shape[-2]
-    num_filters = input_layer_object.shape[-1]
+    num_time_steps = __dimension_to_int(input_layer_object.shape[-2])
+    num_filters = __dimension_to_int(input_layer_object.shape[-1])
 
     for i in range(num_conv_layers):
         this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
@@ -341,8 +355,9 @@ def _get_3d_conv_block(
             )(input_layer_object)
 
             new_dims = (
-                current_layer_object.shape[1:3] +
-                (current_layer_object.shape[-1],)
+                __dimension_to_int(current_layer_object.shape[1]),
+                __dimension_to_int(current_layer_object.shape[2]),
+                __dimension_to_int(current_layer_object.shape[-1])
             )
 
             this_name = '{0:s}_remove-time-dim'.format(basic_layer_name)
@@ -374,8 +389,9 @@ def _get_3d_conv_block(
             )(input_layer_object)
 
             new_dims = (
-                this_layer_object.shape[1:3] +
-                (this_layer_object.shape[-1],)
+                __dimension_to_int(this_layer_object.shape[1]),
+                __dimension_to_int(this_layer_object.shape[2]),
+                __dimension_to_int(this_layer_object.shape[-1])
             )
 
             this_name = '{0:s}_preresidual_squeeze'.format(basic_layer_name)
@@ -422,12 +438,12 @@ def _pad_2d_layer(source_layer_object, target_layer_object, padding_layer_name):
         spatial dimensions.
     """
 
-    num_source_rows = source_layer_object.shape[1]
-    num_target_rows = target_layer_object.shape[1]
+    num_source_rows = __dimension_to_int(source_layer_object.shape[1])
+    num_target_rows = __dimension_to_int(target_layer_object.shape[1])
     num_padding_rows = num_target_rows - num_source_rows
 
-    num_source_columns = source_layer_object.shape[2]
-    num_target_columns = target_layer_object.shape[2]
+    num_source_columns = __dimension_to_int(source_layer_object.shape[2])
+    num_target_columns = __dimension_to_int(target_layer_object.shape[2])
     num_padding_columns = num_target_columns - num_source_columns
 
     if num_padding_rows + num_padding_columns > 0:
@@ -440,13 +456,14 @@ def _pad_2d_layer(source_layer_object, target_layer_object, padding_layer_name):
     return source_layer_object
 
 
-def create_model(option_dict):
+def create_model(option_dict, omit_model_summary=False):
     """Creates Chiu-net++.
 
     This method sets up the architecture, loss function, and optimizer -- and
     compiles the model -- but does not train it.
 
     :param option_dict: See doc for `chiu_net_architecture.check_args`.
+    :param omit_model_summary: Boolean flag.
     :return: model_object: Instance of `keras.models.Model`, with the
         Chiu-net++ architecture.
     """
@@ -460,6 +477,7 @@ def create_model(option_dict):
     # GFS-lead-time axis and target-lag/lead-time axis.
 
     option_dict = chiu_net_arch.check_args(option_dict)
+    error_checking.assert_is_boolean(omit_model_summary)
 
     input_dimensions_gfs_3d = option_dict[GFS_3D_DIMENSIONS_KEY]
     input_dimensions_gfs_2d = option_dict[GFS_2D_DIMENSIONS_KEY]
@@ -739,6 +757,7 @@ def create_model(option_dict):
             )
         else:
             orig_dims = gfs_fcst_module_layer_objects[i].shape
+            orig_dims = numpy.array([__dimension_to_int(d) for d in orig_dims], dtype=int)
             new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
 
             this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
@@ -1033,5 +1052,7 @@ def create_model(option_dict):
         metrics=metric_functions
     )
 
-    model_object.summary()
+    if not omit_model_summary:
+        model_object.summary()
+
     return model_object
