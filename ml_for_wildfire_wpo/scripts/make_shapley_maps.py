@@ -202,13 +202,10 @@ def _modify_model_output(model_object, region_mask_matrix, target_field_index):
 
 def _apply_deepshap_1day(
         explainer_object, init_date_string, baseline_init_date_strings,
-        target_field_name, region_mask_matrix, validation_option_dict,
+        target_field_name, validation_option_dict,
         model_input_layer_names, model_lead_time_days, model_file_name,
-        output_file_name):
+        region_mask_file_name, output_file_name):
     """Applies DeepSHAP for one forecast-init day.
-
-    M = number of rows in grid
-    N = number of columns in grid
 
     :param explainer_object: Instance of `shap.DeepExplainer`.
     :param init_date_string: Forecast-init day (format "yyyymmdd").
@@ -216,14 +213,12 @@ def _apply_deepshap_1day(
         DeepSHAP baseline (format "yyyymmdd").
     :param target_field_name: Name of target field for which Shapley values will
         be computed.
-    :param region_mask_matrix: M-by-N numpy array of Boolean flags, indicating
-        the spatial region of interest.  Shapley values will be computed for the
-        given target field, averaged over this area of interest.
     :param model_input_layer_names: 1-D list with names of input layers for
         trained model.
     :param validation_option_dict: Dictionary with metadata for trained model.
     :param model_lead_time_days: Model lead time.
     :param model_file_name: Path to trained model.
+    :param region_mask_file_name: Path to file with region mask.
     :param output_file_name: Path to output file.  Shapley values will be
         written here.
     """
@@ -272,7 +267,7 @@ def _apply_deepshap_1day(
         grid_longitudes_deg_e=grid_longitudes_deg_e,
         init_date_string=init_date_string,
         baseline_init_date_strings=baseline_init_date_strings,
-        region_mask_file_name=region_mask_matrix,
+        region_mask_file_name=region_mask_file_name,
         target_field_name=target_field_name,
         model_input_layer_names=model_input_layer_names,
         model_lead_time_days=model_lead_time_days,
@@ -436,9 +431,10 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             init_date_string=new_init_date_strings[i],
             baseline_init_date_strings=baseline_init_date_strings,
             target_field_name=target_field_name,
-            region_mask_matrix=region_mask_matrix,
+            region_mask_file_name=region_mask_file_name,
             validation_option_dict=validation_option_dict,
-            model_input_layer_names=[l.name for l in model_object.input],
+            model_input_layer_names=
+            [l.name.split(':')[0] for l in model_object.input],
             model_lead_time_days=model_lead_time_days,
             model_file_name=model_file_name,
             output_file_name=this_output_file_name

@@ -5,6 +5,7 @@ import re
 import time
 import random
 import pickle
+import warnings
 import numpy
 import pandas
 import keras
@@ -2576,17 +2577,17 @@ def read_model(hdf5_file_name):
     return model_object
 
 
-def read_model_for_shapley(hdf5_file_name):
-    """Reads model from HDF5 file.
+def read_model_for_shapley(pickle_file_name):
+    """Reads model from Pickle file.
 
-    :param hdf5_file_name: Path to input file.
+    :param pickle_file_name: Path to input file.
     :return: model_object: Instance of `keras.models.Model`.
     """
 
-    error_checking.assert_file_exists(hdf5_file_name)
+    error_checking.assert_file_exists(pickle_file_name)
 
     metafile_name = find_metafile(
-        model_file_name=hdf5_file_name, raise_error_if_missing=True
+        model_file_name=pickle_file_name, raise_error_if_missing=True
     )
     metadata_dict = read_metafile(metafile_name)
     print(metadata_dict[LOSS_FUNCTION_KEY])
@@ -2621,6 +2622,40 @@ def read_model_for_shapley(hdf5_file_name):
     model_object = chiu_net_pp_architecture.create_model(
         option_dict=arch_dict, omit_model_summary=True
     )
+    orig_model_object = chiu_net_pp_architecture.create_model(
+        option_dict=arch_dict, omit_model_summary=True
+    )
+
+    pickle_file_handle = open(pickle_file_name, 'rb')
+    model_weights_array_list = pickle.load(pickle_file_handle)
+    pickle_file_handle.close()
+    model_object.set_weights(model_weights_array_list)
+
+    layer_names = [layer.name for layer in model_object.layers]
+
+    for this_layer_name in layer_names:
+        orig_weights_array_list = orig_model_object.get_layer(
+            name=this_layer_name
+        ).get_weights()
+
+        new_weights_array_list = model_object.get_layer(
+            name=this_layer_name
+        ).get_weights()
+
+        for k in range(len(orig_weights_array_list)):
+            if not numpy.allclose(
+                    orig_weights_array_list[k], new_weights_array_list[k],
+                    atol=TOLERANCE
+            ):
+                continue
+
+            warning_string = (
+                'POTENTIAL MAJOR ERROR: some weight tensors in layer "{0:s}" '
+                'did not change!'
+            ).format(this_layer_name)
+
+            warnings.warn(warning_string)
+
     return model_object
 
 
