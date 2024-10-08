@@ -7,15 +7,19 @@ import shap
 import shap.explainers
 import keras.layers
 import keras.models
-from keras import backend as K
+# from keras import backend as K
+from tensorflow.keras import backend as K
 from ml_for_wildfire_wpo.io import region_mask_io
 from ml_for_wildfire_wpo.io import shapley_io
 from ml_for_wildfire_wpo.machine_learning import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
-# tensorflow.compat.v1.disable_v2_behavior()
-# tensorflow.compat.v1.disable_eager_execution()
+# TODO(thunderhoser): This code does not work.  The line itself throws an error.
+# tensorflow.compat.v1.keras.backend.set_learning_phase(0)
+
+# TODO(thunderhoser): I have no idea what these lines are doing.  I copied them
+# over from the ml4tc library.
 # tensorflow.config.threading.set_inter_op_parallelism_threads(1)
 # tensorflow.config.threading.set_intra_op_parallelism_threads(1)
 
@@ -28,10 +32,15 @@ BASELINE_INIT_DATES_ARG_NAME = 'baseline_init_date_strings'
 NEW_INIT_DATES_ARG_NAME = 'new_init_date_strings'
 REGION_MASK_FILE_ARG_NAME = 'input_region_mask_file_name'
 TARGET_FIELD_ARG_NAME = 'target_field_name'
+USE_DEEP_EXPLAINER_ARG_NAME = 'use_deep_explainer'
+USE_INOUT_TENSORS_ARG_NAME = 'use_inout_tensors_only'
+DISABLE_TENSORFLOW2_ARG_NAME = 'disable_tensorflow2'
+DISABLE_EAGER_EXEC_ARG_NAME = 'disable_eager_execution'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 MODEL_FILE_HELP_STRING = (
-    'Path to trained model (will be read by `neural_net.read_model`).'
+    'Path to trained model (will be read by '
+    '`neural_net.read_model_for_shapley`).'
 )
 GFS_DIRECTORY_HELP_STRING = (
     'Name of directory with GFS data (predictors).  Files therein will be '
@@ -68,6 +77,22 @@ TARGET_FIELD_HELP_STRING = (
     'for this field averaged over the spatial region found in the file `{0:s}`.'
 ).format(
     REGION_MASK_FILE_ARG_NAME
+)
+USE_DEEP_EXPLAINER_HELP_STRING = (
+    'Boolean flag.  If 1 (0), will use shap.DeepExplainer '
+    '(shap.GradientExplainer).'
+)
+USE_INOUT_TENSORS_HELP_STRING = (
+    'Boolean flag.  If 1 (0), will send full model (only input and output '
+    'tensors) to the shap.DeepExplainer or shap.GradientExplainer object.'
+)
+DISABLE_TENSORFLOW2_HELP_STRING = (
+    'Boolean flag.  If 1, will disable TensorFlow 2 operations.  This is '
+    'PROBABLY NECESSARY to run this script.'
+)
+DISABLE_EAGER_EXEC_HELP_STRING = (
+    'Boolean flag.  If 1, will disable eager execution in TensorFlow.  Not '
+    'sure if this is necessary to run this script.'
 )
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Shapley values will be written here by '
@@ -111,6 +136,22 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + TARGET_FIELD_ARG_NAME, type=str, required=True,
     help=TARGET_FIELD_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + USE_DEEP_EXPLAINER_ARG_NAME, type=int, required=True,
+    help=USE_DEEP_EXPLAINER_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + USE_INOUT_TENSORS_ARG_NAME, type=int, required=True,
+    help=USE_INOUT_TENSORS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + DISABLE_TENSORFLOW2_ARG_NAME, type=int, required=True,
+    help=DISABLE_TENSORFLOW2_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + DISABLE_EAGER_EXEC_ARG_NAME, type=int, required=True,
+    help=DISABLE_EAGER_EXEC_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
@@ -203,9 +244,14 @@ def _apply_deepshap_1day(
     grid_longitudes_deg_e = data_dict[neural_net.GRID_LONGITUDES_KEY]
     del data_dict
 
-    shapley_matrices = explainer_object.shap_values(
-        X=predictor_matrices, check_additivity=False
-    )
+    if 'DeepExplainer' in str(type(explainer_object)):
+        shapley_matrices = explainer_object.shap_values(
+            X=predictor_matrices, check_additivity=False
+        )
+    else:
+        shapley_matrices = explainer_object.shap_values(
+            X=predictor_matrices
+        )
 
     # TODO(thunderhoser): I'm not sure what this does -- carried over from
     # rapid-intensification code.
@@ -237,7 +283,9 @@ def _apply_deepshap_1day(
 def _run(model_file_name, gfs_directory_name, target_dir_name,
          gfs_forecast_target_dir_name, model_lead_time_days,
          baseline_init_date_strings, new_init_date_strings,
-         region_mask_file_name, target_field_name, output_dir_name):
+         region_mask_file_name, target_field_name,
+         use_deep_explainer, use_inout_tensors_only,
+         disable_tensorflow2, disable_eager_execution, output_dir_name):
     """Uses DeepSHAP algorithm to create Shapley maps.
 
     This is effectively the main method.
@@ -251,12 +299,21 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     :param new_init_date_strings: Same.
     :param region_mask_file_name: Same.
     :param target_field_name: Same.
+    :param use_deep_explainer: Same.
+    :param use_inout_tensors_only: Same.
+    :param disable_tensorflow2: Same.
+    :param disable_eager_execution: Same.
     :param output_dir_name: Same.
     """
 
+    if disable_tensorflow2:
+        tensorflow.compat.v1.disable_v2_behavior()
+    if disable_eager_execution:
+        tensorflow.compat.v1.disable_eager_execution()
+
     # Read model.
     print('Reading model from: "{0:s}"...'.format(model_file_name))
-    model_object = neural_net.read_model(model_file_name)
+    model_object = neural_net.read_model_for_shapley(model_file_name)
     model_metafile_name = neural_net.find_metafile(
         model_file_name=model_file_name, raise_error_if_missing=True
     )
@@ -293,15 +350,16 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
 
     output_layer_object = model_object.output
     output_layer_object = keras.layers.GlobalAveragePooling3D(
-        data_format='channels_first'
+        data_format='channels_last'
     )(output_layer_object)
     output_layer_object = keras.layers.Lambda(
-        lambda x: K.mean(x, axis=1)
+        lambda x: K.mean(x, axis=1), output_shape=()
     )(output_layer_object)
 
     model_predict_function = keras.models.Model(
         inputs=model_object.input, outputs=output_layer_object
     )
+    # model_predict_function.summary()
 
     # Read baseline examples.
     num_baseline_examples = len(baseline_init_date_strings)
@@ -338,10 +396,31 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     del data_dict
 
     # Do actual stuff.
-    explainer_object = shap.DeepExplainer(
-        model=model_predict_function, data=baseline_predictor_matrices
-    )
-    del baseline_predictor_matrices
+    print(model_predict_function.inputs)
+    print(model_predict_function.output)
+
+    if use_deep_explainer:
+        if use_inout_tensors_only:
+            explainer_object = shap.DeepExplainer(
+                model=
+                (model_predict_function.inputs, model_predict_function.output),
+                data=baseline_predictor_matrices
+            )
+        else:
+            explainer_object = shap.DeepExplainer(
+                model=model_predict_function, data=baseline_predictor_matrices
+            )
+    else:
+        if use_inout_tensors_only:
+            explainer_object = shap.GradientExplainer(
+                model=
+                (model_predict_function.inputs, model_predict_function.output),
+                data=baseline_predictor_matrices
+            )
+        else:
+            explainer_object = shap.GradientExplainer(
+                model=model_predict_function, data=baseline_predictor_matrices
+            )
 
     num_new_examples = len(new_init_date_strings)
 
@@ -391,5 +470,17 @@ if __name__ == '__main__':
         target_field_name=getattr(
             INPUT_ARG_OBJECT, TARGET_FIELD_ARG_NAME
         ),
+        use_deep_explainer=bool(getattr(
+            INPUT_ARG_OBJECT, USE_DEEP_EXPLAINER_ARG_NAME
+        )),
+        use_inout_tensors_only=bool(getattr(
+            INPUT_ARG_OBJECT, USE_INOUT_TENSORS_ARG_NAME
+        )),
+        disable_tensorflow2=bool(getattr(
+            INPUT_ARG_OBJECT, DISABLE_TENSORFLOW2_ARG_NAME
+        )),
+        disable_eager_execution=bool(getattr(
+            INPUT_ARG_OBJECT, DISABLE_EAGER_EXEC_ARG_NAME
+        )),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
