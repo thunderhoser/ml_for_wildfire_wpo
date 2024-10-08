@@ -332,17 +332,11 @@ def _apply_deepshap_1day(
             X=predictor_matrices
         )
 
-    # TODO(thunderhoser): I'm not sure what this does -- carried over from
-    # rapid-intensification code.
     if isinstance(shapley_matrices[0], list):
         shapley_matrices = shapley_matrices[0]
 
     shapley_matrices = [sm[0, ...] for sm in shapley_matrices]
 
-    # TODO(thunderhoser): I might want to include predictor matrices in the
-    # output file -- but I don't know.  These would be normalized predictors,
-    # but plots will need to include unnormalized predictors.  So it might be
-    # best to just generate all this on the fly when plotting.
     print('Writing results to: "{0:s}"...'.format(output_file_name))
     shapley_io.write_file(
         netcdf_file_name=output_file_name,
