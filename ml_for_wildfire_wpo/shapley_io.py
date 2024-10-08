@@ -121,6 +121,7 @@ def write_file(
     # Check input args.
     error_checking.assert_is_string_list(model_input_layer_names)
     for this_layer_name in model_input_layer_names:
+        print(this_layer_name)
         assert this_layer_name in VALID_LAYER_NAMES
 
     assert (
