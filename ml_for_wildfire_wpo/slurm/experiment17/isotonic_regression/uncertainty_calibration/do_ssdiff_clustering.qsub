@@ -50,11 +50,27 @@ TARGET_FIELD_NAMES=("fire_weather_index" "daily_severity_rating" "fine_fuel_mois
 TARGET_FIELD_NAMES_DASHED=("fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index")
 MODEL_LEAD_TIMES_DAYS=("01" "01" "01" "01" "01" "01" "01" "02" "02" "02" "02" "02" "02" "02" "03" "03" "03" "03" "03" "03" "03" "04" "04" "04" "04" "04" "04" "04" "05" "05" "05" "05" "05" "05" "05" "06" "06" "06" "06" "06" "06" "06" "07" "07" "07" "07" "07" "07" "07" "08" "08" "08" "08" "08" "08" "08" "09" "09" "09" "09" "09" "09" "09" "10" "10" "10" "10" "10" "10" "10")
 
+if [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "fire_weather_index" ]]; then
+    bias_discretization_intervals=" 0.4000 0.8000 1.2000 1.6000 2.0000 "
+elif [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "daily_severity_rating" ]]; then
+    bias_discretization_intervals=" 0.6000 1.2000 1.8000 2.4000 3.0000 "
+elif [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "fine_fuel_moisture_code" ]]; then
+    bias_discretization_intervals=" 0.3000 0.6000 0.9000 1.2000 1.5000 "
+elif [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "duff_moisture_code" ]]; then
+    bias_discretization_intervals=" 0.8000 1.6000 2.4000 3.2000 4.0000 "
+elif [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "drought_code" ]]; then
+    bias_discretization_intervals=" 1.6000 3.2000 4.8000 6.4000 8.0000 "
+elif [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "initial_spread_index" ]]; then
+    bias_discretization_intervals=" 1.000 2.000 3.000 4.000 5.0000 "
+elif [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "buildup_index" ]]; then
+    bias_discretization_intervals=" 2.4000 4.8000 7.2000 9.6000 12.0000 "
+fi
+
 python3 -u "${CODE_DIR_NAME}/do_bias_clustering.py" \
 --input_gridded_eval_file_arg_name="${model_dir_name}/training_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/gridded_evaluation.nc" \
 --min_cluster_size_px=100 \
 --target_field_name="${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" \
---bias_discretization_intervals "TODO: this will be tricky!" \
+--bias_discretization_intervals ${bias_discretization_intervals} \
 --buffer_distance_px=1 \
 --do_backwards_clustering=1 \
 --cluster_ssdiff_instead_of_bias=1 \
