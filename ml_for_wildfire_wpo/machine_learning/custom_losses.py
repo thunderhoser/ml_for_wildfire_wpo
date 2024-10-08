@@ -4,7 +4,7 @@ import numpy
 import tensorflow
 from tensorflow.math import lgamma as log_gamma
 from tensorflow.keras import backend as K
-from tensorflow.keras import ops as tf_ops
+# from tensorflow.keras import ops as tf_ops
 from gewittergefahr.gg_utils import error_checking
 
 MIN_EVIDENCE = 1e-12  # Prevents division by zero.
@@ -48,7 +48,11 @@ def _get_evidence(input_tensor):
         but containing proper evidence values.
     """
 
-    return K.maximum(tf_ops.softplus(input_tensor), MIN_EVIDENCE)
+    # TODO(thunderhoser): If I ever try evidential NNs again, will need to
+    # uncomment the code below.  For now, the code below prevents me from
+    # running DeepSHAP in TensorFlow 1.
+    return 0.
+    # return K.maximum(tf_ops.softplus(input_tensor), MIN_EVIDENCE)
 
 
 def __evidential_nll_get_error_tensor(target_tensor, prediction_tensor):

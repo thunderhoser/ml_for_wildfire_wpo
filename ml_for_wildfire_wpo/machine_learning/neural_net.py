@@ -1,6 +1,7 @@
 """Helper methods for training a neural network to predict fire weather."""
 
 import os
+import re
 import time
 import random
 import pickle
@@ -8,7 +9,6 @@ import numpy
 import pandas
 import keras
 from scipy.interpolate import interp1d
-from tensorflow.keras.saving import load_model
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import number_rounding
 from gewittergefahr.gg_utils import file_system_utils
@@ -25,6 +25,11 @@ from ml_for_wildfire_wpo.utils import canadian_fwi_utils
 from ml_for_wildfire_wpo.utils import normalization
 from ml_for_wildfire_wpo.machine_learning import custom_losses
 from ml_for_wildfire_wpo.machine_learning import custom_metrics
+
+try:
+    from tensorflow.keras.saving import load_model
+except:
+    pass
 
 TOLERANCE = 1e-6
 DATE_FORMAT = '%Y%m%d'
@@ -2568,6 +2573,52 @@ def read_model(hdf5_file_name):
         metrics=metric_function_list
     )
 
+    return model_object
+
+
+def read_model_for_shapley(hdf5_file_name):
+    """Reads model from HDF5 file.
+
+    :param hdf5_file_name: Path to input file.
+    :return: model_object: Instance of `keras.models.Model`.
+    """
+
+    error_checking.assert_file_exists(hdf5_file_name)
+
+    metafile_name = find_metafile(
+        model_file_name=hdf5_file_name, raise_error_if_missing=True
+    )
+    metadata_dict = read_metafile(metafile_name)
+    print(metadata_dict[LOSS_FUNCTION_KEY])
+
+    chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
+    assert chiu_net_pp_architecture_dict is not None
+
+    from ml_for_wildfire_wpo.machine_learning import \
+        chiu_net_pp_architecture
+
+    arch_dict = chiu_net_pp_architecture_dict
+    if chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY not in arch_dict:
+        arch_dict[chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY] = False
+
+    arch_dict[chiu_net_pp_architecture.LOSS_FUNCTION_KEY] = 'mse'
+
+    for this_key in [
+        chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
+    ]:
+        try:
+            arch_dict[this_key] = eval(arch_dict[this_key])
+        except:
+            arch_dict[this_key] = re.sub(
+                r"gradient_accumulation_steps=\d+", "", arch_dict[this_key]
+            )
+            arch_dict[this_key] = eval(arch_dict[this_key])
+
+    for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
+        for k in range(len(arch_dict[this_key])):
+            arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+
+    model_object = chiu_net_pp_architecture.create_model(arch_dict)
     return model_object
 
 

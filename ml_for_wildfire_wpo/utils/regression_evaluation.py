@@ -1509,17 +1509,17 @@ def get_scores_with_bootstrapping(
         )
     }
 
-    if per_grid_cell:
-        these_dim_keys = (LATITUDE_DIM, LONGITUDE_DIM)
-        new_dict = {
-            EVAL_WEIGHT_KEY: (these_dim_keys, numpy.mean(weight_matrix, axis=0))
-        }
-        main_data_dict.update(new_dict)
-
     if compute_ssrat:
         new_dict = {
             SSRAT_KEY: (these_dim_keys, ssrat_matrix),
             SSDIFF_KEY: (these_dim_keys, ssdiff_matrix)
+        }
+        main_data_dict.update(new_dict)
+
+    if per_grid_cell:
+        these_dim_keys = (LATITUDE_DIM, LONGITUDE_DIM)
+        new_dict = {
+            EVAL_WEIGHT_KEY: (these_dim_keys, numpy.mean(weight_matrix, axis=0))
         }
         main_data_dict.update(new_dict)
 
