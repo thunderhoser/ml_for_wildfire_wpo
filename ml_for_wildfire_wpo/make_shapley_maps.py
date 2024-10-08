@@ -214,23 +214,28 @@ def _modify_model_output(model_object, region_mask_matrix, target_field_index):
     )(output_layer_object)
 
     # Average over ensemble members.
-    new_dims = (
-        __dimension_to_int(output_layer_object.shape[k])
-        for k in [1, 2]
-    )
     output_layer_object = keras.layers.Lambda(
-        lambda x: K.mean(x, axis=-1),
-        output_shape=()
+        lambda x: K.mean(x, axis=-1, keepdims=True),
+        output_shape=new_dims
     )(output_layer_object)
 
     # Multiply by region mask.
     region_mask_matrix = numpy.expand_dims(region_mask_matrix, axis=0)
+    region_mask_matrix = numpy.expand_dims(region_mask_matrix, axis=-1)
     region_mask_tensor = tensorflow.convert_to_tensor(
         region_mask_matrix, dtype=output_layer_object.dtype
     )
     output_layer_object = keras.layers.Multiply()(
         [output_layer_object, region_mask_tensor]
     )
+    output_layer_object = keras.layers.GlobalAveragePooling2D(
+        data_format='channels_last'
+    )(output_layer_object)
+
+    # Get rid of final (ensemble-member) axis.
+    output_layer_object = keras.layers.Lambda(
+        lambda x: x[..., 0], output_shape=()
+    )(output_layer_object)
 
     return keras.models.Model(
         inputs=model_object.input, outputs=output_layer_object
