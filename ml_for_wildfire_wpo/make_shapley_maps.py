@@ -167,7 +167,78 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
+def __dimension_to_int(dimension_object):
+    """Converts `tensorflow.Dimension` object to integer.
+
+    :param dimension_object: `tensorflow.Dimension` object.
+    :return: dimension_int: Integer.
+    """
+
+    try:
+        return dimension_object.value
+    except:
+        return dimension_object
+
+
 def _modify_model_output(model_object, region_mask_matrix, target_field_index):
+    """Modifies model output.
+
+    The original model output should have dimensions E x M x N x F or
+    E x M x N x F x S, where E = number of data examples; M = number of grid
+    rows; N = number of grid columns; F = number of target fields; and
+    S = number of ensemble members.  We want to collapse this whole array to
+    just a length-E vector, by averaging over ensemble members, finding the
+    desired target field, and averaging over relevant spatial locations (in the
+    desired region).
+
+    :param model_object: Trained model (instance of `keras.models.Model` or
+        `keras.models.Sequential`).
+    :param region_mask_matrix: M-by-N numpy array of Boolean flags, where True
+        means that the pixel is within the desired region.
+    :param target_field_index: Index of desired target field, along the target-
+        field axis of the model's output tensor.
+    :return: model_object: Equivalent model to input, but returning a length-E
+        vector.
+    """
+
+    output_layer_object = model_object.output
+
+    # Extract the relevant target field.
+    new_dims = (
+        __dimension_to_int(output_layer_object.shape[k])
+        for k in [1, 2, 4]
+    )
+    output_layer_object = keras.layers.Lambda(
+        lambda x: x[..., target_field_index, :],
+        output_shape=new_dims
+    )(output_layer_object)
+
+    # Average over ensemble members.
+    new_dims = (
+        __dimension_to_int(output_layer_object.shape[k])
+        for k in [1, 2]
+    )
+    output_layer_object = keras.layers.Lambda(
+        lambda x: K.mean(x, axis=-1),
+        output_shape=()
+    )(output_layer_object)
+
+    # Multiply by region mask.
+    region_mask_matrix = numpy.expand_dims(region_mask_matrix, axis=0)
+    region_mask_tensor = tensorflow.convert_to_tensor(
+        region_mask_matrix, dtype=output_layer_object.dtype
+    )
+    output_layer_object = keras.layers.Multiply()(
+        [output_layer_object, region_mask_tensor]
+    )
+
+    return keras.models.Model(
+        inputs=model_object.input, outputs=output_layer_object
+    )
+
+
+def _modify_model_output_old(model_object, region_mask_matrix,
+                             target_field_index):
     """Modifies model output.
 
     The original model output should have dimensions E x M x N x F or
@@ -345,24 +416,16 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     region_mask_matrix = (
         mask_table_xarray[region_mask_io.REGION_MASK_KEY].values
     )
-    # model_predict_function = _modify_model_output(
-    #     model_object=model_object,
-    #     region_mask_matrix=region_mask_matrix,
-    #     target_field_index=target_field_index
-    # )
-
-    output_layer_object = model_object.output
-    output_layer_object = keras.layers.GlobalAveragePooling3D(
-        data_format='channels_last'
-    )(output_layer_object)
-    output_layer_object = keras.layers.Lambda(
-        lambda x: K.mean(x, axis=1), output_shape=()
-    )(output_layer_object)
-
-    model_predict_function = keras.models.Model(
-        inputs=model_object.input, outputs=output_layer_object
+    model_object = _modify_model_output(
+        model_object=model_object,
+        region_mask_matrix=region_mask_matrix,
+        target_field_index=target_field_index
     )
-    # model_predict_function.summary()
+
+    try:
+        model_object.summary()
+    except:
+        pass
 
     # Read baseline examples.
     num_baseline_examples = len(baseline_init_date_strings)
@@ -399,30 +462,28 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     del data_dict
 
     # Do actual stuff.
-    print(model_predict_function.inputs)
-    print(model_predict_function.output)
+    print(model_object.inputs)
+    print(model_object.output)
 
     if use_deep_explainer:
         if use_inout_tensors_only:
             explainer_object = shap.DeepExplainer(
-                model=
-                (model_predict_function.inputs, model_predict_function.output),
+                model=(model_object.inputs, model_object.output),
                 data=baseline_predictor_matrices
             )
         else:
             explainer_object = shap.DeepExplainer(
-                model=model_predict_function, data=baseline_predictor_matrices
+                model=model_object, data=baseline_predictor_matrices
             )
     else:
         if use_inout_tensors_only:
             explainer_object = shap.GradientExplainer(
-                model=
-                (model_predict_function.inputs, model_predict_function.output),
+                model=(model_object.inputs, model_object.output),
                 data=baseline_predictor_matrices
             )
         else:
             explainer_object = shap.GradientExplainer(
-                model=model_predict_function, data=baseline_predictor_matrices
+                model=model_object, data=baseline_predictor_matrices
             )
 
     num_new_examples = len(new_init_date_strings)
