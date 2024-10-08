@@ -254,6 +254,10 @@ def _plot_one_shapley_field(
     max_abs_contour_value = numpy.percentile(
         numpy.absolute(shapley_matrix), max_colour_percentile
     )
+    max_abs_contour_value = max([
+        max_abs_contour_value,
+        min_abs_contour_value + 1e-9
+    ])
 
     (
         grid_latitude_matrix_deg_n, grid_longitude_matrix_deg_e
