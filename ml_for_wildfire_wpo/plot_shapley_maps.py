@@ -537,6 +537,11 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
     for i in range(len(gfs_lead_times_hours)):
         for j in range(len(gfs_field_names)):
+            print(this_predictor_matrix.shape)
+            print(i)
+            print(j)
+            print('\n\n\n')
+
             gfs_matrix_to_plot, unit_string = (
                 gfs_plotting.field_to_plotting_units(
                     data_matrix_default_units=this_predictor_matrix[..., i, j],
