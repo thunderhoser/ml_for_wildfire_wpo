@@ -44,6 +44,8 @@ TRAINING_STRATEGIES=("20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-p
 SPECTRAL_COMPLEXITIES=("040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100")
 RESIDUAL_BLOCK_FLAGS=("0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1")
 
+BEST_MODEL_INDEX=10
+
 training_strategy=${TRAINING_STRATEGIES[$BEST_MODEL_INDEX]}
 spectral_complexity=${SPECTRAL_COMPLEXITIES[$BEST_MODEL_INDEX]}
 use_residual_blocks=${RESIDUAL_BLOCK_FLAGS[$BEST_MODEL_INDEX]}
