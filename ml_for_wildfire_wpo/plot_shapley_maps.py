@@ -15,6 +15,7 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import grids
 import longitude_conversion as lng_conversion
+import file_system_utils
 import error_checking
 import shapley_io
 import border_io
@@ -391,6 +392,10 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     if region_name == '':
         region_name = None
 
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=output_dir_name
+    )
+
     # Read Shapley values.
     print('Reading Shapley values from: "{0:s}"...'.format(shapley_file_name))
     shapley_table_xarray = shapley_io.read_file(shapley_file_name)
@@ -409,6 +414,9 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     vod[neural_net.GFS_DIRECTORY_KEY] = gfs_directory_name
     vod[neural_net.TARGET_DIRECTORY_KEY] = target_dir_name
     vod[neural_net.GFS_FORECAST_TARGET_DIR_KEY] = gfs_forecast_target_dir_name
+    vod[neural_net.GFS_NORM_FILE_KEY] = None
+    vod[neural_net.TARGET_NORM_FILE_KEY] = None
+    vod[neural_net.ERA5_NORM_FILE_KEY] = None
     validation_option_dict = vod
 
     init_date_string = stx.attrs[shapley_io.INIT_DATE_KEY]
