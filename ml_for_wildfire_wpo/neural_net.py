@@ -2628,7 +2628,11 @@ def read_model_for_shapley(hdf5_file_name):
     model_object = chiu_net_pp_architecture.create_model(
         option_dict=arch_dict, omit_model_summary=True
     )
-    model_object.load_weights(hdf5_file_name)
+    print(model_object.get_layer(name='output_conv0').get_weights())
+    print('\n\n\n')
+
+    model_object.load_weights(hdf5_file_name, by_name=True)
+    print(model_object.get_layer(name='output_conv0').get_weights())
     return model_object
 
 
