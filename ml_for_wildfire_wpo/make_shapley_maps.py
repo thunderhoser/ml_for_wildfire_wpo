@@ -446,7 +446,8 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             target_field_name=target_field_name,
             region_mask_matrix=region_mask_matrix,
             validation_option_dict=validation_option_dict,
-            model_input_layer_names=[l.name for l in model_object.input],
+            model_input_layer_names=
+            [l.name.split(':')[0] for l in model_object.input],
             model_lead_time_days=model_lead_time_days,
             model_file_name=model_file_name,
             output_file_name=this_output_file_name
