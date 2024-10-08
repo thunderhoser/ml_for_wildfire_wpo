@@ -15,6 +15,7 @@ sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import grids
 import longitude_conversion as lng_conversion
+import gg_general_utils
 import file_system_utils
 import error_checking
 import shapley_io
@@ -119,6 +120,72 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
+def _smooth_maps(shapley_table_xarray, smoothing_radius_px):
+    """Smooths Shapley maps via Gaussian filter.
+
+    :param shapley_table_xarray: xarray table returned by
+        `shapley_io.read_file`.
+    :param smoothing_radius_px: e-folding radius (num pixels).
+    :return: shapley_table_xarray: Same as input but with smoothed maps.
+    """
+
+    shapley_keys = [
+        shapley_io.SHAPLEY_FOR_3D_GFS_KEY, shapley_io.SHAPLEY_FOR_2D_GFS_KEY,
+        shapley_io.SHAPLEY_FOR_LAGLEAD_TARGETS_KEY,
+        shapley_io.SHAPLEY_FOR_ERA5_KEY,
+        shapley_io.SHAPLEY_FOR_PREDN_BASELINE_KEY
+    ]
+    stx = shapley_table_xarray
+
+    print((
+        'Smoothing maps with Gaussian filter (e-folding radius of {0:.1f} grid '
+        'cells)...'
+    ).format(
+        smoothing_radius_px
+    ))
+
+    for this_key in shapley_keys:
+        if this_key not in stx.data_vars:
+            continue
+
+        this_shapley_matrix = stx[this_key].values
+
+        if len(this_shapley_matrix.shape) == 3:
+            for i in range(this_shapley_matrix.shape[2]):
+                this_shapley_matrix[..., i] = (
+                    gg_general_utils.apply_gaussian_filter(
+                        input_matrix=this_shapley_matrix[..., i],
+                        e_folding_radius_grid_cells=smoothing_radius_px
+                    )
+                )
+        elif len(this_shapley_matrix.shape) == 4:
+            for i in range(this_shapley_matrix.shape[2]):
+                for j in range(this_shapley_matrix.shape[3]):
+                    this_shapley_matrix[..., i, j] = (
+                        gg_general_utils.apply_gaussian_filter(
+                            input_matrix=this_shapley_matrix[..., i, j],
+                            e_folding_radius_grid_cells=smoothing_radius_px
+                        )
+                    )
+        elif len(this_shapley_matrix.shape) == 5:
+            for i in range(this_shapley_matrix.shape[2]):
+                for j in range(this_shapley_matrix.shape[3]):
+                    for k in range(this_shapley_matrix.shape[4]):
+                        this_shapley_matrix[..., i, j, k] = (
+                            gg_general_utils.apply_gaussian_filter(
+                                input_matrix=this_shapley_matrix[..., i, j, k],
+                                e_folding_radius_grid_cells=smoothing_radius_px
+                            )
+                        )
+
+        stx = stx.assign({
+            this_key: (stx[this_key].dims, this_shapley_matrix)
+        })
+
+    shapley_table_xarray = stx
+    return shapley_table_xarray
+
+
 def _plot_one_shapley_field(
         shapley_matrix, axes_object, figure_object, grid_latitudes_deg_n,
         grid_longitudes_deg_e, min_colour_percentile, max_colour_percentile,
@@ -132,7 +199,8 @@ def _plot_one_shapley_field(
     :param shapley_matrix: M-by-N numpy array of Shapley values.
     :param axes_object: Instance of `matplotlib.axes._subplots.AxesSubplot`.
         Will plot on these axes.
-    :param figure_object: BLAHH.
+    :param figure_object: Will plot on this figure (instance of
+        `matplotlib.figure.Figure`).
     :param grid_latitudes_deg_n: length-M numpy array of latitudes (deg north).
     :param grid_longitudes_deg_e: length-N numpy array of longitudes (deg east).
     :param min_colour_percentile: Determines minimum absolute Shapley value to
@@ -145,10 +213,9 @@ def _plot_one_shapley_field(
     :param output_file_name: Path to output file.
     :param plot_in_log_space: Boolean flag.  If True (False), colour scale will
         be logarithmic in base 10 (linear).
+    :return: min_abs_contour_value: Minimum absolute contour value.
+    :return: max_abs_contour_value: Max absolute contour value.
     """
-
-    # TODO: doc for figure_object
-    # TODO: need output doc
 
     # Check input args.
     error_checking.assert_is_boolean(plot_in_log_space)
@@ -245,7 +312,7 @@ def _plot_one_gfs_field(
         data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
         border_latitudes_deg_n, border_longitudes_deg_e,
         field_name, min_colour_percentile, max_colour_percentile,
-        title_string, output_file_name):
+        title_string):
     """Plots a single 2-D GFS field with Shapley values on top.
 
     M = number of rows in grid
@@ -263,10 +330,11 @@ def _plot_one_gfs_field(
     :param min_colour_percentile: See documentation at top of script.
     :param max_colour_percentile: Same.
     :param title_string: Title.
-    :param output_file_name: Path to output file.
+    :return: figure_object: Figure handle (instance of
+        `matplotlib.figure.Figure`).
+    :return: axes_object: Axes handle (instance of
+        `matplotlib.axes._subplots.AxesSubplot`).
     """
-
-    # TODO: update output documentation.
 
     figure_object, axes_object = pyplot.subplots(
         1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
@@ -399,6 +467,12 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     # Read Shapley values.
     print('Reading Shapley values from: "{0:s}"...'.format(shapley_file_name))
     shapley_table_xarray = shapley_io.read_file(shapley_file_name)
+
+    # TODO(thunderhoser): Smoothing needs to be an input arg.
+    shapley_table_xarray = _smooth_maps(
+        shapley_table_xarray=shapley_table_xarray,
+        smoothing_radius_px=2.
+    )
     stx = shapley_table_xarray
 
     # Read model metadata.
@@ -496,8 +570,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 field_name=gfs_field_names[j],
                 min_colour_percentile=predictor_colour_limits_prctile[0],
                 max_colour_percentile=predictor_colour_limits_prctile[1],
-                title_string=title_string,
-                output_file_name=output_file_name
+                title_string=title_string
             )
 
             min_colour_value, max_colour_value = _plot_one_shapley_field(
@@ -510,8 +583,8 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 min_colour_percentile=shapley_colour_limits_prctile[0],
                 max_colour_percentile=shapley_colour_limits_prctile[1],
                 half_num_contours=10,  # TODO: make input arg
-                colour_map_object=pyplot.get_cmap('Greys'),  # TODO: make input arg
-                line_width=4,  # TODO: make input arg
+                colour_map_object=pyplot.get_cmap('Oranges'),  # TODO: make input arg
+                line_width=3,  # TODO: make input arg
                 plot_in_log_space=False,  # TODO: make input arg
                 output_file_name=output_file_name
             )
@@ -521,7 +594,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             )
             plotting_utils.add_colour_bar(
                 figure_file_name=output_file_name,
-                colour_map_object=pyplot.get_cmap('Greys'),
+                colour_map_object=pyplot.get_cmap('Oranges'),
                 colour_norm_object=colour_norm_object,
                 orientation_string='vertical',
                 font_size=COLOUR_BAR_FONT_SIZE,
