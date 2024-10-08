@@ -2,7 +2,7 @@
 
 #SBATCH --job-name="test_shapley_maps_colorado_tiny"
 #SBATCH --partition="bigmem"
-#SBATCH --account="gsd-gpcs"
+#SBATCH --account="gsd-hpcs"
 #SBATCH --qos="batch"
 #SBATCH --nodes=1
 #SBATCH --ntasks=8           # 8 tasks per node
