@@ -63,7 +63,7 @@ use_inout_tensors_only=${USE_INOUT_TENSORS_FLAGS[$SLURM_ARRAY_TASK_ID]}
 disable_tensorflow2=${DISABLE_TENSORFLOW2_FLAGS[$SLURM_ARRAY_TASK_ID]}
 disable_eager_execution=${DISABLE_EAGER_EXEC_FLAGS[$SLURM_ARRAY_TASK_ID]}
 
-model_file_name="${model_dir_name}/model.weights.h5"
+model_file_name="${model_dir_name}/model.weights.p"
 output_dir_name="${model_dir_name}/validation_lead-time-days=02/shapley_maps/test_for_colorado/use-deep-explainer=${use_deep_explainer}_use-inout-tensors-only=${use_inout_tensors_only}_disable-tensorflow2=${disable_tensorflow2}_disable-eager-execution=${disable_eager_execution}"
 
 this_directory_name=`pwd`

@@ -64,7 +64,7 @@ disable_tensorflow2=${DISABLE_TENSORFLOW2_FLAGS[$SLURM_ARRAY_TASK_ID]}
 disable_eager_execution=${DISABLE_EAGER_EXEC_FLAGS[$SLURM_ARRAY_TASK_ID]}
 
 python3 -u "${CODE_DIR_NAME}/make_shapley_maps.py" \
---input_model_file_name="${model_dir_name}/model.weights.h5" \
+--input_model_file_name="${model_dir_name}/model.weights.p" \
 --input_gfs_directory_name="${GFS_DIR_NAME}" \
 --input_target_dir_name="${TARGET_DIR_NAME}" \
 --input_gfs_fcst_target_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
