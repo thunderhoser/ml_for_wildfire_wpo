@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_predictions_marshall_fire"
+#SBATCH --job-name="apply_neural_net_marshall_fire"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="gpuwf"
@@ -18,8 +18,9 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_predictions_marshall_fire_%A_%a.out
+#SBATCH --output=apply_neural_net_marshall_fire_%A_%a.out
 
+module load cuda/12.3.1
 conda init
 conda activate base
 
@@ -32,6 +33,10 @@ echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
 TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment17"
+
+GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
+TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
 
 TRAINING_STRATEGIES=("20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days")
 SPECTRAL_COMPLEXITIES=("040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100")
@@ -47,14 +52,15 @@ model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=${training_strategy}_spe
 echo $model_dir_name
 
 MODEL_LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10")
-INIT_DATE_STRINGS=("20211215" "20211216" "20211217" "20211218" "20211219" "20211220" "20211221" "20211222" "20211223" "20211224" "20211225" "20211226" "20211227" "20211228" "20211229" "20211230")
+START_DATE_STRINGS=("20211215" "20211215" "20211215" "20211215" "20211215" "20211215" "20211215" "20211215" "20211215" "20211215")
+END_DATE_STRINGS=("20220101" "20220101" "20220101" "20220101" "20220101" "20220101" "20220101" "20220101" "20220101" "20220101")
 
-for init_date_string in "${INIT_DATE_STRINGS[@]}"; do
-    python3 -u "${CODE_DIR_NAME}/plot_predictions.py" \
-    --input_prediction_dir_name_by_model "${model_dir_name}/validation_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/uncertainty_calibration" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}day_lead" \
-    --description_string_by_model "NN" "GFS" \
-    --field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" \
-    --init_date_string="${init_date_string}" \
-    --max_diff_prctile_by_field 99.9 99.9 99.9 99.9 99.9 99.9 99.9 \
-    --output_dir_name="${model_dir_name}/validation_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/uncertainty_calibration/prediction_plots"
-done
+python3 -u "${CODE_DIR_NAME}/apply_neural_net.py" \
+--input_model_file_name="${model_dir_name}/model.weights.h5" \
+--input_gfs_directory_name="${GFS_DIR_NAME}" \
+--input_target_dir_name="${TARGET_DIR_NAME}" \
+--input_gfs_fcst_target_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
+--init_date_limit_strings "${START_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}" "${END_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}" \
+--model_lead_time_days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]} \
+--take_ensemble_mean=0 \
+--output_dir_name="${model_dir_name}/validation_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}"

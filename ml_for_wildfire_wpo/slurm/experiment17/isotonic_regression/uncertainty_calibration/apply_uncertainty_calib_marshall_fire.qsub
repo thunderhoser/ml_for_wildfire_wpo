@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_predictions_marshall_fire"
+#SBATCH --job-name="apply_uncertainty_calib_marshall_fire"
 #SBATCH --partition="fge"
 #SBATCH --account="rda-ghpcs"
 #SBATCH --qos="gpuwf"
@@ -18,7 +18,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_predictions_marshall_fire_%A_%a.out
+#SBATCH --output=apply_uncertainty_calib_marshall_fire_%A_%a.out
 
 conda init
 conda activate base
@@ -47,14 +47,11 @@ model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=${training_strategy}_spe
 echo $model_dir_name
 
 MODEL_LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10")
-INIT_DATE_STRINGS=("20211215" "20211216" "20211217" "20211218" "20211219" "20211220" "20211221" "20211222" "20211223" "20211224" "20211225" "20211226" "20211227" "20211228" "20211229" "20211230")
+START_DATE_STRINGS=("20211215" "20211215" "20211215" "20211215" "20211215" "20211215" "20211215" "20211215" "20211215" "20211215")
+END_DATE_STRINGS=("20220101" "20220101" "20220101" "20220101" "20220101" "20220101" "20220101" "20220101" "20220101" "20220101")
 
-for init_date_string in "${INIT_DATE_STRINGS[@]}"; do
-    python3 -u "${CODE_DIR_NAME}/plot_predictions.py" \
-    --input_prediction_dir_name_by_model "${model_dir_name}/validation_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/uncertainty_calibration" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}day_lead" \
-    --description_string_by_model "NN" "GFS" \
-    --field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" \
-    --init_date_string="${init_date_string}" \
-    --max_diff_prctile_by_field 99.9 99.9 99.9 99.9 99.9 99.9 99.9 \
-    --output_dir_name="${model_dir_name}/validation_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/uncertainty_calibration/prediction_plots"
-done
+python3 -u "${CODE_DIR_NAME}/apply_bias_correction.py" \
+--input_prediction_dir_name="${model_dir_name}/validation_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression" \
+--init_date_limit_strings "${START_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}" "${END_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}" \
+--uncertainty_calib_model_file_name="${model_dir_name}/training_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/uncertainty_calibration/uncertainty_calibration.dill" \
+--output_prediction_dir_name="${model_dir_name}/validation_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/uncertainty_calibration"
