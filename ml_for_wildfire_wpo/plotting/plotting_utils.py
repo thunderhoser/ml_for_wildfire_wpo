@@ -1,11 +1,17 @@
 """Helper methods for general plotting."""
 
+import os
 import numpy
+from PIL import Image
 import matplotlib
 matplotlib.use('agg')
 import matplotlib.pyplot as pyplot
 from gewittergefahr.gg_utils import number_rounding
 from gewittergefahr.gg_utils import error_checking
+from gewittergefahr.plotting import plotting_utils as gg_plotting_utils
+from gewittergefahr.plotting import imagemagick_utils
+
+FIGURE_RESOLUTION_DPI = 300
 
 GRID_LINE_WIDTH = 1.
 GRID_LINE_COLOUR = numpy.full(3, 0.)
@@ -152,4 +158,104 @@ def plot_borders(
     axes_object.plot(
         border_longitudes_deg_e, border_latitudes_deg_n, color=line_colour,
         linestyle='solid', linewidth=line_width, zorder=z_order
+    )
+
+
+def add_colour_bar(
+        figure_file_name, colour_map_object, colour_norm_object,
+        orientation_string, font_size, cbar_label_string,
+        tick_label_format_string='{0:.2g}', log_space=False,
+        temporary_cbar_file_name=None):
+    """Adds colour bar to saved image file.
+
+    :param figure_file_name: Path to saved image file.  Colour bar will be added
+        to this image.
+    :param colour_map_object: See doc for `gg_plotting_utils.plot_colour_bar`.
+    :param colour_norm_object: Same.
+    :param orientation_string: Same.
+    :param font_size: Same.
+    :param cbar_label_string: Label for colour bar.
+    :param tick_label_format_string: Number format for tick labels.  A valid
+        example is '{0:.2g}'.
+    :param log_space: Boolean flag.  If True (False), values are scaled
+        logarithmically (linearly).
+    :param temporary_cbar_file_name: Path to temporary image file where colour
+        bar will be saved.  If None, will determine this on the fly.
+    """
+
+    error_checking.assert_is_boolean(log_space)
+
+    this_image_matrix = Image.open(figure_file_name)
+    figure_width_px, figure_height_px = this_image_matrix.size
+    figure_width_inches = float(figure_width_px) / FIGURE_RESOLUTION_DPI
+    figure_height_inches = float(figure_height_px) / FIGURE_RESOLUTION_DPI
+
+    extra_figure_object, extra_axes_object = pyplot.subplots(
+        1, 1, figsize=(figure_width_inches, figure_height_inches)
+    )
+    extra_axes_object.axis('off')
+
+    if hasattr(colour_norm_object, 'boundaries'):
+        dummy_values = numpy.array([
+            colour_norm_object.boundaries[0], colour_norm_object.boundaries[-1]
+        ])
+    else:
+        dummy_values = numpy.array([
+            colour_norm_object.vmin, colour_norm_object.vmax
+        ])
+
+    colour_bar_object = gg_plotting_utils.plot_colour_bar(
+        axes_object_or_matrix=extra_axes_object, data_matrix=dummy_values,
+        colour_map_object=colour_map_object,
+        colour_norm_object=colour_norm_object,
+        orientation_string=orientation_string,
+        extend_min=False, extend_max=False, fraction_of_axis_length=1.25,
+        font_size=font_size
+    )
+
+    tick_values = colour_bar_object.get_ticks()
+    if 'd' in tick_label_format_string:
+        tick_values = numpy.round(tick_values).astype(int)
+
+    if log_space:
+        tick_strings = [
+            tick_label_format_string.format(10 ** v - 1) for v in tick_values
+        ]
+    else:
+        tick_strings = [tick_label_format_string.format(v) for v in tick_values]
+
+    colour_bar_object.set_ticks(tick_values)
+    colour_bar_object.set_ticklabels(tick_strings)
+    colour_bar_object.set_label(cbar_label_string, fontsize=font_size)
+
+    if temporary_cbar_file_name is None:
+        temporary_cbar_file_name = '{0:s}_cbar.jpg'.format(
+            '.'.join(figure_file_name.split('.')[:-1])
+        )
+
+    extra_figure_object.savefig(
+        temporary_cbar_file_name, dpi=FIGURE_RESOLUTION_DPI,
+        pad_inches=0, bbox_inches='tight'
+    )
+    pyplot.close(extra_figure_object)
+
+    print('Concatenating colour bar to: "{0:s}"...'.format(figure_file_name))
+
+    if orientation_string == 'vertical':
+        num_panel_rows = 1
+        num_panel_columns = 2
+    else:
+        num_panel_rows = 2
+        num_panel_columns = 1
+
+    imagemagick_utils.concatenate_images(
+        input_file_names=[figure_file_name, temporary_cbar_file_name],
+        output_file_name=figure_file_name,
+        num_panel_rows=num_panel_rows, num_panel_columns=num_panel_columns,
+        extra_args_string='-gravity Center'
+    )
+
+    os.remove(temporary_cbar_file_name)
+    imagemagick_utils.trim_whitespace(
+        input_file_name=figure_file_name, output_file_name=figure_file_name
     )

@@ -23,6 +23,16 @@ FIELD_NAME_TO_FANCY = {
     canadian_fwi_utils.ISI_NAME: 'Initial-spread index (ISI)'
 }
 
+FIELD_NAME_TO_SIMPLE = {
+    canadian_fwi_utils.FFMC_NAME: 'FFMC',
+    canadian_fwi_utils.DSR_NAME: 'DSR',
+    canadian_fwi_utils.DC_NAME: 'DC',
+    canadian_fwi_utils.DMC_NAME: 'DMC',
+    canadian_fwi_utils.BUI_NAME: 'BUI',
+    canadian_fwi_utils.FWI_NAME: 'FWI',
+    canadian_fwi_utils.ISI_NAME: 'ISI'
+}
+
 
 def field_to_colour_scheme(field_name):
     """Returns colour scheme for one field (i.e., one fire-weather index).
