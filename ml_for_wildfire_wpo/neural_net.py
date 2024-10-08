@@ -2611,7 +2611,7 @@ def read_model_for_shapley(hdf5_file_name):
     arch_dict[chiu_net_pp_architecture.LOSS_FUNCTION_KEY] = 'mse'
 
     for this_key in [
-        chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
+            chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
     ]:
         try:
             arch_dict[this_key] = eval(arch_dict[this_key])
@@ -2625,7 +2625,9 @@ def read_model_for_shapley(hdf5_file_name):
         for k in range(len(arch_dict[this_key])):
             arch_dict[this_key][k] = eval(arch_dict[this_key][k])
 
-    model_object = chiu_net_pp_architecture.create_model(arch_dict)
+    model_object = chiu_net_pp_architecture.create_model(
+        option_dict=arch_dict, omit_model_summary=True
+    )
     return model_object
 
 
