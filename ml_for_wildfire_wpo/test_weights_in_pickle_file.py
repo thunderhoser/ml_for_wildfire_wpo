@@ -77,7 +77,7 @@ if chiu_net_pp_architecture_dict is not None:
         ).get_weights()
 
         for k in range(len(orig_weights_array_list)):
-            if numpy.allclose(
+            if not numpy.allclose(
                     orig_weights_array_list[k], new_weights_array_list[k],
                     atol=1e-6
             ):
