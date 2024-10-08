@@ -2631,7 +2631,9 @@ def read_model_for_shapley(hdf5_file_name):
     print(model_object.get_layer(name='output_conv0').get_weights())
     print('\n\n\n')
 
-    model_object.load_weights(hdf5_file_name, skip_mismatch=True, by_name=False)
+    hdf5_file_name = hdf5_file_name.replace('.h5', '.keras')
+
+    model_object.load_weights(hdf5_file_name)
     print(model_object.get_layer(name='output_conv0').get_weights())
     return model_object
 
