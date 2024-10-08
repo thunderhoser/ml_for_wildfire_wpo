@@ -10,7 +10,7 @@
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
 #SBATCH --time=01:00:00
-#SBATCH --array=0-15
+#SBATCH --array=5-7,13-15
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
@@ -58,13 +58,13 @@ USE_INOUT_TENSORS_FLAGS=("0" "0" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1"
 DISABLE_TENSORFLOW2_FLAGS=("0" "0" "1" "1" "0" "0" "1" "1" "0" "0" "1" "1" "0" "0" "1" "1")
 DISABLE_EAGER_EXEC_FLAGS=("0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1")
 
-model_file_name="${model_dir_name}/model.weights.h5"
-output_dir_name="${model_dir_name}/validation_lead-time-days=02/shapley_maps/test_for_colorado/use-deep-explainer=${use_deep_explainer}_use-inout-tensors-only=${use_inout_tensors_only}_disable-tensorflow2=${disable_tensorflow2}_disable-eager-execution=${disable_eager_execution}"
-
 use_deep_explainer=${USE_DEEP_EXPLAINER_FLAGS[$SLURM_ARRAY_TASK_ID]}
 use_inout_tensors_only=${USE_INOUT_TENSORS_FLAGS[$SLURM_ARRAY_TASK_ID]}
 disable_tensorflow2=${DISABLE_TENSORFLOW2_FLAGS[$SLURM_ARRAY_TASK_ID]}
 disable_eager_execution=${DISABLE_EAGER_EXEC_FLAGS[$SLURM_ARRAY_TASK_ID]}
+
+model_file_name="${model_dir_name}/model.weights.h5"
+output_dir_name="${model_dir_name}/validation_lead-time-days=02/shapley_maps/test_for_colorado/use-deep-explainer=${use_deep_explainer}_use-inout-tensors-only=${use_inout_tensors_only}_disable-tensorflow2=${disable_tensorflow2}_disable-eager-execution=${disable_eager_execution}"
 
 this_directory_name=`pwd`
 singularity exec --nv /scratch1/RDARCH/rda-ghpcs/Jebb.Q.Stewart/ml-ryan.simg /bin/sh -c "cd ${this_directory_name}; sh test_shapley_maps_colorado_tiny.sh ${model_file_name} ${use_deep_explainer} ${use_inout_tensors_only} ${disable_tensorflow2} ${disable_eager_execution} ${output_dir_name}"
