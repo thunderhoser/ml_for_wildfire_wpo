@@ -55,4 +55,4 @@ python3 -u "${CODE_DIR_NAME}/plot_evaluation_by_lead_time.py" \
 --lead_times_days 1 2 3 4 5 6 7 8 9 10 \
 --model_description_string="NN" \
 --baseline_description_string="GFS" \
---output_dir_name="${model_dir_name}/validation_by_lead_time"
+--output_dir_name="${model_dir_name}/validation_by_lead_time/isotonic_regression/uncertainty_calibration"
