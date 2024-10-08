@@ -5,6 +5,7 @@ import sys
 import re
 import pickle
 import keras
+import numpy
 import tensorflow
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
@@ -56,14 +57,34 @@ if chiu_net_pp_architecture_dict is not None:
         for k in range(len(arch_dict[this_key])):
             arch_dict[this_key][k] = eval(arch_dict[this_key][k])
 
+    orig_model_object = chiu_net_pp_architecture.create_model(arch_dict)
     model_object = chiu_net_pp_architecture.create_model(arch_dict)
-    # model_object.load_weights(hdf5_file_name)
-    print(model_object.get_layer(name='output_conv0').get_weights())
-    print('\n\n\n')
 
     pickle_file_handle = open(MODEL_FILE_NAME, 'rb')
     model_weights_array_list = pickle.load(pickle_file_handle)
     pickle_file_handle.close()
-
     model_object.set_weights(model_weights_array_list)
-    print(model_object.get_layer(name='output_conv0').get_weights())
+
+    layer_names = [layer.name for layer in model_object.layers]
+
+    for this_layer_name in layer_names:
+        orig_weights_array_list = orig_model_object.get_layer(
+            name=this_layer_name
+        ).get_weights()
+
+        new_weights_array_list = model_object.get_layer(
+            name=this_layer_name
+        ).get_weights()
+
+        for k in range(len(orig_weights_array_list)):
+            if numpy.allclose(
+                    orig_weights_array_list[k], new_weights_array_list[k],
+                    atol=1e-6
+            ):
+                continue
+
+            print('Some weight tensors in layer "{0:s}" did not change!'.format(
+                this_layer_name
+            ))
+
+            print(this_layer_name)
