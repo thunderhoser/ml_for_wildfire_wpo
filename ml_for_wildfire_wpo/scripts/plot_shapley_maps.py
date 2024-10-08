@@ -7,6 +7,7 @@ matplotlib.use('agg')
 from matplotlib import pyplot
 from gewittergefahr.gg_utils import grids
 from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
+from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.io import shapley_io
 from ml_for_wildfire_wpo.io import border_io
@@ -382,6 +383,10 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
     if region_name == '':
         region_name = None
+
+    file_system_utils.mkdir_recursive_if_necessary(
+        directory_name=output_dir_name
+    )
 
     # Read Shapley values.
     print('Reading Shapley values from: "{0:s}"...'.format(shapley_file_name))
