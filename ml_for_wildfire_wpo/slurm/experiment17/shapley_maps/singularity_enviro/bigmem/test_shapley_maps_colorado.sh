@@ -24,7 +24,7 @@ python3 -u "${CODE_DIR_NAME}/make_shapley_maps.py" \
 --input_target_dir_name="${TARGET_DIR_NAME}" \
 --input_gfs_fcst_target_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
 --model_lead_time_days=2 \
---baseline_init_date_strings "20200801" "20200802" "20200803" "20200804" \
+--baseline_init_date_strings "20200801" "20200802" "20200803" "20200804" "20200805" \
 --new_init_date_strings "20210809" "20210810" \
 --input_region_mask_file_name="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/colorado_mask.nc" \
 --target_field_name="fire_weather_index" \
