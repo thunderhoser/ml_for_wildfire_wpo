@@ -1,8 +1,8 @@
 """Helper methods for training a neural network to predict fire weather."""
 
 import os
-import re
 import sys
+import re
 import time
 import random
 import pickle
@@ -10,7 +10,6 @@ import numpy
 import pandas
 import keras
 from scipy.interpolate import interp1d
-# from tensorflow.keras.saving import load_model
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -33,6 +32,11 @@ import canadian_fwi_utils
 import normalization
 import custom_losses
 import custom_metrics
+
+try:
+    from tensorflow.keras.saving import load_model
+except:
+    pass
 
 TOLERANCE = 1e-6
 DATE_FORMAT = '%Y%m%d'
@@ -175,9 +179,6 @@ def __report_data_properties(
             error_checking.assert_is_numpy_array_without_nan(
                 predictor_matrices[k]
             )
-
-    print(numpy.nanmin(laglead_target_predictor_matrix, axis=(0, 1, 2)))
-    print(numpy.nanmax(laglead_target_predictor_matrix, axis=(0, 1, 2)))
 
     if baseline_prediction_matrix is not None:
         these_min = numpy.nanmin(
@@ -2512,7 +2513,7 @@ def read_model(hdf5_file_name):
     :return: model_object: Instance of `keras.models.Model`.
     """
 
-    # error_checking.assert_file_exists(hdf5_file_name)
+    error_checking.assert_file_exists(hdf5_file_name)
 
     metafile_name = find_metafile(
         model_file_name=hdf5_file_name, raise_error_if_missing=True
@@ -2549,54 +2550,83 @@ def read_model(hdf5_file_name):
         if chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY not in arch_dict:
             arch_dict[chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY] = False
 
-        arch_dict[chiu_net_pp_architecture.LOSS_FUNCTION_KEY] = 'mse'
-
         for this_key in [
+                chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
                 chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
         ]:
-            try:
-                arch_dict[this_key] = eval(arch_dict[this_key])
-            except:
-                arch_dict[this_key] = re.sub(
-                    r"gradient_accumulation_steps=\d+", "", arch_dict[this_key]
-                )
-                arch_dict[this_key] = eval(arch_dict[this_key])
+            arch_dict[this_key] = eval(arch_dict[this_key])
 
         for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
             for k in range(len(arch_dict[this_key])):
                 arch_dict[this_key][k] = eval(arch_dict[this_key][k])
 
         model_object = chiu_net_pp_architecture.create_model(arch_dict)
-        # model_object.load_weights(hdf5_file_name)
-
-        # checkpoint_file_name = hdf5_file_name.replace('model.weights.h5', 'model_checkpoint')
-        # checkpoint_file_name = checkpoint_file_name.replace('weights.weights.h5', 'model_checkpoint')
-        #
-        # import tensorflow
-        #
-        # checkpoint_object = tensorflow.train.Checkpoint(model=model_object)
-        # checkpoint_object.restore(checkpoint_file_name).expect_partial()
+        model_object.load_weights(hdf5_file_name)
         return model_object
 
-    return None
+    custom_object_dict = {
+        'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
+    }
+    model_object = load_model(
+        hdf5_file_name, custom_objects=custom_object_dict, compile=False
+    )
 
-    # custom_object_dict = {
-    #     'loss': eval(metadata_dict[LOSS_FUNCTION_KEY])
-    # }
-    # model_object = load_model(
-    #     hdf5_file_name, custom_objects=custom_object_dict, compile=False
-    # )
-    #
-    # metric_function_list = [
-    #     eval(m) for m in metadata_dict[METRIC_FUNCTIONS_KEY]
-    # ]
-    # model_object.compile(
-    #     loss=custom_object_dict['loss'],
-    #     optimizer=eval(metadata_dict[OPTIMIZER_FUNCTION_KEY]),
-    #     metrics=metric_function_list
-    # )
-    #
-    # return model_object
+    metric_function_list = [
+        eval(m) for m in metadata_dict[METRIC_FUNCTIONS_KEY]
+    ]
+    model_object.compile(
+        loss=custom_object_dict['loss'],
+        optimizer=eval(metadata_dict[OPTIMIZER_FUNCTION_KEY]),
+        metrics=metric_function_list
+    )
+
+    return model_object
+
+
+def read_model_for_shapley(hdf5_file_name):
+    """Reads model from HDF5 file.
+
+    :param hdf5_file_name: Path to input file.
+    :return: model_object: Instance of `keras.models.Model`.
+    """
+
+    error_checking.assert_file_exists(hdf5_file_name)
+
+    metafile_name = find_metafile(
+        model_file_name=hdf5_file_name, raise_error_if_missing=True
+    )
+    metadata_dict = read_metafile(metafile_name)
+    print(metadata_dict[LOSS_FUNCTION_KEY])
+
+    chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
+    assert chiu_net_pp_architecture_dict is not None
+
+    import \
+        chiu_net_pp_architecture
+
+    arch_dict = chiu_net_pp_architecture_dict
+    if chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY not in arch_dict:
+        arch_dict[chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY] = False
+
+    arch_dict[chiu_net_pp_architecture.LOSS_FUNCTION_KEY] = 'mse'
+
+    for this_key in [
+        chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
+    ]:
+        try:
+            arch_dict[this_key] = eval(arch_dict[this_key])
+        except:
+            arch_dict[this_key] = re.sub(
+                r"gradient_accumulation_steps=\d+", "", arch_dict[this_key]
+            )
+            arch_dict[this_key] = eval(arch_dict[this_key])
+
+    for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
+        for k in range(len(arch_dict[this_key])):
+            arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+
+    model_object = chiu_net_pp_architecture.create_model(arch_dict)
+    return model_object
 
 
 def train_model(

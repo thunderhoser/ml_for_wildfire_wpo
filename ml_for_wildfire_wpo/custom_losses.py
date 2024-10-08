@@ -56,6 +56,9 @@ def _get_evidence(input_tensor):
         but containing proper evidence values.
     """
 
+    # TODO(thunderhoser): If I ever try evidential NNs again, will need to
+    # uncomment the code below.  For now, the code below prevents me from
+    # running DeepSHAP in TensorFlow 1.
     return 0.
     # return K.maximum(tf_ops.softplus(input_tensor), MIN_EVIDENCE)
 

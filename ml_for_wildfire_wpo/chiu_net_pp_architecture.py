@@ -14,6 +14,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import error_checking
 import architecture_utils
 import chiu_net_architecture as chiu_net_arch
 
@@ -101,9 +102,6 @@ def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
     current_channel_counts = numpy.array(
         [__dimension_to_int(l.shape[-1]) for l in input_layer_objects], dtype=float
     )
-    print(input_layer_objects[0].shape)
-    print(type(input_layer_objects[0].shape))
-    print(current_channel_counts)
 
     num_input_layers = len(input_layer_objects)
     desired_channel_counts = numpy.full(num_input_layers, -1, dtype=int)
@@ -118,11 +116,9 @@ def _get_channel_counts_for_skip_cnxn(input_layer_objects, num_output_channels):
         float(remaining_num_output_channels) /
         numpy.sum(current_channel_counts[:-1])
     )
-    print(this_ratio)
     desired_channel_counts[:-1] = numpy.round(
         current_channel_counts[:-1] * this_ratio
     ).astype(int)
-    print(desired_channel_counts)
 
     while numpy.sum(desired_channel_counts) > num_output_channels:
         desired_channel_counts[numpy.argmax(desired_channel_counts[:-1])] -= 1
@@ -467,13 +463,14 @@ def _pad_2d_layer(source_layer_object, target_layer_object, padding_layer_name):
     return source_layer_object
 
 
-def create_model(option_dict):
+def create_model(option_dict, omit_model_summary=False):
     """Creates Chiu-net++.
 
     This method sets up the architecture, loss function, and optimizer -- and
     compiles the model -- but does not train it.
 
     :param option_dict: See doc for `chiu_net_architecture.check_args`.
+    :param omit_model_summary: Boolean flag.
     :return: model_object: Instance of `keras.models.Model`, with the
         Chiu-net++ architecture.
     """
@@ -487,6 +484,7 @@ def create_model(option_dict):
     # GFS-lead-time axis and target-lag/lead-time axis.
 
     option_dict = chiu_net_arch.check_args(option_dict)
+    error_checking.assert_is_boolean(omit_model_summary)
 
     input_dimensions_gfs_3d = option_dict[GFS_3D_DIMENSIONS_KEY]
     input_dimensions_gfs_2d = option_dict[GFS_2D_DIMENSIONS_KEY]
@@ -1061,10 +1059,7 @@ def create_model(option_dict):
         metrics=metric_functions
     )
 
-    import json
+    if not omit_model_summary:
+        model_object.summary()
 
-    print(model_object.inputs)
-    # print(json.dumps(model_object.get_config(), indent=4))
-
-    # model_object.summary()
     return model_object
