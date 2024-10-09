@@ -765,6 +765,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         gfs_2d_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
 
         print(gfs_field_names_2d)
+        print(gfs_2d_predictor_matrix.shape)
         print(numpy.nanmin(gfs_2d_predictor_matrix, axis=(0, 1, 2)))
         print(numpy.nanmax(gfs_2d_predictor_matrix, axis=(0, 1, 2)))
     else:
@@ -854,8 +855,9 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         gfs_3d_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
 
         print(gfs_field_names_3d)
-        print(numpy.nanmin(gfs_3d_predictor_matrix, axis=(0, 1)))
-        print(numpy.nanmax(gfs_3d_predictor_matrix, axis=(0, 1)))
+        print(gfs_3d_predictor_matrix.shape)
+        print(numpy.nanmin(gfs_3d_predictor_matrix, axis=(0, 1, 3)))
+        print(numpy.nanmax(gfs_3d_predictor_matrix, axis=(0, 1, 3)))
     else:
         gfs_3d_predictor_matrix = numpy.array([])
 
@@ -944,7 +946,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
     ][model_lead_time_days]
 
-    target_lag_times_days = numpy.concatenate([
+    target_lag_or_lead_times_days = numpy.concatenate([
         target_lag_times_days, -1 * gfs_target_lead_times_days
     ])
     all_target_field_names = vod[neural_net.TARGET_FIELDS_KEY]
@@ -954,11 +956,11 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     )
     laglead_target_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
 
-    for t in range(len(target_lag_times_days)):
+    for t in range(len(target_lag_or_lead_times_days)):
         for f in range(len(all_target_field_names)):
             this_predictor_matrix = laglead_target_predictor_matrix[..., t, f]
 
-            if target_lag_times_days[t] < 0:
+            if target_lag_or_lead_times_days[t] < 0:
                 title_string = (
                     'GFS-forecast {0:s}, {1:s} + {2:d} days\n'
                     'Shapley values for {3:d}-day {4:s}{5:s}'
@@ -967,7 +969,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                         all_target_field_names[f]
                     ],
                     init_date_string_nice,
-                    -1 * target_lag_times_days[t],
+                    -1 * target_lag_or_lead_times_days[t],
                     model_lead_time_days,
                     fwi_plotting.FIELD_NAME_TO_SIMPLE[target_field_name],
                     '' if region_name is None else ' over ' + region_name
@@ -981,7 +983,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                         all_target_field_names[f]
                     ],
                     init_date_string_nice,
-                    target_lag_times_days[t],
+                    target_lag_or_lead_times_days[t],
                     model_lead_time_days,
                     fwi_plotting.FIELD_NAME_TO_SIMPLE[target_field_name],
                     '' if region_name is None else ' over ' + region_name
@@ -992,7 +994,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             ).format(
                 output_dir_name,
                 all_target_field_names[f].replace('_', '-'),
-                target_lag_times_days[t]
+                -1 * target_lag_or_lead_times_days[t]
             )
 
             figure_object, axes_object = _plot_one_fwi_field(
