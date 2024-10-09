@@ -432,6 +432,12 @@ def _plot_one_shapley_field(
         / 6
     )
 
+    print(plot_latitude_limits_deg_n)
+    print(parallel_spacing_deg)
+    print('\n\n')
+    print(plot_longitude_limits_deg_e)
+    print(meridian_spacing_deg)
+
     plotting_utils.plot_grid_lines(
         plot_latitudes_deg_n=plot_latitude_limits_deg_n,
         plot_longitudes_deg_e=plot_longitude_limits_deg_e,
