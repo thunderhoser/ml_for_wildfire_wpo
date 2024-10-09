@@ -295,23 +295,6 @@ def _plot_one_shapley_field(
         scaled_shapley_matrix = shapley_matrix
 
     min_abs_contour_value = numpy.percentile(
-        numpy.absolute(shapley_matrix), min_colour_percentile
-    )
-    max_abs_contour_value = numpy.percentile(
-        numpy.absolute(shapley_matrix), max_colour_percentile
-    )
-    max_abs_contour_value = max([
-        max_abs_contour_value,
-        min_abs_contour_value + 1e-9
-    ])
-
-    print('_plot_one_shapley_field')
-    print('False')
-    print(min_abs_contour_value)
-    print(max_abs_contour_value)
-    print('\n')
-
-    min_abs_contour_value = numpy.percentile(
         numpy.absolute(scaled_shapley_matrix), min_colour_percentile
     )
     max_abs_contour_value = numpy.percentile(
@@ -321,12 +304,6 @@ def _plot_one_shapley_field(
         max_abs_contour_value,
         min_abs_contour_value + 1e-9
     ])
-
-    print('_plot_one_shapley_field')
-    print(plot_in_log_space)
-    print(min_abs_contour_value)
-    print(max_abs_contour_value)
-    print('\n')
 
     (
         grid_latitude_matrix_deg_n, grid_longitude_matrix_deg_e
@@ -811,11 +788,6 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     if len(gfs_field_names_2d) > 0:
         lyr_idx = model_input_layer_names.index(neural_net.GFS_2D_LAYER_NAME)
         gfs_2d_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
-
-        print(gfs_field_names_2d)
-        print(gfs_2d_predictor_matrix.shape)
-        print(numpy.nanmin(gfs_2d_predictor_matrix, axis=(0, 1, 2)))
-        print(numpy.nanmax(gfs_2d_predictor_matrix, axis=(0, 1, 2)))
     else:
         gfs_2d_predictor_matrix = numpy.array([])
 
@@ -878,10 +850,6 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 output_file_name=output_file_name
             )
 
-            print(min_colour_value)
-            print(max_colour_value)
-            print(plot_shapley_in_log_space)
-
             colour_norm_object = pyplot.Normalize(
                 vmin=min_colour_value, vmax=max_colour_value
             )
@@ -905,11 +873,6 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     if len(gfs_field_names_3d) > 0:
         lyr_idx = model_input_layer_names.index(neural_net.GFS_3D_LAYER_NAME)
         gfs_3d_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
-
-        print(gfs_field_names_3d)
-        print(gfs_3d_predictor_matrix.shape)
-        print(numpy.nanmin(gfs_3d_predictor_matrix, axis=(0, 1, 3)))
-        print(numpy.nanmax(gfs_3d_predictor_matrix, axis=(0, 1, 3)))
     else:
         gfs_3d_predictor_matrix = numpy.array([])
 
