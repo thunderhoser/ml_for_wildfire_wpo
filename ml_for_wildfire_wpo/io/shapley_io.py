@@ -9,6 +9,7 @@ from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.utils import canadian_fwi_utils
+from ml_for_wildfire_wpo.machine_learning import neural_net
 
 DATE_FORMAT = '%Y%m%d'
 
@@ -36,20 +37,6 @@ SHAPLEY_FOR_2D_GFS_KEY = 'shapley_gfs_2d_inputs'
 SHAPLEY_FOR_ERA5_KEY = 'shapley_for_era5_inputs'
 SHAPLEY_FOR_LAGLEAD_TARGETS_KEY = 'shapley_for_lagged_target_inputs'
 SHAPLEY_FOR_PREDN_BASELINE_KEY = 'shapley_for_predn_baseline_inputs'
-
-# TODO(thunderhoser): These constants should really be defined in neural_net.py
-# or one of the architecture files.
-GFS_3D_LAYER_NAME = 'gfs_3d_inputs'
-GFS_2D_LAYER_NAME = 'gfs_2d_inputs'
-LEAD_TIME_LAYER_NAME = 'lead_time'
-LAGLEAD_TARGET_LAYER_NAME = 'lagged_target_inputs'
-ERA5_LAYER_NAME = 'era5_inputs'
-PREDN_BASELINE_LAYER_NAME = 'predn_baseline_inputs'
-
-VALID_LAYER_NAMES = [
-    GFS_3D_LAYER_NAME, GFS_2D_LAYER_NAME, LEAD_TIME_LAYER_NAME,
-    LAGLEAD_TARGET_LAYER_NAME, ERA5_LAYER_NAME, PREDN_BASELINE_LAYER_NAME
-]
 
 
 def find_file(directory_name, init_date_string, raise_error_if_missing=True):
@@ -114,18 +101,18 @@ def write_file(
     # Check input args.
     error_checking.assert_is_string_list(model_input_layer_names)
     for this_layer_name in model_input_layer_names:
-        assert this_layer_name in VALID_LAYER_NAMES
+        assert this_layer_name in neural_net.VALID_INPUT_LAYER_NAMES
 
     assert (
-        GFS_3D_LAYER_NAME in model_input_layer_names or
-        GFS_2D_LAYER_NAME in model_input_layer_names
+        neural_net.GFS_3D_LAYER_NAME in model_input_layer_names or
+        neural_net.GFS_2D_LAYER_NAME in model_input_layer_names
     )
     assert len(model_input_layer_names) == len(shapley_matrices)
 
-    if GFS_3D_LAYER_NAME in model_input_layer_names:
-        lyr_idx = model_input_layer_names.index(GFS_3D_LAYER_NAME)
+    if neural_net.GFS_3D_LAYER_NAME in model_input_layer_names:
+        lyr_idx = model_input_layer_names.index(neural_net.GFS_3D_LAYER_NAME)
     else:
-        lyr_idx = model_input_layer_names.index(GFS_2D_LAYER_NAME)
+        lyr_idx = model_input_layer_names.index(neural_net.GFS_2D_LAYER_NAME)
 
     num_grid_rows = shapley_matrices[lyr_idx].shape[0]
     num_grid_columns = shapley_matrices[lyr_idx].shape[1]
@@ -183,10 +170,10 @@ def write_file(
     num_input_layers = len(model_input_layer_names)
 
     for k in range(num_input_layers):
-        if model_input_layer_names[k] == LEAD_TIME_LAYER_NAME:
+        if model_input_layer_names[k] == neural_net.LEAD_TIME_LAYER_NAME:
             continue
 
-        if model_input_layer_names[k] == GFS_3D_LAYER_NAME:
+        if model_input_layer_names[k] == neural_net.GFS_3D_LAYER_NAME:
             if ROW_DIM not in dataset_object.dimensions:
                 dataset_object.createDimension(ROW_DIM, num_grid_rows)
             if COLUMN_DIM not in dataset_object.dimensions:
@@ -215,7 +202,7 @@ def write_file(
             dataset_object.variables[SHAPLEY_FOR_3D_GFS_KEY][:] = (
                 shapley_matrices[k]
             )
-        elif model_input_layer_names[k] == GFS_2D_LAYER_NAME:
+        elif model_input_layer_names[k] == neural_net.GFS_2D_LAYER_NAME:
             if ROW_DIM not in dataset_object.dimensions:
                 dataset_object.createDimension(ROW_DIM, num_grid_rows)
             if COLUMN_DIM not in dataset_object.dimensions:
@@ -239,7 +226,7 @@ def write_file(
             dataset_object.variables[SHAPLEY_FOR_2D_GFS_KEY][:] = (
                 shapley_matrices[k]
             )
-        elif model_input_layer_names[k] == LAGLEAD_TARGET_LAYER_NAME:
+        elif model_input_layer_names[k] == neural_net.LAGLEAD_TARGET_LAYER_NAME:
             if ROW_DIM not in dataset_object.dimensions:
                 dataset_object.createDimension(ROW_DIM, num_grid_rows)
             if COLUMN_DIM not in dataset_object.dimensions:
@@ -263,7 +250,7 @@ def write_file(
             dataset_object.variables[SHAPLEY_FOR_LAGLEAD_TARGETS_KEY][:] = (
                 shapley_matrices[k]
             )
-        elif model_input_layer_names[k] == ERA5_LAYER_NAME:
+        elif model_input_layer_names[k] == neural_net.ERA5_LAYER_NAME:
             if ROW_DIM not in dataset_object.dimensions:
                 dataset_object.createDimension(ROW_DIM, num_grid_rows)
             if COLUMN_DIM not in dataset_object.dimensions:

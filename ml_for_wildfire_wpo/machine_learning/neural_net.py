@@ -106,6 +106,19 @@ PREDICTOR_MATRICES_KEY = 'predictor_matrices'
 TARGETS_AND_WEIGHTS_KEY = 'target_matrix_with_weights'
 GRID_LATITUDES_KEY = 'grid_latitudes_deg_n'
 GRID_LONGITUDES_KEY = 'grid_longitudes_deg_e'
+INPUT_LAYER_NAMES_KEY = 'input_layer_names'
+
+GFS_3D_LAYER_NAME = 'gfs_3d_inputs'
+GFS_2D_LAYER_NAME = 'gfs_2d_inputs'
+LEAD_TIME_LAYER_NAME = 'lead_time'
+LAGLEAD_TARGET_LAYER_NAME = 'lagged_target_inputs'
+ERA5_LAYER_NAME = 'era5_inputs'
+PREDN_BASELINE_LAYER_NAME = 'predn_baseline_inputs'
+
+VALID_INPUT_LAYER_NAMES = [
+    GFS_3D_LAYER_NAME, GFS_2D_LAYER_NAME, LEAD_TIME_LAYER_NAME,
+    LAGLEAD_TARGET_LAYER_NAME, ERA5_LAYER_NAME, PREDN_BASELINE_LAYER_NAME
+]
 
 
 def __report_data_properties(
@@ -124,6 +137,9 @@ def __report_data_properties(
     :param target_matrix_with_weights: Same.
     :param sentinel_value: Same.
     :return: predictor_matrices: Tuple with 32-bit predictor matrices.
+    :return: input_layer_names: 1-D list with same length as
+        "predictor_matrices", indicating the input layer for every predictor
+        matrix.
     """
 
     error_checking.assert_is_numpy_array_without_nan(target_matrix_with_weights)
@@ -147,6 +163,11 @@ def __report_data_properties(
         '3-D GFS predictor matrix', '2-D GFS predictor matrix',
         'lead-time predictor matrix', 'ERA5-constant predictor matrix',
         'lag/lead-target predictor matrix', 'residual baseline matrix'
+    ]
+    input_layer_names = [
+        GFS_3D_LAYER_NAME, GFS_2D_LAYER_NAME,
+        LEAD_TIME_LAYER_NAME, ERA5_LAYER_NAME,
+        LAGLEAD_TARGET_LAYER_NAME, PREDN_BASELINE_LAYER_NAME
     ]
     allow_nan_flags = [True, True, False, False, True, True]
 
@@ -189,9 +210,14 @@ def __report_data_properties(
             str(these_max)
         ))
 
-    return tuple(
-        pm.astype('float32') for pm in predictor_matrices if pm is not None
+    good_flags = numpy.array(
+        [pm is not None for pm in predictor_matrices], dtype=bool
     )
+    good_indices = numpy.where(good_flags)[0]
+
+    predictor_matrices = tuple([predictor_matrices[k] for k in good_indices])
+    input_layer_names = tuple([input_layer_names[k] for k in good_indices])
+    return predictor_matrices, input_layer_names
 
 
 def __determine_num_times_for_interp(generator_option_dict):
@@ -1989,7 +2015,7 @@ def data_generator(option_dict):
             baseline_prediction_matrix=baseline_prediction_matrix,
             target_matrix_with_weights=target_matrix_with_weights,
             sentinel_value=sentinel_value
-        )
+        )[0]
 
         print('MODEL LEAD TIME: {0:d} days'.format(model_lead_time_days))
         num_batches_provided += 1
@@ -2015,6 +2041,9 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
         north).
     data_dict["grid_longitudes_deg_e"]: length-N numpy array of longitudes (deg
         east).
+    data_dict["input_layer_names"]: 1-D list with same length as
+        "predictor_matrices", indicating the input layer for every predictor
+        matrix.
     """
 
     _ = time_conversion.string_to_unix_sec(init_date_string, DATE_FORMAT)
@@ -2319,7 +2348,7 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
         [target_matrix, weight_matrix], axis=-1
     )
 
-    predictor_matrices = __report_data_properties(
+    predictor_matrices, input_layer_names = __report_data_properties(
         gfs_predictor_matrix_3d=gfs_predictor_matrix_3d,
         gfs_predictor_matrix_2d=gfs_predictor_matrix_2d,
         lead_time_predictors_days=lead_time_predictors_days,
@@ -2336,7 +2365,8 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
         PREDICTOR_MATRICES_KEY: list(predictor_matrices),
         TARGETS_AND_WEIGHTS_KEY: target_matrix_with_weights,
         GRID_LATITUDES_KEY: grid_latitudes_deg_n,
-        GRID_LONGITUDES_KEY: grid_longitudes_deg_e
+        GRID_LONGITUDES_KEY: grid_longitudes_deg_e,
+        INPUT_LAYER_NAMES_KEY: input_layer_names
     }
 
 
