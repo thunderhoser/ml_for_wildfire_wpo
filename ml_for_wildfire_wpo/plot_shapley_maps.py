@@ -306,6 +306,7 @@ def _plot_one_shapley_field(
     ])
 
     print('_plot_one_shapley_field')
+    print(plot_in_log_space)
     print(min_abs_contour_value)
     print(max_abs_contour_value)
     print('\n')

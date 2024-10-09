@@ -230,6 +230,7 @@ def add_colour_bar(
         tick_strings = [
             tick_label_format_string.format(10 ** v - 1) for v in tick_values
         ]
+        print(tick_values)
         print(tick_strings)
     else:
         tick_strings = [tick_label_format_string.format(v) for v in tick_values]
