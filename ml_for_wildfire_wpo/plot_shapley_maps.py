@@ -396,6 +396,8 @@ def _plot_one_shapley_field(
         numpy.max(plot_latitude_limits_deg_n)
     )
 
+    print(plot_longitude_limits_deg_e)
+
     if plot_longitude_limits_deg_e is None:
         plot_longitude_limits_deg_e = numpy.array([
             numpy.min(grid_longitudes_to_plot_deg_e),
