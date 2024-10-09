@@ -751,16 +751,23 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
     print(SEPARATOR_STRING)
 
-    try:
-        data_dict = neural_net.create_data(
-            option_dict=validation_option_dict,
-            init_date_string=init_date_string,
-            model_lead_time_days=model_lead_time_days
-        )
-        print(SEPARATOR_STRING)
-    except:
-        print(SEPARATOR_STRING)
-        return
+    data_dict = neural_net.create_data(
+        option_dict=validation_option_dict,
+        init_date_string=init_date_string,
+        model_lead_time_days=model_lead_time_days
+    )
+    print(SEPARATOR_STRING)
+
+    # try:
+    #     data_dict = neural_net.create_data(
+    #         option_dict=validation_option_dict,
+    #         init_date_string=init_date_string,
+    #         model_lead_time_days=model_lead_time_days
+    #     )
+    #     print(SEPARATOR_STRING)
+    # except:
+    #     print(SEPARATOR_STRING)
+    #     return
 
     predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
     model_input_layer_names = data_dict[neural_net.INPUT_LAYER_NAMES_KEY]
