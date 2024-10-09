@@ -305,6 +305,11 @@ def _plot_one_shapley_field(
         min_abs_contour_value + 1e-9
     ])
 
+    print('_plot_one_shapley_field')
+    print(min_abs_contour_value)
+    print(max_abs_contour_value)
+    print('\n')
+
     (
         grid_latitude_matrix_deg_n, grid_longitude_matrix_deg_e
     ) = grids.latlng_vectors_to_matrices(
