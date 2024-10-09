@@ -618,8 +618,6 @@ def _plot_one_gfs_field(
             else:
                 y_values = gfs_npt[gfs_utils.QUANTILE_KEY_3D].values[0, 0, :]
 
-            print(y_values)
-
             interp_object = interp1d(
                 x=gfs_npt.coords[gfs_utils.QUANTILE_LEVEL_DIM].values,
                 y=y_values, kind='linear', bounds_error=True, assume_sorted=True
@@ -633,8 +631,16 @@ def _plot_one_gfs_field(
 
         max_colour_value = max([max_colour_value, min_colour_value + TOLERANCE])
 
-    print(min_colour_value)
-    print(max_colour_value)
+    data_matrix = gfs_plotting.field_to_plotting_units(
+        data_matrix_default_units=data_matrix, field_name=field_name
+    )[0]
+    colour_limits = gfs_plotting.field_to_plotting_units(
+        data_matrix_default_units=
+        numpy.array([min_colour_value, max_colour_value]),
+        field_name=field_name
+    )[0]
+    min_colour_value = colour_limits[0]
+    max_colour_value = colour_limits[1]
 
     colour_norm_object = pyplot.Normalize(
         vmin=min_colour_value, vmax=max_colour_value
@@ -1029,13 +1035,10 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
     for t in range(len(gfs_lead_times_hours)):
         for f in range(len(gfs_field_names_2d)):
-            this_predictor_matrix, unit_string = (
-                gfs_plotting.field_to_plotting_units(
-                    data_matrix_default_units=
-                    gfs_2d_predictor_matrix[..., t, f],
-                    field_name=gfs_field_names_2d[f]
-                )
-            )
+            this_predictor_matrix = gfs_2d_predictor_matrix[..., t, f] + 0.
+            unit_string = gfs_plotting.FIELD_TO_PLOTTING_UNIT_STRING[
+                gfs_field_names_2d[f]
+            ]
 
             title_string = (
                 'GFS {0:s} ({1:s}), {2:s} + {3:d} hours\n'
@@ -1136,13 +1139,13 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     for p in range(len(gfs_pressure_levels_mb)):
         for t in range(len(gfs_lead_times_hours)):
             for f in range(len(gfs_field_names_3d)):
-                this_predictor_matrix, unit_string = (
-                    gfs_plotting.field_to_plotting_units(
-                        data_matrix_default_units=
-                        gfs_3d_predictor_matrix[..., p, t, f],
-                        field_name=gfs_field_names_3d[f]
-                    )
+
+                this_predictor_matrix = (
+                    gfs_3d_predictor_matrix[..., p, t, f] + 0.
                 )
+                unit_string = gfs_plotting.FIELD_TO_PLOTTING_UNIT_STRING[
+                    gfs_field_names_3d[f]
+                ]
 
                 title_string = (
                     'GFS {0:s} ({1:s}), {2:.0f} mb, {3:s} + {4:d} hours\n'
