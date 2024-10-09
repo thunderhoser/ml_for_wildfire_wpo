@@ -71,9 +71,9 @@ python3 -u "${CODE_DIR_NAME}/plot_shapley_maps.py" \
 --input_gfs_fcst_target_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
 --predictor_colour_limits_prctile 0.1 99.9 \
 --shapley_colour_limits_prctile 5.0 99.9 \
---shapley_line_width=3 \
+--shapley_line_width=2 \
 --shapley_half_num_contours=10 \
---plot_shapley_in_log_space=1 \
+--plot_shapley_in_log_space=0 \
 --shapley_smoothing_radius_px=2 \
 --region_name="Colorado" \
 --output_dir_name="${output_dir_name}"
