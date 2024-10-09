@@ -704,6 +704,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         )
 
     stx = shapley_table_xarray
+    model_lead_time_days = stx.attrs[shapley_io.MODEL_LEAD_TIME_KEY]
 
     # Read model metadata.
     model_file_name = stx.attrs[shapley_io.MODEL_FILE_KEY]
@@ -713,14 +714,31 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
     print('Reading metadata from: "{0:s}"...'.format(model_metafile_name))
     model_metadata_dict = neural_net.read_metafile(model_metafile_name)
-
     vod = model_metadata_dict[neural_net.VALIDATION_OPTIONS_KEY]
+
     vod[neural_net.GFS_DIRECTORY_KEY] = gfs_directory_name
     vod[neural_net.TARGET_DIRECTORY_KEY] = target_dir_name
     vod[neural_net.GFS_FORECAST_TARGET_DIR_KEY] = gfs_forecast_target_dir_name
     vod[neural_net.GFS_NORM_FILE_KEY] = None
     vod[neural_net.TARGET_NORM_FILE_KEY] = None
     vod[neural_net.ERA5_NORM_FILE_KEY] = None
+    vod[neural_net.SENTINEL_VALUE_KEY] = None
+    vod[neural_net.MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = {
+        model_lead_time_days: vod[
+            neural_net.MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
+        ][model_lead_time_days]
+    }
+    vod[neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY] = {
+        model_lead_time_days: vod[
+            neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY
+        ][model_lead_time_days]
+    }
+    vod[neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = {
+        model_lead_time_days: vod[
+            neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
+        ][model_lead_time_days]
+    }
+
     validation_option_dict = vod
 
     init_date_string = stx.attrs[shapley_io.INIT_DATE_KEY]
@@ -729,7 +747,6 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         '-' + init_date_string[4:6] +
         '-' + init_date_string[6:]
     )
-    model_lead_time_days = stx.attrs[shapley_io.MODEL_LEAD_TIME_KEY]
     target_field_name = stx.attrs[shapley_io.TARGET_FIELD_KEY]
 
     print(SEPARATOR_STRING)
