@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_shapley_maps_20210809_subdomain"
+#SBATCH --job-name="plot_shapley_maps_20210809_subdomain_global_norm"
 #SBATCH --partition="bigmem"
 #SBATCH --account="gsd-hpcs"
 #SBATCH --qos="batch"
@@ -16,7 +16,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_shapley_maps_20210809_subdomain_%A_%a.out
+#SBATCH --output=plot_shapley_maps_20210809_subdomain_global_norm_%A_%a.out
 
 module load imagemagick/7.1.1-11
 conda init
@@ -69,6 +69,7 @@ python3 -u "${CODE_DIR_NAME}/plot_shapley_maps.py" \
 --input_gfs_directory_name="${GFS_DIR_NAME}" \
 --input_target_dir_name="${TARGET_DIR_NAME}" \
 --input_gfs_fcst_target_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
+--input_gfs_norm_file_name="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/normalization_params_2019-2020.nc" \
 --predictor_colour_limits_prctile 0.1 99.9 \
 --shapley_colour_limits_prctile 5.0 99.9 \
 --shapley_line_width=4 \

@@ -7,6 +7,7 @@ import numpy
 import matplotlib
 matplotlib.use('agg')
 from matplotlib import pyplot
+from scipy.interpolate import interp1d
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -19,6 +20,7 @@ import longitude_conversion as lng_conversion
 import gg_general_utils
 import file_system_utils
 import error_checking
+import gfs_io
 import shapley_io
 import border_io
 import gfs_utils
@@ -50,6 +52,7 @@ SHAPLEY_FILE_ARG_NAME = 'input_shapley_file_name'
 GFS_DIRECTORY_ARG_NAME = 'input_gfs_directory_name'
 TARGET_DIR_ARG_NAME = 'input_target_dir_name'
 GFS_FCST_TARGET_DIR_ARG_NAME = 'input_gfs_fcst_target_dir_name'
+GFS_NORM_FILE_ARG_NAME = 'input_gfs_norm_file_name'
 PREDICTOR_COLOUR_LIMITS_ARG_NAME = 'predictor_colour_limits_prctile'
 SHAPLEY_COLOUR_LIMITS_ARG_NAME = 'shapley_colour_limits_prctile'
 REGION_ARG_NAME = 'region_name'
@@ -81,13 +84,22 @@ GFS_FCST_TARGET_DIR_HELP_STRING = (
     'therein will be found by `gfs_daily_io.find_file` and read by '
     '`gfs_daily_io.read_file`.'
 )
+GFS_NORM_FILE_HELP_STRING = (
+    'Path to file with GFS-normalization parameters.  If you pass this '
+    'normalization file, the percentiles in `{0:s}` will be computed once -- '
+    'on values in this normalization file -- and the resulting colour limits '
+    'will be used for every GFS plot.  If you leave this argument empty, the '
+    'percentiles in `{0:s}` will be computed for every 2-D slice of GFS data.'
+).format(
+    PREDICTOR_COLOUR_LIMITS_ARG_NAME
+)
 PREDICTOR_COLOUR_LIMITS_HELP_STRING = (
     'Colour limits for predictor values, in terms of percentile (ranging from '
-    '0...100).  For each 2-D predictor slice, these percentiles will be '
-    'recomputed and will determine the limits of the colour bar.'
+    '0...100).'
 )
 SHAPLEY_COLOUR_LIMITS_HELP_STRING = (
-    'Same as `{0:s}` but for Shapley values.'
+    'Same as `{0:s}` but for Shapley values.  Colour limits will be computed '
+    'for every 2-D slice of Shapley values.'
 ).format(
     PREDICTOR_COLOUR_LIMITS_ARG_NAME
 )
@@ -140,6 +152,10 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + GFS_FCST_TARGET_DIR_ARG_NAME, type=str, required=True,
     help=GFS_FCST_TARGET_DIR_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + GFS_NORM_FILE_ARG_NAME, type=str, required=True,
+    help=GFS_NORM_FILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + PREDICTOR_COLOUR_LIMITS_ARG_NAME, type=float, nargs=2, required=True,
@@ -520,7 +536,7 @@ def _plot_one_gfs_field(
         data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
         border_latitudes_deg_n, border_longitudes_deg_e,
         field_name, min_colour_percentile, max_colour_percentile,
-        title_string):
+        title_string, gfs_norm_param_table_xarray=None):
     """Plots a single 2-D GFS field with Shapley values on top.
 
     M = number of rows in grid
@@ -538,6 +554,12 @@ def _plot_one_gfs_field(
     :param min_colour_percentile: See documentation at top of script.
     :param max_colour_percentile: Same.
     :param title_string: Title.
+    :param gfs_norm_param_table_xarray: xarray table with normalization params
+        for GFS data -- in format returned by `gfs_io.read_normalization_file`
+        -- but subset to the relevant field, pressure level (if applicable),
+        and forecast hour (if applicable).
+        If you want colour limits to be based on the current 2-D slice of data
+        (`data_matrix`), leave this argument alone.
     :return: figure_object: Figure handle (instance of
         `matplotlib.figure.Figure`).
     :return: axes_object: Axes handle (instance of
@@ -550,9 +572,29 @@ def _plot_one_gfs_field(
 
     if gfs_plotting.use_diverging_colour_scheme(field_name):
         colour_map_object = GFS_DIVERGING_COLOUR_MAP_OBJECT
-        max_colour_value = numpy.nanpercentile(
-            numpy.absolute(data_matrix), max_colour_percentile
-        )
+
+        if gfs_norm_param_table_xarray is None:
+            max_colour_value = numpy.nanpercentile(
+                numpy.absolute(data_matrix), max_colour_percentile
+            )
+        else:
+            gfs_npt = gfs_norm_param_table_xarray
+
+            if field_name in gfs_utils.ALL_2D_FIELD_NAMES:
+                y_values = gfs_npt[gfs_utils.QUANTILE_KEY_2D].values[0, 0, :]
+            else:
+                y_values = gfs_npt[gfs_utils.QUANTILE_KEY_3D].values[0, 0, :]
+
+            interp_object = interp1d(
+                x=gfs_npt.coords[gfs_utils.QUANTILE_LEVEL_DIM].values,
+                y=y_values, kind='linear', bounds_error=True, assume_sorted=True
+            )
+
+            new_percentile = numpy.mena(
+                numpy.array([max_colour_percentile, 100.])
+            )
+            max_colour_value = interp_object(new_percentile * 0.01)
+
         if numpy.isnan(max_colour_value):
             max_colour_value = TOLERANCE
 
@@ -560,12 +602,28 @@ def _plot_one_gfs_field(
         min_colour_value = -1 * max_colour_value
     else:
         colour_map_object = GFS_SEQUENTIAL_COLOUR_MAP_OBJECT
-        min_colour_value = numpy.nanpercentile(
-            data_matrix, min_colour_percentile
-        )
-        max_colour_value = numpy.nanpercentile(
-            data_matrix, max_colour_percentile
-        )
+
+        if gfs_norm_param_table_xarray is None:
+            min_colour_value = numpy.nanpercentile(
+                data_matrix, min_colour_percentile
+            )
+            max_colour_value = numpy.nanpercentile(
+                data_matrix, max_colour_percentile
+            )
+        else:
+            gfs_npt = gfs_norm_param_table_xarray
+
+            if field_name in gfs_utils.ALL_2D_FIELD_NAMES:
+                y_values = gfs_npt[gfs_utils.QUANTILE_KEY_2D].values[0, 0, :]
+            else:
+                y_values = gfs_npt[gfs_utils.QUANTILE_KEY_3D].values[0, 0, :]
+
+            interp_object = interp1d(
+                x=gfs_npt.coords[gfs_utils.QUANTILE_LEVEL_DIM].values,
+                y=y_values, kind='linear', bounds_error=True, assume_sorted=True
+            )
+            min_colour_value = interp_object(min_colour_percentile * 0.01)
+            max_colour_value = interp_object(max_colour_percentile * 0.01)
 
         if numpy.isnan(min_colour_value):
             min_colour_value = 0.
@@ -735,9 +793,9 @@ def _plot_one_era5_field(
 
 
 def _run(shapley_file_name, gfs_directory_name, target_dir_name,
-         gfs_forecast_target_dir_name, predictor_colour_limits_prctile,
-         shapley_colour_limits_prctile, region_name,
-         shapley_line_width, shapley_line_opacity,
+         gfs_forecast_target_dir_name, gfs_normalization_file_name,
+         predictor_colour_limits_prctile, shapley_colour_limits_prctile,
+         region_name, shapley_line_width, shapley_line_opacity,
          plot_latitude_limits_deg_n, plot_longitude_limits_deg_e,
          shapley_half_num_contours, plot_shapley_in_log_space,
          shapley_smoothing_radius_px, output_dir_name):
@@ -749,6 +807,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     :param gfs_directory_name: Same.
     :param target_dir_name: Same.
     :param gfs_forecast_target_dir_name: Same.
+    :param gfs_normalization_file_name: Same.
     :param predictor_colour_limits_prctile: Same.
     :param shapley_colour_limits_prctile: Same.
     :param region_name: Same.
@@ -826,6 +885,16 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         error_checking.assert_is_greater_numpy_array(
             numpy.absolute(numpy.diff(plot_longitude_limits_deg_e)),
             0
+        )
+
+    if gfs_normalization_file_name is None:
+        gfs_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            gfs_normalization_file_name
+        ))
+        gfs_norm_param_table_xarray = gfs_io.read_normalization_file(
+            gfs_normalization_file_name
         )
 
     file_system_utils.mkdir_recursive_if_necessary(
@@ -984,6 +1053,25 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 gfs_lead_times_hours[t]
             )
 
+            if gfs_norm_param_table_xarray is None:
+                this_norm_param_table_xarray = None
+            else:
+                gfs_npt = gfs_norm_param_table_xarray
+
+                t_idxs = numpy.where(
+                    gfs_npt.coords[gfs_utils.FORECAST_HOUR_DIM].values ==
+                    gfs_lead_times_hours[t]
+                )[0]
+                this_npt = gfs_npt.isel({gfs_utils.FORECAST_HOUR_DIM: t_idxs})
+
+                f_idxs = numpy.where(
+                    this_npt.coords[gfs_utils.FIELD_DIM_2D].values ==
+                    gfs_field_names_2d[f]
+                )[0]
+                this_npt = this_npt.isel({gfs_utils.FIELD_DIM_2D: f_idxs})
+
+                this_norm_param_table_xarray = this_npt
+
             figure_object, axes_object = _plot_one_gfs_field(
                 data_matrix=this_predictor_matrix,
                 grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
@@ -993,7 +1081,8 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 field_name=gfs_field_names_2d[f],
                 min_colour_percentile=predictor_colour_limits_prctile[0],
                 max_colour_percentile=predictor_colour_limits_prctile[1],
-                title_string=title_string
+                title_string=title_string,
+                gfs_norm_param_table_xarray=this_norm_param_table_xarray
             )
 
             min_colour_value, max_colour_value = _plot_one_shapley_field(
@@ -1073,6 +1162,27 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                     gfs_lead_times_hours[t]
                 )
 
+                if gfs_norm_param_table_xarray is None:
+                    this_norm_param_table_xarray = None
+                else:
+                    gfs_npt = gfs_norm_param_table_xarray
+
+                    p_idxs = numpy.where(
+                        gfs_npt.coords[gfs_utils.PRESSURE_LEVEL_DIM].values ==
+                        gfs_pressure_levels_mb[p]
+                    )[0]
+                    this_npt = gfs_npt.isel(
+                        {gfs_utils.PRESSURE_LEVEL_DIM: p_idxs}
+                    )
+
+                    f_idxs = numpy.where(
+                        this_npt.coords[gfs_utils.FIELD_DIM_3D].values ==
+                        gfs_field_names_3d[f]
+                    )[0]
+                    this_npt = this_npt.isel({gfs_utils.FIELD_DIM_3D: f_idxs})
+
+                    this_norm_param_table_xarray = this_npt
+
                 figure_object, axes_object = _plot_one_gfs_field(
                     data_matrix=this_predictor_matrix,
                     grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
@@ -1082,7 +1192,8 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                     field_name=gfs_field_names_3d[f],
                     min_colour_percentile=predictor_colour_limits_prctile[0],
                     max_colour_percentile=predictor_colour_limits_prctile[1],
-                    title_string=title_string
+                    title_string=title_string,
+                    gfs_norm_param_table_xarray=this_norm_param_table_xarray
                 )
 
                 min_colour_value, max_colour_value = _plot_one_shapley_field(
@@ -1376,6 +1487,9 @@ if __name__ == '__main__':
         target_dir_name=getattr(INPUT_ARG_OBJECT, TARGET_DIR_ARG_NAME),
         gfs_forecast_target_dir_name=getattr(
             INPUT_ARG_OBJECT, GFS_FCST_TARGET_DIR_ARG_NAME
+        ),
+        gfs_normalization_file_name=getattr(
+            INPUT_ARG_OBJECT, GFS_NORM_FILE_ARG_NAME
         ),
         predictor_colour_limits_prctile=numpy.array(
             getattr(INPUT_ARG_OBJECT, PREDICTOR_COLOUR_LIMITS_ARG_NAME),
