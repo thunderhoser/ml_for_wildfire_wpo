@@ -39,6 +39,28 @@ ALL_FIELD_NAMES = [
     SUBGRID_OROGRAPHY_STDEV_NAME, RESOLVED_OROGRAPHY_STDEV_NAME
 ]
 
+FIELD_NAME_TO_FANCY = {
+    SUBGRID_OROGRAPHY_SINE_NAME: 'sin of subgrid orog\'y angle',
+    SUBGRID_OROGRAPHY_COSINE_NAME: 'cos of subgrid orog\'y angle',
+    SUBGRID_OROGRAPHY_ANISOTROPY_NAME: 'anisotropy of subgrid orog\'y angle',
+    GEOPOTENTIAL_NAME: 'sfc geopotential',
+    LAND_SEA_MASK_NAME: 'land/sea mask',
+    SUBGRID_OROGRAPHY_SLOPE_NAME: 'slope of subgrid orog\'y angle',
+    SUBGRID_OROGRAPHY_STDEV_NAME: 'stdev of subgrid orog\'y',
+    RESOLVED_OROGRAPHY_STDEV_NAME: 'stdev of resolved orog\'y',
+}
+
+FIELD_NAME_TO_UNIT_STRING = {
+    SUBGRID_OROGRAPHY_SINE_NAME: '',
+    SUBGRID_OROGRAPHY_COSINE_NAME: '',
+    SUBGRID_OROGRAPHY_ANISOTROPY_NAME: '',
+    GEOPOTENTIAL_NAME: r'm$^2$ s$^{-2}$',
+    LAND_SEA_MASK_NAME: '',
+    SUBGRID_OROGRAPHY_SLOPE_NAME: '',
+    SUBGRID_OROGRAPHY_STDEV_NAME: 'm',
+    RESOLVED_OROGRAPHY_STDEV_NAME: 'm',
+}
+
 
 def check_field_name(field_name):
     """Ensures validity of field name.

@@ -21,6 +21,7 @@ import error_checking
 import shapley_io
 import border_io
 import gfs_utils
+import era5_constant_utils
 import neural_net
 import plotting_utils
 import gfs_plotting
@@ -31,10 +32,13 @@ TOLERANCE = 1e-6
 DATE_FORMAT = '%Y%m%d'
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
-GFS_SEQUENTIAL_COLOUR_MAP_OBJECT = pyplot.get_cmap('viridis')
+GFS_SEQUENTIAL_COLOUR_MAP_OBJECT = pyplot.get_cmap('plasma')
 GFS_DIVERGING_COLOUR_MAP_OBJECT = pyplot.get_cmap('seismic')
+SHAPLEY_COLOUR_MAP_OBJECT = pyplot.get_cmap('gist_yarg')
 
-COLOUR_BAR_FONT_SIZE = 24
+COLOUR_BAR_FONT_SIZE = 20
+BORDER_COLOUR = numpy.array([139, 69, 19], dtype=float) / 255
+
 FIGURE_WIDTH_INCHES = 15
 FIGURE_HEIGHT_INCHES = 15
 FIGURE_RESOLUTION_DPI = 300
@@ -46,6 +50,10 @@ GFS_FCST_TARGET_DIR_ARG_NAME = 'input_gfs_fcst_target_dir_name'
 PREDICTOR_COLOUR_LIMITS_ARG_NAME = 'predictor_colour_limits_prctile'
 SHAPLEY_COLOUR_LIMITS_ARG_NAME = 'shapley_colour_limits_prctile'
 REGION_ARG_NAME = 'region_name'
+SHAPLEY_LINE_WIDTH_ARG_NAME = 'shapley_line_width'
+SHAPLEY_HALF_NUM_CONTOURS_ARG_NAME = 'shapley_half_num_contours'
+SHAPLEY_LOG_SPACE_ARG_NAME = 'plot_shapley_in_log_space'
+SHAPLEY_SMOOTHING_RADIUS_ARG_NAME = 'shapley_smoothing_radius_px'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 SHAPLEY_FILE_HELP_STRING = (
@@ -81,6 +89,20 @@ REGION_HELP_STRING = (
     'Name of region for which Shapley values will be computed.  If you leave '
     'this empty, the region will not be reported in figure titles.'
 )
+SHAPLEY_LINE_WIDTH_HELP_STRING = 'Line width for Shapley-value contours.'
+SHAPLEY_HALF_NUM_CONTOURS_HELP_STRING = (
+    'Half-number of line contours for Shapley values.  This many contours will '
+    'be used on either side of zero -- i.e., for both positive and negative '
+    'values.'
+)
+SHAPLEY_LOG_SPACE_HELP_STRING = (
+    'Boolean flag.  If 1 (0), will plot Shapley values in logarithmic (linear) '
+    'space.'
+)
+SHAPLEY_SMOOTHING_RADIUS_HELP_STRING = (
+    'Smoothing radius (units = num pixels) for Shapley values.  If you do not '
+    'want to smooth Shapley values, make this non-positive.'
+)
 OUTPUT_DIR_HELP_STRING = (
     'Path to output directory.  Figures will be saved here.'
 )
@@ -113,6 +135,22 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + REGION_ARG_NAME, type=str, required=False, default='',
     help=REGION_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + SHAPLEY_LINE_WIDTH_ARG_NAME, type=float, required=True,
+    help=SHAPLEY_LINE_WIDTH_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + SHAPLEY_HALF_NUM_CONTOURS_ARG_NAME, type=int, required=True,
+    help=SHAPLEY_HALF_NUM_CONTOURS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + SHAPLEY_LOG_SPACE_ARG_NAME, type=int, required=True,
+    help=SHAPLEY_LOG_SPACE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + SHAPLEY_SMOOTHING_RADIUS_ARG_NAME, type=float, required=True,
+    help=SHAPLEY_SMOOTHING_RADIUS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
@@ -312,6 +350,90 @@ def _plot_one_shapley_field(
     return min_abs_contour_value, max_abs_contour_value
 
 
+def _plot_one_fwi_field(
+        data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
+        border_latitudes_deg_n, border_longitudes_deg_e,
+        field_name, title_string):
+    """Plots a single 2-D fire-weather field with Shapley values on top.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    P = number of points in border file
+
+    :param data_matrix: M-by-N numpy array of data values.
+    :param grid_latitudes_deg_n: length-M numpy array of latitudes (deg north).
+    :param grid_longitudes_deg_e: length-N numpy array of longitudes (deg east).
+    :param border_latitudes_deg_n: length-P numpy array of latitudes (deg
+        north).
+    :param border_longitudes_deg_e: length-P numpy array of longitudes (deg
+        east).
+    :param field_name: Field name.
+    :param title_string: Title.
+    :return: figure_object: Figure handle (instance of
+        `matplotlib.figure.Figure`).
+    :return: axes_object: Axes handle (instance of
+        `matplotlib.axes._subplots.AxesSubplot`).
+    """
+
+    figure_object, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    colour_map_object, colour_norm_object = fwi_plotting.field_to_colour_scheme(
+        field_name
+    )
+
+    is_longitude_positive_in_west = fwi_plotting.plot_field(
+        data_matrix=data_matrix,
+        grid_latitudes_deg_n=grid_latitudes_deg_n,
+        grid_longitudes_deg_e=grid_longitudes_deg_e,
+        colour_map_object=colour_map_object,
+        colour_norm_object=colour_norm_object,
+        axes_object=axes_object, plot_colour_bar=True
+    )
+
+    if is_longitude_positive_in_west:
+        border_longitudes_deg_e = lng_conversion.convert_lng_positive_in_west(
+            border_longitudes_deg_e
+        )
+        grid_longitudes_deg_e = lng_conversion.convert_lng_positive_in_west(
+            grid_longitudes_deg_e
+        )
+    else:
+        border_longitudes_deg_e = lng_conversion.convert_lng_negative_in_west(
+            border_longitudes_deg_e
+        )
+        grid_longitudes_deg_e = lng_conversion.convert_lng_negative_in_west(
+            grid_longitudes_deg_e
+        )
+
+    plotting_utils.plot_borders(
+        border_latitudes_deg_n=border_latitudes_deg_n,
+        border_longitudes_deg_e=border_longitudes_deg_e,
+        axes_object=axes_object,
+        line_colour=numpy.full(3, 0.)
+    )
+    plotting_utils.plot_grid_lines(
+        plot_latitudes_deg_n=grid_latitudes_deg_n,
+        plot_longitudes_deg_e=grid_longitudes_deg_e,
+        axes_object=axes_object,
+        meridian_spacing_deg=20.,
+        parallel_spacing_deg=10.
+    )
+
+    axes_object.set_xlim(
+        numpy.min(grid_longitudes_deg_e),
+        numpy.max(grid_longitudes_deg_e)
+    )
+    axes_object.set_ylim(
+        numpy.min(grid_latitudes_deg_n),
+        numpy.max(grid_latitudes_deg_n)
+    )
+    axes_object.set_title(title_string)
+
+    return figure_object, axes_object
+
+
 def _plot_one_gfs_field(
         data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
         border_latitudes_deg_n, border_longitudes_deg_e,
@@ -429,9 +551,105 @@ def _plot_one_gfs_field(
     return figure_object, axes_object
 
 
+def _plot_one_era5_field(
+        data_matrix, grid_latitudes_deg_n, grid_longitudes_deg_e,
+        border_latitudes_deg_n, border_longitudes_deg_e,
+        min_colour_percentile, max_colour_percentile, title_string):
+    """Plots a single ERA5 time-constant field with Shapley values on top.
+
+    :param data_matrix: See documentation for `_plot_one_gfs_field`.
+    :param grid_latitudes_deg_n: Same.
+    :param grid_longitudes_deg_e: Same.
+    :param border_latitudes_deg_n: Same.
+    :param border_longitudes_deg_e: Same.
+    :param min_colour_percentile: Same.
+    :param max_colour_percentile: Same.
+    :param title_string: Same.
+    :return: figure_object: Same.
+    :return: axes_object: Same.
+    """
+
+    figure_object, axes_object = pyplot.subplots(
+        1, 1, figsize=(FIGURE_WIDTH_INCHES, FIGURE_HEIGHT_INCHES)
+    )
+
+    colour_map_object = GFS_SEQUENTIAL_COLOUR_MAP_OBJECT
+    min_colour_value = numpy.nanpercentile(
+        data_matrix, min_colour_percentile
+    )
+    max_colour_value = numpy.nanpercentile(
+        data_matrix, max_colour_percentile
+    )
+
+    if numpy.isnan(min_colour_value):
+        min_colour_value = 0.
+        max_colour_value = TOLERANCE
+
+    max_colour_value = max([max_colour_value, min_colour_value + TOLERANCE])
+
+    colour_norm_object = pyplot.Normalize(
+        vmin=min_colour_value, vmax=max_colour_value
+    )
+
+    is_longitude_positive_in_west = gfs_plotting.plot_field(
+        data_matrix=data_matrix,
+        grid_latitudes_deg_n=grid_latitudes_deg_n,
+        grid_longitudes_deg_e=grid_longitudes_deg_e,
+        colour_map_object=colour_map_object,
+        colour_norm_object=colour_norm_object,
+        axes_object=axes_object,
+        plot_colour_bar=True,
+        plot_in_log2_scale=False
+    )
+
+    if is_longitude_positive_in_west:
+        border_longitudes_deg_e = lng_conversion.convert_lng_positive_in_west(
+            border_longitudes_deg_e
+        )
+        grid_longitudes_deg_e = lng_conversion.convert_lng_positive_in_west(
+            grid_longitudes_deg_e
+        )
+    else:
+        border_longitudes_deg_e = lng_conversion.convert_lng_negative_in_west(
+            border_longitudes_deg_e
+        )
+        grid_longitudes_deg_e = lng_conversion.convert_lng_negative_in_west(
+            grid_longitudes_deg_e
+        )
+
+    plotting_utils.plot_borders(
+        border_latitudes_deg_n=border_latitudes_deg_n,
+        border_longitudes_deg_e=border_longitudes_deg_e,
+        axes_object=axes_object,
+        line_colour=numpy.full(3, 0.)
+    )
+    plotting_utils.plot_grid_lines(
+        plot_latitudes_deg_n=grid_latitudes_deg_n,
+        plot_longitudes_deg_e=grid_longitudes_deg_e,
+        axes_object=axes_object,
+        meridian_spacing_deg=20.,
+        parallel_spacing_deg=10.
+    )
+
+    axes_object.set_xlim(
+        numpy.min(grid_longitudes_deg_e),
+        numpy.max(grid_longitudes_deg_e)
+    )
+    axes_object.set_ylim(
+        numpy.min(grid_latitudes_deg_n),
+        numpy.max(grid_latitudes_deg_n)
+    )
+    axes_object.set_title(title_string)
+
+    return figure_object, axes_object
+
+
 def _run(shapley_file_name, gfs_directory_name, target_dir_name,
          gfs_forecast_target_dir_name, predictor_colour_limits_prctile,
-         shapley_colour_limits_prctile, region_name, output_dir_name):
+         shapley_colour_limits_prctile, region_name,
+         shapley_line_width, shapley_half_num_contours,
+         plot_shapley_in_log_space, shapley_smoothing_radius_px,
+         output_dir_name):
     """Plots Shapley values as spatial maps.
 
     This is effectively the main method.
@@ -443,6 +661,10 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     :param predictor_colour_limits_prctile: Same.
     :param shapley_colour_limits_prctile: Same.
     :param region_name: Same.
+    :param shapley_line_width: Same.
+    :param shapley_half_num_contours: Same.
+    :param plot_shapley_in_log_space: Same.
+    :param shapley_smoothing_radius_px: Same.
     :param output_dir_name: Same.
     """
 
@@ -464,6 +686,10 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     if region_name == '':
         region_name = None
 
+    error_checking.assert_is_greater(shapley_line_width, 0.)
+    if shapley_smoothing_radius_px < TOLERANCE:
+        shapley_smoothing_radius_px = None
+
     file_system_utils.mkdir_recursive_if_necessary(
         directory_name=output_dir_name
     )
@@ -471,12 +697,12 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     # Read Shapley values.
     print('Reading Shapley values from: "{0:s}"...'.format(shapley_file_name))
     shapley_table_xarray = shapley_io.read_file(shapley_file_name)
+    if shapley_smoothing_radius_px is not None:
+        shapley_table_xarray = _smooth_maps(
+            shapley_table_xarray=shapley_table_xarray,
+            smoothing_radius_px=shapley_smoothing_radius_px
+        )
 
-    # TODO(thunderhoser): Smoothing needs to be an input arg.
-    shapley_table_xarray = _smooth_maps(
-        shapley_table_xarray=shapley_table_xarray,
-        smoothing_radius_px=2.
-    )
     stx = shapley_table_xarray
 
     # Read model metadata.
@@ -520,32 +746,33 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         return
 
     predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
-
-    # TODO
-    # model_input_layer_names = data_dict[neural_net.INPUT_LAYER_NAMES_KEY]
-    model_input_layer_names = [shapley_io.GFS_3D_LAYER_NAME, shapley_io.GFS_2D_LAYER_NAME]
+    model_input_layer_names = data_dict[neural_net.INPUT_LAYER_NAMES_KEY]
     del data_dict
 
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
-    lyr_idx = model_input_layer_names.index(shapley_io.GFS_2D_LAYER_NAME)
-    this_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
     gfs_lead_times_hours = vod[neural_net.MODEL_LEAD_TO_GFS_PRED_LEADS_KEY][
         model_lead_time_days
     ]
     gfs_field_names = vod[neural_net.GFS_PREDICTOR_FIELDS_KEY]
+    gfs_field_names_2d = [
+        f for f in gfs_field_names
+        if f in gfs_utils.ALL_2D_FIELD_NAMES
+    ]
 
-    for i in range(len(gfs_lead_times_hours)):
-        for j in range(len(gfs_field_names)):
-            print(this_predictor_matrix.shape)
-            print(i)
-            print(j)
-            print('\n\n\n')
+    if len(gfs_field_names_2d) > 0:
+        lyr_idx = model_input_layer_names.index(neural_net.GFS_2D_LAYER_NAME)
+        gfs_2d_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
+    else:
+        gfs_2d_predictor_matrix = numpy.array([])
 
-            gfs_matrix_to_plot, unit_string = (
+    for t in range(len(gfs_lead_times_hours)):
+        for f in range(len(gfs_field_names_2d)):
+            this_predictor_matrix, unit_string = (
                 gfs_plotting.field_to_plotting_units(
-                    data_matrix_default_units=this_predictor_matrix[..., i, j],
-                    field_name=gfs_field_names[j]
+                    data_matrix_default_units=
+                    gfs_2d_predictor_matrix[..., t, f],
+                    field_name=gfs_field_names_2d[f]
                 )
             )
 
@@ -553,10 +780,10 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 'GFS {0:s} ({1:s}), {2:s} + {3:d} hours\n'
                 'Shapley values for {4:d}-day {5:s}{6:s}'
             ).format(
-                gfs_plotting.FIELD_NAME_TO_FANCY[gfs_field_names[j]],
+                gfs_plotting.FIELD_NAME_TO_FANCY[gfs_field_names_2d[f]],
                 unit_string,
                 init_date_string_nice,
-                gfs_lead_times_hours[i],
+                gfs_lead_times_hours[t],
                 model_lead_time_days,
                 fwi_plotting.FIELD_NAME_TO_SIMPLE[target_field_name],
                 '' if region_name is None else ' over ' + region_name
@@ -566,17 +793,17 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 '{0:s}/shapley_gfs_{1:s}_{2:03d}hours.jpg'
             ).format(
                 output_dir_name,
-                gfs_field_names[j].replace('_', '-'),
-                gfs_lead_times_hours[i]
+                gfs_field_names_2d[f].replace('_', '-'),
+                gfs_lead_times_hours[t]
             )
 
             figure_object, axes_object = _plot_one_gfs_field(
-                data_matrix=gfs_matrix_to_plot,
+                data_matrix=this_predictor_matrix,
                 grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
                 grid_longitudes_deg_e=stx[shapley_io.LONGITUDE_KEY].values,
                 border_latitudes_deg_n=border_latitudes_deg_n,
                 border_longitudes_deg_e=border_longitudes_deg_e,
-                field_name=gfs_field_names[j],
+                field_name=gfs_field_names_2d[f],
                 min_colour_percentile=predictor_colour_limits_prctile[0],
                 max_colour_percentile=predictor_colour_limits_prctile[1],
                 title_string=title_string
@@ -584,17 +811,17 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
             min_colour_value, max_colour_value = _plot_one_shapley_field(
                 shapley_matrix=
-                stx[shapley_io.SHAPLEY_FOR_2D_GFS_KEY].values[..., i, j],
+                stx[shapley_io.SHAPLEY_FOR_2D_GFS_KEY].values[..., t, f],
                 axes_object=axes_object,
                 figure_object=figure_object,
                 grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
                 grid_longitudes_deg_e=stx[shapley_io.LONGITUDE_KEY].values,
                 min_colour_percentile=shapley_colour_limits_prctile[0],
                 max_colour_percentile=shapley_colour_limits_prctile[1],
-                half_num_contours=10,  # TODO: make input arg
-                colour_map_object=pyplot.get_cmap('Oranges'),  # TODO: make input arg
-                line_width=3,  # TODO: make input arg
-                plot_in_log_space=False,  # TODO: make input arg
+                half_num_contours=shapley_half_num_contours,
+                colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+                line_width=shapley_line_width,
+                plot_in_log_space=plot_shapley_in_log_space,
                 output_file_name=output_file_name
             )
 
@@ -603,14 +830,349 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             )
             plotting_utils.add_colour_bar(
                 figure_file_name=output_file_name,
-                colour_map_object=pyplot.get_cmap('Oranges'),
+                colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
                 colour_norm_object=colour_norm_object,
                 orientation_string='vertical',
                 font_size=COLOUR_BAR_FONT_SIZE,
                 cbar_label_string='Absolute Shapley value',
                 tick_label_format_string='{0:.2g}',
-                log_space=False
+                log_space=plot_shapley_in_log_space
             )
+
+    gfs_pressure_levels_mb = vod[neural_net.GFS_PRESSURE_LEVELS_KEY]
+    gfs_field_names_3d = [
+        f for f in gfs_field_names
+        if f in gfs_utils.ALL_3D_FIELD_NAMES
+    ]
+
+    if len(gfs_field_names_3d) > 0:
+        lyr_idx = model_input_layer_names.index(neural_net.GFS_3D_LAYER_NAME)
+        gfs_3d_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
+    else:
+        gfs_3d_predictor_matrix = numpy.array([])
+
+    for p in range(len(gfs_pressure_levels_mb)):
+        for t in range(len(gfs_lead_times_hours)):
+            for f in range(len(gfs_field_names_3d)):
+                this_predictor_matrix, unit_string = (
+                    gfs_plotting.field_to_plotting_units(
+                        data_matrix_default_units=
+                        gfs_3d_predictor_matrix[..., p, t, f],
+                        field_name=gfs_field_names_3d[f]
+                    )
+                )
+
+                title_string = (
+                    'GFS {0:s} ({1:s}), {2:.0f} mb, {3:s} + {4:d} hours\n'
+                    'Shapley values for {5:d}-day {6:s}{7:s}'
+                ).format(
+                    gfs_plotting.FIELD_NAME_TO_FANCY[gfs_field_names_3d[f]],
+                    unit_string,
+                    gfs_pressure_levels_mb[p],
+                    init_date_string_nice,
+                    gfs_lead_times_hours[t],
+                    model_lead_time_days,
+                    fwi_plotting.FIELD_NAME_TO_SIMPLE[target_field_name],
+                    '' if region_name is None else ' over ' + region_name
+                )
+
+                output_file_name = (
+                    '{0:s}/shapley_gfs_{1:s}_{2:04d}mb_{3:03d}hours.jpg'
+                ).format(
+                    output_dir_name,
+                    gfs_field_names_3d[f].replace('_', '-'),
+                    int(numpy.round(gfs_pressure_levels_mb[p])),
+                    gfs_lead_times_hours[t]
+                )
+
+                figure_object, axes_object = _plot_one_gfs_field(
+                    data_matrix=this_predictor_matrix,
+                    grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
+                    grid_longitudes_deg_e=stx[shapley_io.LONGITUDE_KEY].values,
+                    border_latitudes_deg_n=border_latitudes_deg_n,
+                    border_longitudes_deg_e=border_longitudes_deg_e,
+                    field_name=gfs_field_names_3d[f],
+                    min_colour_percentile=predictor_colour_limits_prctile[0],
+                    max_colour_percentile=predictor_colour_limits_prctile[1],
+                    title_string=title_string
+                )
+
+                min_colour_value, max_colour_value = _plot_one_shapley_field(
+                    shapley_matrix=
+                    stx[shapley_io.SHAPLEY_FOR_3D_GFS_KEY].values[..., p, t, f],
+                    axes_object=axes_object,
+                    figure_object=figure_object,
+                    grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
+                    grid_longitudes_deg_e=stx[shapley_io.LONGITUDE_KEY].values,
+                    min_colour_percentile=shapley_colour_limits_prctile[0],
+                    max_colour_percentile=shapley_colour_limits_prctile[1],
+                    half_num_contours=shapley_half_num_contours,
+                    colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+                    line_width=shapley_line_width,
+                    plot_in_log_space=plot_shapley_in_log_space,
+                    output_file_name=output_file_name
+                )
+
+                colour_norm_object = pyplot.Normalize(
+                    vmin=min_colour_value, vmax=max_colour_value
+                )
+                plotting_utils.add_colour_bar(
+                    figure_file_name=output_file_name,
+                    colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+                    colour_norm_object=colour_norm_object,
+                    orientation_string='vertical',
+                    font_size=COLOUR_BAR_FONT_SIZE,
+                    cbar_label_string='Absolute Shapley value',
+                    tick_label_format_string='{0:.2g}',
+                    log_space=plot_shapley_in_log_space
+                )
+
+    # TODO(thunderhoser): This code does not yet handle the case where lagged
+    # targets or GFS fire-weather forecasts are missing.
+    target_lag_times_days = vod[neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY][
+        model_lead_time_days
+    ]
+    gfs_target_lead_times_days = vod[
+        neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
+    ][model_lead_time_days]
+
+    target_lag_times_days = numpy.concatenate([
+        target_lag_times_days, -1 * gfs_target_lead_times_days
+    ])
+    all_target_field_names = vod[neural_net.TARGET_FIELDS_KEY]
+
+    lyr_idx = model_input_layer_names.index(
+        neural_net.LAGLEAD_TARGET_LAYER_NAME
+    )
+    laglead_target_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
+
+    for t in range(len(target_lag_times_days)):
+        for f in range(len(all_target_field_names)):
+            this_predictor_matrix = laglead_target_predictor_matrix[..., t, f]
+
+            if target_lag_times_days[t] < 0:
+                title_string = (
+                    'GFS-forecast {0:s}, {1:s} + {2:d} days\n'
+                    'Shapley values for {3:d}-day {4:s}{5:s}'
+                ).format(
+                    fwi_plotting.FIELD_NAME_TO_SIMPLE[
+                        all_target_field_names[f]
+                    ],
+                    init_date_string_nice,
+                    -1 * target_lag_times_days[t],
+                    model_lead_time_days,
+                    fwi_plotting.FIELD_NAME_TO_SIMPLE[target_field_name],
+                    '' if region_name is None else ' over ' + region_name
+                )
+            else:
+                title_string = (
+                    'Lagged-truth {0:s}, {1:s} - {2:d} days\n'
+                    'Shapley values for {3:d}-day {4:s}{5:s}'
+                ).format(
+                    fwi_plotting.FIELD_NAME_TO_SIMPLE[
+                        all_target_field_names[f]
+                    ],
+                    init_date_string_nice,
+                    target_lag_times_days[t],
+                    model_lead_time_days,
+                    fwi_plotting.FIELD_NAME_TO_SIMPLE[target_field_name],
+                    '' if region_name is None else ' over ' + region_name
+                )
+
+            output_file_name = (
+                '{0:s}/shapley_laglead_target_{1:s}_{2:+03d}days.jpg'
+            ).format(
+                output_dir_name,
+                all_target_field_names[f].replace('_', '-'),
+                target_lag_times_days[t]
+            )
+
+            figure_object, axes_object = _plot_one_fwi_field(
+                data_matrix=this_predictor_matrix,
+                grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
+                grid_longitudes_deg_e=stx[shapley_io.LONGITUDE_KEY].values,
+                border_latitudes_deg_n=border_latitudes_deg_n,
+                border_longitudes_deg_e=border_longitudes_deg_e,
+                field_name=all_target_field_names[f],
+                title_string=title_string
+            )
+
+            min_colour_value, max_colour_value = _plot_one_shapley_field(
+                shapley_matrix=
+                stx[shapley_io.SHAPLEY_FOR_LAGLEAD_TARGETS_KEY].values[..., t, f],
+                axes_object=axes_object,
+                figure_object=figure_object,
+                grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
+                grid_longitudes_deg_e=stx[shapley_io.LONGITUDE_KEY].values,
+                min_colour_percentile=shapley_colour_limits_prctile[0],
+                max_colour_percentile=shapley_colour_limits_prctile[1],
+                half_num_contours=shapley_half_num_contours,
+                colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+                line_width=shapley_line_width,
+                plot_in_log_space=plot_shapley_in_log_space,
+                output_file_name=output_file_name
+            )
+
+            colour_norm_object = pyplot.Normalize(
+                vmin=min_colour_value, vmax=max_colour_value
+            )
+            plotting_utils.add_colour_bar(
+                figure_file_name=output_file_name,
+                colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+                colour_norm_object=colour_norm_object,
+                orientation_string='vertical',
+                font_size=COLOUR_BAR_FONT_SIZE,
+                cbar_label_string='Absolute Shapley value',
+                tick_label_format_string='{0:.2g}',
+                log_space=plot_shapley_in_log_space
+            )
+
+    era5_constant_field_names = vod[
+        neural_net.ERA5_CONSTANT_PREDICTOR_FIELDS_KEY
+    ]
+
+    if era5_constant_field_names is None:
+        era5_constant_predictor_matrix = numpy.array([])
+    else:
+        lyr_idx = model_input_layer_names.index(neural_net.ERA5_LAYER_NAME)
+        era5_constant_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
+
+    for f in range(len(era5_constant_field_names)):
+        this_predictor_matrix = era5_constant_predictor_matrix[..., f]
+
+        unit_string = era5_constant_utils.FIELD_NAME_TO_UNIT_STRING[
+            era5_constant_field_names[f]
+        ]
+        if unit_string != '':
+            unit_string = '({0:s})'.format(unit_string)
+
+        title_string = (
+            'ERA5 {0:s}{1:s}\n'
+            'Shapley values for {2:d}-day {3:s}{4:s}'
+        ).format(
+            era5_constant_utils.FIELD_NAME_TO_FANCY[
+                era5_constant_field_names[f]
+            ],
+            unit_string,
+            model_lead_time_days,
+            fwi_plotting.FIELD_NAME_TO_SIMPLE[target_field_name],
+            '' if region_name is None else ' over ' + region_name
+        )
+
+        output_file_name = '{0:s}/shapley_era5_{1:s}.jpg'.format(
+            output_dir_name,
+            era5_constant_field_names[f].replace('_', '-')
+        )
+
+        figure_object, axes_object = _plot_one_era5_field(
+            data_matrix=this_predictor_matrix,
+            grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
+            grid_longitudes_deg_e=stx[shapley_io.LONGITUDE_KEY].values,
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            min_colour_percentile=predictor_colour_limits_prctile[0],
+            max_colour_percentile=predictor_colour_limits_prctile[1],
+            title_string=title_string
+        )
+
+        min_colour_value, max_colour_value = _plot_one_shapley_field(
+            shapley_matrix=stx[shapley_io.SHAPLEY_FOR_ERA5_KEY].values[..., f],
+            axes_object=axes_object,
+            figure_object=figure_object,
+            grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
+            grid_longitudes_deg_e=stx[shapley_io.LONGITUDE_KEY].values,
+            min_colour_percentile=shapley_colour_limits_prctile[0],
+            max_colour_percentile=shapley_colour_limits_prctile[1],
+            half_num_contours=shapley_half_num_contours,
+            colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+            line_width=shapley_line_width,
+            plot_in_log_space=plot_shapley_in_log_space,
+            output_file_name=output_file_name
+        )
+
+        colour_norm_object = pyplot.Normalize(
+            vmin=min_colour_value, vmax=max_colour_value
+        )
+        plotting_utils.add_colour_bar(
+            figure_file_name=output_file_name,
+            colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+            colour_norm_object=colour_norm_object,
+            orientation_string='vertical',
+            font_size=COLOUR_BAR_FONT_SIZE,
+            cbar_label_string='Absolute Shapley value',
+            tick_label_format_string='{0:.2g}',
+            log_space=plot_shapley_in_log_space
+        )
+
+    do_residual_prediction = vod[neural_net.DO_RESIDUAL_PREDICTION_KEY]
+
+    if do_residual_prediction:
+        lyr_idx = model_input_layer_names.index(
+            neural_net.PREDN_BASELINE_LAYER_NAME
+        )
+        resid_baseline_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
+    else:
+        resid_baseline_predictor_matrix = numpy.array([])
+
+    for f in range(len(all_target_field_names)):
+        this_predictor_matrix = resid_baseline_predictor_matrix[..., f]
+
+        title_string = (
+            'Baseline {0:s}, {1:s} - {2:d} days\n'
+            'Shapley values for {3:d}-day {4:s}{5:s}'
+        ).format(
+            fwi_plotting.FIELD_NAME_TO_SIMPLE[all_target_field_names[f]],
+            init_date_string_nice,
+            numpy.min(target_lag_times_days),
+            model_lead_time_days,
+            fwi_plotting.FIELD_NAME_TO_SIMPLE[target_field_name],
+            '' if region_name is None else ' over ' + region_name
+        )
+
+        output_file_name = '{0:s}/shapley_residual_baseline_{1:s}.jpg'.format(
+            output_dir_name,
+            all_target_field_names[f].replace('_', '-')
+        )
+
+        figure_object, axes_object = _plot_one_fwi_field(
+            data_matrix=this_predictor_matrix,
+            grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
+            grid_longitudes_deg_e=stx[shapley_io.LONGITUDE_KEY].values,
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            field_name=all_target_field_names[f],
+            title_string=title_string
+        )
+
+        min_colour_value, max_colour_value = _plot_one_shapley_field(
+            shapley_matrix=
+            stx[shapley_io.SHAPLEY_FOR_PREDN_BASELINE_KEY].values[..., f],
+            axes_object=axes_object,
+            figure_object=figure_object,
+            grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
+            grid_longitudes_deg_e=stx[shapley_io.LONGITUDE_KEY].values,
+            min_colour_percentile=shapley_colour_limits_prctile[0],
+            max_colour_percentile=shapley_colour_limits_prctile[1],
+            half_num_contours=shapley_half_num_contours,
+            colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+            line_width=shapley_line_width,
+            plot_in_log_space=plot_shapley_in_log_space,
+            output_file_name=output_file_name
+        )
+
+        colour_norm_object = pyplot.Normalize(
+            vmin=min_colour_value, vmax=max_colour_value
+        )
+        plotting_utils.add_colour_bar(
+            figure_file_name=output_file_name,
+            colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+            colour_norm_object=colour_norm_object,
+            orientation_string='vertical',
+            font_size=COLOUR_BAR_FONT_SIZE,
+            cbar_label_string='Absolute Shapley value',
+            tick_label_format_string='{0:.2g}',
+            log_space=plot_shapley_in_log_space
+        )
 
 
 if __name__ == '__main__':
@@ -632,5 +1194,17 @@ if __name__ == '__main__':
             dtype=float
         ),
         region_name=getattr(INPUT_ARG_OBJECT, REGION_ARG_NAME),
+        shapley_line_width=getattr(
+            INPUT_ARG_OBJECT, SHAPLEY_LINE_WIDTH_ARG_NAME
+        ),
+        shapley_half_num_contours=getattr(
+            INPUT_ARG_OBJECT, SHAPLEY_HALF_NUM_CONTOURS_ARG_NAME
+        ),
+        plot_shapley_in_log_space=bool(getattr(
+            INPUT_ARG_OBJECT, SHAPLEY_LOG_SPACE_ARG_NAME
+        )),
+        shapley_smoothing_radius_px=getattr(
+            INPUT_ARG_OBJECT, SHAPLEY_SMOOTHING_RADIUS_ARG_NAME
+        ),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )
