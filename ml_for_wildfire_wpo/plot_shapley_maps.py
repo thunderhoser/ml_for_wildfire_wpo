@@ -14,6 +14,7 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
 import grids
+import number_rounding
 import longitude_conversion as lng_conversion
 import gg_general_utils
 import file_system_utils
@@ -396,8 +397,6 @@ def _plot_one_shapley_field(
         numpy.max(plot_latitude_limits_deg_n)
     )
 
-    print(plot_longitude_limits_deg_e)
-
     if plot_longitude_limits_deg_e is None:
         plot_longitude_limits_deg_e = numpy.array([
             numpy.min(grid_longitudes_to_plot_deg_e),
@@ -417,28 +416,34 @@ def _plot_one_shapley_field(
             )
         )
 
-    plot_longitude_limits_deg_e = numpy.argsort(plot_longitude_limits_deg_e)
+    plot_longitude_limits_deg_e = numpy.sort(plot_longitude_limits_deg_e)
     axes_object.set_xlim(
         numpy.min(plot_longitude_limits_deg_e),
         numpy.max(plot_longitude_limits_deg_e)
     )
 
-    meridian_spacing_deg = numpy.floor(
-        (numpy.max(plot_longitude_limits_deg_e) -
-         numpy.min(plot_longitude_limits_deg_e))
-        / 7
-    )
-    parallel_spacing_deg = numpy.floor(
-        (numpy.max(plot_latitude_limits_deg_n) -
-         numpy.min(plot_latitude_limits_deg_n))
-        / 6
-    )
+    meridian_spacing_deg = (
+        numpy.max(plot_longitude_limits_deg_e) -
+        numpy.min(plot_longitude_limits_deg_e)
+    ) / 7
+    parallel_spacing_deg = (
+        numpy.max(plot_latitude_limits_deg_n) -
+        numpy.min(plot_latitude_limits_deg_n)
+    ) / 6
 
-    print(plot_latitude_limits_deg_n)
-    print(parallel_spacing_deg)
-    print('\n\n')
-    print(plot_longitude_limits_deg_e)
-    print(meridian_spacing_deg)
+    if meridian_spacing_deg > 1:
+        meridian_spacing_deg = numpy.floor(meridian_spacing_deg)
+    else:
+        meridian_spacing_deg = number_rounding.floor_to_nearest(
+            meridian_spacing_deg, 0.1
+        )
+
+    if parallel_spacing_deg > 1:
+        parallel_spacing_deg = numpy.floor(parallel_spacing_deg)
+    else:
+        parallel_spacing_deg = number_rounding.floor_to_nearest(
+            parallel_spacing_deg, 0.1
+        )
 
     plotting_utils.plot_grid_lines(
         plot_latitudes_deg_n=plot_latitude_limits_deg_n,
