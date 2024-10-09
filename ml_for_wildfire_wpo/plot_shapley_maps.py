@@ -590,7 +590,7 @@ def _plot_one_gfs_field(
                 y=y_values, kind='linear', bounds_error=True, assume_sorted=True
             )
 
-            new_percentile = numpy.mena(
+            new_percentile = numpy.mean(
                 numpy.array([max_colour_percentile, 100.])
             )
             max_colour_value = interp_object(new_percentile * 0.01)
@@ -618,6 +618,8 @@ def _plot_one_gfs_field(
             else:
                 y_values = gfs_npt[gfs_utils.QUANTILE_KEY_3D].values[0, 0, :]
 
+            print(y_values)
+
             interp_object = interp1d(
                 x=gfs_npt.coords[gfs_utils.QUANTILE_LEVEL_DIM].values,
                 y=y_values, kind='linear', bounds_error=True, assume_sorted=True
@@ -630,6 +632,9 @@ def _plot_one_gfs_field(
             max_colour_value = TOLERANCE
 
         max_colour_value = max([max_colour_value, min_colour_value + TOLERANCE])
+
+    print(min_colour_value)
+    print(max_colour_value)
 
     colour_norm_object = pyplot.Normalize(
         vmin=min_colour_value, vmax=max_colour_value
