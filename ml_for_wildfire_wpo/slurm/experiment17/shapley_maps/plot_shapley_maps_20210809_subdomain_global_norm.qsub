@@ -62,7 +62,7 @@ disable_tensorflow2=${DISABLE_TENSORFLOW2_FLAGS[$SLURM_ARRAY_TASK_ID]}
 disable_eager_execution=${DISABLE_EAGER_EXEC_FLAGS[$SLURM_ARRAY_TASK_ID]}
 
 shapley_file_name="${model_dir_name}/validation_lead-time-days=02/shapley_maps/test_for_colorado/use-deep-explainer=${use_deep_explainer}_use-inout-tensors-only=${use_inout_tensors_only}_disable-tensorflow2=${disable_tensorflow2}_disable-eager-execution=${disable_eager_execution}/shapley_maps_20210809.nc"
-output_dir_name="${model_dir_name}/validation_lead-time-days=02/shapley_maps/test_for_colorado/use-deep-explainer=${use_deep_explainer}_use-inout-tensors-only=${use_inout_tensors_only}_disable-tensorflow2=${disable_tensorflow2}_disable-eager-execution=${disable_eager_execution}/shapley_maps_20210809_subdomain"
+output_dir_name="${model_dir_name}/validation_lead-time-days=02/shapley_maps/test_for_colorado/use-deep-explainer=${use_deep_explainer}_use-inout-tensors-only=${use_inout_tensors_only}_disable-tensorflow2=${disable_tensorflow2}_disable-eager-execution=${disable_eager_execution}/shapley_maps_20210809_subdomain_global_norm"
 
 python3 -u "${CODE_DIR_NAME}/plot_shapley_maps.py" \
 --input_shapley_file_name="${shapley_file_name}" \
