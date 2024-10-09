@@ -295,6 +295,23 @@ def _plot_one_shapley_field(
         scaled_shapley_matrix = shapley_matrix
 
     min_abs_contour_value = numpy.percentile(
+        numpy.absolute(shapley_matrix), min_colour_percentile
+    )
+    max_abs_contour_value = numpy.percentile(
+        numpy.absolute(shapley_matrix), max_colour_percentile
+    )
+    max_abs_contour_value = max([
+        max_abs_contour_value,
+        min_abs_contour_value + 1e-9
+    ])
+
+    print('_plot_one_shapley_field')
+    print('False')
+    print(min_abs_contour_value)
+    print(max_abs_contour_value)
+    print('\n')
+
+    min_abs_contour_value = numpy.percentile(
         numpy.absolute(scaled_shapley_matrix), min_colour_percentile
     )
     max_abs_contour_value = numpy.percentile(
