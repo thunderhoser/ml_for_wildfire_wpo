@@ -1353,7 +1353,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             era5_constant_field_names[f]
         ]
         if unit_string != '':
-            unit_string = '({0:s})'.format(unit_string)
+            unit_string = ' ({0:s})'.format(unit_string)
 
         title_string = (
             'ERA5 {0:s}{1:s}\n'
