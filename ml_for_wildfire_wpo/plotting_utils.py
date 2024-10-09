@@ -74,6 +74,7 @@ def plot_grid_lines(
     parallels_deg_n = parallels_deg_n[
         parallels_deg_n <= numpy.max(plot_latitudes_deg_n)
         ]
+    print(parallels_deg_n)
     parallel_label_strings = [
         '{0:.1f}'.format(p) if parallel_spacing_deg < 1.
         else '{0:d}'.format(int(numpy.round(p)))
@@ -94,6 +95,7 @@ def plot_grid_lines(
     meridians_deg_e = meridians_deg_e[
         meridians_deg_e <= numpy.max(plot_longitudes_deg_e)
         ]
+    print(meridians_deg_e)
     meridian_label_strings = [
         '{0:.1f}'.format(m) if meridian_spacing_deg < 1.
         else '{0:d}'.format(int(numpy.round(m)))

@@ -22,6 +22,7 @@ import error_checking
 import shapley_io
 import border_io
 import gfs_utils
+import misc_utils
 import era5_constant_utils
 import neural_net
 import plotting_utils
@@ -186,6 +187,44 @@ INPUT_ARG_PARSER.add_argument(
 )
 
 
+def _get_grid_line_spacing(plot_latitude_limits_deg_n,
+                           plot_longitude_limits_deg_e):
+    """Determines spacing of meridians and parallels in plot.
+
+    :param plot_latitude_limits_deg_n: length-2 numpy array with latitude limits
+        of plot.
+    :param plot_longitude_limits_deg_e: length-2 numpy array with longitude
+        limits of plot.
+    :return: parallel_spacing_deg: Spacing between successive parallels.
+    :return: meridian_spacing_deg: Spacing between successive meridians.
+    """
+
+    meridian_spacing_deg = (
+        numpy.max(plot_longitude_limits_deg_e) -
+        numpy.min(plot_longitude_limits_deg_e)
+    ) / 7
+    parallel_spacing_deg = (
+        numpy.max(plot_latitude_limits_deg_n) -
+        numpy.min(plot_latitude_limits_deg_n)
+    ) / 6
+
+    if meridian_spacing_deg > 1:
+        meridian_spacing_deg = numpy.floor(meridian_spacing_deg)
+    else:
+        meridian_spacing_deg = number_rounding.floor_to_nearest(
+            meridian_spacing_deg, 0.1
+        )
+
+    if parallel_spacing_deg > 1:
+        parallel_spacing_deg = numpy.floor(parallel_spacing_deg)
+    else:
+        parallel_spacing_deg = number_rounding.floor_to_nearest(
+            parallel_spacing_deg, 0.1
+        )
+
+    return parallel_spacing_deg, meridian_spacing_deg
+
+
 def _smooth_maps(shapley_table_xarray, smoothing_radius_px):
     """Smooths Shapley maps via Gaussian filter.
 
@@ -255,8 +294,7 @@ def _smooth_maps(shapley_table_xarray, smoothing_radius_px):
 def _plot_one_shapley_field(
         shapley_matrix, axes_object, figure_object, grid_latitudes_deg_n,
         grid_longitudes_deg_e, min_colour_percentile, max_colour_percentile,
-        half_num_contours, colour_map_object, line_width,
-        opacity, plot_latitude_limits_deg_n, plot_longitude_limits_deg_e,
+        half_num_contours, colour_map_object, line_width, opacity,
         output_file_name, plot_in_log_space=False):
     """Plots 2-D field of Shapley values as a spatial map.
 
@@ -278,10 +316,6 @@ def _plot_one_shapley_field(
         `matplotlib.pyplot.cm`).
     :param line_width: Width of contour lines.
     :param opacity: Opacity of contour lines.
-    :param plot_latitude_limits_deg_n: length-2 numpy array with latitude
-        boundaries of plot.  This can also be None.
-    :param plot_longitude_limits_deg_e: length-2 numpy array with longitude
-        boundaries of plot.  This can also be None.
     :param output_file_name: Path to output file.
     :param plot_in_log_space: Boolean flag.  If True (False), colour scale will
         be logarithmic in base 10 (linear).
@@ -305,10 +339,7 @@ def _plot_one_shapley_field(
         grid_longitudes_deg_e + 0, allow_nan=False
     )
 
-    is_longitude_positive_in_west = True
-
     if numpy.any(numpy.diff(grid_longitudes_to_plot_deg_e) < 0):
-        is_longitude_positive_in_west = False
         grid_longitudes_to_plot_deg_e = (
             lng_conversion.convert_lng_negative_in_west(
                 grid_longitudes_to_plot_deg_e
@@ -386,73 +417,6 @@ def _plot_one_shapley_field(
         zorder=1e6
     )
 
-    if plot_latitude_limits_deg_n is None:
-        plot_latitude_limits_deg_n = numpy.array([
-            numpy.min(grid_latitudes_deg_n),
-            numpy.max(grid_latitudes_deg_n)
-        ])
-
-    axes_object.set_ylim(
-        numpy.min(plot_latitude_limits_deg_n),
-        numpy.max(plot_latitude_limits_deg_n)
-    )
-
-    if plot_longitude_limits_deg_e is None:
-        plot_longitude_limits_deg_e = numpy.array([
-            numpy.min(grid_longitudes_to_plot_deg_e),
-            numpy.max(grid_longitudes_to_plot_deg_e)
-        ])
-
-    if is_longitude_positive_in_west:
-        plot_longitude_limits_deg_e = (
-            lng_conversion.convert_lng_positive_in_west(
-                plot_longitude_limits_deg_e
-            )
-        )
-    else:
-        plot_longitude_limits_deg_e = (
-            lng_conversion.convert_lng_negative_in_west(
-                plot_longitude_limits_deg_e
-            )
-        )
-
-    plot_longitude_limits_deg_e = numpy.sort(plot_longitude_limits_deg_e)
-    axes_object.set_xlim(
-        numpy.min(plot_longitude_limits_deg_e),
-        numpy.max(plot_longitude_limits_deg_e)
-    )
-
-    meridian_spacing_deg = (
-        numpy.max(plot_longitude_limits_deg_e) -
-        numpy.min(plot_longitude_limits_deg_e)
-    ) / 7
-    parallel_spacing_deg = (
-        numpy.max(plot_latitude_limits_deg_n) -
-        numpy.min(plot_latitude_limits_deg_n)
-    ) / 6
-
-    if meridian_spacing_deg > 1:
-        meridian_spacing_deg = numpy.floor(meridian_spacing_deg)
-    else:
-        meridian_spacing_deg = number_rounding.floor_to_nearest(
-            meridian_spacing_deg, 0.1
-        )
-
-    if parallel_spacing_deg > 1:
-        parallel_spacing_deg = numpy.floor(parallel_spacing_deg)
-    else:
-        parallel_spacing_deg = number_rounding.floor_to_nearest(
-            parallel_spacing_deg, 0.1
-        )
-
-    plotting_utils.plot_grid_lines(
-        plot_latitudes_deg_n=plot_latitude_limits_deg_n,
-        plot_longitudes_deg_e=plot_longitude_limits_deg_e,
-        axes_object=axes_object,
-        meridian_spacing_deg=meridian_spacing_deg,
-        parallel_spacing_deg=parallel_spacing_deg
-    )
-
     print('Saving figure to: "{0:s}"...'.format(output_file_name))
     figure_object.savefig(
         output_file_name, dpi=FIGURE_RESOLUTION_DPI,
@@ -526,12 +490,17 @@ def _plot_one_fwi_field(
         axes_object=axes_object,
         line_colour=BORDER_COLOUR
     )
+
+    parallel_spacing_deg, meridian_spacing_deg = _get_grid_line_spacing(
+        plot_latitude_limits_deg_n=grid_latitudes_deg_n,
+        plot_longitude_limits_deg_e=grid_longitudes_deg_e
+    )
     plotting_utils.plot_grid_lines(
         plot_latitudes_deg_n=grid_latitudes_deg_n,
         plot_longitudes_deg_e=grid_longitudes_deg_e,
         axes_object=axes_object,
-        meridian_spacing_deg=20.,
-        parallel_spacing_deg=10.
+        meridian_spacing_deg=meridian_spacing_deg,
+        parallel_spacing_deg=parallel_spacing_deg
     )
 
     axes_object.set_xlim(
@@ -643,12 +612,16 @@ def _plot_one_gfs_field(
         axes_object=axes_object,
         line_colour=BORDER_COLOUR
     )
+    parallel_spacing_deg, meridian_spacing_deg = _get_grid_line_spacing(
+        plot_latitude_limits_deg_n=grid_latitudes_deg_n,
+        plot_longitude_limits_deg_e=grid_longitudes_deg_e
+    )
     plotting_utils.plot_grid_lines(
         plot_latitudes_deg_n=grid_latitudes_deg_n,
         plot_longitudes_deg_e=grid_longitudes_deg_e,
         axes_object=axes_object,
-        meridian_spacing_deg=20.,
-        parallel_spacing_deg=10.
+        meridian_spacing_deg=meridian_spacing_deg,
+        parallel_spacing_deg=parallel_spacing_deg
     )
 
     axes_object.set_xlim(
@@ -736,12 +709,16 @@ def _plot_one_era5_field(
         axes_object=axes_object,
         line_colour=BORDER_COLOUR
     )
+    parallel_spacing_deg, meridian_spacing_deg = _get_grid_line_spacing(
+        plot_latitude_limits_deg_n=grid_latitudes_deg_n,
+        plot_longitude_limits_deg_e=grid_longitudes_deg_e
+    )
     plotting_utils.plot_grid_lines(
         plot_latitudes_deg_n=grid_latitudes_deg_n,
         plot_longitudes_deg_e=grid_longitudes_deg_e,
         axes_object=axes_object,
-        meridian_spacing_deg=20.,
-        parallel_spacing_deg=10.
+        meridian_spacing_deg=meridian_spacing_deg,
+        parallel_spacing_deg=parallel_spacing_deg
     )
 
     axes_object.set_xlim(
@@ -841,15 +818,14 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             plot_longitude_limits_deg_e,
             exact_dimensions=numpy.array([2], dtype=int)
         )
-        plot_longitude_limits_deg_e = (
-            lng_conversion.convert_lng_positive_in_west(
-                plot_longitude_limits_deg_e, allow_nan=False
-            )
+        error_checking.assert_is_valid_lng_numpy_array(
+            plot_longitude_limits_deg_e,
+            positive_in_west_flag=False, negative_in_west_flag=False,
+            allow_nan=False
         )
-
-        plot_longitude_limits_deg_e = numpy.sort(plot_longitude_limits_deg_e)
         error_checking.assert_is_greater_numpy_array(
-            numpy.diff(plot_longitude_limits_deg_e), 0.
+            numpy.absolute(numpy.diff(plot_longitude_limits_deg_e)),
+            0
         )
 
     file_system_utils.mkdir_recursive_if_necessary(
@@ -928,6 +904,38 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     model_input_layer_names = data_dict[neural_net.INPUT_LAYER_NAMES_KEY]
     del data_dict
 
+    if plot_latitude_limits_deg_n is not None:
+        desired_row_indices = misc_utils.desired_latitudes_to_rows(
+            grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
+            start_latitude_deg_n=plot_latitude_limits_deg_n[0],
+            end_latitude_deg_n=plot_latitude_limits_deg_n[1]
+        )
+        stx = stx.isel({shapley_io.ROW_DIM: desired_row_indices})
+
+        for k in range(len(predictor_matrices)):
+            if len(predictor_matrices[k].shape) < 2:
+                continue
+
+            predictor_matrices[k] = (
+                predictor_matrices[k][:, desired_row_indices, ...]
+            )
+
+    if plot_longitude_limits_deg_e is not None:
+        desired_column_indices = misc_utils.desired_longitudes_to_columns(
+            grid_longitudes_deg_e=stx[shapley_io.LONGITUDE_KEY].values,
+            start_longitude_deg_e=plot_longitude_limits_deg_e[0],
+            end_longitude_deg_e=plot_longitude_limits_deg_e[1]
+        )
+        stx = stx.isel({shapley_io.COLUMN_DIM: desired_column_indices})
+
+        for k in range(len(predictor_matrices)):
+            if len(predictor_matrices[k].shape) < 2:
+                continue
+
+            predictor_matrices[k] = (
+                predictor_matrices[k][:, :, desired_column_indices, ...]
+            )
+
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
     gfs_lead_times_hours = vod[neural_net.MODEL_LEAD_TO_GFS_PRED_LEADS_KEY][
@@ -1001,8 +1009,6 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 colour_map_object=SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT,
                 line_width=shapley_line_width,
                 opacity=shapley_line_opacity,
-                plot_latitude_limits_deg_n=plot_latitude_limits_deg_n,
-                plot_longitude_limits_deg_e=plot_longitude_limits_deg_e,
                 plot_in_log_space=plot_shapley_in_log_space,
                 output_file_name=output_file_name
             )
@@ -1092,8 +1098,6 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                     colour_map_object=SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT,
                     line_width=shapley_line_width,
                     opacity=shapley_line_opacity,
-                    plot_latitude_limits_deg_n=plot_latitude_limits_deg_n,
-                    plot_longitude_limits_deg_e=plot_longitude_limits_deg_e,
                     plot_in_log_space=plot_shapley_in_log_space,
                     output_file_name=output_file_name
                 )
@@ -1195,8 +1199,6 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 colour_map_object=SHAPLEY_FWI_COLOUR_MAP_OBJECT,
                 line_width=shapley_line_width,
                 opacity=shapley_line_opacity,
-                plot_latitude_limits_deg_n=plot_latitude_limits_deg_n,
-                plot_longitude_limits_deg_e=plot_longitude_limits_deg_e,
                 plot_in_log_space=plot_shapley_in_log_space,
                 output_file_name=output_file_name
             )
@@ -1275,8 +1277,6 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             colour_map_object=SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT,
             line_width=shapley_line_width,
             opacity=shapley_line_opacity,
-            plot_latitude_limits_deg_n=plot_latitude_limits_deg_n,
-            plot_longitude_limits_deg_e=plot_longitude_limits_deg_e,
             plot_in_log_space=plot_shapley_in_log_space,
             output_file_name=output_file_name
         )
@@ -1348,8 +1348,6 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             colour_map_object=SHAPLEY_FWI_COLOUR_MAP_OBJECT,
             line_width=shapley_line_width,
             opacity=shapley_line_opacity,
-            plot_latitude_limits_deg_n=plot_latitude_limits_deg_n,
-            plot_longitude_limits_deg_e=plot_longitude_limits_deg_e,
             plot_in_log_space=plot_shapley_in_log_space,
             output_file_name=output_file_name
         )
