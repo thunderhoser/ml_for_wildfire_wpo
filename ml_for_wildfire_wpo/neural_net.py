@@ -532,7 +532,7 @@ def _check_generator_args(option_dict):
 
     error_checking.assert_is_integer(option_dict[BATCH_SIZE_KEY])
     error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 1)
-    error_checking.assert_is_not_nan(option_dict[SENTINEL_VALUE_KEY])
+    # error_checking.assert_is_not_nan(option_dict[SENTINEL_VALUE_KEY])
     error_checking.assert_is_boolean(option_dict[DO_RESIDUAL_PREDICTION_KEY])
     error_checking.assert_is_boolean(option_dict[USE_LEAD_TIME_AS_PRED_KEY])
 
