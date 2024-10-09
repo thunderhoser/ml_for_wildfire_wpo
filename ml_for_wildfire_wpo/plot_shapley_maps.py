@@ -160,12 +160,12 @@ INPUT_ARG_PARSER.add_argument(
     default=1., help=SHAPLEY_LINE_OPACITY_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + PLOT_LATITUDE_LIMITS_ARG_NAME, type=float, required=False,
+    '--' + PLOT_LATITUDE_LIMITS_ARG_NAME, type=float, nargs='+', required=False,
     default=[-1.], help=PLOT_LATITUDE_LIMITS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + PLOT_LONGITUDE_LIMITS_ARG_NAME, type=float, required=False,
-    default=[361.], help=PLOT_LONGITUDE_LIMITS_HELP_STRING
+    '--' + PLOT_LONGITUDE_LIMITS_ARG_NAME, type=float, nargs='+',
+    required=False, default=[361.], help=PLOT_LONGITUDE_LIMITS_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + SHAPLEY_HALF_NUM_CONTOURS_ARG_NAME, type=int, required=True,
