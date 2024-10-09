@@ -34,7 +34,8 @@ SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
 GFS_SEQUENTIAL_COLOUR_MAP_OBJECT = pyplot.get_cmap('plasma')
 GFS_DIVERGING_COLOUR_MAP_OBJECT = pyplot.get_cmap('seismic')
-SHAPLEY_COLOUR_MAP_OBJECT = pyplot.get_cmap('gist_yarg')
+SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT = pyplot.get_cmap('gist_yarg')
+SHAPLEY_FWI_COLOUR_MAP_OBJECT = pyplot.get_cmap('Greens')
 
 COLOUR_BAR_FONT_SIZE = 20
 BORDER_COLOUR = numpy.array([139, 69, 19], dtype=float) / 255
@@ -286,11 +287,18 @@ def _plot_one_shapley_field(
     error_checking.assert_is_integer(half_num_contours)
     error_checking.assert_is_geq(half_num_contours, 5)
 
+    if plot_in_log_space:
+        scaled_shapley_matrix = numpy.log10(
+            1 + numpy.absolute(shapley_matrix)
+        )
+    else:
+        scaled_shapley_matrix = shapley_matrix
+
     min_abs_contour_value = numpy.percentile(
-        numpy.absolute(shapley_matrix), min_colour_percentile
+        numpy.absolute(scaled_shapley_matrix), min_colour_percentile
     )
     max_abs_contour_value = numpy.percentile(
-        numpy.absolute(shapley_matrix), max_colour_percentile
+        numpy.absolute(scaled_shapley_matrix), max_colour_percentile
     )
     max_abs_contour_value = max([
         max_abs_contour_value,
@@ -751,23 +759,16 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
     print(SEPARATOR_STRING)
 
-    data_dict = neural_net.create_data(
-        option_dict=validation_option_dict,
-        init_date_string=init_date_string,
-        model_lead_time_days=model_lead_time_days
-    )
-    print(SEPARATOR_STRING)
-
-    # try:
-    #     data_dict = neural_net.create_data(
-    #         option_dict=validation_option_dict,
-    #         init_date_string=init_date_string,
-    #         model_lead_time_days=model_lead_time_days
-    #     )
-    #     print(SEPARATOR_STRING)
-    # except:
-    #     print(SEPARATOR_STRING)
-    #     return
+    try:
+        data_dict = neural_net.create_data(
+            option_dict=validation_option_dict,
+            init_date_string=init_date_string,
+            model_lead_time_days=model_lead_time_days
+        )
+        print(SEPARATOR_STRING)
+    except:
+        print(SEPARATOR_STRING)
+        return
 
     predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
     model_input_layer_names = data_dict[neural_net.INPUT_LAYER_NAMES_KEY]
@@ -848,7 +849,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 min_colour_percentile=shapley_colour_limits_prctile[0],
                 max_colour_percentile=shapley_colour_limits_prctile[1],
                 half_num_contours=shapley_half_num_contours,
-                colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+                colour_map_object=SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT,
                 line_width=shapley_line_width,
                 plot_in_log_space=plot_shapley_in_log_space,
                 output_file_name=output_file_name
@@ -859,7 +860,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             )
             plotting_utils.add_colour_bar(
                 figure_file_name=output_file_name,
-                colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+                colour_map_object=SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT,
                 colour_norm_object=colour_norm_object,
                 orientation_string='vertical',
                 font_size=COLOUR_BAR_FONT_SIZE,
@@ -941,7 +942,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                     min_colour_percentile=shapley_colour_limits_prctile[0],
                     max_colour_percentile=shapley_colour_limits_prctile[1],
                     half_num_contours=shapley_half_num_contours,
-                    colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+                    colour_map_object=SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT,
                     line_width=shapley_line_width,
                     plot_in_log_space=plot_shapley_in_log_space,
                     output_file_name=output_file_name
@@ -952,7 +953,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 )
                 plotting_utils.add_colour_bar(
                     figure_file_name=output_file_name,
-                    colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+                    colour_map_object=SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT,
                     colour_norm_object=colour_norm_object,
                     orientation_string='vertical',
                     font_size=COLOUR_BAR_FONT_SIZE,
@@ -1041,7 +1042,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 min_colour_percentile=shapley_colour_limits_prctile[0],
                 max_colour_percentile=shapley_colour_limits_prctile[1],
                 half_num_contours=shapley_half_num_contours,
-                colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+                colour_map_object=SHAPLEY_FWI_COLOUR_MAP_OBJECT,
                 line_width=shapley_line_width,
                 plot_in_log_space=plot_shapley_in_log_space,
                 output_file_name=output_file_name
@@ -1052,7 +1053,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             )
             plotting_utils.add_colour_bar(
                 figure_file_name=output_file_name,
-                colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+                colour_map_object=SHAPLEY_FWI_COLOUR_MAP_OBJECT,
                 colour_norm_object=colour_norm_object,
                 orientation_string='vertical',
                 font_size=COLOUR_BAR_FONT_SIZE,
@@ -1118,7 +1119,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             min_colour_percentile=shapley_colour_limits_prctile[0],
             max_colour_percentile=shapley_colour_limits_prctile[1],
             half_num_contours=shapley_half_num_contours,
-            colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+            colour_map_object=SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT,
             line_width=shapley_line_width,
             plot_in_log_space=plot_shapley_in_log_space,
             output_file_name=output_file_name
@@ -1129,7 +1130,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         )
         plotting_utils.add_colour_bar(
             figure_file_name=output_file_name,
-            colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+            colour_map_object=SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT,
             colour_norm_object=colour_norm_object,
             orientation_string='vertical',
             font_size=COLOUR_BAR_FONT_SIZE,
@@ -1188,7 +1189,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             min_colour_percentile=shapley_colour_limits_prctile[0],
             max_colour_percentile=shapley_colour_limits_prctile[1],
             half_num_contours=shapley_half_num_contours,
-            colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+            colour_map_object=SHAPLEY_FWI_COLOUR_MAP_OBJECT,
             line_width=shapley_line_width,
             plot_in_log_space=plot_shapley_in_log_space,
             output_file_name=output_file_name
@@ -1199,7 +1200,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         )
         plotting_utils.add_colour_bar(
             figure_file_name=output_file_name,
-            colour_map_object=SHAPLEY_COLOUR_MAP_OBJECT,
+            colour_map_object=SHAPLEY_FWI_COLOUR_MAP_OBJECT,
             colour_norm_object=colour_norm_object,
             orientation_string='vertical',
             font_size=COLOUR_BAR_FONT_SIZE,
