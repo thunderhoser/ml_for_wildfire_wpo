@@ -855,6 +855,10 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 output_file_name=output_file_name
             )
 
+            print(min_colour_value)
+            print(max_colour_value)
+            print(plot_shapley_in_log_space)
+
             colour_norm_object = pyplot.Normalize(
                 vmin=min_colour_value, vmax=max_colour_value
             )
