@@ -325,7 +325,13 @@ def _plot_one_extreme_case(
             input_file_names=panel_file_names,
             output_file_name=concat_figure_file_name,
             num_panel_rows=num_panel_rows,
-            num_panel_columns=num_panel_columns
+            num_panel_columns=num_panel_columns,
+            border_width_pixels=25
+        )
+        imagemagick_utils.trim_whitespace(
+            input_file_name=concat_figure_file_name,
+            output_file_name=concat_figure_file_name,
+            border_width_pixels=0
         )
 
         for this_panel_file_name in panel_file_names:
@@ -447,7 +453,13 @@ def _plot_one_extreme_case(
                 input_file_names=panel_file_names,
                 output_file_name=concat_figure_file_name,
                 num_panel_rows=num_panel_rows,
-                num_panel_columns=num_panel_columns
+                num_panel_columns=num_panel_columns,
+                border_width_pixels=25
+            )
+            imagemagick_utils.trim_whitespace(
+                input_file_name=concat_figure_file_name,
+                output_file_name=concat_figure_file_name,
+                border_width_pixels=0
             )
 
             for this_panel_file_name in panel_file_names:
@@ -548,7 +560,13 @@ def _plot_one_extreme_case(
             input_file_names=panel_file_names,
             output_file_name=concat_figure_file_name,
             num_panel_rows=num_panel_rows,
-            num_panel_columns=num_panel_columns
+            num_panel_columns=num_panel_columns,
+            border_width_pixels=25
+        )
+        imagemagick_utils.trim_whitespace(
+            input_file_name=concat_figure_file_name,
+            output_file_name=concat_figure_file_name,
+            border_width_pixels=0
         )
 
         for this_panel_file_name in panel_file_names:
