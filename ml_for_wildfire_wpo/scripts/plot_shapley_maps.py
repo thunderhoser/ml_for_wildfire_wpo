@@ -35,6 +35,7 @@ GFS_DIVERGING_COLOUR_MAP_OBJECT = pyplot.get_cmap('seismic')
 SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT = pyplot.get_cmap('gist_yarg')
 SHAPLEY_FWI_COLOUR_MAP_OBJECT = pyplot.get_cmap('gist_yarg')
 
+TITLE_FONT_SIZE = 24
 COLOUR_BAR_FONT_SIZE = 20
 BORDER_COLOUR = numpy.array([139, 69, 19], dtype=float) / 255
 
@@ -523,7 +524,7 @@ def _plot_one_fwi_field(
         numpy.min(grid_latitudes_deg_n),
         numpy.max(grid_latitudes_deg_n)
     )
-    axes_object.set_title(title_string)
+    axes_object.set_title(title_string, fontsize=TITLE_FONT_SIZE)
 
     return figure_object, axes_object
 
@@ -697,7 +698,7 @@ def _plot_one_gfs_field(
         numpy.min(grid_latitudes_deg_n),
         numpy.max(grid_latitudes_deg_n)
     )
-    axes_object.set_title(title_string)
+    axes_object.set_title(title_string, fontsize=TITLE_FONT_SIZE)
 
     return figure_object, axes_object
 
@@ -794,7 +795,7 @@ def _plot_one_era5_field(
         numpy.min(grid_latitudes_deg_n),
         numpy.max(grid_latitudes_deg_n)
     )
-    axes_object.set_title(title_string)
+    axes_object.set_title(title_string, fontsize=TITLE_FONT_SIZE)
 
     return figure_object, axes_object
 
@@ -1146,7 +1147,13 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             input_file_names=panel_file_names,
             output_file_name=concat_figure_file_name,
             num_panel_rows=num_panel_rows,
-            num_panel_columns=num_panel_columns
+            num_panel_columns=num_panel_columns,
+            border_width_pixels=25
+        )
+        imagemagick_utils.trim_whitespace(
+            input_file_name=concat_figure_file_name,
+            output_file_name=concat_figure_file_name,
+            border_width_pixels=0
         )
 
         for this_panel_file_name in panel_file_names:
@@ -1292,7 +1299,13 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 input_file_names=panel_file_names,
                 output_file_name=concat_figure_file_name,
                 num_panel_rows=num_panel_rows,
-                num_panel_columns=num_panel_columns
+                num_panel_columns=num_panel_columns,
+                border_width_pixels=25
+            )
+            imagemagick_utils.trim_whitespace(
+                input_file_name=concat_figure_file_name,
+                output_file_name=concat_figure_file_name,
+                border_width_pixels=0
             )
 
             for this_panel_file_name in panel_file_names:
@@ -1428,7 +1441,13 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             input_file_names=panel_file_names,
             output_file_name=concat_figure_file_name,
             num_panel_rows=num_panel_rows,
-            num_panel_columns=num_panel_columns
+            num_panel_columns=num_panel_columns,
+            border_width_pixels=25
+        )
+        imagemagick_utils.trim_whitespace(
+            input_file_name=concat_figure_file_name,
+            output_file_name=concat_figure_file_name,
+            border_width_pixels=0
         )
 
         for this_panel_file_name in panel_file_names:
@@ -1536,7 +1555,13 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         input_file_names=panel_file_names,
         output_file_name=concat_figure_file_name,
         num_panel_rows=num_panel_rows,
-        num_panel_columns=num_panel_columns
+        num_panel_columns=num_panel_columns,
+        border_width_pixels=25
+    )
+    imagemagick_utils.trim_whitespace(
+        input_file_name=concat_figure_file_name,
+        output_file_name=concat_figure_file_name,
+        border_width_pixels=0
     )
 
     for this_panel_file_name in panel_file_names:
@@ -1641,7 +1666,13 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         input_file_names=panel_file_names,
         output_file_name=concat_figure_file_name,
         num_panel_rows=num_panel_rows,
-        num_panel_columns=num_panel_columns
+        num_panel_columns=num_panel_columns,
+        border_width_pixels=25
+    )
+    imagemagick_utils.trim_whitespace(
+        input_file_name=concat_figure_file_name,
+        output_file_name=concat_figure_file_name,
+        border_width_pixels=0
     )
 
 
