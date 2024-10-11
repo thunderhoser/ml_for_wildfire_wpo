@@ -20,11 +20,12 @@ import longitude_conversion as lng_conversion
 import gg_general_utils
 import file_system_utils
 import error_checking
+import imagemagick_utils
 import gfs_io
 import shapley_io
 import border_io
-import gfs_utils
 import misc_utils
+import gfs_utils
 import era5_constant_utils
 import neural_net
 import plotting_utils
@@ -47,6 +48,8 @@ BORDER_COLOUR = numpy.array([139, 69, 19], dtype=float) / 255
 FIGURE_WIDTH_INCHES = 15
 FIGURE_HEIGHT_INCHES = 15
 FIGURE_RESOLUTION_DPI = 300
+PANEL_SIZE_PX = int(2.5e6)
+CONCAT_FIGURE_SIZE_PX = int(1e7)
 
 SHAPLEY_FILE_ARG_NAME = 'input_shapley_file_name'
 GFS_DIRECTORY_ARG_NAME = 'input_gfs_directory_name'
@@ -1034,6 +1037,8 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         gfs_2d_predictor_matrix = numpy.array([])
 
     for t in range(len(gfs_lead_times_hours)):
+        panel_file_names = [] * len(gfs_field_names_2d)
+
         for f in range(len(gfs_field_names_2d)):
             this_predictor_matrix = gfs_2d_predictor_matrix[..., t, f] + 0.
             unit_string = gfs_plotting.FIELD_TO_PLOTTING_UNIT_STRING[
@@ -1053,7 +1058,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 '' if region_name is None else ' over ' + region_name
             )
 
-            output_file_name = (
+            panel_file_names[f] = (
                 '{0:s}/shapley_gfs_{1:s}_{2:03d}hours.jpg'
             ).format(
                 output_dir_name,
@@ -1107,14 +1112,14 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 line_width=shapley_line_width,
                 opacity=shapley_line_opacity,
                 plot_in_log_space=plot_shapley_in_log_space,
-                output_file_name=output_file_name
+                output_file_name=panel_file_names[f]
             )
 
             colour_norm_object = pyplot.Normalize(
                 vmin=min_colour_value, vmax=max_colour_value
             )
             plotting_utils.add_colour_bar(
-                figure_file_name=output_file_name,
+                figure_file_name=panel_file_names[f],
                 colour_map_object=SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT,
                 colour_norm_object=colour_norm_object,
                 orientation_string='vertical',
@@ -1123,6 +1128,36 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 tick_label_format_string='{0:.2g}',
                 log_space=plot_shapley_in_log_space
             )
+
+            imagemagick_utils.resize_image(
+                input_file_name=panel_file_names[f],
+                output_file_name=panel_file_names[f],
+                output_size_pixels=PANEL_SIZE_PX
+            )
+
+        concat_figure_file_name = '{0:s}/shapley_gfs2d_{1:03d}hours.jpg'.format(
+            output_dir_name, gfs_lead_times_hours[t]
+        )
+
+        num_panel_rows = int(numpy.floor(
+            numpy.sqrt(len(panel_file_names))
+        ))
+        num_panel_columns = int(numpy.ceil(
+            float(len(panel_file_names)) / num_panel_rows
+        ))
+
+        print('Concatenating panels to: "{0:s}"...'.format(
+            concat_figure_file_name
+        ))
+        imagemagick_utils.concatenate_images(
+            input_file_names=panel_file_names,
+            output_file_name=concat_figure_file_name,
+            num_panel_rows=num_panel_rows,
+            num_panel_columns=num_panel_columns
+        )
+
+        for this_panel_file_name in panel_file_names:
+            os.remove(this_panel_file_name)
 
     gfs_pressure_levels_mb = vod[neural_net.GFS_PRESSURE_LEVELS_KEY]
     gfs_field_names_3d = [
@@ -1138,8 +1173,9 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
     for p in range(len(gfs_pressure_levels_mb)):
         for t in range(len(gfs_lead_times_hours)):
-            for f in range(len(gfs_field_names_3d)):
+            panel_file_names = [] * len(gfs_field_names_3d)
 
+            for f in range(len(gfs_field_names_3d)):
                 this_predictor_matrix = (
                     gfs_3d_predictor_matrix[..., p, t, f] + 0.
                 )
@@ -1161,7 +1197,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                     '' if region_name is None else ' over ' + region_name
                 )
 
-                output_file_name = (
+                panel_file_names[f] = (
                     '{0:s}/shapley_gfs_{1:s}_{2:04d}mb_{3:03d}hours.jpg'
                 ).format(
                     output_dir_name,
@@ -1218,14 +1254,14 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                     line_width=shapley_line_width,
                     opacity=shapley_line_opacity,
                     plot_in_log_space=plot_shapley_in_log_space,
-                    output_file_name=output_file_name
+                    output_file_name=panel_file_names[f]
                 )
 
                 colour_norm_object = pyplot.Normalize(
                     vmin=min_colour_value, vmax=max_colour_value
                 )
                 plotting_utils.add_colour_bar(
-                    figure_file_name=output_file_name,
+                    figure_file_name=panel_file_names[f],
                     colour_map_object=SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT,
                     colour_norm_object=colour_norm_object,
                     orientation_string='vertical',
@@ -1234,6 +1270,40 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                     tick_label_format_string='{0:.2g}',
                     log_space=plot_shapley_in_log_space
                 )
+
+                imagemagick_utils.resize_image(
+                    input_file_name=panel_file_names[f],
+                    output_file_name=panel_file_names[f],
+                    output_size_pixels=PANEL_SIZE_PX
+                )
+
+            concat_figure_file_name = (
+                '{0:s}/shapley_gfs3d_{1:04d}mb_{2:03d}hours.jpg'
+            ).format(
+                output_dir_name,
+                int(numpy.round(gfs_pressure_levels_mb[p])),
+                gfs_lead_times_hours[t]
+            )
+
+            num_panel_rows = int(numpy.floor(
+                numpy.sqrt(len(panel_file_names))
+            ))
+            num_panel_columns = int(numpy.ceil(
+                float(len(panel_file_names)) / num_panel_rows
+            ))
+
+            print('Concatenating panels to: "{0:s}"...'.format(
+                concat_figure_file_name
+            ))
+            imagemagick_utils.concatenate_images(
+                input_file_names=panel_file_names,
+                output_file_name=concat_figure_file_name,
+                num_panel_rows=num_panel_rows,
+                num_panel_columns=num_panel_columns
+            )
+
+            for this_panel_file_name in panel_file_names:
+                os.remove(this_panel_file_name)
 
     # TODO(thunderhoser): This code does not yet handle the case where lagged
     # targets or GFS fire-weather forecasts are missing.
@@ -1255,6 +1325,8 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     laglead_target_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
 
     for t in range(len(target_lag_or_lead_times_days)):
+        panel_file_names = [] * len(all_target_field_names)
+
         for f in range(len(all_target_field_names)):
             this_predictor_matrix = laglead_target_predictor_matrix[..., t, f]
 
@@ -1287,7 +1359,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                     '' if region_name is None else ' over ' + region_name
                 )
 
-            output_file_name = (
+            panel_file_names[f] = (
                 '{0:s}/shapley_laglead_target_{1:s}_{2:+03d}days.jpg'
             ).format(
                 output_dir_name,
@@ -1319,14 +1391,14 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 line_width=shapley_line_width,
                 opacity=shapley_line_opacity,
                 plot_in_log_space=plot_shapley_in_log_space,
-                output_file_name=output_file_name
+                output_file_name=panel_file_names[f]
             )
 
             colour_norm_object = pyplot.Normalize(
                 vmin=min_colour_value, vmax=max_colour_value
             )
             plotting_utils.add_colour_bar(
-                figure_file_name=output_file_name,
+                figure_file_name=panel_file_names[f],
                 colour_map_object=SHAPLEY_FWI_COLOUR_MAP_OBJECT,
                 colour_norm_object=colour_norm_object,
                 orientation_string='vertical',
@@ -1335,6 +1407,39 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 tick_label_format_string='{0:.2g}',
                 log_space=plot_shapley_in_log_space
             )
+
+            imagemagick_utils.resize_image(
+                input_file_name=panel_file_names[f],
+                output_file_name=panel_file_names[f],
+                output_size_pixels=PANEL_SIZE_PX
+            )
+
+        concat_figure_file_name = (
+            '{0:s}/shapley_laglead_targets_{1:+03d}days.jpg'
+        ).format(
+            output_dir_name,
+            -1 * target_lag_or_lead_times_days[t]
+        )
+
+        num_panel_rows = int(numpy.floor(
+            numpy.sqrt(len(panel_file_names))
+        ))
+        num_panel_columns = int(numpy.ceil(
+            float(len(panel_file_names)) / num_panel_rows
+        ))
+
+        print('Concatenating panels to: "{0:s}"...'.format(
+            concat_figure_file_name
+        ))
+        imagemagick_utils.concatenate_images(
+            input_file_names=panel_file_names,
+            output_file_name=concat_figure_file_name,
+            num_panel_rows=num_panel_rows,
+            num_panel_columns=num_panel_columns
+        )
+
+        for this_panel_file_name in panel_file_names:
+            os.remove(this_panel_file_name)
 
     era5_constant_field_names = vod[
         neural_net.ERA5_CONSTANT_PREDICTOR_FIELDS_KEY
@@ -1345,6 +1450,8 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     else:
         lyr_idx = model_input_layer_names.index(neural_net.ERA5_LAYER_NAME)
         era5_constant_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
+
+    panel_file_names = [] * len(era5_constant_field_names)
 
     for f in range(len(era5_constant_field_names)):
         this_predictor_matrix = era5_constant_predictor_matrix[..., f]
@@ -1368,7 +1475,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             '' if region_name is None else ' over ' + region_name
         )
 
-        output_file_name = '{0:s}/shapley_era5_{1:s}.jpg'.format(
+        panel_file_names[f] = '{0:s}/shapley_era5_{1:s}.jpg'.format(
             output_dir_name,
             era5_constant_field_names[f].replace('_', '-')
         )
@@ -1397,14 +1504,14 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             line_width=shapley_line_width,
             opacity=shapley_line_opacity,
             plot_in_log_space=plot_shapley_in_log_space,
-            output_file_name=output_file_name
+            output_file_name=panel_file_names[f]
         )
 
         colour_norm_object = pyplot.Normalize(
             vmin=min_colour_value, vmax=max_colour_value
         )
         plotting_utils.add_colour_bar(
-            figure_file_name=output_file_name,
+            figure_file_name=panel_file_names[f],
             colour_map_object=SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT,
             colour_norm_object=colour_norm_object,
             orientation_string='vertical',
@@ -1413,6 +1520,34 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             tick_label_format_string='{0:.2g}',
             log_space=plot_shapley_in_log_space
         )
+
+        imagemagick_utils.resize_image(
+            input_file_name=panel_file_names[f],
+            output_file_name=panel_file_names[f],
+            output_size_pixels=PANEL_SIZE_PX
+        )
+
+    concat_figure_file_name = '{0:s}/shapley_era5.jpg'.format(output_dir_name)
+
+    num_panel_rows = int(numpy.floor(
+        numpy.sqrt(len(panel_file_names))
+    ))
+    num_panel_columns = int(numpy.ceil(
+        float(len(panel_file_names)) / num_panel_rows
+    ))
+
+    print('Concatenating panels to: "{0:s}"...'.format(
+        concat_figure_file_name
+    ))
+    imagemagick_utils.concatenate_images(
+        input_file_names=panel_file_names,
+        output_file_name=concat_figure_file_name,
+        num_panel_rows=num_panel_rows,
+        num_panel_columns=num_panel_columns
+    )
+
+    for this_panel_file_name in panel_file_names:
+        os.remove(this_panel_file_name)
 
     do_residual_prediction = vod[neural_net.DO_RESIDUAL_PREDICTION_KEY]
 
@@ -1423,6 +1558,8 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         resid_baseline_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
     else:
         resid_baseline_predictor_matrix = numpy.array([])
+
+    panel_file_names = [] * len(all_target_field_names)
 
     for f in range(len(all_target_field_names)):
         this_predictor_matrix = resid_baseline_predictor_matrix[..., f]
@@ -1439,7 +1576,9 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             '' if region_name is None else ' over ' + region_name
         )
 
-        output_file_name = '{0:s}/shapley_residual_baseline_{1:s}.jpg'.format(
+        panel_file_names[f] = (
+            '{0:s}/shapley_residual_baseline_{1:s}.jpg'
+        ).format(
             output_dir_name,
             all_target_field_names[f].replace('_', '-')
         )
@@ -1468,14 +1607,14 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             line_width=shapley_line_width,
             opacity=shapley_line_opacity,
             plot_in_log_space=plot_shapley_in_log_space,
-            output_file_name=output_file_name
+            output_file_name=panel_file_names[f]
         )
 
         colour_norm_object = pyplot.Normalize(
             vmin=min_colour_value, vmax=max_colour_value
         )
         plotting_utils.add_colour_bar(
-            figure_file_name=output_file_name,
+            figure_file_name=panel_file_names[f],
             colour_map_object=SHAPLEY_FWI_COLOUR_MAP_OBJECT,
             colour_norm_object=colour_norm_object,
             orientation_string='vertical',
@@ -1484,6 +1623,33 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             tick_label_format_string='{0:.2g}',
             log_space=plot_shapley_in_log_space
         )
+
+        imagemagick_utils.resize_image(
+            input_file_name=panel_file_names[f],
+            output_file_name=panel_file_names[f],
+            output_size_pixels=PANEL_SIZE_PX
+        )
+
+    concat_figure_file_name = '{0:s}/shapley_residual_baseline.jpg'.format(
+        output_dir_name
+    )
+
+    num_panel_rows = int(numpy.floor(
+        numpy.sqrt(len(panel_file_names))
+    ))
+    num_panel_columns = int(numpy.ceil(
+        float(len(panel_file_names)) / num_panel_rows
+    ))
+
+    print('Concatenating panels to: "{0:s}"...'.format(
+        concat_figure_file_name
+    ))
+    imagemagick_utils.concatenate_images(
+        input_file_names=panel_file_names,
+        output_file_name=concat_figure_file_name,
+        num_panel_rows=num_panel_rows,
+        num_panel_columns=num_panel_columns
+    )
 
 
 if __name__ == '__main__':
