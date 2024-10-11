@@ -227,7 +227,7 @@ def _plot_one_extreme_case(
         gfs_2d_predictor_matrix = numpy.array([])
 
     for t in range(len(gfs_lead_times_hours)):
-        panel_file_names = [] * len(gfs_field_names_2d)
+        panel_file_names = [''] * len(gfs_field_names_2d)
 
         for f in range(len(gfs_field_names_2d)):
             this_predictor_matrix = gfs_2d_predictor_matrix[..., t, f] + 0.
@@ -338,7 +338,7 @@ def _plot_one_extreme_case(
 
     for p in range(len(gfs_pressure_levels_mb)):
         for t in range(len(gfs_lead_times_hours)):
-            panel_file_names = [] * len(gfs_field_names_2d)
+            panel_file_names = [''] * len(gfs_field_names_2d)
 
             for f in range(len(gfs_field_names_3d)):
                 this_predictor_matrix = (
@@ -465,7 +465,7 @@ def _plot_one_extreme_case(
     laglead_target_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
 
     for t in range(len(target_lag_or_lead_times_days)):
-        panel_file_names = [] * len(all_target_field_names)
+        panel_file_names = [''] * len(all_target_field_names)
 
         for f in range(len(all_target_field_names)):
             this_predictor_matrix = laglead_target_predictor_matrix[..., t, f]

@@ -1030,7 +1030,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         gfs_2d_predictor_matrix = numpy.array([])
 
     for t in range(len(gfs_lead_times_hours)):
-        panel_file_names = [] * len(gfs_field_names_2d)
+        panel_file_names = [''] * len(gfs_field_names_2d)
 
         for f in range(len(gfs_field_names_2d)):
             this_predictor_matrix = gfs_2d_predictor_matrix[..., t, f] + 0.
@@ -1166,7 +1166,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
     for p in range(len(gfs_pressure_levels_mb)):
         for t in range(len(gfs_lead_times_hours)):
-            panel_file_names = [] * len(gfs_field_names_3d)
+            panel_file_names = [''] * len(gfs_field_names_3d)
 
             for f in range(len(gfs_field_names_3d)):
                 this_predictor_matrix = (
@@ -1318,7 +1318,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     laglead_target_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
 
     for t in range(len(target_lag_or_lead_times_days)):
-        panel_file_names = [] * len(all_target_field_names)
+        panel_file_names = [''] * len(all_target_field_names)
 
         for f in range(len(all_target_field_names)):
             this_predictor_matrix = laglead_target_predictor_matrix[..., t, f]
@@ -1444,7 +1444,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         lyr_idx = model_input_layer_names.index(neural_net.ERA5_LAYER_NAME)
         era5_constant_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
 
-    panel_file_names = [] * len(era5_constant_field_names)
+    panel_file_names = [''] * len(era5_constant_field_names)
 
     for f in range(len(era5_constant_field_names)):
         this_predictor_matrix = era5_constant_predictor_matrix[..., f]
@@ -1552,7 +1552,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     else:
         resid_baseline_predictor_matrix = numpy.array([])
 
-    panel_file_names = [] * len(all_target_field_names)
+    panel_file_names = [''] * len(all_target_field_names)
 
     for f in range(len(all_target_field_names)):
         this_predictor_matrix = resid_baseline_predictor_matrix[..., f]
