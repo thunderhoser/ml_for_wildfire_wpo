@@ -689,6 +689,7 @@ def dual_weighted_crps_all_constraints(
         for _ in range(3):
             mdwt = K.expand_dims(mdwt, axis=0)
         mdwt = K.expand_dims(mdwt, axis=-1)
+        max_dual_weight_tensor = mdwt
         dual_weight_tensor = K.minimum(dual_weight_tensor, mdwt)
 
         channel_weight_tensor = K.cast(
@@ -708,7 +709,7 @@ def dual_weighted_crps_all_constraints(
             relevant_prediction_tensor, perm=[1, 0, 2, 3, 4]
         )
         censored_relevant_prediction_tensor = K.minimum(
-            K.abs(relevant_prediction_tensor), max_dual_weight_tensor
+            K.abs(relevant_prediction_tensor), mdwt
         )
 
         def compute_mapd_1row(
@@ -904,6 +905,7 @@ def dual_weighted_crpss_all_constraints(
         for _ in range(3):
             mdwt = K.expand_dims(mdwt, axis=0)
         mdwt = K.expand_dims(mdwt, axis=-1)
+        max_dual_weight_tensor = mdwt
         dual_weight_tensor = K.minimum(dual_weight_tensor, mdwt)
 
         channel_weight_tensor = K.cast(
@@ -923,7 +925,7 @@ def dual_weighted_crpss_all_constraints(
             relevant_prediction_tensor, perm=[1, 0, 2, 3, 4]
         )
         censored_relevant_prediction_tensor = K.minimum(
-            K.abs(relevant_prediction_tensor), max_dual_weight_tensor
+            K.abs(relevant_prediction_tensor), mdwt
         )
 
         def compute_mapd_1row(
