@@ -2,6 +2,7 @@
 
 import numpy
 import tensorflow
+import tensorflow.math
 from tensorflow.keras import backend as K
 # from tensorflow.keras import ops as tf_ops
 from gewittergefahr.gg_utils import error_checking
@@ -107,6 +108,12 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
         tgt_dmc - (1. - 0.8 * tgt_dc / (tgt_dmc + 0.4 * tgt_dc)) / (0.92 + K.pow(0.0114 * tgt_dmc, 1.7))
     )
 
+    target_bui_tensor = tensorflow.where(
+        tensorflow.math.is_nan(target_bui_tensor),
+        tensorflow.zeros_like(target_bui_tensor),
+        target_bui_tensor
+    )
+    target_bui_tensor = K.maximum(target_bui_tensor, 0.)
     target_tensor_no_mask = K.concatenate([
         target_tensor_no_mask,
         K.expand_dims(target_bui_tensor, axis=-1)
@@ -129,6 +136,13 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
         (0.8 * pred_dmc * pred_dc) / (pred_dmc + 0.4 * pred_dc),
         pred_dmc - (1. - 0.8 * pred_dc / (pred_dmc + 0.4 * pred_dc)) / (0.92 + K.pow(0.0114 * pred_dmc, 1.7))
     )
+
+    predicted_bui_tensor = tensorflow.where(
+        tensorflow.math.is_nan(predicted_bui_tensor),
+        tensorflow.zeros_like(predicted_bui_tensor),
+        predicted_bui_tensor
+    )
+    predicted_bui_tensor = K.maximum(predicted_bui_tensor, 0.)
 
     if expect_ensemble:
         prediction_tensor = K.concatenate([
@@ -194,6 +208,12 @@ def _add_fwi_to_tensors(prediction_tensor, target_tensor_no_mask,
         tgt_prelim_fwi
     )
 
+    target_fwi_tensor = tensorflow.where(
+        tensorflow.math.is_nan(target_fwi_tensor),
+        tensorflow.zeros_like(target_fwi_tensor),
+        target_fwi_tensor
+    )
+    target_fwi_tensor = K.maximum(target_fwi_tensor, 0.)
     target_tensor_no_mask = K.concatenate([
         target_tensor_no_mask,
         K.expand_dims(target_fwi_tensor, axis=-1)
@@ -223,6 +243,13 @@ def _add_fwi_to_tensors(prediction_tensor, target_tensor_no_mask,
         K.exp(2.72 * K.pow(0.434 * _natural_log(pred_prelim_fwi), 0.647)),
         pred_prelim_fwi
     )
+
+    predicted_fwi_tensor = tensorflow.where(
+        tensorflow.math.is_nan(predicted_fwi_tensor),
+        tensorflow.zeros_like(predicted_fwi_tensor),
+        predicted_fwi_tensor
+    )
+    predicted_fwi_tensor = K.maximum(predicted_fwi_tensor, 0.)
 
     if expect_ensemble:
         prediction_tensor = K.concatenate([
@@ -681,6 +708,7 @@ def dual_weighted_crps_all_constraints(
         for _ in range(3):
             mdwt = K.expand_dims(mdwt, axis=0)
         mdwt = K.expand_dims(mdwt, axis=-1)
+        max_dual_weight_tensor = mdwt
         dual_weight_tensor = K.minimum(dual_weight_tensor, mdwt)
 
         channel_weight_tensor = K.cast(
@@ -700,7 +728,7 @@ def dual_weighted_crps_all_constraints(
             relevant_prediction_tensor, perm=[1, 0, 2, 3, 4]
         )
         censored_relevant_prediction_tensor = K.minimum(
-            K.abs(relevant_prediction_tensor), max_dual_weight_tensor
+            K.abs(relevant_prediction_tensor), mdwt
         )
 
         def compute_mapd_1row(
@@ -896,6 +924,7 @@ def dual_weighted_crpss_all_constraints(
         for _ in range(3):
             mdwt = K.expand_dims(mdwt, axis=0)
         mdwt = K.expand_dims(mdwt, axis=-1)
+        max_dual_weight_tensor = mdwt
         dual_weight_tensor = K.minimum(dual_weight_tensor, mdwt)
 
         channel_weight_tensor = K.cast(
@@ -915,7 +944,7 @@ def dual_weighted_crpss_all_constraints(
             relevant_prediction_tensor, perm=[1, 0, 2, 3, 4]
         )
         censored_relevant_prediction_tensor = K.minimum(
-            K.abs(relevant_prediction_tensor), max_dual_weight_tensor
+            K.abs(relevant_prediction_tensor), mdwt
         )
 
         def compute_mapd_1row(

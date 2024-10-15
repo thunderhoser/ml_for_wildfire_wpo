@@ -146,6 +146,8 @@ def dmc_and_dc_to_bui(dmc_value_or_array, dc_value_or_array):
 
     idx = numpy.invert(idx)
     bui_value_or_array[idx] = dmc[idx] - (1. - 0.8 * dc[idx] / (dmc[idx] + 0.4 * dc[idx])) / (0.92 + numpy.power(0.0114 * dmc[idx], 1.7))
+    bui_value_or_array[numpy.isnan(bui_value_or_array)] = 0.
+    bui_value_or_array = numpy.maximum(bui_value_or_array, 0.)
 
     if found_arrays:
         return bui_value_or_array
@@ -196,6 +198,8 @@ def isi_and_bui_to_fwi(isi_value_or_array, bui_value_or_array):
 
     idx = numpy.invert(idx)
     fwi_value_or_array[idx] = prelim_fwi[idx]
+    fwi_value_or_array[numpy.isnan(fwi_value_or_array)] = 0.
+    fwi_value_or_array = numpy.maximum(fwi_value_or_array, 0.)
 
     if found_arrays:
         return fwi_value_or_array
