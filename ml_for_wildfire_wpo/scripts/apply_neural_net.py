@@ -130,6 +130,33 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     target_field_names = copy.deepcopy(
         validation_option_dict[neural_net.TARGET_FIELDS_KEY]
     )
+
+    constrain_bui = (
+        canadian_fwi_utils.DMC_NAME in target_field_names and
+        canadian_fwi_utils.DC_NAME in target_field_names and
+        canadian_fwi_utils.BUI_NAME not in target_field_names
+    )
+    if constrain_bui:
+        target_field_names.append(canadian_fwi_utils.BUI_NAME)
+        dmc_index = target_field_names.index(canadian_fwi_utils.DMC_NAME)
+        dc_index = target_field_names.index(canadian_fwi_utils.DC_NAME)
+    else:
+        dmc_index = None
+        dc_index = None
+
+    constrain_fwi = (
+        canadian_fwi_utils.ISI_NAME in target_field_names and
+        canadian_fwi_utils.BUI_NAME in target_field_names and
+        canadian_fwi_utils.FWI_NAME not in target_field_names
+    )
+    if constrain_fwi:
+        target_field_names.append(canadian_fwi_utils.FWI_NAME)
+        isi_index = target_field_names.index(canadian_fwi_utils.ISI_NAME)
+        bui_index = target_field_names.index(canadian_fwi_utils.BUI_NAME)
+    else:
+        isi_index = None
+        bui_index = None
+
     constrain_dsr = (
         canadian_fwi_utils.FWI_NAME in target_field_names and
         canadian_fwi_utils.DSR_NAME not in target_field_names
@@ -140,10 +167,6 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
         fwi_index = target_field_names.index(canadian_fwi_utils.FWI_NAME)
     else:
         fwi_index = None
-
-    print('constrain_dsr = {0:d}'.format(
-        int(constrain_dsr)
-    ))
 
     for this_init_date_string in init_date_strings:
         try:
@@ -175,17 +198,57 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
                 prediction_matrix, axis=-1, keepdims=True
             )
 
+        if constrain_bui:
+            predicted_bui_matrix = canadian_fwi_utils.dmc_and_dc_to_bui(
+                dmc_value_or_array=prediction_matrix[..., dmc_index, :],
+                dc_value_or_array=prediction_matrix[..., dc_index, :]
+            )
+            prediction_matrix = numpy.concatenate([
+                prediction_matrix,
+                numpy.expand_dims(predicted_bui_matrix, axis=-2)
+            ], axis=-2)
+
+            target_bui_matrix = canadian_fwi_utils.dmc_and_dc_to_bui(
+                dmc_value_or_array=target_matrix_with_weights[..., dmc_index],
+                dc_value_or_array=target_matrix_with_weights[..., dc_index]
+            )
+            target_matrix_with_weights = numpy.concatenate([
+                target_matrix_with_weights[..., :-1],
+                numpy.expand_dims(target_bui_matrix, axis=-1),
+                target_matrix_with_weights[..., [-1]]
+            ], axis=-1)
+
+        if constrain_fwi:
+            predicted_fwi_matrix = canadian_fwi_utils.isi_and_bui_to_fwi(
+                isi_value_or_array=prediction_matrix[..., isi_index, :],
+                bui_value_or_array=prediction_matrix[..., bui_index, :]
+            )
+            prediction_matrix = numpy.concatenate([
+                prediction_matrix,
+                numpy.expand_dims(predicted_fwi_matrix, axis=-2)
+            ], axis=-2)
+
+            target_fwi_matrix = canadian_fwi_utils.isi_and_bui_to_fwi(
+                isi_value_or_array=target_matrix_with_weights[..., isi_index],
+                bui_value_or_array=target_matrix_with_weights[..., bui_index]
+            )
+            target_matrix_with_weights = numpy.concatenate([
+                target_matrix_with_weights[..., :-1],
+                numpy.expand_dims(target_fwi_matrix, axis=-1),
+                target_matrix_with_weights[..., [-1]]
+            ], axis=-1)
+
         if constrain_dsr:
-            predicted_dsr_matrix = 0.0272 * numpy.power(
-                prediction_matrix[..., fwi_index, :], 1.77
+            predicted_dsr_matrix = canadian_fwi_utils.fwi_to_dsr(
+                fwi_value_or_array=prediction_matrix[..., fwi_index, :]
             )
             prediction_matrix = numpy.concatenate([
                 prediction_matrix,
                 numpy.expand_dims(predicted_dsr_matrix, axis=-2)
             ], axis=-2)
 
-            target_dsr_matrix = 0.0272 * numpy.power(
-                target_matrix_with_weights[..., fwi_index], 1.77
+            target_dsr_matrix = canadian_fwi_utils.fwi_to_dsr(
+                fwi_value_or_array=target_matrix_with_weights[..., fwi_index]
             )
             target_matrix_with_weights = numpy.concatenate([
                 target_matrix_with_weights[..., :-1],

@@ -28,6 +28,16 @@ ALL_FIELD_NAMES = [
 ]
 
 
+def _natural_log(input_array):
+    """Computes natural logarithm.
+
+    :param input_array: numpy array.
+    :return: logarithm_array: numpy array with the same shape as `input_array`.
+    """
+
+    return numpy.log(numpy.maximum(input_array, 1e-6))
+
+
 def check_field_name(field_name):
     """Ensures validity of field name.
 
@@ -105,11 +115,109 @@ def subset_by_column(fwi_table_xarray, desired_column_indices):
     )
 
 
+def dmc_and_dc_to_bui(dmc_value_or_array, dc_value_or_array):
+    """Converts duff moisture code (DMC) and drought code (DC) to BUI.
+
+    BUI = build-up index
+
+    :param dmc_value_or_array: DMC (either a single value or a numpy array).
+    :param dc_value_or_array: DC (either a single value or a numpy array).
+    :return: bui_value_or_array: BUI (same shape as both inputs).
+    """
+
+    found_arrays = isinstance(dmc_value_or_array, numpy.ndarray)
+    if not found_arrays:
+        dmc_value_or_array = numpy.array([dmc_value_or_array], dtype=float)
+        dc_value_or_array = numpy.array([dc_value_or_array], dtype=float)
+
+    error_checking.assert_is_numpy_array(
+        dc_value_or_array,
+        exact_dimensions=numpy.array(dmc_value_or_array.shape, dtype=int)
+    )
+    error_checking.assert_is_geq_numpy_array(dmc_value_or_array, 0.)
+    error_checking.assert_is_geq_numpy_array(dc_value_or_array, 0.)
+
+    bui_value_or_array = numpy.full(dmc_value_or_array.shape, numpy.nan)
+    dmc = dmc_value_or_array
+    dc = dc_value_or_array
+
+    idx = dmc_value_or_array <= 0.4 * dc_value_or_array
+    bui_value_or_array[idx] = (0.8 * dmc[idx] * dc[idx]) / (dmc[idx] + 0.4 * dc[idx])
+
+    idx = numpy.invert(idx)
+    bui_value_or_array[idx] = dmc[idx] - (1. - 0.8 * dc[idx] / (dmc[idx] + 0.4 * dc[idx])) / (0.92 + numpy.power(0.0114 * dmc[idx], 1.7))
+
+    if found_arrays:
+        return bui_value_or_array
+
+    return bui_value_or_array[0]
+
+
+def isi_and_bui_to_fwi(isi_value_or_array, bui_value_or_array):
+    """Converts initial-spread index (ISI) and build-up index (BUI) to FWI.
+
+    FWI = fire-weather index
+
+    :param isi_value_or_array: ISI (either a single value or a numpy array).
+    :param bui_value_or_array: BUI (either a single value or a numpy array).
+    :return: fwi_value_or_array: FWI (same shape as both inputs).
+    """
+
+    found_arrays = isinstance(isi_value_or_array, numpy.ndarray)
+    if not found_arrays:
+        isi_value_or_array = numpy.array([isi_value_or_array], dtype=float)
+        bui_value_or_array = numpy.array([bui_value_or_array], dtype=float)
+
+    error_checking.assert_is_numpy_array(
+        bui_value_or_array,
+        exact_dimensions=numpy.array(isi_value_or_array.shape, dtype=int)
+    )
+    error_checking.assert_is_geq_numpy_array(isi_value_or_array, 0.)
+    error_checking.assert_is_geq_numpy_array(bui_value_or_array, 0.)
+
+    dmfunc = numpy.full(isi_value_or_array.shape, numpy.nan)
+    isi = isi_value_or_array
+    bui = bui_value_or_array
+
+    idx = bui_value_or_array <= 80.
+    dmfunc[idx] = 0.626 * numpy.power(bui[idx], 0.809) + 2
+
+    idx = numpy.invert(idx)
+    dmfunc[idx] = 1000. / (25 + 108.64 * numpy.exp(-0.023 * bui[idx]))
+    prelim_fwi = 0.1 * isi * dmfunc
+
+    fwi_value_or_array = numpy.full(prelim_fwi.shape, numpy.nan)
+
+    idx = prelim_fwi > 1.
+    fwi_value_or_array[idx] = numpy.exp(
+        2.72 *
+        numpy.power(0.434 * _natural_log(prelim_fwi[idx]), 0.647)
+    )
+
+    idx = numpy.invert(idx)
+    fwi_value_or_array[idx] = prelim_fwi[idx]
+
+    if found_arrays:
+        return fwi_value_or_array
+
+    return fwi_value_or_array[0]
+
+
 def fwi_to_dsr(fwi_value_or_array):
     """Converts fire-weather index (FWI) to daily severity rating (DSR).
 
     :param fwi_value_or_array: FWI (either a single value or a numpy array).
-    :return: dsr_value_or_array: DSR (same shape as input).
+    :return: dsr_value_or_array: DSR (same shape as the input).
     """
 
-    return 0.0272 * numpy.power(fwi_value_or_array, 1.77)
+    found_arrays = isinstance(fwi_value_or_array, numpy.ndarray)
+    if not found_arrays:
+        fwi_value_or_array = numpy.array([fwi_value_or_array], dtype=float)
+
+    error_checking.assert_is_geq_numpy_array(fwi_value_or_array, 0.)
+
+    dsr_value_or_array = 0.0272 * numpy.power(fwi_value_or_array, 1.77)
+    if found_arrays:
+        return dsr_value_or_array
+
+    return dsr_value_or_array[0]
