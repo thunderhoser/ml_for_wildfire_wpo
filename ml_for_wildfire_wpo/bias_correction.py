@@ -868,14 +868,27 @@ def apply_model_suite_one_per_pixel(prediction_table_xarray, model_dict,
         mean_prediction_matrix = numpy.array([], dtype=float)
         prediction_stdev_matrix = numpy.array([], dtype=float)
 
-    constrain_dsr = (
+    constrain_bui = (
+        canadian_fwi_utils.DMC_NAME in ptx[prediction_io.FIELD_NAME_KEY].values and
+        canadian_fwi_utils.DC_NAME in ptx[prediction_io.FIELD_NAME_KEY].values and
+        canadian_fwi_utils.BUI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
+    )
+    constrain_fwi = (
+        canadian_fwi_utils.ISI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values and
+        canadian_fwi_utils.BUI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values and
         canadian_fwi_utils.FWI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
-        and
+    )
+    constrain_dsr = (
+        canadian_fwi_utils.FWI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values and
         canadian_fwi_utils.DSR_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
     )
 
     # Do actual stuff.
     for f in range(num_fields):
+        if constrain_bui and field_names[f] == canadian_fwi_utils.BUI_NAME:
+            continue
+        if constrain_fwi and field_names[f] == canadian_fwi_utils.FWI_NAME:
+            continue
         if constrain_dsr and field_names[f] == canadian_fwi_utils.DSR_NAME:
             continue
 
@@ -939,15 +952,57 @@ def apply_model_suite_one_per_pixel(prediction_table_xarray, model_dict,
 
     prediction_matrix = numpy.maximum(prediction_matrix, 0.)
 
+    if constrain_bui:
+        print('POTENTIAL MAJOR ERROR (actually not): constraining BUI!')
+
+        dmc_index = numpy.where(
+            numpy.array(field_names) == canadian_fwi_utils.DMC_NAME
+        )[0][0]
+        dc_index = numpy.where(
+            numpy.array(field_names) == canadian_fwi_utils.DC_NAME
+        )[0][0]
+        bui_index = numpy.where(
+            numpy.array(field_names) == canadian_fwi_utils.BUI_NAME
+        )[0][0]
+        prediction_matrix[..., bui_index, :] = (
+            canadian_fwi_utils.dmc_and_dc_to_bui(
+                dmc_value_or_array=prediction_matrix[..., dmc_index, :],
+                dc_value_or_array=prediction_matrix[..., dc_index, :]
+            )
+        )
+
+    if constrain_fwi:
+        print('POTENTIAL MAJOR ERROR (actually not): constraining FWI!')
+
+        isi_index = numpy.where(
+            numpy.array(field_names) == canadian_fwi_utils.ISI_NAME
+        )[0][0]
+        bui_index = numpy.where(
+            numpy.array(field_names) == canadian_fwi_utils.BUI_NAME
+        )[0][0]
+        fwi_index = numpy.where(
+            numpy.array(field_names) == canadian_fwi_utils.FWI_NAME
+        )[0][0]
+        prediction_matrix[..., fwi_index, :] = (
+            canadian_fwi_utils.isi_and_bui_to_fwi(
+                isi_value_or_array=prediction_matrix[..., isi_index, :],
+                bui_value_or_array=prediction_matrix[..., bui_index, :]
+            )
+        )
+
     if constrain_dsr:
+        print('POTENTIAL MAJOR ERROR (actually not): constraining DSR!')
+
         fwi_index = numpy.where(
             numpy.array(field_names) == canadian_fwi_utils.FWI_NAME
         )[0][0]
         dsr_index = numpy.where(
             numpy.array(field_names) == canadian_fwi_utils.DSR_NAME
         )[0][0]
-        prediction_matrix[..., dsr_index, :] = canadian_fwi_utils.fwi_to_dsr(
-            prediction_matrix[..., fwi_index, :]
+        prediction_matrix[..., dsr_index, :] = (
+            canadian_fwi_utils.fwi_to_dsr(
+                fwi_value_or_array=prediction_matrix[..., fwi_index, :]
+            )
         )
 
     ptx = ptx.assign({
@@ -1022,9 +1077,18 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
         mean_prediction_matrix = numpy.array([], dtype=float)
         prediction_stdev_matrix = numpy.array([], dtype=float)
 
-    constrain_dsr = (
+    constrain_bui = (
+        canadian_fwi_utils.DMC_NAME in ptx[prediction_io.FIELD_NAME_KEY].values and
+        canadian_fwi_utils.DC_NAME in ptx[prediction_io.FIELD_NAME_KEY].values and
+        canadian_fwi_utils.BUI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
+    )
+    constrain_fwi = (
+        canadian_fwi_utils.ISI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values and
+        canadian_fwi_utils.BUI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values and
         canadian_fwi_utils.FWI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
-        and
+    )
+    constrain_dsr = (
+        canadian_fwi_utils.FWI_NAME in ptx[prediction_io.FIELD_NAME_KEY].values and
         canadian_fwi_utils.DSR_NAME in ptx[prediction_io.FIELD_NAME_KEY].values
     )
 
@@ -1032,6 +1096,10 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
     num_fields = len(field_names)
 
     for f in range(num_fields):
+        if constrain_bui and field_names[f] == canadian_fwi_utils.BUI_NAME:
+            continue
+        if constrain_fwi and field_names[f] == canadian_fwi_utils.FWI_NAME:
+            continue
         if constrain_dsr and field_names[f] == canadian_fwi_utils.DSR_NAME:
             continue
 
@@ -1112,15 +1180,57 @@ def apply_model_suite(prediction_table_xarray, model_dict, verbose):
 
     prediction_matrix = numpy.maximum(prediction_matrix, 0.)
 
+    if constrain_bui:
+        print('POTENTIAL MAJOR ERROR (actually not): constraining BUI!')
+
+        dmc_index = numpy.where(
+            numpy.array(field_names) == canadian_fwi_utils.DMC_NAME
+        )[0][0]
+        dc_index = numpy.where(
+            numpy.array(field_names) == canadian_fwi_utils.DC_NAME
+        )[0][0]
+        bui_index = numpy.where(
+            numpy.array(field_names) == canadian_fwi_utils.BUI_NAME
+        )[0][0]
+        prediction_matrix[..., bui_index, :] = (
+            canadian_fwi_utils.dmc_and_dc_to_bui(
+                dmc_value_or_array=prediction_matrix[..., dmc_index, :],
+                dc_value_or_array=prediction_matrix[..., dc_index, :]
+            )
+        )
+
+    if constrain_fwi:
+        print('POTENTIAL MAJOR ERROR (actually not): constraining FWI!')
+
+        isi_index = numpy.where(
+            numpy.array(field_names) == canadian_fwi_utils.ISI_NAME
+        )[0][0]
+        bui_index = numpy.where(
+            numpy.array(field_names) == canadian_fwi_utils.BUI_NAME
+        )[0][0]
+        fwi_index = numpy.where(
+            numpy.array(field_names) == canadian_fwi_utils.FWI_NAME
+        )[0][0]
+        prediction_matrix[..., fwi_index, :] = (
+            canadian_fwi_utils.isi_and_bui_to_fwi(
+                isi_value_or_array=prediction_matrix[..., isi_index, :],
+                bui_value_or_array=prediction_matrix[..., bui_index, :]
+            )
+        )
+
     if constrain_dsr:
+        print('POTENTIAL MAJOR ERROR (actually not): constraining DSR!')
+
         fwi_index = numpy.where(
             numpy.array(field_names) == canadian_fwi_utils.FWI_NAME
         )[0][0]
         dsr_index = numpy.where(
             numpy.array(field_names) == canadian_fwi_utils.DSR_NAME
         )[0][0]
-        prediction_matrix[..., dsr_index, :] = canadian_fwi_utils.fwi_to_dsr(
-            prediction_matrix[..., fwi_index, :]
+        prediction_matrix[..., dsr_index, :] = (
+            canadian_fwi_utils.fwi_to_dsr(
+                fwi_value_or_array=prediction_matrix[..., fwi_index, :]
+            )
         )
 
     ptx = ptx.assign({
