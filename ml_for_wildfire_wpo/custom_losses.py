@@ -4,6 +4,7 @@ import os
 import sys
 import numpy
 import tensorflow
+import tensorflow.math
 from tensorflow.keras import backend as K
 # from tensorflow.keras import ops as tf_ops
 
@@ -115,6 +116,12 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
         tgt_dmc - (1. - 0.8 * tgt_dc / (tgt_dmc + 0.4 * tgt_dc)) / (0.92 + K.pow(0.0114 * tgt_dmc, 1.7))
     )
 
+    target_bui_tensor = tensorflow.where(
+        tensorflow.math.is_nan(target_bui_tensor),
+        tensorflow.zeros_like(target_bui_tensor),
+        target_bui_tensor
+    )
+    target_bui_tensor = K.maximum(target_bui_tensor, 0.)
     target_tensor_no_mask = K.concatenate([
         target_tensor_no_mask,
         K.expand_dims(target_bui_tensor, axis=-1)
@@ -137,6 +144,13 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
         (0.8 * pred_dmc * pred_dc) / (pred_dmc + 0.4 * pred_dc),
         pred_dmc - (1. - 0.8 * pred_dc / (pred_dmc + 0.4 * pred_dc)) / (0.92 + K.pow(0.0114 * pred_dmc, 1.7))
     )
+
+    predicted_bui_tensor = tensorflow.where(
+        tensorflow.math.is_nan(predicted_bui_tensor),
+        tensorflow.zeros_like(predicted_bui_tensor),
+        predicted_bui_tensor
+    )
+    predicted_bui_tensor = K.maximum(predicted_bui_tensor, 0.)
 
     if expect_ensemble:
         prediction_tensor = K.concatenate([
@@ -202,6 +216,12 @@ def _add_fwi_to_tensors(prediction_tensor, target_tensor_no_mask,
         tgt_prelim_fwi
     )
 
+    target_fwi_tensor = tensorflow.where(
+        tensorflow.math.is_nan(target_fwi_tensor),
+        tensorflow.zeros_like(target_fwi_tensor),
+        target_fwi_tensor
+    )
+    target_fwi_tensor = K.maximum(target_fwi_tensor, 0.)
     target_tensor_no_mask = K.concatenate([
         target_tensor_no_mask,
         K.expand_dims(target_fwi_tensor, axis=-1)
@@ -231,6 +251,13 @@ def _add_fwi_to_tensors(prediction_tensor, target_tensor_no_mask,
         K.exp(2.72 * K.pow(0.434 * _natural_log(pred_prelim_fwi), 0.647)),
         pred_prelim_fwi
     )
+
+    predicted_fwi_tensor = tensorflow.where(
+        tensorflow.math.is_nan(predicted_fwi_tensor),
+        tensorflow.zeros_like(predicted_fwi_tensor),
+        predicted_fwi_tensor
+    )
+    predicted_fwi_tensor = K.maximum(predicted_fwi_tensor, 0.)
 
     if expect_ensemble:
         prediction_tensor = K.concatenate([
