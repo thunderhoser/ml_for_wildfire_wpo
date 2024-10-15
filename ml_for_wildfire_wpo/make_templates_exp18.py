@@ -131,7 +131,7 @@ DEFAULT_OPTION_DICT = {
     #     [265, 537, -1, 6], dtype=int
     # ),
     chiu_net_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array(
-        [265, 537, 6], dtype=int
+        [265, 537, 4], dtype=int
     ),
     # chiu_net_pp_arch.USE_RESIDUAL_BLOCKS_KEY: False,
     chiu_net_pp_arch.GFS_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
@@ -245,7 +245,7 @@ def _run():
                             [265, 537, num_gfs_hours, 5], dtype=int
                         ),
                         chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
-                            [265, 537, num_target_days, 6], dtype=int
+                            [265, 537, num_target_days, 4], dtype=int
                         ),
                         chiu_net_pp_arch.GFS_ENCODER_NUM_CHANNELS_KEY:
                             gfs_encoder_channel_counts,
