@@ -184,7 +184,7 @@ PREDICTOR_TIME_STRATEGIES_AXIS1 = [
 
 PREDICTOR_TIME_STRATEGY_TO_NUM_GFS_HOURS = {
     'all-daily-valid-times-up-to-target-time': 15,
-    'different-valid-times-up-to-target-time': 4,
+    'different-valid-times-up-to-target-time': 14,
     'different-valid-times-up-to-target-time-plus2days': 14,
     # 'same-valid-times-for-every-model-lead': 11
 }
