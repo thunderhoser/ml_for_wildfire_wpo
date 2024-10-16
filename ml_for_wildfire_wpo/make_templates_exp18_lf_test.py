@@ -31,17 +31,17 @@ OUTPUT_DIR_NAME = (
 CHANNEL_WEIGHTS = numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004])
 MAX_DUAL_WEIGHTS = numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856])
 
-LOSS_FUNCTION = custom_losses.dual_weighted_crpss_constrained_bui(
-    channel_weights=CHANNEL_WEIGHTS[:5],
-    max_dual_weight_by_channel=MAX_DUAL_WEIGHTS[:5],
+LOSS_FUNCTION = custom_losses.dual_weighted_crpss_constrained_bui_fwi(
+    channel_weights=CHANNEL_WEIGHTS[:6],
+    max_dual_weight_by_channel=MAX_DUAL_WEIGHTS[:6],
     dmc_index=1, dc_index=2, isi_index=3,
     function_name='loss_dwcrpss'
 )
 
 LOSS_FUNCTION_STRING = (
-    'custom_losses.dual_weighted_crpss_constrained_bui('
-    'channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004])[:5], '
-    'max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856])[:5], '
+    'custom_losses.dual_weighted_crpss_constrained_bui_fwi('
+    'channel_weights=numpy.array([0.02562263, 0.00373885, 0.00008940, 0.60291427, 0.00251213, 0.08761268, 0.27751004])[:6], '
+    'max_dual_weight_by_channel=numpy.array([96.4105, 303.9126, 1741.9033, 23.1660, 361.6984, 61.3669, 40.1856])[:6], '
     'dmc_index=1, dc_index=2, isi_index=3, '
     'function_name="loss_dwcrpss")'
 )
