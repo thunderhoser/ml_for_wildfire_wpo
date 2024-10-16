@@ -1066,3 +1066,649 @@ def dual_weighted_crpss_all_constraints(
 
     loss.__name__ = function_name
     return loss
+
+
+def dual_weighted_crpss(
+        channel_weights, dmc_index, dc_index, isi_index, function_name,
+        max_dual_weight_by_channel=None, test_mode=False):
+    """Creates DWCRPSS loss function with no constraints.
+
+    :param channel_weights: See documentation for
+        `dual_weighted_mse_all_constraints`.
+    :param dmc_index: Same.
+    :param dc_index: Same.
+    :param isi_index: Same.
+    :param function_name: Same.
+    :param max_dual_weight_by_channel: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    _check_index_args(
+        dmc_index=dmc_index, dc_index=dc_index, isi_index=isi_index
+    )
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(test_mode)
+
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (DWCRPSS).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: loss: DWCRPSS.
+        """
+
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=True
+        )
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_tensor_no_mask = target_tensor[..., :num_target_fields]
+        gfs_prediction_tensor = target_tensor[..., num_target_fields:-1]
+        mask_weight_tensor = target_tensor[..., -1]
+
+        relevant_target_tensor = K.expand_dims(target_tensor_no_mask, axis=-1)
+        relevant_gfs_prediction_tensor = K.expand_dims(
+            gfs_prediction_tensor, axis=-1
+        )
+        relevant_prediction_tensor = prediction_tensor
+        mask_weight_tensor = K.expand_dims(mask_weight_tensor, axis=-1)
+
+        dual_weight_tensor = K.maximum(
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_prediction_tensor)
+        )
+        max_dual_weight_tensor = K.cast(
+            K.constant(max_dual_weight_by_channel), dual_weight_tensor.dtype
+        )
+        mdwt = max_dual_weight_tensor
+        for _ in range(3):
+            mdwt = K.expand_dims(mdwt, axis=0)
+        mdwt = K.expand_dims(mdwt, axis=-1)
+        max_dual_weight_tensor = mdwt
+        dual_weight_tensor = K.minimum(dual_weight_tensor, mdwt)
+
+        channel_weight_tensor = K.cast(
+            K.constant(channel_weights), dual_weight_tensor.dtype
+        )
+        for _ in range(3):
+            channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
+
+        absolute_error_tensor = K.abs(
+            relevant_prediction_tensor - relevant_target_tensor
+        )
+        mean_prediction_error_tensor = K.mean(
+            dual_weight_tensor * absolute_error_tensor, axis=-1
+        )
+
+        relevant_prediction_tensor = tensorflow.transpose(
+            relevant_prediction_tensor, perm=[1, 0, 2, 3, 4]
+        )
+        censored_relevant_prediction_tensor = K.minimum(
+            K.abs(relevant_prediction_tensor), mdwt
+        )
+
+        def compute_mapd_1row(
+                prediction_tensor_1row, censored_prediction_tensor_1row):
+            """Computes MAPD for one grid row.
+
+            MAPD = mean absolute pairwise difference
+
+            :param prediction_tensor_1row: E-by-N-by-T-by-S tensor of
+                predictions.
+            :param censored_prediction_tensor_1row: Same as
+                `prediction_tensor_1row`, except that values above the max
+                dual weight have been replaced with the max dual weight.
+            :return: mapd_tensor_1row: E-by-N-by-T tensor of mean absolute
+                pairwise differences.
+            """
+
+            pt1row = prediction_tensor_1row
+            cpt1row = censored_prediction_tensor_1row
+
+            return K.mean(
+                K.maximum(
+                    K.abs(K.expand_dims(cpt1row, axis=-1)),
+                    K.abs(K.expand_dims(cpt1row, axis=-2))
+                ) *
+                K.abs(
+                    K.expand_dims(pt1row, axis=-1) -
+                    K.expand_dims(pt1row, axis=-2)
+                ),
+                axis=(-2, -1)
+            )
+
+        def loop_body(i, mapd_tensor):
+            """Body of while-loop for computing MAPD.
+
+            This method is run once for every iteration through the while-loop,
+            i.e., once for every grid row.
+
+            :param i: Index of current grid row.
+            :param mapd_tensor: M-by-E-by-N-by-T tensor of MAPD values, which
+                this method will update.
+            :return: i_new: Index of next grid row.
+            :return: mapd_tensor: Updated version of input.
+            """
+
+            this_mapd_tensor = compute_mapd_1row(
+                prediction_tensor_1row=relevant_prediction_tensor[i, ...],
+                censored_prediction_tensor_1row=
+                censored_relevant_prediction_tensor[i, ...]
+            )
+
+            mapd_tensor = mapd_tensor.write(i, this_mapd_tensor)
+            return i + 1, mapd_tensor
+
+        mapd_tensor = tensorflow.TensorArray(
+            size=relevant_prediction_tensor.shape[0],
+            dtype=tensorflow.float32
+        )
+        i = tensorflow.constant(0)
+        condition = lambda i, mapd_tensor: tensorflow.less(
+            i, relevant_prediction_tensor.shape[0]
+        )
+        _, mapd_tensor = tensorflow.while_loop(
+            cond=condition,
+            body=loop_body,
+            loop_vars=[i, mapd_tensor],
+            maximum_iterations=relevant_prediction_tensor.shape[0],
+            # parallel_iterations=1,
+            # swap_memory=True
+        )
+        mapd_tensor = mapd_tensor.stack()
+
+        mapd_tensor = tensorflow.transpose(
+            mapd_tensor, perm=[1, 0, 2, 3]
+        )
+        error_tensor = channel_weight_tensor * (
+                mean_prediction_error_tensor -
+                0.5 * mapd_tensor
+        )
+        actual_dwcrps = (
+                K.sum(mask_weight_tensor * error_tensor) /
+                K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        )
+
+        gfs_dual_weight_tensor = K.maximum(
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_gfs_prediction_tensor)
+        )
+        gfs_max_dual_weight_tensor = K.cast(
+            K.constant(max_dual_weight_by_channel), gfs_dual_weight_tensor.dtype
+        )
+        gfs_mdwt = gfs_max_dual_weight_tensor
+        for _ in range(3):
+            gfs_mdwt = K.expand_dims(gfs_mdwt, axis=0)
+        gfs_mdwt = K.expand_dims(gfs_mdwt, axis=-1)
+        gfs_dual_weight_tensor = K.minimum(gfs_dual_weight_tensor, gfs_mdwt)
+
+        gfs_abs_error_tensor = K.abs(
+            relevant_gfs_prediction_tensor - relevant_target_tensor
+        )
+        gfs_mean_pred_error_tensor = K.mean(
+            gfs_dual_weight_tensor * gfs_abs_error_tensor, axis=-1
+        )
+        gfs_error_tensor = channel_weight_tensor * gfs_mean_pred_error_tensor
+        gfs_dwcrps = (
+                K.sum(mask_weight_tensor * gfs_error_tensor) /
+                K.sum(mask_weight_tensor * K.ones_like(gfs_error_tensor))
+        )
+
+        return (actual_dwcrps - gfs_dwcrps) / gfs_dwcrps
+
+    loss.__name__ = function_name
+    return loss
+
+
+def dual_weighted_crpss_constrained_bui(
+        channel_weights, dmc_index, dc_index, isi_index, function_name,
+        max_dual_weight_by_channel=None, test_mode=False):
+    """Creates DWCRPSS loss function with constrained BUI only.
+
+    :param channel_weights: See documentation for
+        `dual_weighted_mse_all_constraints`.
+    :param dmc_index: Same.
+    :param dc_index: Same.
+    :param isi_index: Same.
+    :param function_name: Same.
+    :param max_dual_weight_by_channel: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    _check_index_args(
+        dmc_index=dmc_index, dc_index=dc_index, isi_index=isi_index
+    )
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(test_mode)
+
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (DWCRPSS).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: loss: DWCRPSS.
+        """
+
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=True
+        )
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_tensor_no_mask = target_tensor[..., :num_target_fields]
+        gfs_prediction_tensor = target_tensor[..., num_target_fields:-1]
+        mask_weight_tensor = target_tensor[..., -1]
+
+        prediction_tensor, target_tensor_no_mask = _add_bui_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            dmc_index=dmc_index,
+            dc_index=dc_index,
+            expect_ensemble=True
+        )
+
+        _, gfs_prediction_tensor = _add_bui_to_tensors(
+            prediction_tensor=None,
+            target_tensor_no_mask=gfs_prediction_tensor,
+            dmc_index=dmc_index,
+            dc_index=dc_index,
+            expect_ensemble=True
+        )
+
+        relevant_target_tensor = K.expand_dims(target_tensor_no_mask, axis=-1)
+        relevant_gfs_prediction_tensor = K.expand_dims(
+            gfs_prediction_tensor, axis=-1
+        )
+        relevant_prediction_tensor = prediction_tensor
+        mask_weight_tensor = K.expand_dims(mask_weight_tensor, axis=-1)
+
+        dual_weight_tensor = K.maximum(
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_prediction_tensor)
+        )
+        max_dual_weight_tensor = K.cast(
+            K.constant(max_dual_weight_by_channel), dual_weight_tensor.dtype
+        )
+        mdwt = max_dual_weight_tensor
+        for _ in range(3):
+            mdwt = K.expand_dims(mdwt, axis=0)
+        mdwt = K.expand_dims(mdwt, axis=-1)
+        max_dual_weight_tensor = mdwt
+        dual_weight_tensor = K.minimum(dual_weight_tensor, mdwt)
+
+        channel_weight_tensor = K.cast(
+            K.constant(channel_weights), dual_weight_tensor.dtype
+        )
+        for _ in range(3):
+            channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
+
+        absolute_error_tensor = K.abs(
+            relevant_prediction_tensor - relevant_target_tensor
+        )
+        mean_prediction_error_tensor = K.mean(
+            dual_weight_tensor * absolute_error_tensor, axis=-1
+        )
+
+        relevant_prediction_tensor = tensorflow.transpose(
+            relevant_prediction_tensor, perm=[1, 0, 2, 3, 4]
+        )
+        censored_relevant_prediction_tensor = K.minimum(
+            K.abs(relevant_prediction_tensor), mdwt
+        )
+
+        def compute_mapd_1row(
+                prediction_tensor_1row, censored_prediction_tensor_1row):
+            """Computes MAPD for one grid row.
+
+            MAPD = mean absolute pairwise difference
+
+            :param prediction_tensor_1row: E-by-N-by-T-by-S tensor of
+                predictions.
+            :param censored_prediction_tensor_1row: Same as
+                `prediction_tensor_1row`, except that values above the max
+                dual weight have been replaced with the max dual weight.
+            :return: mapd_tensor_1row: E-by-N-by-T tensor of mean absolute
+                pairwise differences.
+            """
+
+            pt1row = prediction_tensor_1row
+            cpt1row = censored_prediction_tensor_1row
+
+            return K.mean(
+                K.maximum(
+                    K.abs(K.expand_dims(cpt1row, axis=-1)),
+                    K.abs(K.expand_dims(cpt1row, axis=-2))
+                ) *
+                K.abs(
+                    K.expand_dims(pt1row, axis=-1) -
+                    K.expand_dims(pt1row, axis=-2)
+                ),
+                axis=(-2, -1)
+            )
+
+        def loop_body(i, mapd_tensor):
+            """Body of while-loop for computing MAPD.
+
+            This method is run once for every iteration through the while-loop,
+            i.e., once for every grid row.
+
+            :param i: Index of current grid row.
+            :param mapd_tensor: M-by-E-by-N-by-T tensor of MAPD values, which
+                this method will update.
+            :return: i_new: Index of next grid row.
+            :return: mapd_tensor: Updated version of input.
+            """
+
+            this_mapd_tensor = compute_mapd_1row(
+                prediction_tensor_1row=relevant_prediction_tensor[i, ...],
+                censored_prediction_tensor_1row=
+                censored_relevant_prediction_tensor[i, ...]
+            )
+
+            mapd_tensor = mapd_tensor.write(i, this_mapd_tensor)
+            return i + 1, mapd_tensor
+
+        mapd_tensor = tensorflow.TensorArray(
+            size=relevant_prediction_tensor.shape[0],
+            dtype=tensorflow.float32
+        )
+        i = tensorflow.constant(0)
+        condition = lambda i, mapd_tensor: tensorflow.less(
+            i, relevant_prediction_tensor.shape[0]
+        )
+        _, mapd_tensor = tensorflow.while_loop(
+            cond=condition,
+            body=loop_body,
+            loop_vars=[i, mapd_tensor],
+            maximum_iterations=relevant_prediction_tensor.shape[0],
+            # parallel_iterations=1,
+            # swap_memory=True
+        )
+        mapd_tensor = mapd_tensor.stack()
+
+        mapd_tensor = tensorflow.transpose(
+            mapd_tensor, perm=[1, 0, 2, 3]
+        )
+        error_tensor = channel_weight_tensor * (
+                mean_prediction_error_tensor -
+                0.5 * mapd_tensor
+        )
+        actual_dwcrps = (
+                K.sum(mask_weight_tensor * error_tensor) /
+                K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        )
+
+        gfs_dual_weight_tensor = K.maximum(
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_gfs_prediction_tensor)
+        )
+        gfs_max_dual_weight_tensor = K.cast(
+            K.constant(max_dual_weight_by_channel), gfs_dual_weight_tensor.dtype
+        )
+        gfs_mdwt = gfs_max_dual_weight_tensor
+        for _ in range(3):
+            gfs_mdwt = K.expand_dims(gfs_mdwt, axis=0)
+        gfs_mdwt = K.expand_dims(gfs_mdwt, axis=-1)
+        gfs_dual_weight_tensor = K.minimum(gfs_dual_weight_tensor, gfs_mdwt)
+
+        gfs_abs_error_tensor = K.abs(
+            relevant_gfs_prediction_tensor - relevant_target_tensor
+        )
+        gfs_mean_pred_error_tensor = K.mean(
+            gfs_dual_weight_tensor * gfs_abs_error_tensor, axis=-1
+        )
+        gfs_error_tensor = channel_weight_tensor * gfs_mean_pred_error_tensor
+        gfs_dwcrps = (
+                K.sum(mask_weight_tensor * gfs_error_tensor) /
+                K.sum(mask_weight_tensor * K.ones_like(gfs_error_tensor))
+        )
+
+        return (actual_dwcrps - gfs_dwcrps) / gfs_dwcrps
+
+    loss.__name__ = function_name
+    return loss
+
+
+def dual_weighted_crpss_constrained_bui_fwi(
+        channel_weights, dmc_index, dc_index, isi_index, function_name,
+        max_dual_weight_by_channel=None, test_mode=False):
+    """Creates DWCRPSS loss function with constrained BUI and FWI only.
+
+    :param channel_weights: See documentation for
+        `dual_weighted_mse_all_constraints`.
+    :param dmc_index: Same.
+    :param dc_index: Same.
+    :param isi_index: Same.
+    :param function_name: Same.
+    :param max_dual_weight_by_channel: Same.
+    :param test_mode: Same.
+    :return: loss: Loss function (defined below).
+    """
+
+    _check_index_args(
+        dmc_index=dmc_index, dc_index=dc_index, isi_index=isi_index
+    )
+
+    error_checking.assert_is_numpy_array(channel_weights, num_dimensions=1)
+    error_checking.assert_is_greater_numpy_array(channel_weights, 0.)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(test_mode)
+
+    if max_dual_weight_by_channel is None:
+        max_dual_weight_by_channel = numpy.full(len(channel_weights), 1e12)
+
+    def loss(target_tensor, prediction_tensor):
+        """Computes loss (DWCRPSS).
+
+        :param target_tensor: See doc for `mean_squared_error`.
+        :param prediction_tensor: Same.
+        :return: loss: DWCRPSS.
+        """
+
+        num_target_fields = __get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=True
+        )
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_tensor_no_mask = target_tensor[..., :num_target_fields]
+        gfs_prediction_tensor = target_tensor[..., num_target_fields:-1]
+        mask_weight_tensor = target_tensor[..., -1]
+
+        prediction_tensor, target_tensor_no_mask = _add_bui_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            dmc_index=dmc_index,
+            dc_index=dc_index,
+            expect_ensemble=True
+        )
+        prediction_tensor, target_tensor_no_mask = _add_fwi_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            isi_index=isi_index,
+            bui_index=-1,
+            expect_ensemble=True
+        )
+
+        _, gfs_prediction_tensor = _add_bui_to_tensors(
+            prediction_tensor=None,
+            target_tensor_no_mask=gfs_prediction_tensor,
+            dmc_index=dmc_index,
+            dc_index=dc_index,
+            expect_ensemble=True
+        )
+        _, gfs_prediction_tensor = _add_fwi_to_tensors(
+            prediction_tensor=None,
+            target_tensor_no_mask=gfs_prediction_tensor,
+            isi_index=isi_index,
+            bui_index=-1,
+            expect_ensemble=True
+        )
+
+        relevant_target_tensor = K.expand_dims(target_tensor_no_mask, axis=-1)
+        relevant_gfs_prediction_tensor = K.expand_dims(
+            gfs_prediction_tensor, axis=-1
+        )
+        relevant_prediction_tensor = prediction_tensor
+        mask_weight_tensor = K.expand_dims(mask_weight_tensor, axis=-1)
+
+        dual_weight_tensor = K.maximum(
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_prediction_tensor)
+        )
+        max_dual_weight_tensor = K.cast(
+            K.constant(max_dual_weight_by_channel), dual_weight_tensor.dtype
+        )
+        mdwt = max_dual_weight_tensor
+        for _ in range(3):
+            mdwt = K.expand_dims(mdwt, axis=0)
+        mdwt = K.expand_dims(mdwt, axis=-1)
+        max_dual_weight_tensor = mdwt
+        dual_weight_tensor = K.minimum(dual_weight_tensor, mdwt)
+
+        channel_weight_tensor = K.cast(
+            K.constant(channel_weights), dual_weight_tensor.dtype
+        )
+        for _ in range(3):
+            channel_weight_tensor = K.expand_dims(channel_weight_tensor, axis=0)
+
+        absolute_error_tensor = K.abs(
+            relevant_prediction_tensor - relevant_target_tensor
+        )
+        mean_prediction_error_tensor = K.mean(
+            dual_weight_tensor * absolute_error_tensor, axis=-1
+        )
+
+        relevant_prediction_tensor = tensorflow.transpose(
+            relevant_prediction_tensor, perm=[1, 0, 2, 3, 4]
+        )
+        censored_relevant_prediction_tensor = K.minimum(
+            K.abs(relevant_prediction_tensor), mdwt
+        )
+
+        def compute_mapd_1row(
+                prediction_tensor_1row, censored_prediction_tensor_1row):
+            """Computes MAPD for one grid row.
+
+            MAPD = mean absolute pairwise difference
+
+            :param prediction_tensor_1row: E-by-N-by-T-by-S tensor of
+                predictions.
+            :param censored_prediction_tensor_1row: Same as
+                `prediction_tensor_1row`, except that values above the max
+                dual weight have been replaced with the max dual weight.
+            :return: mapd_tensor_1row: E-by-N-by-T tensor of mean absolute
+                pairwise differences.
+            """
+
+            pt1row = prediction_tensor_1row
+            cpt1row = censored_prediction_tensor_1row
+
+            return K.mean(
+                K.maximum(
+                    K.abs(K.expand_dims(cpt1row, axis=-1)),
+                    K.abs(K.expand_dims(cpt1row, axis=-2))
+                ) *
+                K.abs(
+                    K.expand_dims(pt1row, axis=-1) -
+                    K.expand_dims(pt1row, axis=-2)
+                ),
+                axis=(-2, -1)
+            )
+
+        def loop_body(i, mapd_tensor):
+            """Body of while-loop for computing MAPD.
+
+            This method is run once for every iteration through the while-loop,
+            i.e., once for every grid row.
+
+            :param i: Index of current grid row.
+            :param mapd_tensor: M-by-E-by-N-by-T tensor of MAPD values, which
+                this method will update.
+            :return: i_new: Index of next grid row.
+            :return: mapd_tensor: Updated version of input.
+            """
+
+            this_mapd_tensor = compute_mapd_1row(
+                prediction_tensor_1row=relevant_prediction_tensor[i, ...],
+                censored_prediction_tensor_1row=
+                censored_relevant_prediction_tensor[i, ...]
+            )
+
+            mapd_tensor = mapd_tensor.write(i, this_mapd_tensor)
+            return i + 1, mapd_tensor
+
+        mapd_tensor = tensorflow.TensorArray(
+            size=relevant_prediction_tensor.shape[0],
+            dtype=tensorflow.float32
+        )
+        i = tensorflow.constant(0)
+        condition = lambda i, mapd_tensor: tensorflow.less(
+            i, relevant_prediction_tensor.shape[0]
+        )
+        _, mapd_tensor = tensorflow.while_loop(
+            cond=condition,
+            body=loop_body,
+            loop_vars=[i, mapd_tensor],
+            maximum_iterations=relevant_prediction_tensor.shape[0],
+            # parallel_iterations=1,
+            # swap_memory=True
+        )
+        mapd_tensor = mapd_tensor.stack()
+
+        mapd_tensor = tensorflow.transpose(
+            mapd_tensor, perm=[1, 0, 2, 3]
+        )
+        error_tensor = channel_weight_tensor * (
+                mean_prediction_error_tensor -
+                0.5 * mapd_tensor
+        )
+        actual_dwcrps = (
+                K.sum(mask_weight_tensor * error_tensor) /
+                K.sum(mask_weight_tensor * K.ones_like(error_tensor))
+        )
+
+        gfs_dual_weight_tensor = K.maximum(
+            K.abs(relevant_target_tensor),
+            K.abs(relevant_gfs_prediction_tensor)
+        )
+        gfs_max_dual_weight_tensor = K.cast(
+            K.constant(max_dual_weight_by_channel), gfs_dual_weight_tensor.dtype
+        )
+        gfs_mdwt = gfs_max_dual_weight_tensor
+        for _ in range(3):
+            gfs_mdwt = K.expand_dims(gfs_mdwt, axis=0)
+        gfs_mdwt = K.expand_dims(gfs_mdwt, axis=-1)
+        gfs_dual_weight_tensor = K.minimum(gfs_dual_weight_tensor, gfs_mdwt)
+
+        gfs_abs_error_tensor = K.abs(
+            relevant_gfs_prediction_tensor - relevant_target_tensor
+        )
+        gfs_mean_pred_error_tensor = K.mean(
+            gfs_dual_weight_tensor * gfs_abs_error_tensor, axis=-1
+        )
+        gfs_error_tensor = channel_weight_tensor * gfs_mean_pred_error_tensor
+        gfs_dwcrps = (
+                K.sum(mask_weight_tensor * gfs_error_tensor) /
+                K.sum(mask_weight_tensor * K.ones_like(gfs_error_tensor))
+        )
+
+        return (actual_dwcrps - gfs_dwcrps) / gfs_dwcrps
+
+    loss.__name__ = function_name
+    return loss
