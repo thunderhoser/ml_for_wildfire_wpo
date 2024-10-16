@@ -2,6 +2,7 @@
 
 from tensorflow.keras import backend as K
 from gewittergefahr.gg_utils import error_checking
+from ml_for_wildfire_wpo.machine_learning import custom_losses
 
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 
@@ -58,10 +59,303 @@ def max_prediction_anywhere(channel_index, function_name, expect_ensemble=True,
         :return: metric: Max prediction.
         """
 
+        num_target_fields = custom_losses.__get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble
+        )
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_tensor_no_mask = target_tensor[..., :num_target_fields]
+
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            dmc_index=1,
+            dc_index=2,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            isi_index=3,
+            bui_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            fwi_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+
         if is_nn_evidential:
             return K.max(prediction_tensor[:, :, :, channel_index, 0])
 
         return K.max(prediction_tensor[:, :, :, channel_index, ...])
+
+    metric.__name__ = function_name
+    return metric
+
+
+def max_target_anywhere(channel_index, function_name, expect_ensemble=True,
+                        is_nn_evidential=False, test_mode=False):
+    """Creates metric to return max target anywhere.
+
+    "Anywhere" = at masked or unmasked grid cell
+
+    :param channel_index: Will compute metric for the [k]th channel, where
+        k = `channel_index`.
+    :param function_name: Function name (string).
+    :param expect_ensemble: Boolean flag.  If True, will expect
+        prediction_tensor to have dimensions E x M x N x T x S.  If False, will
+        expect prediction_tensor to have dimensions E x M x N x T.
+    :param is_nn_evidential: Boolean flag.  If True, will expect evidential NN,
+        where prediction_tensor has dimensions E x M x N x T x 4.
+    :param test_mode: Leave this alone.
+    :return: metric: Metric function (defined below).
+    """
+
+    error_checking.assert_is_integer(channel_index)
+    error_checking.assert_is_geq(channel_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    def metric(target_tensor, prediction_tensor):
+        """Computes metric (max target anywhere).
+
+        E = number of examples
+        M = number of grid rows
+        N = number of grid columns
+        T = number of target variables (channels)
+        S = ensemble size
+
+        :param target_tensor: This could be an E-by-M-by-N-by-(T + 1) tensor,
+            where target_tensor[..., :-1] contains the actual target values and
+            target_tensor[..., -1] contains weights.
+
+        This could also be an E-by-M-by-N-by-(2T + 1) tensor, where
+            target_tensor[..., :T] contains the actual target values;
+            target_tensor[..., T:-1] contains climo errors;
+            and target_tensor[..., -1] contains weights.
+
+        :param prediction_tensor: Tensor of predicted values.  If
+            expect_ensemble == True, will expect dimensions E x M x N x T x S.
+            Otherwise, if is_nn_evidential == True, will expect dimensions
+            E x M x N x T x 4.
+            Otherwise, will expect E x M x N x T.
+        :return: metric: Max target.
+        """
+
+        num_target_fields = custom_losses.__get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble
+        )
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_tensor_no_mask = target_tensor[..., :num_target_fields]
+
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            dmc_index=1,
+            dc_index=2,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            isi_index=3,
+            bui_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            fwi_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+
+        return K.max(target_tensor_no_mask[:, :, :, channel_index])
+
+    metric.__name__ = function_name
+    return metric
+
+
+def min_prediction_anywhere(channel_index, function_name, expect_ensemble=True,
+                            is_nn_evidential=False, test_mode=False):
+    """Creates metric to return min prediction anywhere.
+
+    "Anywhere" = at masked or unmasked grid cell
+
+    :param channel_index: Will compute metric for the [k]th channel, where
+        k = `channel_index`.
+    :param function_name: Function name (string).
+    :param expect_ensemble: Boolean flag.  If True, will expect
+        prediction_tensor to have dimensions E x M x N x T x S.  If False, will
+        expect prediction_tensor to have dimensions E x M x N x T.
+    :param is_nn_evidential: Boolean flag.  If True, will expect evidential NN,
+        where prediction_tensor has dimensions E x M x N x T x 4.
+    :param test_mode: Leave this alone.
+    :return: metric: Metric function (defined below).
+    """
+
+    error_checking.assert_is_integer(channel_index)
+    error_checking.assert_is_geq(channel_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    def metric(target_tensor, prediction_tensor):
+        """Computes metric (min prediction anywhere).
+
+        E = number of examples
+        M = number of grid rows
+        N = number of grid columns
+        T = number of target variables (channels)
+        S = ensemble size
+
+        :param target_tensor: This could be an E-by-M-by-N-by-(T + 1) tensor,
+            where target_tensor[..., :-1] contains the actual target values and
+            target_tensor[..., -1] contains weights.
+
+        This could also be an E-by-M-by-N-by-(2T + 1) tensor, where
+            target_tensor[..., :T] contains the actual target values;
+            target_tensor[..., T:-1] contains climo errors;
+            and target_tensor[..., -1] contains weights.
+
+        :param prediction_tensor: Tensor of predicted values.  If
+            expect_ensemble == True, will expect dimensions E x M x N x T x S.
+            Otherwise, if is_nn_evidential == True, will expect dimensions
+            E x M x N x T x 4.
+            Otherwise, will expect E x M x N x T.
+        :return: metric: min prediction.
+        """
+
+        num_target_fields = custom_losses.__get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble
+        )
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_tensor_no_mask = target_tensor[..., :num_target_fields]
+
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            dmc_index=1,
+            dc_index=2,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            isi_index=3,
+            bui_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            fwi_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+
+        if is_nn_evidential:
+            return K.min(prediction_tensor[:, :, :, channel_index, 0])
+
+        return K.min(prediction_tensor[:, :, :, channel_index, ...])
+
+    metric.__name__ = function_name
+    return metric
+
+
+def min_target_anywhere(channel_index, function_name, expect_ensemble=True,
+                        is_nn_evidential=False, test_mode=False):
+    """Creates metric to return min target anywhere.
+
+    "Anywhere" = at masked or unmasked grid cell
+
+    :param channel_index: Will compute metric for the [k]th channel, where
+        k = `channel_index`.
+    :param function_name: Function name (string).
+    :param expect_ensemble: Boolean flag.  If True, will expect
+        prediction_tensor to have dimensions E x M x N x T x S.  If False, will
+        expect prediction_tensor to have dimensions E x M x N x T.
+    :param is_nn_evidential: Boolean flag.  If True, will expect evidential NN,
+        where prediction_tensor has dimensions E x M x N x T x 4.
+    :param test_mode: Leave this alone.
+    :return: metric: Metric function (defined below).
+    """
+
+    error_checking.assert_is_integer(channel_index)
+    error_checking.assert_is_geq(channel_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    def metric(target_tensor, prediction_tensor):
+        """Computes metric (min target anywhere).
+
+        E = number of examples
+        M = number of grid rows
+        N = number of grid columns
+        T = number of target variables (channels)
+        S = ensemble size
+
+        :param target_tensor: This could be an E-by-M-by-N-by-(T + 1) tensor,
+            where target_tensor[..., :-1] contains the actual target values and
+            target_tensor[..., -1] contains weights.
+
+        This could also be an E-by-M-by-N-by-(2T + 1) tensor, where
+            target_tensor[..., :T] contains the actual target values;
+            target_tensor[..., T:-1] contains climo errors;
+            and target_tensor[..., -1] contains weights.
+
+        :param prediction_tensor: Tensor of predicted values.  If
+            expect_ensemble == True, will expect dimensions E x M x N x T x S.
+            Otherwise, if is_nn_evidential == True, will expect dimensions
+            E x M x N x T x 4.
+            Otherwise, will expect E x M x N x T.
+        :return: metric: Min target.
+        """
+
+        num_target_fields = custom_losses.__get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble
+        )
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_tensor_no_mask = target_tensor[..., :num_target_fields]
+
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            dmc_index=1,
+            dc_index=2,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            isi_index=3,
+            bui_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            fwi_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+
+        return K.min(target_tensor_no_mask[:, :, :, channel_index])
 
     metric.__name__ = function_name
     return metric
@@ -97,6 +391,35 @@ def max_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
         :return: metric: Max prediction.
         """
 
+        num_target_fields = custom_losses.__get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble
+        )
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_tensor_no_mask = target_tensor[..., :num_target_fields]
+
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            dmc_index=1,
+            dc_index=2,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            isi_index=3,
+            bui_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            fwi_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+
         # Output shape: E x M x N
         weight_tensor = target_tensor[..., -1]
         mask_tensor = K.cast(
@@ -122,6 +445,246 @@ def max_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
         return K.max(
             prediction_tensor[:, :, :, channel_index, ...] *
             K.expand_dims(mask_tensor, axis=-1)
+        )
+
+    metric.__name__ = function_name
+    return metric
+
+
+def max_target_unmasked(channel_index, function_name, expect_ensemble=True,
+                        is_nn_evidential=False, test_mode=False):
+    """Creates metric to return max unmasked target.
+
+    "Unmasked" = at grid cell with weight >= MASK_PIXEL_IF_WEIGHT_BELOW
+
+    :param channel_index: See doc for `max_prediction_anywhere`.
+    :param function_name: Same.
+    :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
+    :param test_mode: Same.
+    :return: metric: Metric function (defined below).
+    """
+
+    error_checking.assert_is_integer(channel_index)
+    error_checking.assert_is_geq(channel_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    def metric(target_tensor, prediction_tensor):
+        """Computes metric (max unmasked target).
+
+        :param target_tensor: See doc for `max_prediction_anywhere`.
+        :param prediction_tensor: Same.
+        :return: metric: Max target.
+        """
+
+        num_target_fields = custom_losses.__get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble
+        )
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_tensor_no_mask = target_tensor[..., :num_target_fields]
+
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            dmc_index=1,
+            dc_index=2,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            isi_index=3,
+            bui_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            fwi_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+
+        # Output shape: E x M x N
+        weight_tensor = target_tensor[..., -1]
+        mask_tensor = K.cast(
+            weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW,
+            prediction_tensor.dtype
+        )
+
+        return K.max(
+            target_tensor_no_mask[:, :, :, channel_index] *
+            mask_tensor
+        )
+
+    metric.__name__ = function_name
+    return metric
+
+
+def min_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
+                            is_nn_evidential=False, test_mode=False):
+    """Creates metric to return min unmasked prediction.
+
+    "Unmasked" = at grid cell with weight >= MASK_PIXEL_IF_WEIGHT_BELOW
+
+    :param channel_index: See doc for `min_prediction_anywhere`.
+    :param function_name: Same.
+    :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
+    :param test_mode: Same.
+    :return: metric: Metric function (defined below).
+    """
+
+    error_checking.assert_is_integer(channel_index)
+    error_checking.assert_is_geq(channel_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    def metric(target_tensor, prediction_tensor):
+        """Computes metric (min unmasked prediction).
+
+        :param target_tensor: See doc for `min_prediction_anywhere`.
+        :param prediction_tensor: Same.
+        :return: metric: min prediction.
+        """
+
+        num_target_fields = custom_losses.__get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble
+        )
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_tensor_no_mask = target_tensor[..., :num_target_fields]
+
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            dmc_index=1,
+            dc_index=2,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            isi_index=3,
+            bui_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            fwi_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+
+        # Output shape: E x M x N
+        weight_tensor = target_tensor[..., -1]
+        mask_tensor = K.cast(
+            weight_tensor < MASK_PIXEL_IF_WEIGHT_BELOW,
+            prediction_tensor.dtype
+        )
+
+        if is_nn_evidential:
+            # Input shapes for multiplication: E x M x N and E x M x N
+            return K.min(
+                prediction_tensor[:, :, :, channel_index, 0] *
+                mask_tensor
+            )
+
+        if not expect_ensemble:
+            # Input shapes for multiplication: E x M x N and E x M x N
+            return K.min(
+                prediction_tensor[:, :, :, channel_index] *
+                mask_tensor
+            )
+
+        # Input shapes for multiplication: E x M x N x S and E x M x N x 1
+        return K.min(
+            prediction_tensor[:, :, :, channel_index, ...] *
+            K.expand_dims(mask_tensor, axis=-1)
+        )
+
+    metric.__name__ = function_name
+    return metric
+
+
+def min_target_unmasked(channel_index, function_name, expect_ensemble=True,
+                        is_nn_evidential=False, test_mode=False):
+    """Creates metric to return min unmasked target.
+
+    "Unmasked" = at grid cell with weight >= MASK_PIXEL_IF_WEIGHT_BELOW
+
+    :param channel_index: See doc for `min_prediction_anywhere`.
+    :param function_name: Same.
+    :param expect_ensemble: Same.
+    :param is_nn_evidential: Same.
+    :param test_mode: Same.
+    :return: metric: Metric function (defined below).
+    """
+
+    error_checking.assert_is_integer(channel_index)
+    error_checking.assert_is_geq(channel_index, 0)
+    error_checking.assert_is_string(function_name)
+    error_checking.assert_is_boolean(expect_ensemble)
+    error_checking.assert_is_boolean(is_nn_evidential)
+    error_checking.assert_is_boolean(test_mode)
+    assert not (expect_ensemble and is_nn_evidential)
+
+    def metric(target_tensor, prediction_tensor):
+        """Computes metric (min unmasked target).
+
+        :param target_tensor: See doc for `min_prediction_anywhere`.
+        :param prediction_tensor: Same.
+        :return: metric: Min target.
+        """
+
+        num_target_fields = custom_losses.__get_num_target_fields(
+            prediction_tensor=prediction_tensor,
+            expect_ensemble=expect_ensemble
+        )
+
+        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
+        target_tensor_no_mask = target_tensor[..., :num_target_fields]
+
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            dmc_index=1,
+            dc_index=2,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            isi_index=3,
+            bui_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
+            prediction_tensor=prediction_tensor,
+            target_tensor_no_mask=target_tensor_no_mask,
+            fwi_index=-1,
+            expect_ensemble=expect_ensemble
+        )
+
+        # Output shape: E x M x N
+        weight_tensor = target_tensor[..., -1]
+        mask_tensor = K.cast(
+            weight_tensor < MASK_PIXEL_IF_WEIGHT_BELOW,
+            prediction_tensor.dtype
+        )
+
+        return K.min(
+            target_tensor_no_mask[:, :, :, channel_index] *
+            mask_tensor
         )
 
     metric.__name__ = function_name
