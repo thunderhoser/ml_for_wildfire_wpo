@@ -115,10 +115,50 @@ def subset_by_column(fwi_table_xarray, desired_column_indices):
     )
 
 
+# def dmc_and_dc_to_bui_old(dmc_value_or_array, dc_value_or_array):
+#     """Converts duff moisture code (DMC) and drought code (DC) to BUI.
+#
+#     BUI = build-up index
+#
+#     :param dmc_value_or_array: DMC (either a single value or a numpy array).
+#     :param dc_value_or_array: DC (either a single value or a numpy array).
+#     :return: bui_value_or_array: BUI (same shape as both inputs).
+#     """
+#
+#     found_arrays = isinstance(dmc_value_or_array, numpy.ndarray)
+#     if not found_arrays:
+#         dmc_value_or_array = numpy.array([dmc_value_or_array], dtype=float)
+#         dc_value_or_array = numpy.array([dc_value_or_array], dtype=float)
+#
+#     error_checking.assert_is_numpy_array(
+#         dc_value_or_array,
+#         exact_dimensions=numpy.array(dmc_value_or_array.shape, dtype=int)
+#     )
+#     error_checking.assert_is_geq_numpy_array(dmc_value_or_array, 0.)
+#     error_checking.assert_is_geq_numpy_array(dc_value_or_array, 0.)
+#
+#     bui_value_or_array = numpy.full(dmc_value_or_array.shape, numpy.nan)
+#     dmc = dmc_value_or_array
+#     dc = dc_value_or_array
+#
+#     idx = dmc_value_or_array <= 0.4 * dc_value_or_array
+#     bui_value_or_array[idx] = (0.8 * dmc[idx] * dc[idx]) / (dmc[idx] + 0.4 * dc[idx])
+#
+#     idx = numpy.invert(idx)
+#     bui_value_or_array[idx] = dmc[idx] - (1. - 0.8 * dc[idx] / (dmc[idx] + 0.4 * dc[idx])) / (0.92 + numpy.power(0.0114 * dmc[idx], 1.7))
+#     bui_value_or_array[numpy.invert(numpy.isfinite(bui_value_or_array))] = 0.
+#     bui_value_or_array = numpy.maximum(bui_value_or_array, 0.)
+#
+#     if found_arrays:
+#         return bui_value_or_array
+#
+#     return bui_value_or_array[0]
+
+
 def dmc_and_dc_to_bui(dmc_value_or_array, dc_value_or_array):
     """Converts duff moisture code (DMC) and drought code (DC) to BUI.
 
-    BUI = build-up index
+    Taken from: https://rdrr.io/rforge/cffdrs/src/R/fwiRaster.r
 
     :param dmc_value_or_array: DMC (either a single value or a numpy array).
     :param dc_value_or_array: DC (either a single value or a numpy array).
@@ -137,17 +177,24 @@ def dmc_and_dc_to_bui(dmc_value_or_array, dc_value_or_array):
     error_checking.assert_is_geq_numpy_array(dmc_value_or_array, 0.)
     error_checking.assert_is_geq_numpy_array(dc_value_or_array, 0.)
 
-    bui_value_or_array = numpy.full(dmc_value_or_array.shape, numpy.nan)
     dmc = dmc_value_or_array
     dc = dc_value_or_array
 
-    idx = dmc_value_or_array <= 0.4 * dc_value_or_array
-    bui_value_or_array[idx] = (0.8 * dmc[idx] * dc[idx]) / (dmc[idx] + 0.4 * dc[idx])
-
-    idx = numpy.invert(idx)
-    bui_value_or_array[idx] = dmc[idx] - (1. - 0.8 * dc[idx] / (dmc[idx] + 0.4 * dc[idx])) / (0.92 + numpy.power(0.0114 * dmc[idx], 1.7))
-    bui_value_or_array[numpy.isnan(bui_value_or_array)] = 0.
+    bui_value_or_array = (0.8 * dmc * dc) / (dmc + 0.4 * dc)
+    bui_value_or_array[numpy.invert(numpy.isfinite(bui_value_or_array))] = 0.
     bui_value_or_array = numpy.maximum(bui_value_or_array, 0.)
+
+    first_term = (dmc - bui_value_or_array) / dmc
+    first_term[numpy.invert(numpy.isfinite(first_term))] = 0.
+    first_term = numpy.maximum(first_term, 0.)
+
+    second_term = 0.92 + numpy.power(0.0114 * dmc, 1.7)
+    alt_bui_value_or_array = dmc - first_term * second_term
+    alt_bui_value_or_array[numpy.invert(numpy.isfinite(alt_bui_value_or_array))] = 0.
+    alt_bui_value_or_array = numpy.maximum(alt_bui_value_or_array, 0.)
+
+    idx = bui_value_or_array < dmc
+    bui_value_or_array[idx] = alt_bui_value_or_array[idx]
 
     if found_arrays:
         return bui_value_or_array
@@ -198,7 +245,7 @@ def isi_and_bui_to_fwi(isi_value_or_array, bui_value_or_array):
 
     idx = numpy.invert(idx)
     fwi_value_or_array[idx] = prelim_fwi[idx]
-    fwi_value_or_array[numpy.isnan(fwi_value_or_array)] = 0.
+    fwi_value_or_array[numpy.invert(numpy.isfinite(fwi_value_or_array))] = 0.
     fwi_value_or_array = numpy.maximum(fwi_value_or_array, 0.)
 
     if found_arrays:
