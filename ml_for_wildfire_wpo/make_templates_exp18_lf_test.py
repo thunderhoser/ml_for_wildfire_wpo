@@ -232,9 +232,9 @@ METRIC_FUNCTION_STRINGS = [
 
 NUM_CONV_LAYERS_PER_BLOCK = 1
 
-OPTIMIZER_FUNCTION = keras.optimizers.Nadam(gradient_accumulation_steps=24)
+OPTIMIZER_FUNCTION = keras.optimizers.Nadam(gradient_accumulation_steps=24, clipnorm=0.1, clipvalue=0.1)
 OPTIMIZER_FUNCTION_STRING = (
-    'keras.optimizers.Nadam(gradient_accumulation_steps=24)'
+    'keras.optimizers.Nadam(gradient_accumulation_steps=24, clipnorm=0.1, clipvalue=0.1)'
 )
 
 DEFAULT_OPTION_DICT = {
