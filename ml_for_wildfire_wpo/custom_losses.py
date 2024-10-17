@@ -132,37 +132,18 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
     target_dc_tensor = target_tensor_no_mask[..., dc_index]
     tgt_dmc = target_dmc_tensor
     tgt_dc = target_dc_tensor
+    target_bui_tensor = tensorflow.where(
+        tgt_dmc <= 0.4 * tgt_dc,
+        (0.8 * tgt_dmc * tgt_dc) / (tgt_dmc + 0.4 * tgt_dc),
+        tgt_dmc - (1. - 0.8 * tgt_dc / (tgt_dmc + 0.4 * tgt_dc)) / (0.92 + _power(0.0114 * tgt_dmc, 1.7))
+    )
 
-    target_bui_tensor = (0.8 * tgt_dmc * tgt_dc) / (tgt_dmc + 0.4 * tgt_dc)
     target_bui_tensor = tensorflow.where(
         tensorflow.math.is_finite(target_bui_tensor),
         target_bui_tensor,
         tensorflow.zeros_like(target_bui_tensor)
     )
     target_bui_tensor = K.maximum(target_bui_tensor, 0.)
-
-    first_term = (tgt_dmc - target_bui_tensor) / tgt_dmc
-    first_term = tensorflow.where(
-        tensorflow.math.is_finite(first_term),
-        first_term,
-        tensorflow.zeros_like(first_term)
-    )
-    first_term = K.maximum(first_term, 0.)
-
-    second_term = 0.92 + _power(0.0114 * tgt_dmc, 1.7)
-    tgt_prelim_bui = tgt_dmc - first_term * second_term
-    tgt_prelim_bui = tensorflow.where(
-        tensorflow.math.is_finite(tgt_prelim_bui),
-        tgt_prelim_bui,
-        tensorflow.zeros_like(tgt_prelim_bui)
-    )
-    tgt_prelim_bui = K.maximum(tgt_prelim_bui, 0.)
-
-    target_bui_tensor = tensorflow.where(
-        target_bui_tensor < tgt_dmc,
-        tgt_prelim_bui,
-        target_bui_tensor
-    )
     target_tensor_no_mask = K.concatenate([
         target_tensor_no_mask,
         K.expand_dims(target_bui_tensor, axis=-1)
@@ -180,37 +161,18 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
 
     pred_dmc = predicted_dmc_tensor
     pred_dc = predicted_dc_tensor
+    predicted_bui_tensor = tensorflow.where(
+        pred_dmc <= 0.4 * pred_dc,
+        (0.8 * pred_dmc * pred_dc) / (pred_dmc + 0.4 * pred_dc),
+        pred_dmc - (1. - 0.8 * pred_dc / (pred_dmc + 0.4 * pred_dc)) / (0.92 + _power(0.0114 * pred_dmc, 1.7))
+    )
 
-    predicted_bui_tensor = (0.8 * pred_dmc * pred_dc) / (pred_dmc + 0.4 * pred_dc)
     predicted_bui_tensor = tensorflow.where(
         tensorflow.math.is_finite(predicted_bui_tensor),
         predicted_bui_tensor,
         tensorflow.zeros_like(predicted_bui_tensor)
     )
     predicted_bui_tensor = K.maximum(predicted_bui_tensor, 0.)
-
-    first_term = (pred_dmc - predicted_bui_tensor) / pred_dmc
-    first_term = tensorflow.where(
-        tensorflow.math.is_finite(first_term),
-        first_term,
-        tensorflow.zeros_like(first_term)
-    )
-    first_term = K.maximum(first_term, 0.)
-
-    second_term = 0.92 + _power(0.0114 * pred_dmc, 1.7)
-    pred_prelim_bui = pred_dmc - first_term * second_term
-    pred_prelim_bui = tensorflow.where(
-        tensorflow.math.is_finite(pred_prelim_bui),
-        pred_prelim_bui,
-        tensorflow.zeros_like(pred_prelim_bui)
-    )
-    pred_prelim_bui = K.maximum(pred_prelim_bui, 0.)
-
-    predicted_bui_tensor = tensorflow.where(
-        predicted_bui_tensor < pred_dmc,
-        pred_prelim_bui,
-        predicted_bui_tensor
-    )
 
     if expect_ensemble:
         prediction_tensor = K.concatenate([
@@ -224,6 +186,138 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
         ], axis=-1)
 
     return prediction_tensor, target_tensor_no_mask
+
+
+# def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
+#                         dmc_index, dc_index, expect_ensemble):
+#     """Adds build-up index (BUI) to each tensor.
+#
+#     E = number of examples (time steps)
+#     M = number of rows in grid
+#     N = number of columns in grid
+#     T = number of target fields, not including BUI
+#     S = ensemble size
+#
+#     :param prediction_tensor: Tensor of predicted fire-weather values.  If
+#         `expect_ensemble == True`, this must have dimensions E x M x N x T x S;
+#         otherwise, must have dimensions E x M x N x T.
+#     :param target_tensor_no_mask: Tensor of actual fire-weather values.  This
+#         must have dimensions E x M x N x T.
+#     :param dmc_index: Array index for DMC.  This tells the method that DMC
+#         predictions and targets can be found at
+#         target_tensor_no_mask[:, :, :, dmc_index, ...] and
+#         prediction_tensor[:, :, :, dmc_index, ...], respectively.
+#     :param dc_index: Same as above but for DC.
+#     :param expect_ensemble: Boolean flag, indicating whether to expect
+#         ensemble or deterministic predictions.
+#     :return: prediction_tensor: Same as input but with extra BUI channel at the
+#         end.  This tensor has dimensions E x M x N x (T + 1) x S or
+#         E x M x N x (T + 1).
+#     :return: target_tensor_no_mask: Same as input but with extra BUI channel at
+#         the end.  This tensor has dimensions E x M x N x (T + 1).
+#     """
+#
+#     if prediction_tensor is not None:
+#         target_tensor_no_mask = K.cast(
+#             target_tensor_no_mask, prediction_tensor.dtype
+#         )
+#
+#     target_dmc_tensor = target_tensor_no_mask[..., dmc_index]
+#     target_dc_tensor = target_tensor_no_mask[..., dc_index]
+#     tgt_dmc = target_dmc_tensor
+#     tgt_dc = target_dc_tensor
+#
+#     target_bui_tensor = (0.8 * tgt_dmc * tgt_dc) / (tgt_dmc + 0.4 * tgt_dc)
+#     target_bui_tensor = tensorflow.where(
+#         tensorflow.math.is_finite(target_bui_tensor),
+#         target_bui_tensor,
+#         tensorflow.zeros_like(target_bui_tensor)
+#     )
+#     target_bui_tensor = K.maximum(target_bui_tensor, 0.)
+#
+#     first_term = (tgt_dmc - target_bui_tensor) / tgt_dmc
+#     first_term = tensorflow.where(
+#         tensorflow.math.is_finite(first_term),
+#         first_term,
+#         tensorflow.zeros_like(first_term)
+#     )
+#     first_term = K.maximum(first_term, 0.)
+#
+#     second_term = 0.92 + _power(0.0114 * tgt_dmc, 1.7)
+#     tgt_prelim_bui = tgt_dmc - first_term * second_term
+#     tgt_prelim_bui = tensorflow.where(
+#         tensorflow.math.is_finite(tgt_prelim_bui),
+#         tgt_prelim_bui,
+#         tensorflow.zeros_like(tgt_prelim_bui)
+#     )
+#     tgt_prelim_bui = K.maximum(tgt_prelim_bui, 0.)
+#
+#     target_bui_tensor = tensorflow.where(
+#         target_bui_tensor < tgt_dmc,
+#         tgt_prelim_bui,
+#         target_bui_tensor
+#     )
+#     target_tensor_no_mask = K.concatenate([
+#         target_tensor_no_mask,
+#         K.expand_dims(target_bui_tensor, axis=-1)
+#     ], axis=-1)
+#
+#     if prediction_tensor is None:
+#         return prediction_tensor, target_tensor_no_mask
+#
+#     if expect_ensemble:
+#         predicted_dmc_tensor = prediction_tensor[..., dmc_index, :]
+#         predicted_dc_tensor = prediction_tensor[..., dc_index, :]
+#     else:
+#         predicted_dmc_tensor = prediction_tensor[..., dmc_index]
+#         predicted_dc_tensor = prediction_tensor[..., dc_index]
+#
+#     pred_dmc = predicted_dmc_tensor
+#     pred_dc = predicted_dc_tensor
+#
+#     predicted_bui_tensor = (0.8 * pred_dmc * pred_dc) / (pred_dmc + 0.4 * pred_dc)
+#     predicted_bui_tensor = tensorflow.where(
+#         tensorflow.math.is_finite(predicted_bui_tensor),
+#         predicted_bui_tensor,
+#         tensorflow.zeros_like(predicted_bui_tensor)
+#     )
+#     predicted_bui_tensor = K.maximum(predicted_bui_tensor, 0.)
+#
+#     first_term = (pred_dmc - predicted_bui_tensor) / pred_dmc
+#     first_term = tensorflow.where(
+#         tensorflow.math.is_finite(first_term),
+#         first_term,
+#         tensorflow.zeros_like(first_term)
+#     )
+#     first_term = K.maximum(first_term, 0.)
+#
+#     second_term = 0.92 + _power(0.0114 * pred_dmc, 1.7)
+#     pred_prelim_bui = pred_dmc - first_term * second_term
+#     pred_prelim_bui = tensorflow.where(
+#         tensorflow.math.is_finite(pred_prelim_bui),
+#         pred_prelim_bui,
+#         tensorflow.zeros_like(pred_prelim_bui)
+#     )
+#     pred_prelim_bui = K.maximum(pred_prelim_bui, 0.)
+#
+#     predicted_bui_tensor = tensorflow.where(
+#         predicted_bui_tensor < pred_dmc,
+#         pred_prelim_bui,
+#         predicted_bui_tensor
+#     )
+#
+#     if expect_ensemble:
+#         prediction_tensor = K.concatenate([
+#             prediction_tensor,
+#             K.expand_dims(predicted_bui_tensor, axis=-2)
+#         ], axis=-2)
+#     else:
+#         prediction_tensor = K.concatenate([
+#             prediction_tensor,
+#             K.expand_dims(predicted_bui_tensor, axis=-1)
+#         ], axis=-1)
+#
+#     return prediction_tensor, target_tensor_no_mask
 
 
 def _add_fwi_to_tensors(prediction_tensor, target_tensor_no_mask,
