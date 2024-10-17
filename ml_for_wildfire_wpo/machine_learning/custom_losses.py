@@ -4,6 +4,7 @@ import numpy
 import tensorflow
 import tensorflow.math
 from tensorflow.keras import backend as K
+import tensorflow.debugging
 # from tensorflow.keras import ops as tf_ops
 from gewittergefahr.gg_utils import error_checking
 
@@ -45,6 +46,28 @@ def _natural_log(input_tensor):
     """
 
     return K.log(K.maximum(input_tensor, 1e-6))
+
+
+def _power(input_tensor, exponent):
+    """Computes power.
+
+    :param input_tensor: Keras tensor.
+    :param exponent: Scalar exponent (float).
+    :return: power_tensor: Keras tensor with the same shape as `input_tensor`.
+    """
+
+    power_tensor = K.pow(K.maximum(input_tensor, 1e-6), exponent)
+    return K.maximum(power_tensor, 1e-6)
+
+
+def _exponential(input_tensor):
+    """Computes exponential function.
+
+    :param input_tensor: Keras tensor.
+    :return: exp_tensor: Keras tensor with the same shape as `input_tensor`.
+    """
+
+    return K.maximum(K.exp(input_tensor), 1e-6)
 
 
 def _check_index_args(dmc_index, dc_index, isi_index):
@@ -105,7 +128,7 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
     target_bui_tensor = tensorflow.where(
         tgt_dmc <= 0.4 * tgt_dc,
         (0.8 * tgt_dmc * tgt_dc) / (tgt_dmc + 0.4 * tgt_dc),
-        tgt_dmc - (1. - 0.8 * tgt_dc / (tgt_dmc + 0.4 * tgt_dc)) / (0.92 + K.pow(0.0114 * tgt_dmc, 1.7))
+        tgt_dmc - (1. - 0.8 * tgt_dc / (tgt_dmc + 0.4 * tgt_dc)) / (0.92 + _power(0.0114 * tgt_dmc, 1.7))
     )
 
     target_bui_tensor = tensorflow.where(
@@ -134,7 +157,7 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
     predicted_bui_tensor = tensorflow.where(
         pred_dmc <= 0.4 * pred_dc,
         (0.8 * pred_dmc * pred_dc) / (pred_dmc + 0.4 * pred_dc),
-        pred_dmc - (1. - 0.8 * pred_dc / (pred_dmc + 0.4 * pred_dc)) / (0.92 + K.pow(0.0114 * pred_dmc, 1.7))
+        pred_dmc - (1. - 0.8 * pred_dc / (pred_dmc + 0.4 * pred_dc)) / (0.92 + _power(0.0114 * pred_dmc, 1.7))
     )
 
     predicted_bui_tensor = tensorflow.where(
@@ -198,13 +221,13 @@ def _add_fwi_to_tensors(prediction_tensor, target_tensor_no_mask,
     tgt_bui = target_bui_tensor
     tgt_duff_moisture_func = tensorflow.where(
         tgt_bui <= 80.,
-        0.626 * K.pow(tgt_bui, 0.809) + 2,
-        1000. / (25 + 108.64 * K.exp(-0.023 * tgt_bui))
+        0.626 * _power(tgt_bui, 0.809) + 2,
+        1000. / (25 + 108.64 * _exponential(-0.023 * tgt_bui))
     )
     tgt_prelim_fwi = 0.1 * tgt_isi * tgt_duff_moisture_func
     target_fwi_tensor = tensorflow.where(
         tgt_prelim_fwi > 1.,
-        K.exp(2.72 * K.pow(0.434 * _natural_log(tgt_prelim_fwi), 0.647)),
+        _exponential(2.72 * _power(0.434 * _natural_log(tgt_prelim_fwi), 0.647)),
         tgt_prelim_fwi
     )
 
@@ -234,13 +257,13 @@ def _add_fwi_to_tensors(prediction_tensor, target_tensor_no_mask,
 
     pred_duff_moisture_func = tensorflow.where(
         pred_bui <= 80.,
-        0.626 * K.pow(pred_bui, 0.809) + 2,
-        1000. / (25 + 108.64 * K.exp(-0.023 * pred_bui))
+        0.626 * _power(pred_bui, 0.809) + 2,
+        1000. / (25 + 108.64 * _exponential(-0.023 * pred_bui))
     )
     pred_prelim_fwi = 0.1 * pred_isi * pred_duff_moisture_func
     predicted_fwi_tensor = tensorflow.where(
         pred_prelim_fwi > 1.,
-        K.exp(2.72 * K.pow(0.434 * _natural_log(pred_prelim_fwi), 0.647)),
+        _exponential(2.72 * _power(0.434 * _natural_log(pred_prelim_fwi), 0.647)),
         pred_prelim_fwi
     )
 
@@ -308,7 +331,11 @@ def _add_bui_and_fwi_to_tensors(
     target_bui_tensor = tensorflow.where(
         tgt_dmc <= 0.4 * tgt_dc,
         (0.8 * tgt_dmc * tgt_dc) / (tgt_dmc + 0.4 * tgt_dc),
-        tgt_dmc - (1. - 0.8 * tgt_dc / (tgt_dmc + 0.4 * tgt_dc)) / (0.92 + K.pow(0.0114 * tgt_dmc, 1.7))
+        tgt_dmc - (1. - 0.8 * tgt_dc / (tgt_dmc + 0.4 * tgt_dc)) / (0.92 + _power(0.0114 * tgt_dmc, 1.7))
+    )
+
+    tensorflow.debugging.check_numerics(
+        target_bui_tensor, message='First BUI check'
     )
 
     target_bui_tensor = tensorflow.where(
@@ -316,6 +343,11 @@ def _add_bui_and_fwi_to_tensors(
         tensorflow.zeros_like(target_bui_tensor),
         target_bui_tensor
     )
+
+    tensorflow.debugging.check_numerics(
+        target_bui_tensor, message='Second BUI check'
+    )
+
     target_bui_tensor = K.maximum(target_bui_tensor, 0.)
     target_tensor_no_mask = K.concatenate([
         target_tensor_no_mask,
@@ -327,14 +359,28 @@ def _add_bui_and_fwi_to_tensors(
     tgt_bui = target_bui_tensor
     tgt_duff_moisture_func = tensorflow.where(
         tgt_bui <= 80.,
-        0.626 * K.pow(tgt_bui, 0.809) + 2,
-        1000. / (25 + 108.64 * K.exp(-0.023 * tgt_bui))
+        0.626 * _power(tgt_bui, 0.809) + 2,
+        1000. / (25 + 108.64 * _exponential(-0.023 * tgt_bui))
     )
+
+    tensorflow.debugging.check_numerics(
+        tgt_duff_moisture_func, message='DMF check'
+    )
+
     tgt_prelim_fwi = 0.1 * tgt_isi * tgt_duff_moisture_func
+
+    tensorflow.debugging.check_numerics(
+        tgt_prelim_fwi, message='Prelim-FWI check'
+    )
+
     target_fwi_tensor = tensorflow.where(
         tgt_prelim_fwi > 1.,
-        K.exp(2.72 * K.pow(0.434 * _natural_log(tgt_prelim_fwi), 0.647)),
+        _exponential(2.72 * _power(0.434 * _natural_log(tgt_prelim_fwi), 0.647)),
         tgt_prelim_fwi
+    )
+
+    tensorflow.debugging.check_numerics(
+        target_fwi_tensor, message='First FWI check'
     )
 
     target_fwi_tensor = tensorflow.where(
@@ -342,6 +388,11 @@ def _add_bui_and_fwi_to_tensors(
         tensorflow.zeros_like(target_fwi_tensor),
         target_fwi_tensor
     )
+
+    tensorflow.debugging.check_numerics(
+        target_fwi_tensor, message='Second FWI check'
+    )
+
     target_fwi_tensor = K.maximum(target_fwi_tensor, 0.)
     target_tensor_no_mask = K.concatenate([
         target_tensor_no_mask,
@@ -363,7 +414,11 @@ def _add_bui_and_fwi_to_tensors(
     predicted_bui_tensor = tensorflow.where(
         pred_dmc <= 0.4 * pred_dc,
         (0.8 * pred_dmc * pred_dc) / (pred_dmc + 0.4 * pred_dc),
-        pred_dmc - (1. - 0.8 * pred_dc / (pred_dmc + 0.4 * pred_dc)) / (0.92 + K.pow(0.0114 * pred_dmc, 1.7))
+        pred_dmc - (1. - 0.8 * pred_dc / (pred_dmc + 0.4 * pred_dc)) / (0.92 + _power(0.0114 * pred_dmc, 1.7))
+    )
+
+    tensorflow.debugging.check_numerics(
+        predicted_bui_tensor, message='Third BUI check'
     )
 
     predicted_bui_tensor = tensorflow.where(
@@ -371,6 +426,11 @@ def _add_bui_and_fwi_to_tensors(
         tensorflow.zeros_like(predicted_bui_tensor),
         predicted_bui_tensor
     )
+
+    tensorflow.debugging.check_numerics(
+        predicted_bui_tensor, message='Fourth BUI check'
+    )
+
     predicted_bui_tensor = K.maximum(predicted_bui_tensor, 0.)
 
     if expect_ensemble:
@@ -394,14 +454,28 @@ def _add_bui_and_fwi_to_tensors(
 
     pred_duff_moisture_func = tensorflow.where(
         pred_bui <= 80.,
-        0.626 * K.pow(pred_bui, 0.809) + 2,
-        1000. / (25 + 108.64 * K.exp(-0.023 * pred_bui))
+        0.626 * _power(pred_bui, 0.809) + 2,
+        1000. / (25 + 108.64 * _exponential(-0.023 * pred_bui))
     )
+
+    tensorflow.debugging.check_numerics(
+        pred_duff_moisture_func, message='Second DMF check'
+    )
+
     pred_prelim_fwi = 0.1 * pred_isi * pred_duff_moisture_func
+
+    tensorflow.debugging.check_numerics(
+        pred_prelim_fwi, message='Second prelim-FWI check'
+    )
+
     predicted_fwi_tensor = tensorflow.where(
         pred_prelim_fwi > 1.,
-        K.exp(2.72 * K.pow(0.434 * _natural_log(pred_prelim_fwi), 0.647)),
+        _exponential(2.72 * _power(0.434 * _natural_log(pred_prelim_fwi), 0.647)),
         pred_prelim_fwi
+    )
+
+    tensorflow.debugging.check_numerics(
+        predicted_fwi_tensor, message='Third FWI check'
     )
 
     predicted_fwi_tensor = tensorflow.where(
@@ -409,6 +483,11 @@ def _add_bui_and_fwi_to_tensors(
         tensorflow.zeros_like(predicted_fwi_tensor),
         predicted_fwi_tensor
     )
+
+    tensorflow.debugging.check_numerics(
+        predicted_fwi_tensor, message='Fourth FWI check'
+    )
+
     predicted_fwi_tensor = K.maximum(predicted_fwi_tensor, 0.)
 
     if expect_ensemble:
@@ -458,7 +537,7 @@ def _add_dsr_to_tensors(prediction_tensor, target_tensor_no_mask,
             target_tensor_no_mask, prediction_tensor.dtype
         )
 
-    target_dsr_tensor = 0.0272 * K.pow(
+    target_dsr_tensor = 0.0272 * _power(
         target_tensor_no_mask[..., fwi_index], 1.77
     )
     target_tensor_no_mask = K.concatenate([
@@ -470,7 +549,7 @@ def _add_dsr_to_tensors(prediction_tensor, target_tensor_no_mask,
         return prediction_tensor, target_tensor_no_mask
 
     if expect_ensemble:
-        predicted_dsr_tensor = 0.0272 * K.pow(
+        predicted_dsr_tensor = 0.0272 * _power(
             prediction_tensor[..., fwi_index, :], 1.77
         )
         prediction_tensor = K.concatenate([
@@ -478,7 +557,7 @@ def _add_dsr_to_tensors(prediction_tensor, target_tensor_no_mask,
             K.expand_dims(predicted_dsr_tensor, axis=-2)
         ], axis=-2)
     else:
-        predicted_dsr_tensor = 0.0272 * K.pow(
+        predicted_dsr_tensor = 0.0272 * _power(
             prediction_tensor[..., fwi_index], 1.77
         )
         prediction_tensor = K.concatenate([
@@ -1921,6 +2000,13 @@ def dual_weighted_crpss_constrained_bui_fwi_together(
             expect_ensemble=True
         )
 
+        tensorflow.debugging.check_numerics(
+            prediction_tensor, message='prediction_tensor check'
+        )
+        tensorflow.debugging.check_numerics(
+            target_tensor_no_mask, message='target_tensor_no_mask check'
+        )
+
         _, gfs_prediction_tensor = _add_bui_and_fwi_to_tensors(
             prediction_tensor=None,
             target_tensor_no_mask=gfs_prediction_tensor,
@@ -1928,6 +2014,10 @@ def dual_weighted_crpss_constrained_bui_fwi_together(
             dc_index=dc_index,
             isi_index=isi_index,
             expect_ensemble=True
+        )
+
+        tensorflow.debugging.check_numerics(
+            gfs_prediction_tensor, message='gfs_prediction_tensor check'
         )
 
         relevant_target_tensor = K.expand_dims(target_tensor_no_mask, axis=-1)
