@@ -131,6 +131,7 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
         target_bui_tensor,
         tensorflow.zeros_like(target_bui_tensor)
     )
+    target_bui_tensor = K.maximum(target_bui_tensor, 0.)
 
     first_term = (tgt_dmc - target_bui_tensor) / tgt_dmc
     first_term = tensorflow.where(
@@ -138,6 +139,7 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
         first_term,
         tensorflow.zeros_like(first_term)
     )
+    first_term = K.maximum(first_term, 0.)
 
     second_term = 0.92 + _power(0.0114 * tgt_dmc, 1.7)
     tgt_prelim_bui = tgt_dmc - first_term * second_term
@@ -146,6 +148,7 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
         tgt_prelim_bui,
         tensorflow.zeros_like(tgt_prelim_bui)
     )
+    tgt_prelim_bui = K.maximum(tgt_prelim_bui, 0.)
 
     target_bui_tensor = tensorflow.where(
         target_bui_tensor < tgt_dmc,
@@ -176,6 +179,7 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
         predicted_bui_tensor,
         tensorflow.zeros_like(predicted_bui_tensor)
     )
+    predicted_bui_tensor = K.maximum(predicted_bui_tensor, 0.)
 
     first_term = (pred_dmc - predicted_bui_tensor) / pred_dmc
     first_term = tensorflow.where(
@@ -183,6 +187,7 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
         first_term,
         tensorflow.zeros_like(first_term)
     )
+    first_term = K.maximum(first_term, 0.)
 
     second_term = 0.92 + _power(0.0114 * pred_dmc, 1.7)
     pred_prelim_bui = pred_dmc - first_term * second_term
@@ -191,6 +196,7 @@ def _add_bui_to_tensors(prediction_tensor, target_tensor_no_mask,
         pred_prelim_bui,
         tensorflow.zeros_like(pred_prelim_bui)
     )
+    pred_prelim_bui = K.maximum(pred_prelim_bui, 0.)
 
     predicted_bui_tensor = tensorflow.where(
         predicted_bui_tensor < pred_dmc,
