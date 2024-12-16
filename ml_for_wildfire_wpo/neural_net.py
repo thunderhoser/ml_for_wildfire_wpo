@@ -1886,6 +1886,8 @@ def data_generator(option_dict):
             )
 
             if gfs_forecast_target_dir_name is not None:
+                print(gfs_target_lead_times_days)
+
                 (
                     new_matrix,
                     desired_gfs_fcst_target_row_indices,
