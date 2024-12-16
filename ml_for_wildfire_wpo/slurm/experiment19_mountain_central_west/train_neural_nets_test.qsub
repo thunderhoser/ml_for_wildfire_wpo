@@ -37,6 +37,7 @@ GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project
 TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
 GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
 TARGET_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi/normalization_params_2019-2020.nc"
+ERA5_CONSTANT_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_constants.nc"
 
 LEAD_TIMES_DAYS=("03" "03" "03" "03" "03" "03" "03" "03" "03" "03" "05" "05" "05" "05" "05" "05" "05" "05" "05" "05" "07" "07" "07" "07" "07" "07" "07" "07" "07" "07")
 SPECTRAL_COMPLEXITIES=("050" "050" "075" "075" "100" "100" "125" "125" "150" "150" "050" "050" "075" "075" "100" "100" "125" "125" "150" "150" "050" "050" "075" "075" "100" "100" "125" "125" "150" "150")
@@ -75,6 +76,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --curriculum_num_rampup_epochs=1 \
 --gfs_pred_leads_hours_by_model_lead ${gfs_pred_leads_hours_by_model_lead} \
 --gfs_normalization_file_name="" \
+--era5_constant_file_name="${ERA5_CONSTANT_FILE_NAME}" \
 --target_field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" \
 --target_lags_days_by_model_lead ${target_lags_days_by_model_lead} \
 --gfs_target_leads_days_by_model_lead -1 \
