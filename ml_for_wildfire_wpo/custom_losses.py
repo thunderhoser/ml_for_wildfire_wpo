@@ -1258,7 +1258,7 @@ def dual_weighted_msess_all_constraints(
 
         num_target_fields = __get_num_target_fields(
             prediction_tensor=prediction_tensor,
-            expect_ensemble=True
+            expect_ensemble=False
         )
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
