@@ -1260,7 +1260,6 @@ def dual_weighted_msess_all_constraints(
             prediction_tensor=prediction_tensor,
             expect_ensemble=False
         )
-        print(num_target_fields)
 
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
         target_tensor_no_mask = target_tensor[..., :num_target_fields]

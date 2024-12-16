@@ -1882,8 +1882,6 @@ def data_generator(option_dict):
             )
 
             if len(gfs_target_lead_times_days) > 0:
-                print(gfs_target_lead_times_days)
-
                 (
                     new_matrix,
                     desired_gfs_fcst_target_row_indices,
@@ -1961,8 +1959,6 @@ def data_generator(option_dict):
             )
 
             if compare_to_gfs_in_loss:
-                print(gfs_forecast_target_dir_name)
-
                 (
                     new_target_matrix,
                     desired_gfs_fcst_target_row_indices,
