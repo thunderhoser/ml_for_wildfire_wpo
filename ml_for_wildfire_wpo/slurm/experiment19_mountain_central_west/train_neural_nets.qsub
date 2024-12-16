@@ -57,8 +57,8 @@ elif [ "$lead_time_days" = "07" ]; then
     target_lags_days_by_model_lead="1 2 3 4 5 6 7 -1"
 fi
 
-template_file_name="${TEMPLATE_DIR_NAME}/lead-time-days=${lead_time_days}_spectral-complexity=${spectral_complexity}_use-convnext=${use_convnext}/model.keras"
-output_dir_name="${TOP_OUTPUT_DIR_NAME}/lead-time-days=${lead_time_days}_spectral-complexity=${spectral_complexity}_use-convnext=${use_convnext}"
+template_file_name="${TEMPLATE_DIR_NAME}/lead-time-days=${lead_time_days}_spectral-complexity=${spectral_complexity}_use-convnext=${convnext_flag}/model.keras"
+output_dir_name="${TOP_OUTPUT_DIR_NAME}/lead-time-days=${lead_time_days}_spectral-complexity=${spectral_complexity}_use-convnext=${convnext_flag}"
 echo $output_dir_name
 
 python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
