@@ -1885,7 +1885,7 @@ def data_generator(option_dict):
                 use_quantile_norm=targets_use_quantile_norm
             )
 
-            if gfs_forecast_target_dir_name is not None:
+            if gfs_forecast_target_dir_name is not None and len(gfs_target_lead_times_days) > 0:
                 print(gfs_target_lead_times_days)
 
                 (
@@ -2299,7 +2299,7 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
     else:
         baseline_prediction_matrix = None
 
-    if gfs_forecast_target_dir_name is not None:
+    if gfs_forecast_target_dir_name is not None and len(gfs_target_lead_times_days) > 0:
         new_matrix = _read_gfs_forecast_targets_1example(
             daily_gfs_dir_name=gfs_forecast_target_dir_name,
             init_date_string=gfs_io.file_name_to_date(gfs_file_name),
