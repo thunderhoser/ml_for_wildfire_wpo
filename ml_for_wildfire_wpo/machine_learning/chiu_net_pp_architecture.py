@@ -533,6 +533,22 @@ def _get_2d_conv_block(
     :return: output_layer_object: Output layer from block.
     """
 
+    # Check input args.
+    if do_residual:
+        num_conv_layers = max([num_conv_layers, 2])
+
+    try:
+        _ = len(dropout_rates)
+    except:
+        dropout_rates = numpy.full(num_conv_layers, dropout_rates)
+
+    if len(dropout_rates) < num_conv_layers:
+        dropout_rates = numpy.concatenate([
+            dropout_rates, dropout_rates[[-1]]
+        ])
+
+    assert len(dropout_rates) == num_conv_layers
+
     # Handle ConvNext block.
     if do_convnext:
         current_layer_object = __get_2d_convnext_block(
@@ -567,22 +583,6 @@ def _get_2d_conv_block(
             )
 
         return current_layer_object
-
-    # Check input args for residual block or basic conv block.
-    if do_residual:
-        num_conv_layers = max([num_conv_layers, 2])
-
-    try:
-        _ = len(dropout_rates)
-    except:
-        dropout_rates = numpy.full(num_conv_layers, dropout_rates)
-
-    if len(dropout_rates) < num_conv_layers:
-        dropout_rates = numpy.concatenate([
-            dropout_rates, dropout_rates[[-1]]
-        ])
-
-    assert len(dropout_rates) == num_conv_layers
 
     # Create residual block or basic conv block.
     current_layer_object = None
@@ -685,6 +685,22 @@ def _get_3d_conv_block(
     :return: output_layer_object: Output layer from block (with 2 spatial dims).
     """
 
+    # Check input args.
+    if do_residual:
+        num_conv_layers = max([num_conv_layers, 2])
+
+    try:
+        _ = len(dropout_rates)
+    except:
+        dropout_rates = numpy.full(num_conv_layers, dropout_rates)
+
+    if len(dropout_rates) < num_conv_layers:
+        dropout_rates = numpy.concatenate([
+            dropout_rates, dropout_rates[[-1]]
+        ])
+
+    assert len(dropout_rates) == num_conv_layers
+
     # Handle ConvNext block.
     num_time_steps = __dimension_to_int(input_layer_object.shape[-2])
 
@@ -719,22 +735,6 @@ def _get_3d_conv_block(
             )
 
         return current_layer_object
-
-    # Check input args for residual block or basic conv block.
-    if do_residual:
-        num_conv_layers = max([num_conv_layers, 2])
-
-    try:
-        _ = len(dropout_rates)
-    except:
-        dropout_rates = numpy.full(num_conv_layers, dropout_rates)
-
-    if len(dropout_rates) < num_conv_layers:
-        dropout_rates = numpy.concatenate([
-            dropout_rates, dropout_rates[[-1]]
-        ])
-
-    assert len(dropout_rates) == num_conv_layers
 
     # Create residual block or basic conv block.
     current_layer_object = None
