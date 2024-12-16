@@ -9,7 +9,9 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
-from gewittergefahr.gg_utils import error_checking
+import error_checking
+
+EPSILON = numpy.finfo(numpy.float32).eps
 
 LATITUDE_DIM = 'latitude_deg_n'
 LONGITUDE_DIM = 'longitude_deg_e'
@@ -185,24 +187,23 @@ def dmc_and_dc_to_bui(dmc_value_or_array, dc_value_or_array):
     error_checking.assert_is_geq_numpy_array(dmc_value_or_array, 0.)
     error_checking.assert_is_geq_numpy_array(dc_value_or_array, 0.)
 
-    dmc = dmc_value_or_array
-    dc = dc_value_or_array
-
+    dmc = numpy.maximum(dmc_value_or_array, EPSILON)
+    dc = numpy.maximum(dc_value_or_array, EPSILON)
     bui_value_or_array = (0.8 * dmc * dc) / (dmc + 0.4 * dc)
-    bui_value_or_array[numpy.invert(numpy.isfinite(bui_value_or_array))] = 0.
-    bui_value_or_array = numpy.maximum(bui_value_or_array, 0.)
+    # bui_value_or_array[numpy.invert(numpy.isfinite(bui_value_or_array))] = 0.
+    # bui_value_or_array = numpy.maximum(bui_value_or_array, 0.)
 
     first_term = (dmc - bui_value_or_array) / dmc
-    first_term[numpy.invert(numpy.isfinite(first_term))] = 0.
-    first_term = numpy.maximum(first_term, 0.)
+    # first_term[numpy.invert(numpy.isfinite(first_term))] = 0.
+    # first_term = numpy.maximum(first_term, 0.)
 
     second_term = 0.92 + numpy.power(0.0114 * dmc, 1.7)
-    alt_bui_value_or_array = dmc - first_term * second_term
-    alt_bui_value_or_array[numpy.invert(numpy.isfinite(alt_bui_value_or_array))] = 0.
-    alt_bui_value_or_array = numpy.maximum(alt_bui_value_or_array, 0.)
+    prelim_bui = dmc - first_term * second_term
+    # prelim_bui[numpy.invert(numpy.isfinite(prelim_bui))] = 0.
+    prelim_bui = numpy.maximum(prelim_bui, 0.)
 
     idx = bui_value_or_array < dmc
-    bui_value_or_array[idx] = alt_bui_value_or_array[idx]
+    bui_value_or_array[idx] = prelim_bui[idx]
 
     if found_arrays:
         return bui_value_or_array
