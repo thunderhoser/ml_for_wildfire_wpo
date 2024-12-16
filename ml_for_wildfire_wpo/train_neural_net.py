@@ -130,11 +130,16 @@ def _run(template_file_name, output_dir_name,
         gfs_forecast_target_dir_name_for_training = None
         gfs_forecast_target_dir_name_for_validation = None
 
-    epoch_and_lead_time_to_freq = neural_net.create_learning_curriculum(
-        lead_times_days=model_lead_times_days,
-        start_epoch_by_lead_time=curriculum_start_epoch_by_model_lead,
-        num_rampup_epochs=curriculum_num_rampup_epochs
-    )
+    if len(model_lead_times_days) == 1:
+        epoch_and_lead_time_to_freq = dict()
+        for i in range(num_epochs):
+            epoch_and_lead_time_to_freq[i + 1, model_lead_times_days[0]] = 1.
+    else:
+        epoch_and_lead_time_to_freq = neural_net.create_learning_curriculum(
+            lead_times_days=model_lead_times_days,
+            start_epoch_by_lead_time=curriculum_start_epoch_by_model_lead,
+            num_rampup_epochs=curriculum_num_rampup_epochs
+        )
 
     this_array = gfs_pred_leads_hours_by_model_lead
     this_array = this_array.astype(float)
