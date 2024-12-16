@@ -251,7 +251,7 @@ def __determine_num_times_for_interp(generator_option_dict):
         MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
     ]
     model_lead_times_days = numpy.array(
-        list(model_lead_days_to_target_lags_days.keys()),
+        list(model_lead_days_to_gfs_pred_leads_hours.keys()),
         dtype=int
     )
 
@@ -265,15 +265,25 @@ def __determine_num_times_for_interp(generator_option_dict):
     else:
         num_gfs_hours_for_interp = numpy.max(num_gfs_hours_by_model_lead)
 
-    num_target_lags_by_model_lead = numpy.array([
-        len(model_lead_days_to_target_lags_days[l])
-        for l in model_lead_times_days
-    ], dtype=int)
+    if model_lead_days_to_target_lags_days is None:
+        num_target_lags_by_model_lead = numpy.full(
+            len(model_lead_times_days), 0, dtype=int
+        )
+    else:
+        num_target_lags_by_model_lead = numpy.array([
+            len(model_lead_days_to_target_lags_days[l])
+            for l in model_lead_times_days
+        ], dtype=int)
 
-    num_gfs_target_leads_by_model_lead = numpy.array([
-        len(model_lead_days_to_gfs_target_leads_days[l])
-        for l in model_lead_times_days
-    ], dtype=int)
+    if model_lead_days_to_gfs_target_leads_days is None:
+        num_gfs_target_leads_by_model_lead = numpy.full(
+            len(model_lead_times_days), 0, dtype=int
+        )
+    else:
+        num_gfs_target_leads_by_model_lead = numpy.array([
+            len(model_lead_days_to_gfs_target_leads_days[l])
+            for l in model_lead_times_days
+        ], dtype=int)
 
     num_target_time_steps_by_model_lead = (
         num_target_lags_by_model_lead + num_gfs_target_leads_by_model_lead
@@ -1763,12 +1773,20 @@ def data_generator(option_dict):
             gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
                 model_lead_time_days
             ]
-            target_lag_times_days = model_lead_days_to_target_lags_days[
-                model_lead_time_days
-            ]
-            gfs_target_lead_times_days = model_lead_days_to_gfs_target_leads_days[
-                model_lead_time_days
-            ]
+
+            if model_lead_days_to_target_lags_days is None:
+                target_lag_times_days = numpy.array([], dtype=int)
+            else:
+                target_lag_times_days = model_lead_days_to_target_lags_days[
+                    model_lead_time_days
+                ]
+
+            if model_lead_days_to_gfs_target_leads_days is None:
+                gfs_target_lead_times_days = numpy.array([], dtype=int)
+            else:
+                gfs_target_lead_times_days = model_lead_days_to_gfs_target_leads_days[
+                    model_lead_time_days
+                ]
 
             if use_lead_time_as_predictor:
                 lead_time_predictors_days = numpy.full(
@@ -2112,12 +2130,20 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
     gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
         model_lead_time_days
     ]
-    target_lag_times_days = model_lead_days_to_target_lags_days[
-        model_lead_time_days
-    ]
-    gfs_target_lead_times_days = model_lead_days_to_gfs_target_leads_days[
-        model_lead_time_days
-    ]
+
+    if model_lead_days_to_target_lags_days is None:
+        target_lag_times_days = numpy.array([], dtype=int)
+    else:
+        target_lag_times_days = model_lead_days_to_target_lags_days[
+            model_lead_time_days
+        ]
+
+    if model_lead_days_to_gfs_target_leads_days is None:
+        gfs_target_lead_times_days = numpy.array([], dtype=int)
+    else:
+        gfs_target_lead_times_days = model_lead_days_to_gfs_target_leads_days[
+            model_lead_time_days
+        ]
 
     if use_lead_time_as_predictor:
         lead_time_predictors_days = numpy.array(
