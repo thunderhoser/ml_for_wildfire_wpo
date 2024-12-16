@@ -111,8 +111,6 @@ def _run(template_file_name, output_dir_name,
             gfs_target_leads_days_by_model_lead[0] <= 0
     ):
         gfs_target_leads_days_by_model_lead = None
-        gfs_forecast_target_dir_name_for_training = None
-        gfs_forecast_target_dir_name_for_validation = None
 
     if (
             gfs_forecast_target_dir_name_for_training is None or

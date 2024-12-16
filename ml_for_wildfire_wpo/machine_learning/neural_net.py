@@ -484,17 +484,8 @@ def _check_generator_args(option_dict):
     for this_field_name in option_dict[TARGET_FIELDS_KEY]:
         canadian_fwi_utils.check_field_name(this_field_name)
 
-    if (
-            option_dict[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] is None
-            or option_dict[GFS_FORECAST_TARGET_DIR_KEY] is None
-    ):
-        option_dict[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = None
-        option_dict[GFS_FORECAST_TARGET_DIR_KEY] = None
-
-    if option_dict[GFS_FORECAST_TARGET_DIR_KEY] is not None:
-        error_checking.assert_directory_exists(
-            option_dict[GFS_FORECAST_TARGET_DIR_KEY]
-        )
+    if option_dict[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] is not None:
+        assert option_dict[GFS_FORECAST_TARGET_DIR_KEY] is not None
 
         model_lead_days_to_gfs_target_leads_days = option_dict[
             MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
@@ -521,6 +512,11 @@ def _check_generator_args(option_dict):
             model_lead_days_to_gfs_target_leads_days[d] = (
                 these_target_lead_times_days
             )
+
+    if option_dict[GFS_FORECAST_TARGET_DIR_KEY] is not None:
+        error_checking.assert_directory_exists(
+            option_dict[GFS_FORECAST_TARGET_DIR_KEY]
+        )
 
     error_checking.assert_directory_exists(option_dict[TARGET_DIRECTORY_KEY])
     if option_dict[TARGET_NORM_FILE_KEY] is None:
@@ -1878,7 +1874,7 @@ def data_generator(option_dict):
                 use_quantile_norm=targets_use_quantile_norm
             )
 
-            if gfs_forecast_target_dir_name is not None:
+            if len(gfs_target_lead_times_days) > 0:
                 (
                     new_matrix,
                     desired_gfs_fcst_target_row_indices,
@@ -2290,7 +2286,7 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
     else:
         baseline_prediction_matrix = None
 
-    if gfs_forecast_target_dir_name is not None:
+    if len(gfs_target_lead_times_days) > 0:
         new_matrix = _read_gfs_forecast_targets_1example(
             daily_gfs_dir_name=gfs_forecast_target_dir_name,
             init_date_string=gfs_io.file_name_to_date(gfs_file_name),
