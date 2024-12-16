@@ -292,9 +292,9 @@ LEAD_TIME_DAYS_TO_NUM_GFS_HOURS = {
     7: 9
 }
 LEAD_TIME_DAYS_TO_NUM_URMA_LAGS = {
-    3: 4,
-    5: 6,
-    7: 8
+    3: 3,
+    5: 5,
+    7: 7
 }
 
 SPECTRAL_COMPLEXITIES_AXIS2 = numpy.array([50, 75, 100, 125, 150], dtype=int)

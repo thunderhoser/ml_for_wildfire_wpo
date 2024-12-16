@@ -1,0 +1,102 @@
+#!/bin/bash
+
+#SBATCH --job-name="train_neural_nets"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=96:00:00
+#SBATCH --array=0-29
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=train_neural_nets_%A_%a.out
+
+module load cuda/12.3.1
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment19_mountain_central_west/templates"
+TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment19_mountain_central_west"
+
+GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
+TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
+TARGET_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi/normalization_params_2019-2020.nc"
+
+LEAD_TIMES_DAYS=("03" "03" "03" "03" "03" "03" "03" "03" "03" "03" "05" "05" "05" "05" "05" "05" "05" "05" "05" "05" "07" "07" "07" "07" "07" "07" "07" "07" "07" "07")
+SPECTRAL_COMPLEXITIES=("050" "050" "075" "075" "100" "100" "125" "125" "150" "150" "050" "050" "075" "075" "100" "100" "125" "125" "150" "150" "050" "050" "075" "075" "100" "100" "125" "125" "150" "150")
+CONVNEXT_FLAGS=("0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1")
+
+lead_time_days=${LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}
+spectral_complexity=${SPECTRAL_COMPLEXITIES[$SLURM_ARRAY_TASK_ID]}
+convnext_flag=${CONVNEXT_FLAGS[$SLURM_ARRAY_TASK_ID]}
+
+if [ "$lead_time_days" = "03" ]; then
+    gfs_pred_leads_hours_by_model_lead="0 24 48 72 96 -1"
+    target_lags_days_by_model_lead="1 2 3 -1"
+elif [ "$lead_time_days" = "05" ]; then
+    gfs_pred_leads_hours_by_model_lead="0 24 48 72 96 120 144 -1"
+    target_lags_days_by_model_lead="1 2 3 4 5 -1"
+elif [ "$lead_time_days" = "07" ]; then
+    gfs_pred_leads_hours_by_model_lead="0 24 48 72 96 120 144 168 192 -1"
+    target_lags_days_by_model_lead="1 2 3 4 5 6 7 -1"
+fi
+
+template_file_name="${TEMPLATE_DIR_NAME}/lead-time-days=${lead_time_days}_spectral-complexity=${spectral_complexity}_use-convnext=${use_convnext}/model.keras"
+output_dir_name="${TOP_OUTPUT_DIR_NAME}/lead-time-days=${lead_time_days}_spectral-complexity=${spectral_complexity}_use-convnext=${use_convnext}"
+echo $output_dir_name
+
+python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
+--input_template_file_name="${template_file_name}" \
+--output_model_dir_name="${output_dir_name}" \
+--inner_latitude_limits_deg_n 36 42 \
+--inner_longitude_limits_deg_e 249 257 \
+--outer_latitude_buffer_deg=5 \
+--outer_longitude_buffer_deg=5 \
+--gfs_predictor_field_names "temperature_kelvins" "specific_humidity_kg_kg01" "geopotential_height_m_asl" "u_wind_m_s01" "v_wind_m_s01" "temperature_2m_agl_kelvins" "specific_humidity_2m_agl_kg_kg01" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "accumulated_precip_metres" \
+--gfs_pressure_levels_mb 500 \
+--model_lead_times_days ${lead_time_days} \
+--curriculum_start_epoch_by_model_lead 0 \
+--curriculum_num_rampup_epochs=1 \
+--gfs_pred_leads_hours_by_model_lead ${gfs_pred_leads_hours_by_model_lead} \
+--gfs_normalization_file_name="" \
+--target_field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" \
+--target_lags_days_by_model_lead ${target_lags_days_by_model_lead} \
+--gfs_target_leads_days_by_model_lead -1 \
+--compare_to_gfs_in_loss=1 \
+--target_normalization_file_name="${TARGET_NORM_FILE_NAME}" \
+--targets_use_quantile_norm=1 \
+--num_examples_per_batch=1 \
+--sentinel_value=-10 \
+--do_residual_prediction=1 \
+--use_lead_time_as_predictor=0 \
+--change_model_lead_every_n_batches=-1 \
+--gfs_dir_name_for_training="${GFS_DIR_NAME}" \
+--target_dir_name_for_training="${TARGET_DIR_NAME}" \
+--gfs_forecast_target_dir_name_for_training="${GFS_FORECAST_TARGET_DIR_NAME}" \
+--gfs_init_date_limit_strings_for_training "20190101" "20201210" \
+--gfs_dir_name_for_validation="${GFS_DIR_NAME}" \
+--target_dir_name_for_validation="${TARGET_DIR_NAME}" \
+--gfs_forecast_target_dir_name_for_validation="${GFS_FORECAST_TARGET_DIR_NAME}" \
+--gfs_init_date_limit_strings_for_validation "20210101" "20211210" \
+--num_epochs=10000 \
+--num_training_batches_per_epoch=100 \
+--num_validation_batches_per_epoch=50 \
+--plateau_patience_epochs=50 \
+--plateau_learning_rate_multiplier=0.95 \
+--early_stopping_patience_epochs=10000
