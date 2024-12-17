@@ -40,7 +40,6 @@ BASELINE_INIT_DATES_ARG_NAME = 'baseline_init_date_strings'
 NEW_INIT_DATES_ARG_NAME = 'new_init_date_strings'
 REGION_MASK_FILE_ARG_NAME = 'input_region_mask_file_name'
 TARGET_FIELD_ARG_NAME = 'target_field_name'
-USE_DEEP_EXPLAINER_ARG_NAME = 'use_deep_explainer'
 USE_INOUT_TENSORS_ARG_NAME = 'use_inout_tensors_only'
 DISABLE_TENSORFLOW2_ARG_NAME = 'disable_tensorflow2'
 DISABLE_EAGER_EXEC_ARG_NAME = 'disable_eager_execution'
@@ -85,10 +84,6 @@ TARGET_FIELD_HELP_STRING = (
     'for this field averaged over the spatial region found in the file `{0:s}`.'
 ).format(
     REGION_MASK_FILE_ARG_NAME
-)
-USE_DEEP_EXPLAINER_HELP_STRING = (
-    'Boolean flag.  If 1 (0), will use shap.DeepExplainer '
-    '(shap.GradientExplainer).'
 )
 USE_INOUT_TENSORS_HELP_STRING = (
     'Boolean flag.  If 1 (0), will send full model (only input and output '
@@ -144,10 +139,6 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + TARGET_FIELD_ARG_NAME, type=str, required=True,
     help=TARGET_FIELD_HELP_STRING
-)
-INPUT_ARG_PARSER.add_argument(
-    '--' + USE_DEEP_EXPLAINER_ARG_NAME, type=int, required=True,
-    help=USE_DEEP_EXPLAINER_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + USE_INOUT_TENSORS_ARG_NAME, type=int, required=True,
@@ -242,48 +233,6 @@ def _modify_model_output(model_object, region_mask_matrix, target_field_index):
     )
 
 
-def _modify_model_output_old(model_object, region_mask_matrix,
-                             target_field_index):
-    """Modifies model output.
-
-    The original model output should have dimensions E x M x N x F or
-    E x M x N x F x S, where E = number of data examples; M = number of grid
-    rows; N = number of grid columns; F = number of target fields; and
-    S = number of ensemble members.  We want to collapse this whole array to
-    just a length-E vector, by averaging over ensemble members, finding the
-    desired target field, and averaging over relevant spatial locations (in the
-    desired region).
-
-    :param model_object: Trained model (instance of `keras.models.Model` or
-        `keras.models.Sequential`).
-    :param region_mask_matrix: M-by-N numpy array of Boolean flags, where True
-        means that the pixel is within the desired region.
-    :param target_field_index: Index of desired target field, along the target-
-        field axis of the model's output tensor.
-    :return: model_predict_function: Function, returning the aggregated model
-        predictions as a length-E vector.
-    """
-
-    def model_predict(predictor_matrices):
-        prediction_matrix = model_object.predict(predictor_matrices)
-        if len(prediction_matrix.shape) == 5:
-            prediction_matrix_4d = numpy.mean(prediction_matrix, axis=-1)
-        else:
-            prediction_matrix_4d = prediction_matrix
-
-        prediction_matrix_3d = prediction_matrix_4d[..., target_field_index]
-
-        region_mask_matrix_3d = numpy.expand_dims(
-            region_mask_matrix.astype(int), axis=0
-        )
-        return numpy.mean(
-            prediction_matrix_3d * region_mask_matrix_3d,
-            axis=(1, 2)
-        )
-
-    return model_predict
-
-
 def _apply_deepshap_1day(
         explainer_object, init_date_string, baseline_init_date_strings,
         target_field_name, validation_option_dict,
@@ -357,8 +306,8 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
          gfs_forecast_target_dir_name, model_lead_time_days,
          baseline_init_date_strings, new_init_date_strings,
          region_mask_file_name, target_field_name,
-         use_deep_explainer, use_inout_tensors_only,
-         disable_tensorflow2, disable_eager_execution, output_dir_name):
+         use_inout_tensors_only, disable_tensorflow2, disable_eager_execution,
+         output_dir_name):
     """Uses DeepSHAP algorithm to create Shapley maps.
 
     This is effectively the main method.
@@ -372,12 +321,13 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     :param new_init_date_strings: Same.
     :param region_mask_file_name: Same.
     :param target_field_name: Same.
-    :param use_deep_explainer: Same.
     :param use_inout_tensors_only: Same.
     :param disable_tensorflow2: Same.
     :param disable_eager_execution: Same.
     :param output_dir_name: Same.
     """
+
+    assert disable_tensorflow2 or disable_eager_execution
 
     if disable_tensorflow2:
         tensorflow.compat.v1.disable_v2_behavior()
@@ -429,6 +379,7 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     # Read baseline examples.
     num_baseline_examples = len(baseline_init_date_strings)
     baseline_predictor_matrices = []
+    good_date_indices = []
 
     for i in range(num_baseline_examples):
         try:
@@ -442,6 +393,7 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             print(SEPARATOR_STRING)
             continue
 
+        good_date_indices.append(i)
         these_predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
 
         if len(baseline_predictor_matrices) == 0:
@@ -459,31 +411,27 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             )
 
     del data_dict
+    good_date_indices = numpy.array(good_date_indices, dtype=int)
+    baseline_predictor_matrices = [
+        m[good_date_indices, ...] for m in baseline_predictor_matrices
+    ]
+    baseline_init_date_strings = [
+        baseline_init_date_strings[k] for k in good_date_indices
+    ]
 
     # Do actual stuff.
     print(model_object.inputs)
     print(model_object.output)
 
-    if use_deep_explainer:
-        if use_inout_tensors_only:
-            explainer_object = shap.DeepExplainer(
-                model=(model_object.inputs, model_object.output),
-                data=baseline_predictor_matrices
-            )
-        else:
-            explainer_object = shap.DeepExplainer(
-                model=model_object, data=baseline_predictor_matrices
-            )
+    if use_inout_tensors_only:
+        explainer_object = shap.DeepExplainer(
+            model=(model_object.inputs, model_object.output),
+            data=baseline_predictor_matrices
+        )
     else:
-        if use_inout_tensors_only:
-            explainer_object = shap.GradientExplainer(
-                model=(model_object.inputs, model_object.output),
-                data=baseline_predictor_matrices
-            )
-        else:
-            explainer_object = shap.GradientExplainer(
-                model=model_object, data=baseline_predictor_matrices
-            )
+        explainer_object = shap.DeepExplainer(
+            model=model_object, data=baseline_predictor_matrices
+        )
 
     num_new_examples = len(new_init_date_strings)
 
@@ -534,9 +482,6 @@ if __name__ == '__main__':
         target_field_name=getattr(
             INPUT_ARG_OBJECT, TARGET_FIELD_ARG_NAME
         ),
-        use_deep_explainer=bool(getattr(
-            INPUT_ARG_OBJECT, USE_DEEP_EXPLAINER_ARG_NAME
-        )),
         use_inout_tensors_only=bool(getattr(
             INPUT_ARG_OBJECT, USE_INOUT_TENSORS_ARG_NAME
         )),

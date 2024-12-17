@@ -27,7 +27,7 @@ STATISTIC_VALUE_KEY = 'statistic_value'
 
 SPATIAL_STATISTIC_KEY = 'spatial_statistic_name'
 QUANTITY_KEY = 'quantity_name'
-TARGET_FIELD_KEY = 'target_field_name'
+TARGET_FIELDS_KEY = 'target_field_names'
 REGION_MASK_FILE_KEY = 'region_mask_file_name'
 REGION_NAME_KEY = 'region_name'
 PREDICTION_FILES_KEY = 'prediction_file_names'
@@ -37,8 +37,10 @@ MODEL_LEAD_TIME_KEY = 'model_lead_time_days'
 TARGET_QUANTITY_NAME = 'target'
 PREDICTION_QUANTITY_NAME = 'prediction'
 MODEL_ERROR_QUANTITY_NAME = 'prediction_minus_target'
+ABS_MODEL_ERROR_QUANTITY_NAME = 'absolute_prediction_minus_target'
 VALID_QUANTITY_NAMES = [
-    TARGET_QUANTITY_NAME, PREDICTION_QUANTITY_NAME, MODEL_ERROR_QUANTITY_NAME
+    TARGET_QUANTITY_NAME, PREDICTION_QUANTITY_NAME, MODEL_ERROR_QUANTITY_NAME,
+    ABS_MODEL_ERROR_QUANTITY_NAME
 ]
 
 SPATIAL_MIN_STAT_NAME = 'spatial_min'
@@ -51,7 +53,7 @@ VALID_SPATIAL_STAT_NAMES = [
 
 def write_file(
         netcdf_file_name, init_date_strings, statistic_value_by_date,
-        spatial_statistic_name, quantity_name, target_field_name,
+        spatial_statistic_name, quantity_name, target_field_names,
         region_mask_file_name, region_name, prediction_file_names,
         model_file_name, model_lead_time_days):
     """Writes extreme cases to NetCDF file.
@@ -67,8 +69,10 @@ def write_file(
         be in the list `VALID_SPATIAL_STAT_NAMES`.
     :param quantity_name: Metadata -- name of quantity.  Must be in the list
         `VALID_QUANTITY_NAMES`.
-    :param target_field_name: Metadata -- name of target field.  Must be
-        accepted by `canadian_fwi_utils.check_field_name`.
+    :param target_field_names: Metadata -- 1-D list with names of target fields
+        (each accepted by `canadian_fwi_utils.check_field_name`).  This
+        indicates that the given spatial statistic, taken for the given
+        quantity, was averaged over all fields in `target_field_names`.
     :param region_mask_file_name: Metadata -- path to file with region mask,
         used to determine which grid points are included in spatial statistic.
         This must be a file readable by `region_mask_io.read_file`.
@@ -99,7 +103,10 @@ def write_file(
     error_checking.assert_is_string(quantity_name)
     assert quantity_name in VALID_QUANTITY_NAMES
 
-    canadian_fwi_utils.check_field_name(target_field_name)
+    error_checking.assert_is_string_list(target_field_names)
+    for f in target_field_names:
+        canadian_fwi_utils.check_field_name(f)
+
     error_checking.assert_is_string(region_mask_file_name)
     error_checking.assert_is_string(region_name)
     error_checking.assert_is_string_list(prediction_file_names)
@@ -115,7 +122,7 @@ def write_file(
 
     dataset_object.setncattr(SPATIAL_STATISTIC_KEY, spatial_statistic_name)
     dataset_object.setncattr(QUANTITY_KEY, quantity_name)
-    dataset_object.setncattr(TARGET_FIELD_KEY, target_field_name)
+    dataset_object.setncattr(TARGET_FIELDS_KEY, ' '.join(target_field_names))
     dataset_object.setncattr(REGION_MASK_FILE_KEY, region_mask_file_name)
     dataset_object.setncattr(REGION_NAME_KEY, region_name)
     dataset_object.setncattr(
@@ -161,4 +168,5 @@ def read_file(netcdf_file_name):
     })
 
     xct.attrs[PREDICTION_FILES_KEY] = xct.attrs[PREDICTION_FILES_KEY].split(' ')
+    xct.attrs[TARGET_FIELDS_KEY] = xct.attrs[TARGET_FIELDS_KEY].split(' ')
     return xct
