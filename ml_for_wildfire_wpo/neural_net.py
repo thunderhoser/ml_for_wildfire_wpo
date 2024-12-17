@@ -2656,7 +2656,6 @@ def read_model_for_shapley(pickle_file_name):
     print(metadata_dict[LOSS_FUNCTION_KEY])
 
     chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
-    print(chiu_net_pp_architecture_dict)
     assert chiu_net_pp_architecture_dict is not None
 
     import \

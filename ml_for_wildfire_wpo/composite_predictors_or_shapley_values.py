@@ -158,12 +158,7 @@ def _composite_one_matrix(data_matrix, use_pmm):
     else:
         composite_data_matrix = numpy.nanmean(data_matrix, axis=0)
 
-    composite_data_matrix = numpy.expand_dims(composite_data_matrix, axis=0)
-    composite_data_matrix = numpy.reshape(
-        composite_data_matrix, orig_dimensions
-    )
-
-    return composite_data_matrix[0, ...]
+    return numpy.reshape(composite_data_matrix, orig_dimensions[1:])
 
 
 def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
