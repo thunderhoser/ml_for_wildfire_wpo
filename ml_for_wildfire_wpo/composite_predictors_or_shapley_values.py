@@ -252,7 +252,7 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
 
     # Read model.
     print('Reading model from: "{0:s}"...'.format(model_file_name))
-    model_object = neural_net.read_model(model_file_name)
+    model_object = neural_net.read_model_for_shapley(model_file_name)
 
     # Read model metadata.
     model_metafile_name = neural_net.find_metafile(
