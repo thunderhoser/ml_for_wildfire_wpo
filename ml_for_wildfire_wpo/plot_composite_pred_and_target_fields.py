@@ -236,7 +236,7 @@ def _run(composite_file_name, gfs_normalization_file_name,
                 continue
 
             predictor_matrices[k] = (
-                predictor_matrices[k][:, desired_row_indices, ...]
+                predictor_matrices[k][desired_row_indices, ...]
             )
 
     if plot_longitude_limits_deg_e is not None:
@@ -252,7 +252,7 @@ def _run(composite_file_name, gfs_normalization_file_name,
                 continue
 
             predictor_matrices[k] = (
-                predictor_matrices[k][:, :, desired_column_indices, ...]
+                predictor_matrices[k][:, desired_column_indices, ...]
             )
 
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
