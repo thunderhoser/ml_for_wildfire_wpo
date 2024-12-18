@@ -1,0 +1,51 @@
+#!/bin/bash
+
+#SBATCH --job-name="test_shapley_maps"
+#SBATCH --partition="bigmem"
+#SBATCH --account="gsd-hpcs"
+#SBATCH --qos="batch"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=06:00:00
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=test_shapley_maps_%A.out
+
+module load cuda/12.3.1
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment19/mountain_central_west"
+
+LEAD_TIMES_DAYS=("03" "03" "03" "03" "03" "03" "03" "03" "03" "03" "05" "05" "05" "05" "05" "05" "05" "05" "05" "05" "07" "07" "07" "07" "07" "07" "07" "07" "07" "07")
+SPECTRAL_COMPLEXITIES=("050" "050" "075" "075" "100" "100" "125" "125" "150" "150" "050" "050" "075" "075" "100" "100" "125" "125" "150" "150" "050" "050" "075" "075" "100" "100" "125" "125" "150" "150")
+CONVNEXT_FLAGS=("0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1")
+
+BEST_MODEL_INDEX=3
+
+lead_time_days=${LEAD_TIMES_DAYS[$BEST_MODEL_INDEX]}
+spectral_complexity=${SPECTRAL_COMPLEXITIES[$BEST_MODEL_INDEX]}
+convnext_flag=${CONVNEXT_FLAGS[$BEST_MODEL_INDEX]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/lead-time-days=${lead_time_days}_spectral-complexity=${spectral_complexity}_use-convnext=${convnext_flag}"
+echo $model_dir_name
+
+model_file_name="${model_dir_name}/model.weights.p"
+output_dir_name="${model_dir_name}/validation/test_shapley_maps"
+
+this_directory_name=`pwd`
+singularity exec --nv /scratch1/RDARCH/rda-ghpcs/Jebb.Q.Stewart/ml-ryan.simg /bin/sh -c "cd ${this_directory_name}; sh test_shapley_maps.sh ${model_file_name} ${output_dir_name}"
