@@ -212,18 +212,18 @@ def _modify_model_output(model_object, region_mask_matrix, target_field_index):
             output_shape=new_dims
         )(output_layer_object)
     else:
-        new_dims = (
+        new_dims = [
             __dimension_to_int(output_layer_object.shape[k])
             for k in [1, 2]
-        )
+        ]
         output_layer_object = keras.layers.Lambda(
             lambda x: x[..., target_field_index],
-            output_shape=new_dims
+            output_shape=tuple(new_dims)
         )(output_layer_object)
 
         output_layer_object = keras.layers.Lambda(
             lambda x: K.expand_dims(x, axis=-1),
-            output_shape=new_dims + (1,)
+            output_shape=tuple(new_dims) + (1,)
         )(output_layer_object)
 
     # Multiply by region mask.
