@@ -382,8 +382,14 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     row_indices = misc_utils.desired_latitudes_to_rows(
         grid_latitudes_deg_n=
         mask_table_xarray[region_mask_io.LATITUDE_KEY].values,
-        start_latitude_deg_n=vod[neural_net.INNER_LATITUDE_LIMITS_KEY][0],
-        end_latitude_deg_n=vod[neural_net.INNER_LATITUDE_LIMITS_KEY][1]
+        start_latitude_deg_n=(
+            vod[neural_net.INNER_LATITUDE_LIMITS_KEY][0] -
+            vod[neural_net.OUTER_LATITUDE_BUFFER_KEY]
+        ),
+        end_latitude_deg_n=(
+            vod[neural_net.INNER_LATITUDE_LIMITS_KEY][1] +
+            vod[neural_net.OUTER_LATITUDE_BUFFER_KEY]
+        )
     )
     mask_table_xarray = mask_table_xarray.isel({
         region_mask_io.ROW_DIM: row_indices
@@ -392,8 +398,14 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     column_indices = misc_utils.desired_longitudes_to_columns(
         grid_longitudes_deg_e=
         mask_table_xarray[region_mask_io.LONGITUDE_KEY].values,
-        start_longitude_deg_e=vod[neural_net.INNER_LONGITUDE_LIMITS_KEY][0],
-        end_longitude_deg_e=vod[neural_net.INNER_LONGITUDE_LIMITS_KEY][1]
+        start_longitude_deg_e=(
+            vod[neural_net.INNER_LONGITUDE_LIMITS_KEY][0] -
+            vod[neural_net.OUTER_LONGITUDE_BUFFER_KEY]
+        ),
+        end_longitude_deg_e=(
+            vod[neural_net.INNER_LONGITUDE_LIMITS_KEY][1] +
+            vod[neural_net.OUTER_LONGITUDE_BUFFER_KEY]
+        )
     )
     mask_table_xarray = mask_table_xarray.isel({
         region_mask_io.COLUMN_DIM: column_indices
