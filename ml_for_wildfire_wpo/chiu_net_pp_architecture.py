@@ -298,7 +298,7 @@ def __get_3d_convnext_block(
     """
 
     current_layer_object = None
-    num_filters = input_layer_object.shape[-1]
+    num_filters = __dimension_to_int(input_layer_object.shape[-1])
 
     for i in range(num_conv_layers):
         this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)
@@ -710,7 +710,6 @@ def _get_3d_conv_block(
 
     # Handle ConvNext block.
     num_time_steps = __dimension_to_int(input_layer_object.shape[-2])
-    print(num_time_steps)
 
     if do_convnext:
         current_layer_object = __get_3d_convnext_block(
