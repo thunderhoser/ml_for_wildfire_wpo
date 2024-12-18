@@ -8,7 +8,6 @@ matplotlib.use('agg')
 from matplotlib import pyplot
 from scipy.interpolate import interp1d
 from gewittergefahr.gg_utils import grids
-from gewittergefahr.gg_utils import number_rounding
 from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from gewittergefahr.gg_utils import general_utils as gg_general_utils
 from gewittergefahr.gg_utils import file_system_utils
@@ -38,6 +37,7 @@ SHAPLEY_FWI_COLOUR_MAP_OBJECT = pyplot.get_cmap('gist_yarg')
 TITLE_FONT_SIZE = 24
 COLOUR_BAR_FONT_SIZE = 20
 BORDER_COLOUR = numpy.array([139, 69, 19], dtype=float) / 255
+BORDER_WIDTH = 3.
 
 FIGURE_WIDTH_INCHES = 15
 FIGURE_HEIGHT_INCHES = 15
@@ -198,44 +198,6 @@ INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
-
-
-def _get_grid_line_spacing(plot_latitude_limits_deg_n,
-                           plot_longitude_limits_deg_e):
-    """Determines spacing of meridians and parallels in plot.
-
-    :param plot_latitude_limits_deg_n: length-2 numpy array with latitude limits
-        of plot.
-    :param plot_longitude_limits_deg_e: length-2 numpy array with longitude
-        limits of plot.
-    :return: parallel_spacing_deg: Spacing between successive parallels.
-    :return: meridian_spacing_deg: Spacing between successive meridians.
-    """
-
-    meridian_spacing_deg = (
-        numpy.max(plot_longitude_limits_deg_e) -
-        numpy.min(plot_longitude_limits_deg_e)
-    ) / 7
-    parallel_spacing_deg = (
-        numpy.max(plot_latitude_limits_deg_n) -
-        numpy.min(plot_latitude_limits_deg_n)
-    ) / 6
-
-    if meridian_spacing_deg > 1:
-        meridian_spacing_deg = numpy.floor(meridian_spacing_deg)
-    else:
-        meridian_spacing_deg = number_rounding.floor_to_nearest(
-            meridian_spacing_deg, 0.1
-        )
-
-    if parallel_spacing_deg > 1:
-        parallel_spacing_deg = numpy.floor(parallel_spacing_deg)
-    else:
-        parallel_spacing_deg = number_rounding.floor_to_nearest(
-            parallel_spacing_deg, 0.1
-        )
-
-    return parallel_spacing_deg, meridian_spacing_deg
 
 
 def _smooth_maps(shapley_table_xarray, smoothing_radius_px):
@@ -501,19 +463,8 @@ def _plot_one_fwi_field(
         border_latitudes_deg_n=border_latitudes_deg_n,
         border_longitudes_deg_e=border_longitudes_deg_e,
         axes_object=axes_object,
-        line_colour=BORDER_COLOUR
-    )
-
-    parallel_spacing_deg, meridian_spacing_deg = _get_grid_line_spacing(
-        plot_latitude_limits_deg_n=grid_latitudes_deg_n,
-        plot_longitude_limits_deg_e=grid_longitudes_deg_e
-    )
-    plotting_utils.plot_grid_lines(
-        plot_latitudes_deg_n=grid_latitudes_deg_n,
-        plot_longitudes_deg_e=grid_longitudes_deg_e,
-        axes_object=axes_object,
-        meridian_spacing_deg=meridian_spacing_deg,
-        parallel_spacing_deg=parallel_spacing_deg
+        line_colour=BORDER_COLOUR,
+        line_width=BORDER_WIDTH
     )
 
     axes_object.set_xlim(
@@ -676,18 +627,8 @@ def _plot_one_gfs_field(
         border_latitudes_deg_n=border_latitudes_deg_n,
         border_longitudes_deg_e=border_longitudes_deg_e,
         axes_object=axes_object,
-        line_colour=BORDER_COLOUR
-    )
-    parallel_spacing_deg, meridian_spacing_deg = _get_grid_line_spacing(
-        plot_latitude_limits_deg_n=grid_latitudes_deg_n,
-        plot_longitude_limits_deg_e=grid_longitudes_deg_e
-    )
-    plotting_utils.plot_grid_lines(
-        plot_latitudes_deg_n=grid_latitudes_deg_n,
-        plot_longitudes_deg_e=grid_longitudes_deg_e,
-        axes_object=axes_object,
-        meridian_spacing_deg=meridian_spacing_deg,
-        parallel_spacing_deg=parallel_spacing_deg
+        line_colour=BORDER_COLOUR,
+        line_width=BORDER_WIDTH
     )
 
     axes_object.set_xlim(
@@ -773,18 +714,8 @@ def _plot_one_era5_field(
         border_latitudes_deg_n=border_latitudes_deg_n,
         border_longitudes_deg_e=border_longitudes_deg_e,
         axes_object=axes_object,
-        line_colour=BORDER_COLOUR
-    )
-    parallel_spacing_deg, meridian_spacing_deg = _get_grid_line_spacing(
-        plot_latitude_limits_deg_n=grid_latitudes_deg_n,
-        plot_longitude_limits_deg_e=grid_longitudes_deg_e
-    )
-    plotting_utils.plot_grid_lines(
-        plot_latitudes_deg_n=grid_latitudes_deg_n,
-        plot_longitudes_deg_e=grid_longitudes_deg_e,
-        axes_object=axes_object,
-        meridian_spacing_deg=meridian_spacing_deg,
-        parallel_spacing_deg=parallel_spacing_deg
+        line_colour=BORDER_COLOUR,
+        line_width=BORDER_WIDTH
     )
 
     axes_object.set_xlim(
