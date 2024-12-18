@@ -41,7 +41,7 @@ lead_time_days=${LEAD_TIMES_DAYS[$BEST_MODEL_INDEX]}
 spectral_complexity=${SPECTRAL_COMPLEXITIES[$BEST_MODEL_INDEX]}
 convnext_flag=${CONVNEXT_FLAGS[$BEST_MODEL_INDEX]}
 
-model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=${training_strategy}_spectral-complexity=${spectral_complexity}_use-residual-blocks=${use_residual_blocks}"
+model_dir_name="${TOP_MODEL_DIR_NAME}/lead-time-days=${lead_time_days}_spectral-complexity=${spectral_complexity}_use-convnext=${convnext_flag}"
 echo $model_dir_name
 
 model_file_name="${model_dir_name}/model.weights.h5"
