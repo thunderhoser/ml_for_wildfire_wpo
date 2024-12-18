@@ -72,7 +72,7 @@ EXPANSION_FACTOR_FOR_CONVNEXT = 4
 INIT_VALUE_FOR_LAYER_SCALE = 1e-6
 
 
-@keras.saving.register_keras_serializable()
+# @keras.saving.register_keras_serializable()
 class LayerScale(keras.layers.Layer):
     """Layer-scale module.
 
@@ -107,7 +107,7 @@ class LayerScale(keras.layers.Layer):
         return config
 
 
-@keras.saving.register_keras_serializable()
+# @keras.saving.register_keras_serializable()
 class StochasticDepth(keras.layers.Layer):
     def __init__(self, survival_prob=0.9, **kwargs):
         super().__init__(**kwargs)
@@ -291,7 +291,7 @@ def __get_3d_convnext_block(
     """
 
     current_layer_object = None
-    num_filters = input_layer_object.shape[-1]
+    num_filters = __dimension_to_int(input_layer_object.shape[-1])
 
     for i in range(num_conv_layers):
         this_name = '{0:s}_conv{1:d}'.format(basic_layer_name, i)

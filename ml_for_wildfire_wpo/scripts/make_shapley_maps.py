@@ -11,6 +11,7 @@ import keras.models
 from tensorflow.keras import backend as K
 from ml_for_wildfire_wpo.io import region_mask_io
 from ml_for_wildfire_wpo.io import shapley_io
+from ml_for_wildfire_wpo.utils import misc_utils
 from ml_for_wildfire_wpo.machine_learning import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
@@ -185,22 +186,37 @@ def _modify_model_output(model_object, region_mask_matrix, target_field_index):
     """
 
     output_layer_object = model_object.output
+    has_ensemble = len(output_layer_object.shape) == 5
 
     # Extract the relevant target field.
-    new_dims = (
-        __dimension_to_int(output_layer_object.shape[k])
-        for k in [1, 2, 4]
-    )
-    output_layer_object = keras.layers.Lambda(
-        lambda x: x[..., target_field_index, :],
-        output_shape=new_dims
-    )(output_layer_object)
+    if has_ensemble:
+        new_dims = (
+            __dimension_to_int(output_layer_object.shape[k])
+            for k in [1, 2, 4]
+        )
+        output_layer_object = keras.layers.Lambda(
+            lambda x: x[..., target_field_index, :],
+            output_shape=new_dims
+        )(output_layer_object)
 
-    # Average over ensemble members.
-    output_layer_object = keras.layers.Lambda(
-        lambda x: K.mean(x, axis=-1, keepdims=True),
-        output_shape=new_dims
-    )(output_layer_object)
+        output_layer_object = keras.layers.Lambda(
+            lambda x: K.mean(x, axis=-1, keepdims=True),
+            output_shape=new_dims
+        )(output_layer_object)
+    else:
+        new_dims = [
+            __dimension_to_int(output_layer_object.shape[k])
+            for k in [1, 2]
+        ]
+        output_layer_object = keras.layers.Lambda(
+            lambda x: x[..., target_field_index],
+            output_shape=tuple(new_dims)
+        )(output_layer_object)
+
+        output_layer_object = keras.layers.Lambda(
+            lambda x: K.expand_dims(x, axis=-1),
+            output_shape=tuple(new_dims) + (1,)
+        )(output_layer_object)
 
     # Multiply by region mask.
     region_mask_matrix = numpy.expand_dims(region_mask_matrix, axis=0)
@@ -354,6 +370,39 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     # Change model's output layer to include only the given region and target
     # field.
     mask_table_xarray = region_mask_io.read_file(region_mask_file_name)
+
+    row_indices = misc_utils.desired_latitudes_to_rows(
+        grid_latitudes_deg_n=
+        mask_table_xarray[region_mask_io.LATITUDE_KEY].values,
+        start_latitude_deg_n=(
+            vod[neural_net.INNER_LATITUDE_LIMITS_KEY][0] -
+            vod[neural_net.OUTER_LATITUDE_BUFFER_KEY]
+        ),
+        end_latitude_deg_n=(
+            vod[neural_net.INNER_LATITUDE_LIMITS_KEY][1] +
+            vod[neural_net.OUTER_LATITUDE_BUFFER_KEY]
+        )
+    )
+    mask_table_xarray = mask_table_xarray.isel({
+        region_mask_io.ROW_DIM: row_indices
+    })
+
+    column_indices = misc_utils.desired_longitudes_to_columns(
+        grid_longitudes_deg_e=
+        mask_table_xarray[region_mask_io.LONGITUDE_KEY].values,
+        start_longitude_deg_e=(
+            vod[neural_net.INNER_LONGITUDE_LIMITS_KEY][0] -
+            vod[neural_net.OUTER_LONGITUDE_BUFFER_KEY]
+        ),
+        end_longitude_deg_e=(
+            vod[neural_net.INNER_LONGITUDE_LIMITS_KEY][1] +
+            vod[neural_net.OUTER_LONGITUDE_BUFFER_KEY]
+        )
+    )
+    mask_table_xarray = mask_table_xarray.isel({
+        region_mask_io.COLUMN_DIM: column_indices
+    })
+
     region_mask_matrix = (
         mask_table_xarray[region_mask_io.REGION_MASK_KEY].values
     )

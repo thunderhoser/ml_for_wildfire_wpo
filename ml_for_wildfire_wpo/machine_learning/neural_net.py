@@ -2659,17 +2659,9 @@ def read_model_for_shapley(pickle_file_name):
         arch_dict[chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY] = False
 
     arch_dict[chiu_net_pp_architecture.LOSS_FUNCTION_KEY] = 'mse'
-
-    for this_key in [
-            chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
-    ]:
-        try:
-            arch_dict[this_key] = eval(arch_dict[this_key])
-        except:
-            arch_dict[this_key] = re.sub(
-                r"gradient_accumulation_steps=\d+", "", arch_dict[this_key]
-            )
-            arch_dict[this_key] = eval(arch_dict[this_key])
+    arch_dict[chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY] = (
+        keras.optimizers.Adam()
+    )
 
     for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
         for k in range(len(arch_dict[this_key])):
