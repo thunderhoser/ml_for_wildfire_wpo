@@ -1543,7 +1543,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     panel_file_names = [''] * len(all_target_field_names)
 
     for f in range(len(all_target_field_names)):
-        this_target_matrix = target_matrix[..., f]
+        this_target_matrix = target_matrix[0, ..., f]
         title_string = 'Target {0:s}, {1:s} + {2:d} days'.format(
             fwi_plotting.FIELD_NAME_TO_SIMPLE[all_target_field_names[f]],
             init_date_string_nice,
