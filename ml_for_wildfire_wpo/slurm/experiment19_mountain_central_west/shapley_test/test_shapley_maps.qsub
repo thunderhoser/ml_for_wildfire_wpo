@@ -44,7 +44,7 @@ convnext_flag=${CONVNEXT_FLAGS[$BEST_MODEL_INDEX]}
 model_dir_name="${TOP_MODEL_DIR_NAME}/lead-time-days=${lead_time_days}_spectral-complexity=${spectral_complexity}_use-convnext=${convnext_flag}"
 echo $model_dir_name
 
-model_file_name="${model_dir_name}/model.weights.h5"
+model_file_name="${model_dir_name}/model.weights.p"
 output_dir_name="${model_dir_name}/validation/test_shapley_maps"
 
 this_directory_name=`pwd`
