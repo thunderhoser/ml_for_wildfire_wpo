@@ -2676,6 +2676,7 @@ def read_model_for_shapley(pickle_file_name):
             arch_dict[this_key] = re.sub(
                 r"gradient_accumulation_steps=\d+", "", arch_dict[this_key]
             )
+            arch_dict[this_key] = arch_dict[this_key].replace('AdamW', 'Adam')
             arch_dict[this_key] = eval(arch_dict[this_key])
 
     for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
