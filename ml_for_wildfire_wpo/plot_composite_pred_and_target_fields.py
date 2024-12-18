@@ -616,6 +616,7 @@ def _run(composite_file_name, gfs_normalization_file_name,
     ]
 
     if era5_constant_field_names is None:
+        era5_constant_field_names = []
         era5_constant_predictor_matrix = numpy.array([])
     else:
         lyr_idx = model_input_layer_names.index(neural_net.ERA5_LAYER_NAME)
