@@ -151,12 +151,7 @@ def _composite_one_matrix(data_matrix, use_pmm):
     else:
         composite_data_matrix = numpy.nanmean(data_matrix, axis=0)
 
-    composite_data_matrix = numpy.expand_dims(composite_data_matrix, axis=0)
-    composite_data_matrix = numpy.reshape(
-        composite_data_matrix, orig_dimensions
-    )
-
-    return composite_data_matrix[0, ...]
+    return numpy.reshape(composite_data_matrix, orig_dimensions[1:])
 
 
 def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
@@ -260,6 +255,9 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     vod[neural_net.TARGET_DIRECTORY_KEY] = target_dir_name
     vod[neural_net.GFS_FORECAST_TARGET_DIR_KEY] = gfs_forecast_target_dir_name
     vod[neural_net.USE_LEAD_TIME_AS_PRED_KEY] = False
+    vod[neural_net.GFS_NORM_FILE_KEY] = None
+    vod[neural_net.TARGET_NORM_FILE_KEY] = None
+    vod[neural_net.ERA5_NORM_FILE_KEY] = None
     num_target_fields = len(vod[neural_net.TARGET_FIELDS_KEY])
     validation_option_dict = vod
 
