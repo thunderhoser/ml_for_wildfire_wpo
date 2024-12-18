@@ -710,6 +710,7 @@ def _get_3d_conv_block(
 
     # Handle ConvNext block.
     num_time_steps = __dimension_to_int(input_layer_object.shape[-2])
+    print(num_time_steps)
 
     if do_convnext:
         current_layer_object = __get_3d_convnext_block(
