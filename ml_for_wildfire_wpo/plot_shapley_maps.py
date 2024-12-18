@@ -37,7 +37,7 @@ TOLERANCE = 1e-6
 DATE_FORMAT = '%Y%m%d'
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
-GFS_SEQUENTIAL_COLOUR_MAP_OBJECT = pyplot.get_cmap('plasma')
+GFS_SEQUENTIAL_COLOUR_MAP_OBJECT = pyplot.get_cmap('viridis')
 GFS_DIVERGING_COLOUR_MAP_OBJECT = pyplot.get_cmap('seismic')
 SHAPLEY_DEFAULT_COLOUR_MAP_OBJECT = pyplot.get_cmap('gist_yarg')
 SHAPLEY_FWI_COLOUR_MAP_OBJECT = pyplot.get_cmap('gist_yarg')
