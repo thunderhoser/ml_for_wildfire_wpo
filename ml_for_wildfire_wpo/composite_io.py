@@ -253,17 +253,17 @@ def read_file(netcdf_file_name):
     """Reads Shapley maps from NetCDF file.
 
     :param netcdf_file_name: Path to input file.
-    :return: shapley_table_xarray: xarray table.  Documentation in the xarray
+    :return: composite_table_xarray: xarray table.  Documentation in the xarray
         table should make values self-explanatory.
     """
 
-    shapley_table_xarray = xarray.open_dataset(netcdf_file_name)
+    composite_table_xarray = xarray.open_dataset(netcdf_file_name)
 
-    if shapley_table_xarray.attrs[INIT_DATES_KEY] == '':
-        shapley_table_xarray.attrs[INIT_DATES_KEY] = None
+    if composite_table_xarray.attrs[INIT_DATES_KEY] == '':
+        composite_table_xarray.attrs[INIT_DATES_KEY] = None
     else:
-        shapley_table_xarray.attrs[INIT_DATES_KEY] = (
-            shapley_table_xarray.attrs[INIT_DATES_KEY].split(' ')
+        composite_table_xarray.attrs[INIT_DATES_KEY] = (
+            composite_table_xarray.attrs[INIT_DATES_KEY].split(' ')
         )
 
-    return shapley_table_xarray
+    return composite_table_xarray

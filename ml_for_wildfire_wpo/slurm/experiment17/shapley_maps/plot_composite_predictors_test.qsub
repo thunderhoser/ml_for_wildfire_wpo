@@ -1,0 +1,53 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_composite_predictors_test"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=01:00:00
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_composite_predictors_test_%A.out
+
+module load cuda/12.3.1
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment17"
+
+TRAINING_STRATEGIES=("20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days")
+SPECTRAL_COMPLEXITIES=("040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100")
+RESIDUAL_BLOCK_FLAGS=("0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1")
+
+BEST_MODEL_INDEX=10
+
+training_strategy=${TRAINING_STRATEGIES[$BEST_MODEL_INDEX]}
+spectral_complexity=${SPECTRAL_COMPLEXITIES[$BEST_MODEL_INDEX]}
+use_residual_blocks=${RESIDUAL_BLOCK_FLAGS[$BEST_MODEL_INDEX]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=${training_strategy}_spectral-complexity=${spectral_complexity}_use-residual-blocks=${use_residual_blocks}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/plot_composite_pred_and_target_fields.py" \
+--input_composite_file_name="${model_dir_name}/composited_predictors_20210801-20210810.nc" \
+--input_gfs_norm_file_name="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/normalization_params_2019-2020.nc" \
+--predictor_colour_limits_prctile 0.1 99.9 \
+--plot_latitude_limits_deg_n 33 45 \
+--plot_longitude_limits_deg_e -113 -98 \
+--output_dir_name="${model_dir_name}/composited_predictors_20210801-20210810"

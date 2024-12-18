@@ -945,22 +945,6 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     vod[neural_net.TARGET_NORM_FILE_KEY] = None
     vod[neural_net.ERA5_NORM_FILE_KEY] = None
     vod[neural_net.SENTINEL_VALUE_KEY] = None
-    vod[neural_net.MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = {
-        model_lead_time_days: vod[
-            neural_net.MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
-        ][model_lead_time_days]
-    }
-    vod[neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY] = {
-        model_lead_time_days: vod[
-            neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY
-        ][model_lead_time_days]
-    }
-    vod[neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = {
-        model_lead_time_days: vod[
-            neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
-        ][model_lead_time_days]
-    }
-
     validation_option_dict = vod
 
     init_date_string = stx.attrs[shapley_io.INIT_DATE_KEY]
@@ -971,22 +955,58 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     )
     target_field_name = stx.attrs[shapley_io.TARGET_FIELD_KEY]
 
-    print(SEPARATOR_STRING)
+    if shapley_io.TARGET_VALUE_KEY in stx.data_vars:
+        model_input_layer_names = [
+            neural_net.GFS_3D_LAYER_NAME,
+            neural_net.GFS_2D_LAYER_NAME,
+            neural_net.ERA5_LAYER_NAME,
+            neural_net.LAGLEAD_TARGET_LAYER_NAME,
+            neural_net.PREDN_BASELINE_LAYER_NAME
+        ]
+        predictor_keys = [
+            shapley_io.PREDICTOR_3D_GFS_KEY,
+            shapley_io.PREDICTOR_2D_GFS_KEY,
+            shapley_io.PREDICTOR_ERA5_KEY,
+            shapley_io.PREDICTOR_LAGLEAD_TARGETS_KEY,
+            shapley_io.PREDICTOR_BASELINE_KEY
+        ]
+        predictor_matrices = [
+            stx[k].values if k in stx.data_vars else None
+            for k in predictor_keys
+        ]
 
-    try:
-        data_dict = neural_net.create_data(
-            option_dict=validation_option_dict,
-            init_date_string=init_date_string,
-            model_lead_time_days=model_lead_time_days
+        good_flags = numpy.array(
+            [pm is not None for pm in predictor_matrices], dtype=bool
         )
-        print(SEPARATOR_STRING)
-    except:
-        print(SEPARATOR_STRING)
-        return
+        good_indices = numpy.where(good_flags)[0]
+        predictor_matrices = [predictor_matrices[k] for k in good_indices]
+        model_input_layer_names = [
+            model_input_layer_names[k] for k in good_indices
+        ]
 
-    predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
-    model_input_layer_names = data_dict[neural_net.INPUT_LAYER_NAMES_KEY]
-    del data_dict
+        target_matrix = stx[shapley_io.TARGET_VALUE_KEY].values
+    else:
+        print(SEPARATOR_STRING)
+
+        try:
+            data_dict = neural_net.create_data(
+                option_dict=validation_option_dict,
+                init_date_string=init_date_string,
+                model_lead_time_days=model_lead_time_days
+            )
+            print(SEPARATOR_STRING)
+        except:
+            print(SEPARATOR_STRING)
+            return
+
+        num_target_fields = len(vod[neural_net.TARGET_FIELDS_KEY])
+        target_matrix = data_dict[neural_net.TARGETS_AND_WEIGHTS_KEY][
+            ..., :num_target_fields
+        ]
+
+        predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
+        model_input_layer_names = data_dict[neural_net.INPUT_LAYER_NAMES_KEY]
+        del data_dict
 
     if plot_latitude_limits_deg_n is not None:
         desired_row_indices = misc_utils.desired_latitudes_to_rows(
@@ -1038,6 +1058,9 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         gfs_2d_predictor_matrix = numpy.array([])
 
     for t in range(len(gfs_lead_times_hours)):
+        if len(gfs_field_names_2d) == 0:
+            continue
+
         panel_file_names = [''] * len(gfs_field_names_2d)
 
         for f in range(len(gfs_field_names_2d)):
@@ -1180,6 +1203,9 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
     for p in range(len(gfs_pressure_levels_mb)):
         for t in range(len(gfs_lead_times_hours)):
+            if len(gfs_field_names_3d) == 0:
+                continue
+
             panel_file_names = [''] * len(gfs_field_names_3d)
 
             for f in range(len(gfs_field_names_3d)):
@@ -1318,14 +1344,19 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             for this_panel_file_name in panel_file_names:
                 os.remove(this_panel_file_name)
 
-    # TODO(thunderhoser): This code does not yet handle the case where lagged
-    # targets or GFS fire-weather forecasts are missing.
-    target_lag_times_days = vod[neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY][
-        model_lead_time_days
-    ]
-    gfs_target_lead_times_days = vod[
-        neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
-    ][model_lead_time_days]
+    if vod[neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY] is None:
+        target_lag_times_days = numpy.array([], dtype=int)
+    else:
+        target_lag_times_days = vod[neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY][
+            model_lead_time_days
+        ]
+
+    if vod[neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] is None:
+        gfs_target_lead_times_days = numpy.array([], dtype=int)
+    else:
+        gfs_target_lead_times_days = vod[
+            neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
+        ][model_lead_time_days]
 
     target_lag_or_lead_times_days = numpy.concatenate([
         target_lag_times_days, -1 * gfs_target_lead_times_days
@@ -1546,7 +1577,77 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             output_size_pixels=PANEL_SIZE_PX
         )
 
-    concat_figure_file_name = '{0:s}/shapley_era5.jpg'.format(output_dir_name)
+    if len(era5_constant_field_names) > 0:
+        concat_figure_file_name = '{0:s}/shapley_era5.jpg'.format(
+            output_dir_name
+        )
+
+        num_panel_rows = int(numpy.floor(
+            numpy.sqrt(len(panel_file_names))
+        ))
+        num_panel_columns = int(numpy.ceil(
+            float(len(panel_file_names)) / num_panel_rows
+        ))
+
+        print('Concatenating panels to: "{0:s}"...'.format(
+            concat_figure_file_name
+        ))
+        imagemagick_utils.concatenate_images(
+            input_file_names=panel_file_names,
+            output_file_name=concat_figure_file_name,
+            num_panel_rows=num_panel_rows,
+            num_panel_columns=num_panel_columns,
+            border_width_pixels=25
+        )
+        imagemagick_utils.trim_whitespace(
+            input_file_name=concat_figure_file_name,
+            output_file_name=concat_figure_file_name,
+            border_width_pixels=0
+        )
+
+        for this_panel_file_name in panel_file_names:
+            os.remove(this_panel_file_name)
+
+    panel_file_names = [''] * len(all_target_field_names)
+
+    for f in range(len(all_target_field_names)):
+        this_target_matrix = target_matrix[..., f]
+        title_string = 'Target {0:s}, {1:s} + {2:d} days'.format(
+            fwi_plotting.FIELD_NAME_TO_SIMPLE[all_target_field_names[f]],
+            init_date_string_nice,
+            model_lead_time_days
+        )
+        panel_file_names[f] = '{0:s}/actual_{1:s}.jpg'.format(
+            output_dir_name,
+            all_target_field_names[f].replace('_', '-')
+        )
+
+        figure_object, _ = _plot_one_fwi_field(
+            data_matrix=this_target_matrix,
+            grid_latitudes_deg_n=stx[shapley_io.LATITUDE_KEY].values,
+            grid_longitudes_deg_e=stx[shapley_io.LONGITUDE_KEY].values,
+            border_latitudes_deg_n=border_latitudes_deg_n,
+            border_longitudes_deg_e=border_longitudes_deg_e,
+            field_name=all_target_field_names[f],
+            title_string=title_string
+        )
+
+        print('Saving figure to: "{0:s}"...'.format(
+            panel_file_names[f]
+        ))
+        figure_object.savefig(
+            panel_file_names[f], dpi=FIGURE_RESOLUTION_DPI,
+            pad_inches=0, bbox_inches='tight'
+        )
+        pyplot.close(figure_object)
+
+        imagemagick_utils.resize_image(
+            input_file_name=panel_file_names[f],
+            output_file_name=panel_file_names[f],
+            output_size_pixels=PANEL_SIZE_PX
+        )
+
+    concat_figure_file_name = '{0:s}/actual.jpg'.format(output_dir_name)
 
     num_panel_rows = int(numpy.floor(
         numpy.sqrt(len(panel_file_names))
@@ -1571,19 +1672,14 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         border_width_pixels=0
     )
 
-    for this_panel_file_name in panel_file_names:
-        os.remove(this_panel_file_name)
-
     do_residual_prediction = vod[neural_net.DO_RESIDUAL_PREDICTION_KEY]
+    if not do_residual_prediction:
+        return
 
-    if do_residual_prediction:
-        lyr_idx = model_input_layer_names.index(
-            neural_net.PREDN_BASELINE_LAYER_NAME
-        )
-        resid_baseline_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
-    else:
-        resid_baseline_predictor_matrix = numpy.array([])
-
+    lyr_idx = model_input_layer_names.index(
+        neural_net.PREDN_BASELINE_LAYER_NAME
+    )
+    resid_baseline_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
     panel_file_names = [''] * len(all_target_field_names)
 
     for f in range(len(all_target_field_names)):

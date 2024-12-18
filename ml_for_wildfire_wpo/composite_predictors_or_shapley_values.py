@@ -262,6 +262,9 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     vod[neural_net.TARGET_DIRECTORY_KEY] = target_dir_name
     vod[neural_net.GFS_FORECAST_TARGET_DIR_KEY] = gfs_forecast_target_dir_name
     vod[neural_net.USE_LEAD_TIME_AS_PRED_KEY] = False
+    vod[neural_net.GFS_NORM_FILE_KEY] = None
+    vod[neural_net.TARGET_NORM_FILE_KEY] = None
+    vod[neural_net.ERA5_NORM_FILE_KEY] = None
     num_target_fields = len(vod[neural_net.TARGET_FIELDS_KEY])
     validation_option_dict = vod
 
