@@ -56,6 +56,8 @@ for model_lead_time_days in "${MODEL_LEAD_TIMES_DAYS[@]}"; do
     --min_relia_bin_edge_by_target 0 0 0 0 0 0 0 \
     --max_relia_bin_edge_by_target 99 1000 2500 65 1000 130 150 \
     --per_grid_cell=0 \
-    --keep_it_simple=1 \
+    --keep_it_simple=0 \
+    --latitude_limits_deg_n 36 42 \
+    --longitude_limits_deg_e 249 257 \
     --output_file_name="${model_dir_name}/validation_lead-time-days=${model_lead_time_days}/mountain_central_west/ungridded_evaluation.nc"
 done
