@@ -161,6 +161,9 @@ def _plot_attributes_diagram(
         for etx in evaluation_tables_xarray
     ], dtype=int)
 
+    print(target_field_name)
+    print(target_indices)
+
     mean_predictions_by_set = [
         etx[regression_eval.RELIABILITY_X_KEY].values[k, ...]
         for etx, k in zip(evaluation_tables_xarray, target_indices)
