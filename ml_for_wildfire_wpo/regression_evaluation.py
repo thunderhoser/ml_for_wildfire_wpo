@@ -17,6 +17,7 @@ import file_system_utils
 import error_checking
 import prediction_io
 import canadian_fwi_io
+import misc_utils
 import canadian_fwi_utils
 import neural_net
 import bias_correction
@@ -1053,7 +1054,8 @@ def confidence_interval_to_polygon(
 
 def read_inputs(prediction_file_names, isotonic_model_file_name,
                 uncertainty_calib_model_file_name,
-                target_field_names, mask_pixel_if_weight_below=0.05):
+                target_field_names, mask_pixel_if_weight_below=0.05,
+                latitude_limits_deg_n=None, longitude_limits_deg_e=None):
     """Reads inputs (predictions and targets) from many files.
 
     E = number of examples
@@ -1070,6 +1072,9 @@ def read_inputs(prediction_file_names, isotonic_model_file_name,
     :param mask_pixel_if_weight_below: Masking threshold.  For any pixel with an
         evaluation weight below this threshold, both the prediction and target
         will be set to NaN, so that the pixel cannot factor into evaluation.
+    :param latitude_limits_deg_n: See documentation for
+        `get_scores_with_bootstrapping`.
+    :param longitude_limits_deg_e: Same.
     :return: target_matrix: E-by-M-by-N-by-T numpy array of target values.
     :return: prediction_matrix: E-by-M-by-N-by-T-by-S numpy array of
         predictions.
@@ -1143,6 +1148,22 @@ def read_inputs(prediction_file_names, isotonic_model_file_name,
 
         tpt = this_prediction_table_xarray
 
+        if latitude_limits_deg_n is not None:
+            these_indices = misc_utils.desired_latitudes_to_rows(
+                grid_latitudes_deg_n=tpt[prediction_io.LATITUDE_KEY].values,
+                start_latitude_deg_n=latitude_limits_deg_n[0],
+                end_latitude_deg_n=latitude_limits_deg_n[1]
+            )
+            tpt = tpt.isel({prediction_io.ROW_DIM: these_indices})
+
+        if longitude_limits_deg_e is not None:
+            these_indices = misc_utils.desired_longitudes_to_columns(
+                grid_longitudes_deg_e=tpt[prediction_io.LONGITUDE_KEY].values,
+                start_longitude_deg_e=longitude_limits_deg_e[0],
+                end_longitude_deg_e=longitude_limits_deg_e[1]
+            )
+            tpt = tpt.isel({prediction_io.COLUMN_DIM: these_indices})
+
         if model_file_name is None:
             these_dim = (
                 (num_times,) + tpt[prediction_io.TARGET_KEY].values.shape
@@ -1184,11 +1205,15 @@ def read_inputs(prediction_file_names, isotonic_model_file_name,
     return target_matrix, prediction_matrix, weight_matrix, model_file_name
 
 
-def _read_inputs_for_ssrat(prediction_file_names, target_field_names):
+def _read_inputs_for_ssrat(
+        prediction_file_names, target_field_names,
+        latitude_limits_deg_n=None, longitude_limits_deg_e=None):
     """Reads inputs for calculation of spread-skill ratio (SSRAT).
 
     :param prediction_file_names: See doc for `read_inputs`.
     :param target_field_names: Same.
+    :param latitude_limits_deg_n: Same.
+    :param longitude_limits_deg_e: Same.
     :return: prediction_tables_xarray: length-F list of xarray tables in format
         returned by `prediction_io.read_file`.
     """
@@ -1228,6 +1253,23 @@ def _read_inputs_for_ssrat(prediction_file_names, target_field_names):
         ], dtype=int)
 
         pt_i = pt_i.isel({prediction_io.FIELD_DIM: these_indices})
+
+        if latitude_limits_deg_n is not None:
+            these_indices = misc_utils.desired_latitudes_to_rows(
+                grid_latitudes_deg_n=pt_i[prediction_io.LATITUDE_KEY].values,
+                start_latitude_deg_n=latitude_limits_deg_n[0],
+                end_latitude_deg_n=latitude_limits_deg_n[1]
+            )
+            pt_i = pt_i.isel({prediction_io.ROW_DIM: these_indices})
+
+        if longitude_limits_deg_e is not None:
+            these_indices = misc_utils.desired_longitudes_to_columns(
+                grid_longitudes_deg_e=pt_i[prediction_io.LONGITUDE_KEY].values,
+                start_longitude_deg_e=longitude_limits_deg_e[0],
+                end_longitude_deg_e=longitude_limits_deg_e[1]
+            )
+            pt_i = pt_i.isel({prediction_io.COLUMN_DIM: these_indices})
+
         prediction_tables_xarray[i] = pt_i
 
     return prediction_tables_xarray
@@ -1239,7 +1281,8 @@ def get_scores_with_bootstrapping(
         min_relia_bin_edge_by_target, max_relia_bin_edge_by_target,
         min_relia_bin_edge_prctile_by_target,
         max_relia_bin_edge_prctile_by_target,
-        per_grid_cell, keep_it_simple=False, compute_ssrat=False,
+        per_grid_cell, latitude_limits_deg_n, longitude_limits_deg_e,
+        keep_it_simple=False, compute_ssrat=False,
         isotonic_model_file_name=None, uncertainty_calib_model_file_name=None):
     """Computes all scores with bootstrapping.
 
@@ -1264,6 +1307,11 @@ def get_scores_with_bootstrapping(
     :param per_grid_cell: Boolean flag.  If True, will compute a separate set of
         scores at each grid cell.  If False, will compute one set of scores for
         the whole domain.
+    :param latitude_limits_deg_n: Length-2 numpy array with meridional limits
+        (deg north) of bounding box for evaluation domain.  Will evaluate only
+        at these grid points.  If you do not want to subset the domain for
+        evaluation, leave this argument alone.
+    :param longitude_limits_deg_e: Same as above but for zonal limits.
     :param keep_it_simple: Boolean flag.  If True, will avoid Kolmogorov-Smirnov
         test and attributes diagram.
     :param compute_ssrat: Boolean flag.  If True, will compute spread-skill
@@ -1337,7 +1385,9 @@ def get_scores_with_bootstrapping(
     if compute_ssrat:
         prediction_tables_xarray = _read_inputs_for_ssrat(
             prediction_file_names=prediction_file_names,
-            target_field_names=target_field_names
+            target_field_names=target_field_names,
+            latitude_limits_deg_n=latitude_limits_deg_n,
+            longitude_limits_deg_e=longitude_limits_deg_e
         )
 
         prediction_variance_matrix = numpy.stack([
@@ -1622,6 +1672,22 @@ def get_scores_with_bootstrapping(
             prediction_file_names[0]
         )
         tpt = this_prediction_table_xarray
+
+        if latitude_limits_deg_n is not None:
+            these_indices = misc_utils.desired_latitudes_to_rows(
+                grid_latitudes_deg_n=tpt[prediction_io.LATITUDE_KEY].values,
+                start_latitude_deg_n=latitude_limits_deg_n[0],
+                end_latitude_deg_n=latitude_limits_deg_n[1]
+            )
+            tpt = tpt.isel({prediction_io.ROW_DIM: these_indices})
+
+        if longitude_limits_deg_e is not None:
+            these_indices = misc_utils.desired_longitudes_to_columns(
+                grid_longitudes_deg_e=tpt[prediction_io.LONGITUDE_KEY].values,
+                start_longitude_deg_e=longitude_limits_deg_e[0],
+                end_longitude_deg_e=longitude_limits_deg_e[1]
+            )
+            tpt = tpt.isel({prediction_io.COLUMN_DIM: these_indices})
 
         metadata_dict.update({
             LATITUDE_DIM: tpt[prediction_io.LATITUDE_KEY].values,
