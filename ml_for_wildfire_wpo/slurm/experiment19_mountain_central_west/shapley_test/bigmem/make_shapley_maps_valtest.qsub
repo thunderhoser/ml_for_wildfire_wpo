@@ -16,7 +16,7 @@
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=make_shapley_maps_valtest_%A.out
+#SBATCH --output=make_shapley_maps_valtest_%A_%a.out
 
 module load cuda/12.3.1
 conda init
