@@ -1,0 +1,52 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_evaluation_gridded_bias"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=04:00:00
+#SBATCH --array=3,4,5,11,12,17,18,26,27,29
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_evaluation_gridded_bias_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment19/mountain_central_west"
+
+LEAD_TIMES_DAYS=("03" "03" "03" "03" "03" "03" "03" "03" "03" "03" "05" "05" "05" "05" "05" "05" "05" "05" "05" "05" "07" "07" "07" "07" "07" "07" "07" "07" "07" "07")
+SPECTRAL_COMPLEXITIES=("050" "050" "075" "075" "100" "100" "125" "125" "150" "150" "050" "050" "075" "075" "100" "100" "125" "125" "150" "150" "050" "050" "075" "075" "100" "100" "125" "125" "150" "150")
+CONVNEXT_FLAGS=("0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1")
+
+lead_time_days=${LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}
+spectral_complexity=${SPECTRAL_COMPLEXITIES[$SLURM_ARRAY_TASK_ID]}
+convnext_flag=${CONVNEXT_FLAGS[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/lead-time-days=${lead_time_days}_spectral-complexity=${spectral_complexity}_use-convnext=${convnext_flag}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/plot_gridded_evaluation.py" \
+--input_evaluation_file_name="${model_dir_name}/validation/gridded_evaluation.nc" \
+--metric_names "target_standard_deviation" "prediction_standard_deviation" "target_mean" "prediction_mean" "root_mean_squared_error" "mse_bias" "mse_variance" "mse_skill_score" "dual_weighted_mean_squared_error" "dwmse_skill_score" "kolmogorov_smirnov_statistic" "kolmogorov_smirnov_p_value" "mean_absolute_error" "mae_skill_score" "bias" "correlation" "kling_gupta_efficiency" \
+--min_colour_percentiles 0.1  0.1  0.0   0.0   0.1  0.1  0.1  0.0   0.1  0.0   0.1  0.1  0.1  0.0   0.1  0.0 0.0 \
+--max_colour_percentiles 99.5 99.5 100.0 100.0 99.5 99.5 99.5 100.0 99.0 100.0 99.9 99.9 99.5 100.0 99.5 100 100 \
+--output_dir_name="${model_dir_name}/validation/gridded_evaluation"
