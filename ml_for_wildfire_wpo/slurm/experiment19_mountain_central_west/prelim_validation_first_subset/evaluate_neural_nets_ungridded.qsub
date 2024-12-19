@@ -53,5 +53,5 @@ python3 -u "${CODE_DIR_NAME}/evaluate_model.py" \
 --min_relia_bin_edge_by_target 0 0 0 0 0 0 0 \
 --max_relia_bin_edge_by_target 99 1000 2500 65 1000 130 150 \
 --per_grid_cell=0 \
---keep_it_simple=1 \
+--keep_it_simple=0 \
 --output_file_name="${model_dir_name}/validation/ungridded_evaluation.nc"
