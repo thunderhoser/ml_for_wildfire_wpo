@@ -448,11 +448,11 @@ def _run(evaluation_file_names, line_styles, line_colour_strings,
         if i == 0:
             target_field_names = (
                 this_etx.coords[regression_eval.FIELD_DIM].values
-            )
+            ).tolist()
             target_norm_file_name = goptd[neural_net.TARGET_NORM_FILE_KEY]
 
         assert target_field_names == (
-            this_etx.coords[regression_eval.FIELD_DIM].values
+            this_etx.coords[regression_eval.FIELD_DIM].values.tolist()
         )
         assert target_norm_file_name == goptd[neural_net.TARGET_NORM_FILE_KEY]
 

@@ -21,6 +21,8 @@ MAX_RELIA_BIN_EDGES_PRCTILE_ARG_NAME = 'max_relia_bin_edge_prctile_by_target'
 PER_GRID_CELL_ARG_NAME = 'per_grid_cell'
 KEEP_IT_SIMPLE_ARG_NAME = 'keep_it_simple'
 COMPUTE_SSRAT_ARG_NAME = 'compute_ssrat'
+LATITUDE_LIMITS_ARG_NAME = 'latitude_limits_deg_n'
+LONGITUDE_LIMITS_ARG_NAME = 'longitude_limits_deg_e'
 ISOTONIC_MODEL_FILE_ARG_NAME = 'isotonic_model_file_name'
 OUTPUT_FILE_ARG_NAME = 'output_file_name'
 
@@ -70,6 +72,16 @@ KEEP_IT_SIMPLE_HELP_STRING = (
 COMPUTE_SSRAT_HELP_STRING = (
     'Boolean flag.  If 1, will compute spread-skill ratio (SSRAT) and spread-'
     'skill difference (SSDIFF).'
+)
+LATITUDE_LIMITS_HELP_STRING = (
+    'Length-2 list with meridional limits (deg north) of bounding box for '
+    'evaluation domain.  Will evaluate only at these grid points.  If you do '
+    'not want to subset the domain for evaluation, leave this argument alone.'
+)
+LONGITUDE_LIMITS_HELP_STRING = (
+    'Same as {0:s} but for longitudes (deg east).'
+).format(
+    LATITUDE_LIMITS_ARG_NAME
 )
 ISOTONIC_MODEL_FILE_HELP_STRING = (
     'Path to file with isotonic-regression model, which will be used to bias-'
@@ -133,6 +145,14 @@ INPUT_ARG_PARSER.add_argument(
     help=COMPUTE_SSRAT_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + LATITUDE_LIMITS_ARG_NAME, type=float, nargs=2,
+    required=False, default=[91, 91], help=LATITUDE_LIMITS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + LONGITUDE_LIMITS_ARG_NAME, type=float, nargs=2,
+    required=False, default=[361, 361], help=LONGITUDE_LIMITS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + ISOTONIC_MODEL_FILE_ARG_NAME, type=str, required=False, default='',
     help=ISOTONIC_MODEL_FILE_HELP_STRING
 )
@@ -148,6 +168,7 @@ def _run(prediction_dir_name, init_date_limit_strings, num_bootstrap_reps,
          min_relia_bin_edge_prctile_by_target,
          max_relia_bin_edge_prctile_by_target,
          per_grid_cell, keep_it_simple, compute_ssrat,
+         latitude_limits_deg_n, longitude_limits_deg_e,
          isotonic_model_file_name, output_file_name):
     """Evaluates model.
 
@@ -165,9 +186,16 @@ def _run(prediction_dir_name, init_date_limit_strings, num_bootstrap_reps,
     :param per_grid_cell: Same.
     :param keep_it_simple: Same.
     :param compute_ssrat: Same.
+    :param latitude_limits_deg_n: Same.
+    :param longitude_limits_deg_e: Same.
     :param isotonic_model_file_name: Same.
     :param output_file_name: Same.
     """
+
+    if numpy.all(latitude_limits_deg_n > 90):
+        latitude_limits_deg_n = None
+    if numpy.all(longitude_limits_deg_e > 360):
+        longitude_limits_deg_e = None
 
     if (
             (len(min_relia_bin_edge_by_target) == 1 and
@@ -211,7 +239,9 @@ def _run(prediction_dir_name, init_date_limit_strings, num_bootstrap_reps,
         max_relia_bin_edge_prctile_by_target,
         per_grid_cell=per_grid_cell,
         keep_it_simple=keep_it_simple,
-        compute_ssrat=compute_ssrat
+        compute_ssrat=compute_ssrat,
+        latitude_limits_deg_n=latitude_limits_deg_n,
+        longitude_limits_deg_e=longitude_limits_deg_e
     )
     print(SEPARATOR_STRING)
 
@@ -291,6 +321,12 @@ if __name__ == '__main__':
         per_grid_cell=bool(getattr(INPUT_ARG_OBJECT, PER_GRID_CELL_ARG_NAME)),
         keep_it_simple=bool(getattr(INPUT_ARG_OBJECT, KEEP_IT_SIMPLE_ARG_NAME)),
         compute_ssrat=bool(getattr(INPUT_ARG_OBJECT, COMPUTE_SSRAT_ARG_NAME)),
+        latitude_limits_deg_n=numpy.array(
+            getattr(INPUT_ARG_OBJECT, LATITUDE_LIMITS_ARG_NAME), dtype=float
+        ),
+        longitude_limits_deg_e=numpy.array(
+            getattr(INPUT_ARG_OBJECT, LONGITUDE_LIMITS_ARG_NAME), dtype=float
+        ),
         isotonic_model_file_name=getattr(
             INPUT_ARG_OBJECT, ISOTONIC_MODEL_FILE_ARG_NAME
         ),
