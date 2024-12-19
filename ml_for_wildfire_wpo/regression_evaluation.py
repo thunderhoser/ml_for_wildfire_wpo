@@ -1463,7 +1463,9 @@ def get_scores_with_bootstrapping(
         isotonic_model_file_name=isotonic_model_file_name,
         uncertainty_calib_model_file_name=uncertainty_calib_model_file_name,
         target_field_names=target_field_names,
-        mask_pixel_if_weight_below=-1.
+        mask_pixel_if_weight_below=-1.,
+        latitude_limits_deg_n=latitude_limits_deg_n,
+        longitude_limits_deg_e=longitude_limits_deg_e
     )
     prediction_matrix = numpy.mean(prediction_matrix, axis=-1)
 
