@@ -334,6 +334,11 @@ def _run(input_file_name, metric_names, min_colour_percentiles,
 
         raise ValueError(error_string)
 
+    target_field_names = (
+        evaluation_table_xarray.coords[regression_eval.FIELD_DIM].values
+    )
+    num_target_fields = len(target_field_names)
+
     model_file_name = (
         evaluation_table_xarray.attrs[regression_eval.MODEL_FILE_KEY]
     )
@@ -346,8 +351,6 @@ def _run(input_file_name, metric_names, min_colour_percentiles,
     generator_option_dict = model_metadata_dict[
         neural_net.TRAINING_OPTIONS_KEY
     ]
-    target_field_names = generator_option_dict[neural_net.TARGET_FIELDS_KEY]
-    num_target_fields = len(target_field_names)
 
     etx = evaluation_table_xarray
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
