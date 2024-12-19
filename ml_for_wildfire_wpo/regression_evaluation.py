@@ -1576,11 +1576,7 @@ def get_scores_with_bootstrapping(
         }
         main_data_dict.update(new_dict)
 
-    print('per_grid_cell = {0:d}'.format(int(per_grid_cell)))
-
     if per_grid_cell:
-        print('Adding eval weights!!!')
-
         these_dim_keys = (LATITUDE_DIM, LONGITUDE_DIM)
         new_dict = {
             EVAL_WEIGHT_KEY: (these_dim_keys, numpy.mean(weight_matrix, axis=0))
