@@ -972,6 +972,8 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             if len(predictor_matrices[k].shape) < 2:
                 continue
 
+            print(predictor_matrices[k].shape)
+
             predictor_matrices[k] = (
                 predictor_matrices[k][:, :, desired_column_indices, ...]
             )
