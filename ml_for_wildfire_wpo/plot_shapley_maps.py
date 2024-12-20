@@ -879,11 +879,16 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     validation_option_dict = vod
 
     init_date_string = stx.attrs[shapley_io.INIT_DATE_KEY]
-    init_date_string_nice = (
-        init_date_string[:4] +
-        '-' + init_date_string[4:6] +
-        '-' + init_date_string[6:]
-    )
+    if init_date_string is None:
+        init_date_string = 'composite'
+        init_date_string_nice = 'composite'
+    else:
+        init_date_string_nice = (
+            init_date_string[:4] +
+            '-' + init_date_string[4:6] +
+            '-' + init_date_string[6:]
+        )
+
     target_field_name = stx.attrs[shapley_io.TARGET_FIELD_KEY]
 
     if shapley_io.TARGET_VALUE_KEY in stx.data_vars:
