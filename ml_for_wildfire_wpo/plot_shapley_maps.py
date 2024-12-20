@@ -921,7 +921,9 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             model_input_layer_names[k] for k in good_indices
         ]
 
-        target_matrix = stx[shapley_io.TARGET_VALUE_KEY].values
+        target_matrix = numpy.expand_dims(
+            stx[shapley_io.TARGET_VALUE_KEY].values, axis=0
+        )
     else:
         print(SEPARATOR_STRING)
 
