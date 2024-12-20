@@ -907,7 +907,8 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             shapley_io.PREDICTOR_BASELINE_KEY
         ]
         predictor_matrices = [
-            stx[k].values if k in stx.data_vars else None
+            numpy.expand_dims(stx[k].values, axis=0) if k in stx.data_vars
+            else None
             for k in predictor_keys
         ]
 
