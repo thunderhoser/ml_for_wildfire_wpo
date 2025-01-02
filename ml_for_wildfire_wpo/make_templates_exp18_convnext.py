@@ -311,7 +311,7 @@ PREDICTOR_TIME_STRATEGY_TO_NUM_TARGET_DAYS = {
     # 'same-valid-times-for-every-model-lead': 20
 }
 
-SPECTRAL_COMPLEXITIES_AXIS2 = numpy.array([40, 50, 60, 70, 80, 90, 100], dtype=int)
+SPECTRAL_COMPLEXITIES_AXIS2 = numpy.array([20, 25, 30, 35, 40], dtype=int)
 USE_LEAD_TIME_AS_PRED_FLAGS_AXIS4 = numpy.array([False, True], dtype=bool)
 
 
@@ -331,12 +331,11 @@ def _run():
                     PREDICTOR_TIME_STRATEGIES_AXIS1[i]
                 ]
 
-                these_multipliers = numpy.array([1, 1.5, 2, 2.5, 3, 3.5, 4])
+                these_multipliers = numpy.linspace(1, 2, num=7, dtype=float)
                 gfs_encoder_channel_counts = numpy.round(
                     SPECTRAL_COMPLEXITIES_AXIS2[j] * these_multipliers
                 ).astype(int)
 
-                these_multipliers = numpy.array([3, 4, 5, 6, 7, 8, 9], dtype=float) / 3
                 lagtgt_encoder_channel_counts = numpy.round(
                     SPECTRAL_COMPLEXITIES_AXIS2[j] * these_multipliers
                 ).astype(int)
