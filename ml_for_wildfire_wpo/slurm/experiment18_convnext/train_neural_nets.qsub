@@ -41,7 +41,7 @@ ERA5_CONSTANT_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_
 ERA5_CONSTANT_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/normalization_params_era5_constants.nc"
 
 TRAINING_STRATEGIES=("20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days")
-SPECTRAL_COMPLEXITIES=("050" "050" "050" "050" "050" "050" "050" "050" "060" "060" "060" "060" "060" "060" "060" "060" "070" "070" "070" "070" "070" "070" "070" "070" "080" "080" "080" "080" "080" "080" "080" "080" "090" "090" "090" "090" "090" "090" "090" "090")
+SPECTRAL_COMPLEXITIES=("020" "020" "020" "020" "020" "020" "020" "020" "025" "025" "025" "025" "025" "025" "025" "025" "030" "030" "030" "030" "030" "030" "030" "030" "035" "035" "035" "035" "035" "035" "035" "035" "040" "040" "040" "040" "040" "040" "040" "040")
 USE_LEAD_TIME_AS_PRED_FLAGS=("0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1")
 
 training_strategy=${TRAINING_STRATEGIES[$SLURM_ARRAY_TASK_ID]}
