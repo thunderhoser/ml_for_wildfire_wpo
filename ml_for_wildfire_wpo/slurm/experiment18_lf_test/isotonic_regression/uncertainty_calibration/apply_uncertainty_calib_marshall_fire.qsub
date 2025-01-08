@@ -12,7 +12,7 @@
 ##SBATCH --cpus-per-task=1
 ##SBATCH --ntasks-per-node=1
 #SBATCH --time=04:00:00
-#SBATCH --array=0-9
+#SBATCH --array=0-13
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
@@ -33,20 +33,10 @@ echo $PATH
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
 TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment18_lf_test"
 
-TRAINING_STRATEGIES=("20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days")
-SPECTRAL_COMPLEXITIES=("040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100")
-RESIDUAL_BLOCK_FLAGS=("0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1")
-
-BEST_MODEL_INDEX=10
-
-training_strategy=${TRAINING_STRATEGIES[$BEST_MODEL_INDEX]}
-spectral_complexity=${SPECTRAL_COMPLEXITIES[$BEST_MODEL_INDEX]}
-use_residual_blocks=${RESIDUAL_BLOCK_FLAGS[$BEST_MODEL_INDEX]}
-
-model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=${training_strategy}_spectral-complexity=${spectral_complexity}_use-residual-blocks=${use_residual_blocks}"
+# model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=80-40-diff-plus2days_spectral-complexity=070_use-residual-blocks=0_use-lead-time-as-predictor=0"
 echo $model_dir_name
 
-MODEL_LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10")
+MODEL_LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "11" "12" "13" "14")
 START_DATE_STRINGS=("20211215" "20211215" "20211215" "20211215" "20211215" "20211215" "20211215" "20211215" "20211215" "20211215")
 END_DATE_STRINGS=("20220101" "20220101" "20220101" "20220101" "20220101" "20220101" "20220101" "20220101" "20220101" "20220101")
 
