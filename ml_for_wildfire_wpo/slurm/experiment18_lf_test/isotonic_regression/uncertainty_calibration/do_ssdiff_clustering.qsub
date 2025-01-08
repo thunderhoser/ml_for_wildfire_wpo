@@ -1,0 +1,78 @@
+#!/bin/bash
+
+#SBATCH --job-name="do_ssdiff_clustering"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=08:00:00
+#SBATCH --array=0-69
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=do_ssdiff_clustering_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment18_lf_test"
+
+TRAINING_STRATEGIES=("20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days")
+SPECTRAL_COMPLEXITIES=("040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100")
+RESIDUAL_BLOCK_FLAGS=("0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1")
+
+BEST_MODEL_INDEX=10
+
+training_strategy=${TRAINING_STRATEGIES[$BEST_MODEL_INDEX]}
+spectral_complexity=${SPECTRAL_COMPLEXITIES[$BEST_MODEL_INDEX]}
+use_residual_blocks=${RESIDUAL_BLOCK_FLAGS[$BEST_MODEL_INDEX]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=${training_strategy}_spectral-complexity=${spectral_complexity}_use-residual-blocks=${use_residual_blocks}"
+echo $model_dir_name
+
+TARGET_FIELD_NAMES=("fire_weather_index" "daily_severity_rating" "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index" "fire_weather_index" "daily_severity_rating" "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" "buildup_index")
+TARGET_FIELD_NAMES_DASHED=("fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index" "fire-weather-index" "daily-severity-rating" "fine-fuel-moisture-code" "duff-moisture-code" "drought-code" "initial-spread-index" "buildup-index")
+MODEL_LEAD_TIMES_DAYS=("01" "01" "01" "01" "01" "01" "01" "02" "02" "02" "02" "02" "02" "02" "03" "03" "03" "03" "03" "03" "03" "04" "04" "04" "04" "04" "04" "04" "05" "05" "05" "05" "05" "05" "05" "06" "06" "06" "06" "06" "06" "06" "07" "07" "07" "07" "07" "07" "07" "08" "08" "08" "08" "08" "08" "08" "09" "09" "09" "09" "09" "09" "09" "10" "10" "10" "10" "10" "10" "10")
+
+if [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "fire_weather_index" ]]; then
+    bias_discretization_intervals=" 0.4000 0.8000 1.2000 1.6000 2.0000 "
+elif [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "daily_severity_rating" ]]; then
+    bias_discretization_intervals=" 0.6000 1.2000 1.8000 2.4000 3.0000 "
+elif [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "fine_fuel_moisture_code" ]]; then
+    bias_discretization_intervals=" 0.3000 0.6000 0.9000 1.2000 1.5000 "
+elif [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "duff_moisture_code" ]]; then
+    bias_discretization_intervals=" 0.8000 1.6000 2.4000 3.2000 4.0000 "
+elif [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "drought_code" ]]; then
+    bias_discretization_intervals=" 1.6000 3.2000 4.8000 6.4000 8.0000 "
+elif [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "initial_spread_index" ]]; then
+    bias_discretization_intervals=" 1.000 2.000 3.000 4.000 5.0000 "
+elif [[ "${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" == "buildup_index" ]]; then
+    bias_discretization_intervals=" 2.4000 4.8000 7.2000 9.6000 12.0000 "
+fi
+
+python3 -u "${CODE_DIR_NAME}/do_bias_clustering.py" \
+--input_gridded_eval_file_arg_name="${model_dir_name}/training_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/gridded_evaluation.nc" \
+--min_cluster_size_px=100 \
+--target_field_name="${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}" \
+--bias_discretization_intervals ${bias_discretization_intervals} \
+--buffer_distance_px=1 \
+--do_backwards_clustering=1 \
+--cluster_ssdiff_instead_of_bias=1 \
+--main_output_file_name="${model_dir_name}/training_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/uncertainty_calibration/ssdiff_clustering_${TARGET_FIELD_NAMES_DASHED[$SLURM_ARRAY_TASK_ID]}.nc" \
+--output_figure_file_name="${model_dir_name}/training_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/uncertainty_calibration/ssdiff_clustering_${TARGET_FIELD_NAMES_DASHED[$SLURM_ARRAY_TASK_ID]}.jpg"

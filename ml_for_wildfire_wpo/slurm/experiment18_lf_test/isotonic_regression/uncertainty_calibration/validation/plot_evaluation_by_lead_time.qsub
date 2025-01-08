@@ -1,0 +1,58 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_evaluation_by_lead_time"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --array=0-9
+#SBATCH --time=02:00:00
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_evaluation_by_lead_time_%A.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment18_lf_test"
+
+TRAINING_STRATEGIES=("20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days" "80-40-diff-plus2days")
+SPECTRAL_COMPLEXITIES=("040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100" "040" "060" "080" "100")
+RESIDUAL_BLOCK_FLAGS=("0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1" "1")
+
+BEST_MODEL_INDEX=10
+
+training_strategy=${TRAINING_STRATEGIES[$BEST_MODEL_INDEX]}
+spectral_complexity=${SPECTRAL_COMPLEXITIES[$BEST_MODEL_INDEX]}
+use_residual_blocks=${RESIDUAL_BLOCK_FLAGS[$BEST_MODEL_INDEX]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=${training_strategy}_spectral-complexity=${spectral_complexity}_use-residual-blocks=${use_residual_blocks}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/plot_evaluation_by_lead_time.py" \
+--model_eval_file_name_by_lead "${model_dir_name}/validation_lead-time-days=01/isotonic_regression/uncertainty_calibration/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=02/isotonic_regression/uncertainty_calibration/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=03/isotonic_regression/uncertainty_calibration/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=04/isotonic_regression/uncertainty_calibration/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=05/isotonic_regression/uncertainty_calibration/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=06/isotonic_regression/uncertainty_calibration/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=07/isotonic_regression/uncertainty_calibration/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=08/isotonic_regression/uncertainty_calibration/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=09/isotonic_regression/uncertainty_calibration/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=10/isotonic_regression/uncertainty_calibration/ungridded_evaluation.nc" \
+--model_ss_file_name_by_lead "${model_dir_name}/validation_lead-time-days=01/isotonic_regression/uncertainty_calibration/spread_vs_skill.nc" "${model_dir_name}/validation_lead-time-days=02/isotonic_regression/uncertainty_calibration/spread_vs_skill.nc" "${model_dir_name}/validation_lead-time-days=03/isotonic_regression/uncertainty_calibration/spread_vs_skill.nc" "${model_dir_name}/validation_lead-time-days=04/isotonic_regression/uncertainty_calibration/spread_vs_skill.nc" "${model_dir_name}/validation_lead-time-days=05/isotonic_regression/uncertainty_calibration/spread_vs_skill.nc" "${model_dir_name}/validation_lead-time-days=06/isotonic_regression/uncertainty_calibration/spread_vs_skill.nc" "${model_dir_name}/validation_lead-time-days=07/isotonic_regression/uncertainty_calibration/spread_vs_skill.nc" "${model_dir_name}/validation_lead-time-days=08/isotonic_regression/uncertainty_calibration/spread_vs_skill.nc" "${model_dir_name}/validation_lead-time-days=09/isotonic_regression/uncertainty_calibration/spread_vs_skill.nc" "${model_dir_name}/validation_lead-time-days=10/isotonic_regression/uncertainty_calibration/spread_vs_skill.nc" \
+--model_dt_file_name_by_lead "${model_dir_name}/validation_lead-time-days=01/isotonic_regression/uncertainty_calibration/discard_test.nc" "${model_dir_name}/validation_lead-time-days=02/isotonic_regression/uncertainty_calibration/discard_test.nc" "${model_dir_name}/validation_lead-time-days=03/isotonic_regression/uncertainty_calibration/discard_test.nc" "${model_dir_name}/validation_lead-time-days=04/isotonic_regression/uncertainty_calibration/discard_test.nc" "${model_dir_name}/validation_lead-time-days=05/isotonic_regression/uncertainty_calibration/discard_test.nc" "${model_dir_name}/validation_lead-time-days=06/isotonic_regression/uncertainty_calibration/discard_test.nc" "${model_dir_name}/validation_lead-time-days=07/isotonic_regression/uncertainty_calibration/discard_test.nc" "${model_dir_name}/validation_lead-time-days=08/isotonic_regression/uncertainty_calibration/discard_test.nc" "${model_dir_name}/validation_lead-time-days=09/isotonic_regression/uncertainty_calibration/discard_test.nc" "${model_dir_name}/validation_lead-time-days=10/isotonic_regression/uncertainty_calibration/discard_test.nc" \
+--model_pith_file_name_by_lead "${model_dir_name}/validation_lead-time-days=01/isotonic_regression/uncertainty_calibration/pit_histograms.nc" "${model_dir_name}/validation_lead-time-days=02/isotonic_regression/uncertainty_calibration/pit_histograms.nc" "${model_dir_name}/validation_lead-time-days=03/isotonic_regression/uncertainty_calibration/pit_histograms.nc" "${model_dir_name}/validation_lead-time-days=04/isotonic_regression/uncertainty_calibration/pit_histograms.nc" "${model_dir_name}/validation_lead-time-days=05/isotonic_regression/uncertainty_calibration/pit_histograms.nc" "${model_dir_name}/validation_lead-time-days=06/isotonic_regression/uncertainty_calibration/pit_histograms.nc" "${model_dir_name}/validation_lead-time-days=07/isotonic_regression/uncertainty_calibration/pit_histograms.nc" "${model_dir_name}/validation_lead-time-days=08/isotonic_regression/uncertainty_calibration/pit_histograms.nc" "${model_dir_name}/validation_lead-time-days=09/isotonic_regression/uncertainty_calibration/pit_histograms.nc" "${model_dir_name}/validation_lead-time-days=10/isotonic_regression/uncertainty_calibration/pit_histograms.nc" \
+--baseline_eval_file_name_by_lead "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/01day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/02day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/03day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/04day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/05day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/06day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/07day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/08day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/09day_lead/ungridded_evaluation_20210101-20211210.nc" "/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts/prediction_files/10day_lead/ungridded_evaluation_20210101-20211210.nc" \
+--lead_times_days 1 2 3 4 5 6 7 8 9 10 \
+--model_description_string="NN" \
+--baseline_description_string="GFS" \
+--output_dir_name="${model_dir_name}/validation_by_lead_time/isotonic_regression/uncertainty_calibration"
