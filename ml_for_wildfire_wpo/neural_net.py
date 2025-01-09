@@ -2545,8 +2545,8 @@ def read_metafile(pickle_file_name):
         vod[CHANGE_LEAD_EVERY_N_BATCHES_KEY] = None
 
     if (
-            metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] is None or
-            'use_convnext_blocks' not in
+            metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] is not None
+            and 'use_convnext_blocks' not in
             metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
     ):
         metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY][
