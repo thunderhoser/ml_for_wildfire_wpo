@@ -52,5 +52,5 @@ python3 -u "${CODE_DIR_NAME}/apply_neural_net.py" \
 --input_gfs_fcst_target_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
 --init_date_limit_strings "${START_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}" "${END_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}" \
 --model_lead_time_days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]} \
---take_ensemble_mean=1 \
+--take_ensemble_mean=0 \
 --output_dir_name="${model_dir_name}/validation_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}"
