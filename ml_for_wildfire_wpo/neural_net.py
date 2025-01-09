@@ -2543,7 +2543,12 @@ def read_metafile(pickle_file_name):
     if CHANGE_LEAD_EVERY_N_BATCHES_KEY not in tod:
         tod[CHANGE_LEAD_EVERY_N_BATCHES_KEY] = None
         vod[CHANGE_LEAD_EVERY_N_BATCHES_KEY] = None
-    if 'use_convnext_blocks' not in metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]:
+
+    if (
+            metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] is None or
+            'use_convnext_blocks' not in
+            metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
+    ):
         metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY][
             'use_convnext_blocks'
         ] = False
