@@ -2,7 +2,6 @@
 
 import os
 import sys
-import re
 import time
 import random
 import pickle
@@ -78,6 +77,8 @@ SENTINEL_VALUE_KEY = 'sentinel_value'
 DO_RESIDUAL_PREDICTION_KEY = 'do_residual_prediction'
 USE_LEAD_TIME_AS_PRED_KEY = 'use_lead_time_as_predictor'
 CHANGE_LEAD_EVERY_N_BATCHES_KEY = 'change_model_lead_every_n_batches'
+OUTER_PATCH_SIZE_DEG_KEY = 'outer_patch_size_deg'
+OUTER_PATCH_OVERLAP_DEG_KEY = 'outer_patch_overlap_deg'
 
 DEFAULT_GENERATOR_OPTION_DICT = {
     INNER_LATITUDE_LIMITS_KEY: numpy.array([17, 73], dtype=float),
@@ -109,10 +110,18 @@ METADATA_KEYS = [
     PLATEAU_PATIENCE_KEY, PLATEAU_LR_MUTIPLIER_KEY, EARLY_STOPPING_PATIENCE_KEY
 ]
 
+NUM_FULL_ROWS_KEY = 'num_rows_in_full_grid'
+NUM_FULL_COLUMNS_KEY = 'num_columns_in_full_grid'
+NUM_PATCH_ROWS_KEY = 'num_rows_in_patch'
+NUM_PATCH_COLUMNS_KEY = 'num_columns_in_patch'
+PATCH_OVERLAP_SIZE_PX_KEY = 'patch_overlap_size_pixels'
+PATCH_START_ROW_KEY = 'patch_start_row'
+PATCH_START_COLUMN_KEY = 'patch_start_column'
+
 PREDICTOR_MATRICES_KEY = 'predictor_matrices'
 TARGETS_AND_WEIGHTS_KEY = 'target_matrix_with_weights'
-GRID_LATITUDES_KEY = 'grid_latitudes_deg_n'
-GRID_LONGITUDES_KEY = 'grid_longitudes_deg_e'
+GRID_LATITUDE_MATRIX_KEY = 'grid_latitudes_deg_n'
+GRID_LONGITUDE_MATRIX_KEY = 'grid_longitudes_deg_e'
 INPUT_LAYER_NAMES_KEY = 'input_layer_names'
 
 GFS_3D_LAYER_NAME = 'gfs_3d_inputs'
@@ -126,6 +135,13 @@ VALID_INPUT_LAYER_NAMES = [
     GFS_3D_LAYER_NAME, GFS_2D_LAYER_NAME, LEAD_TIME_LAYER_NAME,
     LAGLEAD_TARGET_LAYER_NAME, ERA5_LAYER_NAME, PREDN_BASELINE_LAYER_NAME
 ]
+
+PREDICTOR_MATRIX_3D_GFS_KEY = 'gfs_predictor_matrix_3d'
+PREDICTOR_MATRIX_2D_GFS_KEY = 'gfs_predictor_matrix_2d'
+PREDICTOR_MATRIX_BASELINE_KEY = 'baseline_prediction_matrix'
+PREDICTOR_MATRIX_LAGLEAD_KEY = 'laglead_target_predictor_matrix'
+PREDICTOR_MATRIX_ERA5_KEY = 'era5_constant_matrix'
+TARGET_MATRIX_WITH_WEIGHTS_KEY = 'target_matrix_with_weights'
 
 
 def __report_data_properties(
@@ -297,6 +313,344 @@ def __determine_num_times_for_interp(generator_option_dict):
         )
 
     return num_gfs_hours_for_interp, num_target_times_for_interp
+
+
+def __make_trapezoidal_weight_matrix(patch_size_pixels,
+                                     patch_overlap_size_pixels):
+    """Creates trapezoidal weight matrix for applying patchwise NN to full grid.
+
+    :param patch_size_pixels: See doc for `__update_patch_metalocation_dict`.
+    :param patch_overlap_size_pixels: Same.
+    :return: trapezoidal_weight_matrix: M-by-M numpy array of weights, where
+        M = patch size.
+    """
+
+    middle_length = patch_size_pixels - patch_overlap_size_pixels
+    middle_start_index = (patch_size_pixels - middle_length) // 2
+
+    weights_before_plateau = numpy.linspace(
+        0, 1,
+        num=middle_start_index, endpoint=False, dtype=float
+    )
+    weights_before_plateau = numpy.linspace(
+        weights_before_plateau[1], 1,
+        num=middle_start_index, endpoint=False, dtype=float
+    )
+    trapezoidal_weights = numpy.concatenate([
+        weights_before_plateau,
+        numpy.full(middle_length, 1.),
+        weights_before_plateau[::-1]
+    ])
+
+    first_weight_matrix, second_weight_matrix = numpy.meshgrid(
+        trapezoidal_weights, trapezoidal_weights
+    )
+    return first_weight_matrix * second_weight_matrix
+
+
+def __init_patch_metalocation_dict(
+        num_rows_in_full_grid, num_columns_in_full_grid,
+        patch_size_pixels, patch_overlap_size_pixels):
+    """Initializes patch-metalocation dictionary.
+
+    To understand what the "patch-metalocation dictionary" is, see documentation
+    for `__update_patch_metalocation_dict`.
+
+    :param num_rows_in_full_grid: Number of rows in full grid.
+    :param num_columns_in_full_grid: Number of columns in full grid.
+    :param patch_size_pixels: See doc for `__update_patch_metalocation_dict`.
+    :param patch_overlap_size_pixels: Same.
+    :return: patch_metalocation_dict: Same.
+    """
+
+    return {
+        NUM_FULL_ROWS_KEY: num_rows_in_full_grid,
+        NUM_FULL_COLUMNS_KEY: num_columns_in_full_grid,
+        NUM_PATCH_ROWS_KEY: patch_size_pixels,
+        NUM_PATCH_COLUMNS_KEY: patch_size_pixels,
+        PATCH_OVERLAP_SIZE_PX_KEY: patch_overlap_size_pixels,
+        PATCH_START_ROW_KEY: -1,
+        PATCH_START_COLUMN_KEY: -1
+    }
+
+
+def __update_patch_metalocation_dict(patch_metalocation_dict):
+    """Updates patch-metalocation dictionary.
+
+    This is fancy talk for "determines where the next patch will be, when
+    applying a patchwise-trained neural net over the full grid".
+
+    :param patch_metalocation_dict: Dictionary with the following keys.
+    patch_metalocation_dict["num_rows_in_full_grid"]: Number of rows in full
+        grid.
+    patch_metalocation_dict["num_columns_in_full_grid"]: Number of columns in
+        full grid.
+    patch_metalocation_dict["num_rows_in_patch"]: Number of rows in each patch.
+    patch_metalocation_dict["num_columns_in_patch"]: Number of columns in each
+        patch.
+    patch_metalocation_dict["patch_overlap_size_pixels"]: Overlap between
+        adjacent patches.
+    patch_metalocation_dict["patch_start_row"]: First row covered by the
+        current patch location.
+    patch_metalocation_dict["patch_start_column"]: First column covered
+        by the current patch location.
+
+    :return: patch_metalocation_dict: Same as input, except that keys
+        "patch_start_row" and "patch_start_column" have been updated.
+    """
+
+    pmld = patch_metalocation_dict
+    num_rows_in_full_grid = pmld[NUM_FULL_ROWS_KEY]
+    num_columns_in_full_grid = pmld[NUM_FULL_COLUMNS_KEY]
+    num_rows_in_patch = pmld[NUM_PATCH_ROWS_KEY]
+    num_columns_in_patch = pmld[NUM_PATCH_COLUMNS_KEY]
+    patch_overlap_size_pixels = pmld[PATCH_OVERLAP_SIZE_PX_KEY]
+    patch_end_row = pmld[PATCH_START_ROW_KEY] + num_rows_in_patch - 1
+    patch_end_column = pmld[PATCH_START_COLUMN_KEY] + num_columns_in_patch - 1
+
+    if pmld[PATCH_START_ROW_KEY] < 0:
+        patch_end_row = num_rows_in_patch - 1
+        patch_end_column = num_columns_in_patch - 1
+    elif patch_end_column >= num_columns_in_full_grid - 1:
+        if patch_end_row >= num_rows_in_full_grid - 1:
+            patch_end_row = -1
+            patch_end_column = -1
+        else:
+            patch_end_row += num_rows_in_patch - 2 * patch_overlap_size_pixels
+            patch_end_column = num_columns_in_patch - 1
+    else:
+        patch_end_column += num_columns_in_patch - 2 * patch_overlap_size_pixels
+
+    patch_end_row = min([
+        patch_end_row, num_rows_in_full_grid - 1
+    ])
+    patch_end_column = min([
+        patch_end_column, num_columns_in_full_grid - 1
+    ])
+
+    patch_start_row = patch_end_row - num_rows_in_patch + 1
+    patch_start_column = patch_end_column - num_columns_in_patch + 1
+
+    pmld[PATCH_START_ROW_KEY] = patch_start_row
+    pmld[PATCH_START_COLUMN_KEY] = patch_start_column
+    patch_metalocation_dict = pmld
+
+    return patch_metalocation_dict
+
+
+def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
+    """Inits predictor and target matrices for one batch of patchwise training.
+
+    :param generator_option_dict: See documentation for `option_dict` in
+        `data_generator_fast_patches`.
+    :param gfs_file_names: 1-D list of paths to files with GFS forecasts.
+    :return: matrix_dict: Dictionary with the following keys.
+    matrix_dict["gfs_predictor_matrix_3d"]: numpy array for GFS data with three
+        spatial dimensions.  If not using 3-D GFS data, this is None instead of
+        an array.
+    matrix_dict["gfs_predictor_matrix_2d"]: numpy array for GFS data with two
+        spatial dimensions.  If not using 2-D GFS data, this is None instead of
+        an array.
+    matrix_dict["baseline_prediction_matrix"]: numpy array for residual baseline
+        predictions, i.e., FWI predictions from GFS model.  If not using
+        residual baseline, this is None instead of an array.
+    matrix_dict["laglead_target_predictor_matrix"]: numpy array for lag/lead
+        target fields used as predictors.
+    matrix_dict["era5_constant_matrix"]: numpy array for ERA5 time-invariant
+        fields used as predictors.  If not using such fields, this is None
+        instead of an array.
+    matrix_dict["target_matrix_with_weights"]: numpy array for target fields,
+        with evaluation weights as the last channel.
+    """
+
+    option_dict = generator_option_dict
+
+    inner_latitude_limits_deg_n = option_dict[INNER_LATITUDE_LIMITS_KEY]
+    inner_longitude_limits_deg_e = option_dict[INNER_LONGITUDE_LIMITS_KEY]
+    outer_latitude_buffer_deg = option_dict[OUTER_LATITUDE_BUFFER_KEY]
+    outer_longitude_buffer_deg = option_dict[OUTER_LONGITUDE_BUFFER_KEY]
+    gfs_predictor_field_names = option_dict[GFS_PREDICTOR_FIELDS_KEY]
+    gfs_pressure_levels_mb = option_dict[GFS_PRESSURE_LEVELS_KEY]
+    model_lead_days_to_gfs_pred_leads_hours = option_dict[
+        MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
+    ]
+    era5_constant_predictor_field_names = option_dict[
+        ERA5_CONSTANT_PREDICTOR_FIELDS_KEY
+    ]
+    era5_constant_file_name = option_dict[ERA5_CONSTANT_FILE_KEY]
+    target_field_names = option_dict[TARGET_FIELDS_KEY]
+    model_lead_days_to_target_lags_days = option_dict[
+        MODEL_LEAD_TO_TARGET_LAGS_KEY
+    ]
+    model_lead_days_to_gfs_target_leads_days = option_dict[
+        MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
+    ]
+    model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
+    compare_to_gfs_in_loss = option_dict[COMPARE_TO_GFS_IN_LOSS_KEY]
+    target_dir_name = option_dict[TARGET_DIRECTORY_KEY]
+    num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
+    do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
+    patch_size_deg = option_dict[OUTER_PATCH_SIZE_DEG_KEY]
+
+    assert patch_size_deg is not None
+
+    patch_size_pixels = int(numpy.round(
+        float(patch_size_deg) / GRID_SPACING_DEG
+    ))
+    model_lead_times_days = numpy.array(
+        list(model_lead_days_to_freq.keys()),
+        dtype=int
+    )
+    num_gfs_hours_for_interp, num_target_times_for_interp = (
+        __determine_num_times_for_interp(option_dict)
+    )
+
+    # TODO(thunderhoser): The longitude command below might fail.
+    outer_latitude_limits_deg_n = inner_latitude_limits_deg_n + numpy.array([
+        -1 * outer_latitude_buffer_deg, outer_latitude_buffer_deg
+    ])
+    outer_longitude_limits_deg_e = inner_longitude_limits_deg_e + numpy.array([
+        -1 * outer_longitude_buffer_deg, outer_longitude_buffer_deg
+    ])
+
+    this_3d_matrix, this_2d_matrix = _read_gfs_data_1example(
+        gfs_file_name=gfs_file_names[0],
+        desired_row_indices=None,
+        desired_column_indices=None,
+        latitude_limits_deg_n=outer_latitude_limits_deg_n,
+        longitude_limits_deg_e=outer_longitude_limits_deg_e,
+        lead_times_hours=
+        model_lead_days_to_gfs_pred_leads_hours[model_lead_times_days[0]],
+        field_names=gfs_predictor_field_names,
+        pressure_levels_mb=gfs_pressure_levels_mb,
+        norm_param_table_xarray=None,
+        use_quantile_norm=False,
+        num_lead_times_for_interp=num_gfs_hours_for_interp
+    )[:2]
+
+    bs = num_examples_per_batch
+    psp = patch_size_pixels
+
+    if this_3d_matrix is None:
+        gfs_predictor_matrix_3d = None
+    else:
+        these_dim = (bs, psp, psp) + this_3d_matrix.shape[2:]
+        gfs_predictor_matrix_3d = numpy.full(these_dim, numpy.nan)
+
+    if this_2d_matrix is None:
+        gfs_predictor_matrix_2d = None
+    else:
+        these_dim = (bs, psp, psp) + this_2d_matrix.shape[2:]
+        gfs_predictor_matrix_2d = numpy.full(these_dim, numpy.nan)
+
+    if model_lead_days_to_target_lags_days is None:
+        target_lag_times_days = numpy.array([], dtype=int)
+    else:
+        target_lag_times_days = model_lead_days_to_target_lags_days[
+            model_lead_times_days[0]
+        ]
+
+    if model_lead_days_to_gfs_target_leads_days is None:
+        gfs_target_lead_times_days = numpy.array([], dtype=int)
+    else:
+        gfs_target_lead_times_days = model_lead_days_to_gfs_target_leads_days[
+            model_lead_times_days[0]
+        ]
+
+    if do_residual_prediction:
+        this_matrix = _read_lagged_targets_1example(
+            gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_names[0]),
+            target_dir_name=target_dir_name,
+            target_lag_times_days=numpy.array(
+                [numpy.min(target_lag_times_days)]
+            ),
+            desired_row_indices=None,
+            desired_column_indices=None,
+            latitude_limits_deg_n=inner_latitude_limits_deg_n,
+            longitude_limits_deg_e=inner_latitude_limits_deg_n,
+            target_field_names=target_field_names,
+            norm_param_table_xarray=None,
+            use_quantile_norm=False
+        )[0]
+
+        these_dim = (bs, psp, psp) + this_matrix[2:]
+        baseline_prediction_matrix = numpy.full(these_dim, numpy.nan)
+    else:
+        baseline_prediction_matrix = None
+
+    this_matrix = _read_lagged_targets_1example(
+        gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_names[0]),
+        target_dir_name=target_dir_name,
+        target_lag_times_days=target_lag_times_days,
+        desired_row_indices=None,
+        desired_column_indices=None,
+        latitude_limits_deg_n=inner_latitude_limits_deg_n,
+        longitude_limits_deg_e=inner_longitude_limits_deg_e,
+        target_field_names=target_field_names,
+        norm_param_table_xarray=None,
+        use_quantile_norm=False
+    )[0]
+
+    if num_target_times_for_interp is None:
+        this_num_times = (
+            len(target_lag_times_days) + len(gfs_target_lead_times_days)
+        )
+    else:
+        this_num_times = num_target_times_for_interp + 0
+
+    these_dim = (bs, psp, psp, this_num_times) + this_matrix[3:]
+    laglead_target_predictor_matrix = numpy.full(these_dim, numpy.nan)
+
+    if era5_constant_predictor_field_names is None:
+        era5_constant_matrix = None
+    else:
+        this_matrix = _get_era5_constants(
+            era5_constant_file_name=era5_constant_file_name,
+            latitude_limits_deg_n=outer_latitude_limits_deg_n,
+            longitude_limits_deg_e=outer_longitude_limits_deg_e,
+            field_names=era5_constant_predictor_field_names,
+            norm_param_table_xarray=None,
+            use_quantile_norm=False
+        )
+
+        these_dim = (bs, psp, psp) + this_matrix.shape[2:]
+        era5_constant_matrix = numpy.full(these_dim, numpy.nan)
+
+    num_target_channels = 1 + (
+        (int(compare_to_gfs_in_loss) + 1) * len(target_field_names)
+    )
+    these_dim = (bs, psp, psp, num_target_channels)
+    target_matrix_with_weights = numpy.full(these_dim, numpy.nan)
+
+    return {
+        PREDICTOR_MATRIX_3D_GFS_KEY: gfs_predictor_matrix_3d,
+        PREDICTOR_MATRIX_2D_GFS_KEY: gfs_predictor_matrix_2d,
+        PREDICTOR_MATRIX_BASELINE_KEY: baseline_prediction_matrix,
+        PREDICTOR_MATRIX_LAGLEAD_KEY: laglead_target_predictor_matrix,
+        PREDICTOR_MATRIX_ERA5_KEY: era5_constant_matrix,
+        TARGET_MATRIX_WITH_WEIGHTS_KEY: target_matrix_with_weights
+    }
+
+
+def __increment_init_time(current_index, gfs_file_names):
+    """Increments initialization time for generator.
+
+    This allows the generator to read the next init time.
+
+    :param current_index: Current index.  If current_index == k, this means the
+        last file read is gfs_file_names[k].
+    :param gfs_file_names: 1-D list of paths to GFS files, one per init time.
+    :return: current_index: Updated version of input.
+    :return: gfs_file_names: Possibly shuffled version of input.
+    """
+
+    if current_index == len(gfs_file_names) - 1:
+        random.shuffle(gfs_file_names)
+        current_index = 0
+    else:
+        current_index += 1
+
+    return current_index, gfs_file_names
 
 
 def _check_generator_args(option_dict):
@@ -549,6 +903,33 @@ def _check_generator_args(option_dict):
         error_checking.assert_is_greater(
             option_dict[CHANGE_LEAD_EVERY_N_BATCHES_KEY], 0
         )
+
+    if option_dict[OUTER_PATCH_SIZE_DEG_KEY] is None:
+        option_dict[OUTER_PATCH_OVERLAP_DEG_KEY] = None
+        return option_dict
+
+    option_dict[OUTER_PATCH_SIZE_DEG_KEY] = number_rounding.round_to_nearest(
+        option_dict[OUTER_PATCH_SIZE_DEG_KEY], GRID_SPACING_DEG
+    )
+    error_checking.assert_is_greater(
+        option_dict[OUTER_PATCH_SIZE_DEG_KEY],
+        option_dict[OUTER_LATITUDE_BUFFER_KEY]
+    )
+    error_checking.assert_is_greater(
+        option_dict[OUTER_PATCH_SIZE_DEG_KEY],
+        option_dict[OUTER_LONGITUDE_BUFFER_KEY]
+    )
+
+    option_dict[OUTER_PATCH_OVERLAP_DEG_KEY] = number_rounding.round_to_nearest(
+        option_dict[OUTER_PATCH_OVERLAP_DEG_KEY], GRID_SPACING_DEG
+    )
+    error_checking.assert_is_greater(
+        option_dict[OUTER_PATCH_OVERLAP_DEG_KEY], 0.
+    )
+    error_checking.assert_is_less_than(
+        option_dict[OUTER_PATCH_OVERLAP_DEG_KEY],
+        option_dict[OUTER_PATCH_SIZE_DEG_KEY]
+    )
 
     return option_dict
 
@@ -1563,6 +1944,13 @@ def data_generator(option_dict):
     option_dict["change_model_lead_every_n_batches"]: Will change model lead
         time only once every N batches, where N is this variable.  If you want
         to allow different model lead times in the same batch, make this None.
+    option_dict["outer_patch_size_deg"]: Size of outer domain (in degrees) for
+        each patch.  Recall that the outer domain is the predictor domain, while
+        the inner domain is the target domain.  If you want to do full-domain
+        training instead of patchwise training, make this None.
+    option_dict["outer_patch_overlap_size_deg"]: Amount of overlap (in degrees)
+        between adjacent outer patches.  If you want to do full-domain training
+        instead of patchwise training, make this None.
 
     :return: predictor_matrices: List with the following items.  Some items may
         be missing.
@@ -2043,9 +2431,516 @@ def data_generator(option_dict):
         yield predictor_matrices, target_matrix_with_weights
 
 
+def data_generator_fast_patches(option_dict):
+    """Same as `data_generator` but for patchwise training.
+
+    :param option_dict: See documentation for `data_generator`.
+    :return: predictor_matrices: Same.
+    :return: target_matrix: Same.
+    """
+
+    option_dict = _check_generator_args(option_dict)
+
+    inner_latitude_limits_deg_n = option_dict[INNER_LATITUDE_LIMITS_KEY]
+    inner_longitude_limits_deg_e = option_dict[INNER_LONGITUDE_LIMITS_KEY]
+    outer_latitude_buffer_deg = option_dict[OUTER_LATITUDE_BUFFER_KEY]
+    outer_longitude_buffer_deg = option_dict[OUTER_LONGITUDE_BUFFER_KEY]
+    init_date_limit_strings = option_dict[INIT_DATE_LIMITS_KEY]
+    gfs_predictor_field_names = option_dict[GFS_PREDICTOR_FIELDS_KEY]
+    gfs_pressure_levels_mb = option_dict[GFS_PRESSURE_LEVELS_KEY]
+    model_lead_days_to_gfs_pred_leads_hours = option_dict[
+        MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
+    ]
+    gfs_directory_name = option_dict[GFS_DIRECTORY_KEY]
+    gfs_normalization_file_name = option_dict[GFS_NORM_FILE_KEY]
+    gfs_use_quantile_norm = option_dict[GFS_USE_QUANTILE_NORM_KEY]
+    era5_constant_predictor_field_names = option_dict[
+        ERA5_CONSTANT_PREDICTOR_FIELDS_KEY
+    ]
+    era5_constant_file_name = option_dict[ERA5_CONSTANT_FILE_KEY]
+    era5_normalization_file_name = option_dict[ERA5_NORM_FILE_KEY]
+    era5_use_quantile_norm = option_dict[ERA5_USE_QUANTILE_NORM_KEY]
+    target_field_names = option_dict[TARGET_FIELDS_KEY]
+    model_lead_days_to_target_lags_days = option_dict[
+        MODEL_LEAD_TO_TARGET_LAGS_KEY
+    ]
+    model_lead_days_to_gfs_target_leads_days = option_dict[
+        MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
+    ]
+    model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
+    compare_to_gfs_in_loss = option_dict[COMPARE_TO_GFS_IN_LOSS_KEY]
+    target_dir_name = option_dict[TARGET_DIRECTORY_KEY]
+    gfs_forecast_target_dir_name = option_dict[GFS_FORECAST_TARGET_DIR_KEY]
+    target_normalization_file_name = option_dict[TARGET_NORM_FILE_KEY]
+    targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
+    num_examples_per_batch = option_dict[BATCH_SIZE_KEY]
+    sentinel_value = option_dict[SENTINEL_VALUE_KEY]
+    do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
+    use_lead_time_as_predictor = option_dict[USE_LEAD_TIME_AS_PRED_KEY]
+    change_model_lead_every_n_batches = option_dict[
+        CHANGE_LEAD_EVERY_N_BATCHES_KEY
+    ]
+    patch_size_deg = option_dict[OUTER_PATCH_SIZE_DEG_KEY]
+    patch_overlap_size_deg = option_dict[OUTER_PATCH_OVERLAP_DEG_KEY]
+
+    assert patch_size_deg is not None
+
+    patch_size_pixels = int(numpy.round(
+        float(patch_size_deg) / GRID_SPACING_DEG
+    ))
+    patch_overlap_size_pixels = int(numpy.round(
+        float(patch_overlap_size_deg) / GRID_SPACING_DEG
+    ))
+
+    model_lead_times_days = numpy.array(
+        list(model_lead_days_to_freq.keys()),
+        dtype=int
+    )
+    model_lead_time_freqs = numpy.array(
+        [model_lead_days_to_freq[d] for d in model_lead_times_days],
+        dtype=float
+    )
+
+    if gfs_normalization_file_name is None:
+        gfs_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            gfs_normalization_file_name
+        ))
+        gfs_norm_param_table_xarray = gfs_io.read_normalization_file(
+            gfs_normalization_file_name
+        )
+
+    if target_normalization_file_name is None:
+        target_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            target_normalization_file_name
+        ))
+        target_norm_param_table_xarray = (
+            canadian_fwi_io.read_normalization_file(
+                target_normalization_file_name
+            )
+        )
+
+    if era5_normalization_file_name is None:
+        era5_norm_param_table_xarray = None
+    else:
+        print('Reading normalization params from: "{0:s}"...'.format(
+            era5_normalization_file_name
+        ))
+        era5_norm_param_table_xarray = era5_constant_io.read_normalization_file(
+            era5_normalization_file_name
+        )
+
+    # TODO(thunderhoser): The longitude command below might fail.
+    outer_latitude_limits_deg_n = inner_latitude_limits_deg_n + numpy.array([
+        -1 * outer_latitude_buffer_deg, outer_latitude_buffer_deg
+    ])
+    outer_longitude_limits_deg_e = inner_longitude_limits_deg_e + numpy.array([
+        -1 * outer_longitude_buffer_deg, outer_longitude_buffer_deg
+    ])
+
+    gfs_file_names = gfs_io.find_files_for_period(
+        directory_name=gfs_directory_name,
+        first_init_date_string=init_date_limit_strings[0],
+        last_init_date_string=init_date_limit_strings[1],
+        raise_error_if_any_missing=False,
+        raise_error_if_all_missing=True
+    )
+    random.shuffle(gfs_file_names)
+
+    if era5_constant_predictor_field_names is None:
+        full_era5_constant_matrix = None
+    else:
+        full_era5_constant_matrix = _get_era5_constants(
+            era5_constant_file_name=era5_constant_file_name,
+            latitude_limits_deg_n=outer_latitude_limits_deg_n,
+            longitude_limits_deg_e=outer_longitude_limits_deg_e,
+            field_names=era5_constant_predictor_field_names,
+            norm_param_table_xarray=era5_norm_param_table_xarray,
+            use_quantile_norm=era5_use_quantile_norm
+        )
+        full_era5_constant_matrix = full_era5_constant_matrix.astype('float32')
+
+    full_weight_matrix = _create_weight_matrix(
+        era5_constant_file_name=era5_constant_file_name,
+        inner_latitude_limits_deg_n=inner_latitude_limits_deg_n,
+        inner_longitude_limits_deg_e=inner_longitude_limits_deg_e,
+        outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+        outer_longitude_buffer_deg=outer_longitude_buffer_deg
+    )
+    full_weight_matrix = numpy.expand_dims(full_weight_matrix, axis=-1)
+
+    gfs_file_index = len(gfs_file_names)
+    desired_gfs_row_indices = numpy.array([], dtype=int)
+    desired_gfs_column_indices = numpy.array([], dtype=int)
+    desired_target_row_indices = numpy.array([], dtype=int)
+    desired_target_column_indices = numpy.array([], dtype=int)
+    desired_gfs_fcst_target_row_indices = numpy.array([], dtype=int)
+    desired_gfs_fcst_target_column_indices = numpy.array([], dtype=int)
+
+    num_gfs_hours_for_interp, num_target_times_for_interp = (
+        __determine_num_times_for_interp(option_dict)
+    )
+
+    patch_metalocation_dict = __init_patch_metalocation_dict(
+        num_rows_in_full_grid=full_weight_matrix.shape[0],
+        num_columns_in_full_grid=full_weight_matrix.shape[1],
+        patch_size_pixels=patch_size_pixels,
+        patch_overlap_size_pixels=patch_overlap_size_pixels
+    )
+
+    full_gfs_predictor_matrix_3d = None
+    full_gfs_predictor_matrix_2d = None
+    full_laglead_target_predictor_matrix = None
+    full_baseline_prediction_matrix = None
+    full_target_matrix = None
+    full_target_matrix_with_weights = None
+
+    num_batches_provided = 0
+    model_lead_time_days = -1
+
+    while True:
+        matrix_dict = __init_matrices_1batch_patchwise(
+            generator_option_dict=option_dict,
+            gfs_file_names=gfs_file_names
+        )
+        gfs_predictor_matrix_3d = matrix_dict[PREDICTOR_MATRIX_3D_GFS_KEY]
+        gfs_predictor_matrix_2d = matrix_dict[PREDICTOR_MATRIX_2D_GFS_KEY]
+        laglead_target_predictor_matrix = matrix_dict[
+            PREDICTOR_MATRIX_LAGLEAD_KEY
+        ]
+        era5_constant_matrix = matrix_dict[PREDICTOR_MATRIX_ERA5_KEY]
+        baseline_prediction_matrix = matrix_dict[PREDICTOR_MATRIX_BASELINE_KEY]
+        target_matrix_with_weights = matrix_dict[TARGET_MATRIX_WITH_WEIGHTS_KEY]
+
+        if change_model_lead_every_n_batches is None:
+            model_lead_time_days = random.choices(
+                model_lead_times_days, weights=model_lead_time_freqs, k=1
+            )[0]
+        else:
+            if numpy.mod(
+                    num_batches_provided, change_model_lead_every_n_batches
+            ) == 0:
+                model_lead_time_days = random.choices(
+                    model_lead_times_days, weights=model_lead_time_freqs, k=1
+                )[0]
+
+        num_examples_in_memory = 0
+
+        while num_examples_in_memory < num_examples_per_batch:
+            patch_metalocation_dict = __update_patch_metalocation_dict(
+                patch_metalocation_dict
+            )
+
+            if patch_metalocation_dict[PATCH_START_ROW_KEY] < 0:
+                full_gfs_predictor_matrix_3d = None
+                full_gfs_predictor_matrix_2d = None
+                full_laglead_target_predictor_matrix = None
+                full_baseline_prediction_matrix = None
+                full_target_matrix = None
+                full_target_matrix_with_weights = None
+
+                gfs_file_index, gfs_file_names = __increment_init_time(
+                    current_index=gfs_file_index,
+                    gfs_file_names=gfs_file_names
+                )
+                continue
+
+            gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
+                model_lead_time_days
+            ]
+
+            if model_lead_days_to_target_lags_days is None:
+                target_lag_times_days = numpy.array([], dtype=int)
+            else:
+                target_lag_times_days = model_lead_days_to_target_lags_days[
+                    model_lead_time_days
+                ]
+
+            if model_lead_days_to_gfs_target_leads_days is None:
+                gfs_target_lead_times_days = numpy.array([], dtype=int)
+            else:
+                gfs_target_lead_times_days = model_lead_days_to_gfs_target_leads_days[
+                    model_lead_time_days
+                ]
+
+            if use_lead_time_as_predictor:
+                lead_time_predictors_days = numpy.full(
+                    num_examples_per_batch, model_lead_time_days, dtype=float
+                )
+            else:
+                lead_time_predictors_days = None
+
+            if (
+                    full_gfs_predictor_matrix_3d is None
+                    and full_gfs_predictor_matrix_2d is None
+            ):
+                (
+                    full_gfs_predictor_matrix_3d, full_gfs_predictor_matrix_2d,
+                    desired_gfs_row_indices, desired_gfs_column_indices
+                ) = _read_gfs_data_1example(
+                    gfs_file_name=gfs_file_names[gfs_file_index],
+                    desired_row_indices=desired_gfs_row_indices,
+                    desired_column_indices=desired_gfs_column_indices,
+                    latitude_limits_deg_n=outer_latitude_limits_deg_n,
+                    longitude_limits_deg_e=outer_longitude_limits_deg_e,
+                    lead_times_hours=gfs_pred_lead_times_hours,
+                    field_names=gfs_predictor_field_names,
+                    pressure_levels_mb=gfs_pressure_levels_mb,
+                    norm_param_table_xarray=gfs_norm_param_table_xarray,
+                    use_quantile_norm=gfs_use_quantile_norm,
+                    num_lead_times_for_interp=num_gfs_hours_for_interp
+                )
+
+            if (
+                    do_residual_prediction and
+                    full_baseline_prediction_matrix is None
+            ):
+                (
+                    full_baseline_prediction_matrix, _, _
+                ) = _read_lagged_targets_1example(
+                    gfs_init_date_string=gfs_io.file_name_to_date(
+                        gfs_file_names[gfs_file_index]
+                    ),
+                    target_dir_name=target_dir_name,
+                    target_lag_times_days=numpy.array(
+                        [numpy.min(target_lag_times_days)]
+                    ),
+                    desired_row_indices=desired_target_row_indices,
+                    desired_column_indices=desired_target_column_indices,
+                    latitude_limits_deg_n=inner_latitude_limits_deg_n,
+                    longitude_limits_deg_e=inner_longitude_limits_deg_e,
+                    target_field_names=target_field_names,
+                    norm_param_table_xarray=None,
+                    use_quantile_norm=False
+                )
+
+                full_baseline_prediction_matrix = _pad_inner_to_outer_domain(
+                    data_matrix=full_baseline_prediction_matrix,
+                    outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+                    outer_longitude_buffer_deg=outer_longitude_buffer_deg,
+                    is_example_axis_present=False, fill_value=sentinel_value
+                )
+                full_baseline_prediction_matrix = (
+                    full_baseline_prediction_matrix[..., 0, :]
+                )
+            else:
+                full_baseline_prediction_matrix = None
+
+            if full_laglead_target_predictor_matrix is None:
+                (
+                    full_laglead_target_predictor_matrix,
+                    desired_target_row_indices,
+                    desired_target_column_indices
+                ) = _read_lagged_targets_1example(
+                    gfs_init_date_string=gfs_io.file_name_to_date(
+                        gfs_file_names[gfs_file_index]
+                    ),
+                    target_dir_name=target_dir_name,
+                    target_lag_times_days=target_lag_times_days,
+                    desired_row_indices=desired_target_row_indices,
+                    desired_column_indices=desired_target_column_indices,
+                    latitude_limits_deg_n=inner_latitude_limits_deg_n,
+                    longitude_limits_deg_e=inner_longitude_limits_deg_e,
+                    target_field_names=target_field_names,
+                    norm_param_table_xarray=target_norm_param_table_xarray,
+                    use_quantile_norm=targets_use_quantile_norm
+                )
+
+                if len(gfs_target_lead_times_days) > 0:
+                    (
+                        new_matrix,
+                        desired_gfs_fcst_target_row_indices,
+                        desired_gfs_fcst_target_column_indices
+                    ) = _read_gfs_forecast_targets_1example(
+                        daily_gfs_dir_name=gfs_forecast_target_dir_name,
+                        init_date_string=gfs_io.file_name_to_date(
+                            gfs_file_names[gfs_file_index]
+                        ),
+                        target_lead_times_days=gfs_target_lead_times_days,
+                        desired_row_indices=desired_gfs_fcst_target_row_indices,
+                        desired_column_indices=
+                        desired_gfs_fcst_target_column_indices,
+                        latitude_limits_deg_n=inner_latitude_limits_deg_n,
+                        longitude_limits_deg_e=inner_longitude_limits_deg_e,
+                        target_field_names=target_field_names,
+                        norm_param_table_xarray=target_norm_param_table_xarray,
+                        use_quantile_norm=targets_use_quantile_norm
+                    )
+
+                    if new_matrix is None:
+                        gfs_file_index, gfs_file_names = __increment_init_time(
+                            current_index=gfs_file_index,
+                            gfs_file_names=gfs_file_names
+                        )
+                        continue
+
+                    full_laglead_target_predictor_matrix = numpy.concatenate(
+                        [full_laglead_target_predictor_matrix, new_matrix],
+                        axis=-2
+                    )
+                    del new_matrix
+
+                if num_target_times_for_interp is not None:
+                    source_lead_times_days = numpy.concatenate([
+                        numpy.sort(-1 * target_lag_times_days),
+                        gfs_target_lead_times_days
+                    ])
+
+                    full_laglead_target_predictor_matrix = (
+                        _interp_predictors_by_lead_time(
+                            predictor_matrix=
+                            full_laglead_target_predictor_matrix,
+                            source_lead_times_hours=
+                            DAYS_TO_HOURS * source_lead_times_days,
+                            num_target_lead_times=num_target_times_for_interp
+                        )
+                    )
+
+                    full_laglead_target_predictor_matrix = (
+                        full_laglead_target_predictor_matrix.astype('float32')
+                    )
+
+                full_laglead_target_predictor_matrix = (
+                    _pad_inner_to_outer_domain(
+                        data_matrix=full_laglead_target_predictor_matrix,
+                        outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+                        outer_longitude_buffer_deg=outer_longitude_buffer_deg,
+                        is_example_axis_present=True, fill_value=sentinel_value
+                    )
+                )
+
+            if full_target_matrix is None:
+                target_file_name = _find_target_files_needed_1example(
+                    gfs_init_date_string=
+                    gfs_io.file_name_to_date(gfs_file_names[gfs_file_index]),
+                    target_dir_name=target_dir_name,
+                    target_lead_times_days=
+                    numpy.array([model_lead_time_days], dtype=int)
+                )[0]
+
+                full_target_matrix = _get_target_fields(
+                    target_file_name=target_file_name,
+                    desired_row_indices=desired_target_row_indices,
+                    desired_column_indices=desired_target_column_indices,
+                    field_names=target_field_names,
+                    norm_param_table_xarray=None,
+                    use_quantile_norm=False
+                )
+
+                if compare_to_gfs_in_loss:
+                    (
+                        new_target_matrix,
+                        desired_gfs_fcst_target_row_indices,
+                        desired_gfs_fcst_target_column_indices
+                    ) = _read_gfs_forecast_targets_1example(
+                        daily_gfs_dir_name=gfs_forecast_target_dir_name,
+                        init_date_string=gfs_io.file_name_to_date(
+                            gfs_file_names[gfs_file_index]
+                        ),
+                        target_lead_times_days=numpy.array(
+                            [model_lead_time_days], dtype=int
+                        ),
+                        desired_row_indices=desired_gfs_fcst_target_row_indices,
+                        desired_column_indices=
+                        desired_gfs_fcst_target_column_indices,
+                        latitude_limits_deg_n=inner_latitude_limits_deg_n,
+                        longitude_limits_deg_e=inner_longitude_limits_deg_e,
+                        target_field_names=target_field_names,
+                        norm_param_table_xarray=None,
+                        use_quantile_norm=False
+                    )
+
+                    if new_target_matrix is None:
+                        gfs_file_index, gfs_file_names = __increment_init_time(
+                            current_index=gfs_file_index,
+                            gfs_file_names=gfs_file_names
+                        )
+                        continue
+
+                    new_target_matrix = new_target_matrix[..., 0, :]
+                    full_target_matrix = numpy.concatenate(
+                        [full_target_matrix, new_target_matrix], axis=-1
+                    )
+                    del new_target_matrix
+
+                full_target_matrix = _pad_inner_to_outer_domain(
+                    data_matrix=full_target_matrix,
+                    outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+                    outer_longitude_buffer_deg=outer_longitude_buffer_deg,
+                    is_example_axis_present=False, fill_value=0.
+                )
+                full_target_matrix_with_weights = numpy.concatenate(
+                    [full_target_matrix, full_weight_matrix], axis=-1
+                )
+
+            patch_location_dict = misc_utils.determine_patch_location(
+                num_rows_in_full_grid=full_target_matrix.shape[0],
+                num_columns_in_full_grid=full_target_matrix.shape[1],
+                patch_size_pixels=patch_size_pixels,
+                start_row=patch_metalocation_dict[PATCH_START_ROW_KEY],
+                start_column=patch_metalocation_dict[PATCH_START_COLUMN_KEY]
+            )
+            pld = patch_location_dict
+
+            j_start = pld[misc_utils.ROW_LIMITS_KEY][0]
+            j_end = pld[misc_utils.ROW_LIMITS_KEY][1] + 1
+            k_start = pld[misc_utils.COLUMN_LIMITS_KEY][0]
+            k_end = pld[misc_utils.COLUMN_LIMITS_KEY][1] + 1
+            i = num_examples_in_memory + 0
+
+            if full_gfs_predictor_matrix_3d is not None:
+                gfs_predictor_matrix_3d[i, ...] = (
+                    full_gfs_predictor_matrix_3d[j_start:j_end, k_start:k_end, ...]
+                )
+
+            if full_gfs_predictor_matrix_2d is not None:
+                gfs_predictor_matrix_2d[i, ...] = (
+                    full_gfs_predictor_matrix_2d[j_start:j_end, k_start:k_end, ...]
+                )
+
+            laglead_target_predictor_matrix[i, ...] = (
+                full_laglead_target_predictor_matrix[j_start:j_end, k_start:k_end, ...]
+            )
+
+            if full_era5_constant_matrix is not None:
+                era5_constant_matrix[i, ...] = (
+                    full_era5_constant_matrix[j_start:j_end, k_start:k_end, ...]
+                )
+
+            if full_baseline_prediction_matrix is not None:
+                baseline_prediction_matrix[i, ...] = (
+                    full_baseline_prediction_matrix[j_start:j_end, k_start:k_end, ...]
+                )
+
+            target_matrix_with_weights[i, ...] = (
+                full_target_matrix_with_weights[j_start:j_end, k_start:k_end, ...]
+            )
+
+            num_examples_in_memory += 1
+
+        predictor_matrices = __report_data_properties(
+            gfs_predictor_matrix_3d=gfs_predictor_matrix_3d,
+            gfs_predictor_matrix_2d=gfs_predictor_matrix_2d,
+            lead_time_predictors_days=lead_time_predictors_days,
+            era5_constant_matrix=era5_constant_matrix,
+            laglead_target_predictor_matrix=laglead_target_predictor_matrix,
+            baseline_prediction_matrix=baseline_prediction_matrix,
+            target_matrix_with_weights=target_matrix_with_weights,
+            sentinel_value=sentinel_value
+        )[0]
+
+        print('MODEL LEAD TIME: {0:d} days'.format(model_lead_time_days))
+        num_batches_provided += 1
+        yield predictor_matrices, target_matrix_with_weights
+
+
 def create_data(option_dict, init_date_string, model_lead_time_days):
     """Creates, rather than generates, neural-net inputs.
 
+    E = number of examples
     M = number of rows in grid
     N = number of columns in grid
 
@@ -2058,10 +2953,10 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
     data_dict["predictor_matrices"]: Same as output from `data_generator`.
     data_dict["target_matrix_with_weights"]: Same as output from
         `data_generator`.
-    data_dict["grid_latitudes_deg_n"]: length-M numpy array of latitudes (deg
-        north).
-    data_dict["grid_longitudes_deg_e"]: length-N numpy array of longitudes (deg
-        east).
+    data_dict["grid_latitude_matrix_deg_n"]: E-by-M numpy array of latitudes
+        (deg north).
+    data_dict["grid_longitude_matrix_deg_e"]: E-by-N numpy array of longitudes
+        (deg east).
     data_dict["input_layer_names"]: 1-D list with same length as
         "predictor_matrices", indicating the input layer for every predictor
         matrix.
@@ -2387,14 +3282,158 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
         target_matrix_with_weights=target_matrix_with_weights,
         sentinel_value=sentinel_value
     )
-
     print('MODEL LEAD TIME: {0:d} days'.format(model_lead_time_days))
 
+    predictor_matrices = list(predictor_matrices)
+    grid_latitude_matrix_deg_n = numpy.expand_dims(grid_latitudes_deg_n, axis=0)
+    grid_longitude_matrix_deg_e = numpy.expand_dims(
+        grid_longitudes_deg_e, axis=0
+    )
+
+    patch_size_deg = option_dict[OUTER_PATCH_SIZE_DEG_KEY]
+    patch_overlap_size_deg = option_dict[OUTER_PATCH_OVERLAP_DEG_KEY]
+
+    if patch_size_deg is None:
+        return {
+            PREDICTOR_MATRICES_KEY: predictor_matrices,
+            TARGETS_AND_WEIGHTS_KEY: target_matrix_with_weights,
+            GRID_LATITUDE_MATRIX_KEY: grid_latitude_matrix_deg_n,
+            GRID_LONGITUDE_MATRIX_KEY: grid_longitude_matrix_deg_e,
+            INPUT_LAYER_NAMES_KEY: input_layer_names
+        }
+
+    # Determine number of patches in full grid.
+    patch_size_pixels = int(numpy.round(
+        float(patch_size_deg) / GRID_SPACING_DEG
+    ))
+    patch_overlap_size_pixels = int(numpy.round(
+        float(patch_overlap_size_deg) / GRID_SPACING_DEG
+    ))
+    patch_metalocation_dict = __init_patch_metalocation_dict(
+        num_rows_in_full_grid=len(grid_latitudes_deg_n),
+        num_columns_in_full_grid=len(grid_longitudes_deg_e),
+        patch_size_pixels=patch_size_pixels,
+        patch_overlap_size_pixels=patch_overlap_size_pixels
+    )
+
+    pmld = patch_metalocation_dict
+    num_patches = 0
+
+    while True:
+        pmld = __update_patch_metalocation_dict(pmld)
+        if pmld[PATCH_START_ROW_KEY] < 0:
+            break
+
+        num_patches += 1
+
+    # Initialize output arrays.
+    dummy_patch_location_dict = misc_utils.determine_patch_location(
+        num_rows_in_full_grid=len(grid_latitudes_deg_n),
+        num_columns_in_full_grid=len(grid_longitudes_deg_e),
+        patch_size_pixels=patch_size_pixels
+    )
+    dummy_pld = dummy_patch_location_dict
+    num_rows_per_patch = (
+        dummy_pld[misc_utils.ROW_LIMITS_KEY][1]
+        - dummy_pld[misc_utils.ROW_LIMITS_KEY][0] + 1
+    )
+    num_columns_per_patch = (
+        dummy_pld[misc_utils.COLUMN_LIMITS_KEY][1]
+        - dummy_pld[misc_utils.COLUMN_LIMITS_KEY][0] + 1
+    )
+
+    num_matrices = len(predictor_matrices)
+    patch_predictor_matrices = []
+
+    for j in range(num_matrices):
+        if predictor_matrices[j] is None:
+            patch_predictor_matrices.append(None)
+            continue
+
+        if len(predictor_matrices[j].shape) < 3:
+            patch_predictor_matrices[j] = predictor_matrices[j]
+            continue
+
+        these_dim = (
+            (num_patches, num_rows_per_patch, num_columns_per_patch) +
+            predictor_matrices[j].shape[3:]
+        )
+        patch_predictor_matrices = numpy.full(these_dim, numpy.nan)
+
+    these_dim = (
+        (num_patches, num_rows_per_patch, num_columns_per_patch) +
+        target_matrix_with_weights.shape[3:]
+    )
+    patch_target_matrix_with_weights = numpy.full(these_dim, numpy.nan)
+    patch_latitude_matrix_deg_n = numpy.full(
+        (num_patches, num_rows_per_patch), numpy.nan
+    )
+    patch_longitude_matrix_deg_e = numpy.full(
+        (num_patches, num_columns_per_patch), numpy.nan
+    )
+
+    # Populate output arrays.
+    patch_metalocation_dict = __init_patch_metalocation_dict(
+        num_rows_in_full_grid=len(grid_latitudes_deg_n),
+        num_columns_in_full_grid=len(grid_longitudes_deg_e),
+        patch_size_pixels=patch_size_pixels,
+        patch_overlap_size_pixels=patch_overlap_size_pixels
+    )
+
+    for i in range(num_patches):
+        patch_metalocation_dict = __update_patch_metalocation_dict(
+            patch_metalocation_dict
+        )
+        patch_location_dict = misc_utils.determine_patch_location(
+            num_rows_in_full_grid=len(grid_latitudes_deg_n),
+            num_columns_in_full_grid=len(grid_longitudes_deg_e),
+            patch_size_pixels=patch_size_pixels,
+            start_row=patch_metalocation_dict[PATCH_START_ROW_KEY],
+            start_column=patch_metalocation_dict[PATCH_START_COLUMN_KEY]
+        )
+        pld = patch_location_dict
+
+        j_start = pld[misc_utils.ROW_LIMITS_KEY][0]
+        j_end = pld[misc_utils.ROW_LIMITS_KEY][1] + 1
+        k_start = pld[misc_utils.COLUMN_LIMITS_KEY][0]
+        k_end = pld[misc_utils.COLUMN_LIMITS_KEY][1] + 1
+
+        patch_target_matrix_with_weights[i, ...] = (
+            target_matrix_with_weights[0, j_start:j_end, k_start:k_end, ...]
+        )
+        patch_latitude_matrix_deg_n[i, :] = (
+            grid_latitude_matrix_deg_n[0, j_start:j_end]
+        )
+        patch_longitude_matrix_deg_e[i, :] = (
+            grid_longitude_matrix_deg_e[0, k_start:k_end]
+        )
+
+        for j in range(num_matrices):
+            if patch_predictor_matrices[j] is None:
+                continue
+            if len(patch_predictor_matrices[j].shape) < 3:
+                continue
+
+            patch_predictor_matrices[j][i, ...] = (
+                predictor_matrices[j][0, j_start:j_end, k_start:k_end, ...]
+            )
+
+    num_buffer_rows = int(numpy.round(
+        float(outer_latitude_buffer_deg) / GRID_SPACING_DEG
+    ))
+    num_buffer_columns = int(numpy.round(
+        float(outer_longitude_buffer_deg) / GRID_SPACING_DEG
+    ))
+    patch_target_matrix_with_weights[:, :num_buffer_rows, ..., -1] = 0.
+    patch_target_matrix_with_weights[:, -num_buffer_rows:, ..., -1] = 0.
+    patch_target_matrix_with_weights[:, :, :num_buffer_columns, ..., -1] = 0.
+    patch_target_matrix_with_weights[:, : -num_buffer_columns:, ..., -1] = 0.
+
     return {
-        PREDICTOR_MATRICES_KEY: list(predictor_matrices),
-        TARGETS_AND_WEIGHTS_KEY: target_matrix_with_weights,
-        GRID_LATITUDES_KEY: grid_latitudes_deg_n,
-        GRID_LONGITUDES_KEY: grid_longitudes_deg_e,
+        PREDICTOR_MATRICES_KEY: patch_predictor_matrices,
+        TARGETS_AND_WEIGHTS_KEY: patch_target_matrix_with_weights,
+        GRID_LATITUDE_MATRIX_KEY: patch_latitude_matrix_deg_n,
+        GRID_LONGITUDE_MATRIX_KEY: patch_longitude_matrix_deg_e,
         INPUT_LAYER_NAMES_KEY: input_layer_names
     }
 
@@ -2534,15 +3573,12 @@ def read_metafile(pickle_file_name):
         except KeyError:
             pass
 
-    if COMPARE_TO_GFS_IN_LOSS_KEY not in tod:
-        tod[COMPARE_TO_GFS_IN_LOSS_KEY] = False
-        vod[COMPARE_TO_GFS_IN_LOSS_KEY] = False
-    if USE_LEAD_TIME_AS_PRED_KEY not in tod:
-        tod[USE_LEAD_TIME_AS_PRED_KEY] = False
-        vod[USE_LEAD_TIME_AS_PRED_KEY] = False
-    if CHANGE_LEAD_EVERY_N_BATCHES_KEY not in tod:
-        tod[CHANGE_LEAD_EVERY_N_BATCHES_KEY] = None
-        vod[CHANGE_LEAD_EVERY_N_BATCHES_KEY] = None
+    if OUTER_PATCH_SIZE_DEG_KEY not in tod:
+        tod[OUTER_PATCH_SIZE_DEG_KEY] = None
+        tod[OUTER_PATCH_OVERLAP_DEG_KEY] = None
+
+        vod[OUTER_PATCH_SIZE_DEG_KEY] = None
+        vod[OUTER_PATCH_OVERLAP_DEG_KEY] = None
 
     if (
             metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] is not None
@@ -2905,8 +3941,16 @@ def train_model(
             validation_lead_time_days_to_freq
         )
 
-        training_generator = data_generator(training_option_dict)
-        validation_generator = data_generator(validation_option_dict)
+        if training_option_dict[OUTER_PATCH_SIZE_DEG_KEY] is None:
+            training_generator = data_generator(training_option_dict)
+            validation_generator = data_generator(validation_option_dict)
+        else:
+            training_generator = data_generator_fast_patches(
+                training_option_dict
+            )
+            validation_generator = data_generator_fast_patches(
+                validation_option_dict
+            )
 
         model_object.fit(
             x=training_generator,
@@ -2978,3 +4022,197 @@ def apply_model(
         prediction_matrix = numpy.expand_dims(prediction_matrix, axis=-1)
 
     return prediction_matrix
+
+
+def apply_model_patchwise(
+        model_object, full_predictor_matrices, num_examples_per_batch,
+        model_metadata_dict, patch_overlap_size_pixels,
+        use_trapezoidal_weighting=False, verbose=True):
+    """Does inference for neural net trained with patchwise approach.
+
+    :param model_object: See documentation for `apply_model`.
+    :param full_predictor_matrices: See documentation for `apply_model` --
+        except these matrices are on the full grid.
+    :param num_examples_per_batch: Same.
+    :param model_metadata_dict: Dictionary in format returned by
+        `read_metafile`.
+    :param patch_overlap_size_pixels: Overlap between adjacent patches,
+        measured in number of pixels
+    :param use_trapezoidal_weighting: Boolean flag.  If True, trapezoidal
+        weighting will be used, so that predictions in the center of a given
+        patch are given a higher weight than predictions at the edge.
+    :param verbose: See documentation for `apply_model`.
+    :return: full_prediction_matrix: See documentation for `apply_model` --
+        except this matrix is on the full grid.
+    """
+
+    # Check input args.
+    these_dim = model_object.layers[-1].output.shape
+    num_rows_in_patch = these_dim[1]
+    num_columns_in_patch = these_dim[2]
+    num_target_fields = these_dim[3]
+
+    error_checking.assert_equals(num_rows_in_patch, num_columns_in_patch)
+    error_checking.assert_is_boolean(use_trapezoidal_weighting)
+
+    error_checking.assert_is_integer(patch_overlap_size_pixels)
+    error_checking.assert_is_geq(patch_overlap_size_pixels, 0)
+    error_checking.assert_is_less_than(
+        patch_overlap_size_pixels,
+        min([num_rows_in_patch, num_columns_in_patch])
+    )
+
+    if use_trapezoidal_weighting:
+        half_num_rows_in_patch = int(numpy.ceil(
+            float(num_rows_in_patch) / 2
+        ))
+        half_num_columns_in_patch = int(numpy.ceil(
+            float(num_columns_in_patch) / 2
+        ))
+        error_checking.assert_is_geq(
+            patch_overlap_size_pixels,
+            max([half_num_rows_in_patch, half_num_columns_in_patch])
+        )
+
+    error_checking.assert_is_boolean(verbose)
+
+    # Do actual stuff.
+    num_rows_in_full_grid = -1
+    num_columns_in_full_grid = -1
+
+    for this_matrix in full_predictor_matrices:
+        if len(this_matrix.shape) < 2:
+            continue
+
+        num_rows_in_full_grid = this_matrix.shape[1]
+        num_columns_in_full_grid = this_matrix.shape[2]
+        break
+
+    patch_metalocation_dict = __init_patch_metalocation_dict(
+        num_rows_in_full_grid=num_rows_in_full_grid,
+        num_columns_in_full_grid=num_columns_in_full_grid,
+        patch_size_pixels=num_rows_in_patch,
+        patch_overlap_size_pixels=patch_overlap_size_pixels
+    )
+
+    validation_option_dict = model_metadata_dict[VALIDATION_OPTIONS_KEY]
+    outer_latitude_buffer_deg = validation_option_dict[
+        OUTER_LATITUDE_BUFFER_KEY
+    ]
+    outer_longitude_buffer_deg = validation_option_dict[
+        OUTER_LONGITUDE_BUFFER_KEY
+    ]
+
+    outer_latitude_buffer_px = int(numpy.round(
+        outer_latitude_buffer_deg / GRID_SPACING_DEG
+    ))
+    outer_longitude_buffer_px = int(numpy.round(
+        outer_longitude_buffer_deg / GRID_SPACING_DEG
+    ))
+    assert outer_latitude_buffer_px == outer_longitude_buffer_px
+
+    # Buffer between inner (target) and outer (predictor) domains.
+    outer_patch_buffer_px = outer_latitude_buffer_px + 0
+
+    if use_trapezoidal_weighting:
+        weight_matrix = __make_trapezoidal_weight_matrix(
+            patch_size_pixels=num_rows_in_patch - 2 * outer_patch_buffer_px,
+            patch_overlap_size_pixels=patch_overlap_size_pixels
+        )
+        weight_matrix = numpy.pad(
+            weight_matrix, pad_width=outer_patch_buffer_px,
+            mode='constant', constant_values=0
+        )
+    else:
+        weight_matrix = numpy.full(
+            (num_rows_in_patch, num_rows_in_patch), 1, dtype=int
+        )
+        weight_matrix[:outer_patch_buffer_px, :] = 0
+        weight_matrix[-outer_patch_buffer_px:, :] = 0
+        weight_matrix[:, :outer_patch_buffer_px] = 0
+        weight_matrix[:, -outer_patch_buffer_px:] = 0
+
+    weight_matrix = numpy.expand_dims(weight_matrix, axis=0)
+    weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
+    weight_matrix = numpy.expand_dims(weight_matrix, axis=-1)
+
+    num_examples = full_predictor_matrices[0].shape[0]
+    these_dim = (
+        num_examples, num_rows_in_full_grid, num_columns_in_full_grid,
+        num_target_fields, 1
+    )
+    prediction_count_matrix = numpy.full(these_dim, 0, dtype=float)
+    summed_prediction_matrix = None
+    # summed_prediction_matrix = numpy.full(these_dim, 0.)
+
+    while True:
+        patch_metalocation_dict = __update_patch_metalocation_dict(
+            patch_metalocation_dict
+        )
+
+        patch_start_row = patch_metalocation_dict[PATCH_START_ROW_KEY]
+        if patch_start_row < 0:
+            break
+
+        patch_location_dict = misc_utils.determine_patch_location(
+            num_rows_in_full_grid=num_rows_in_full_grid,
+            num_columns_in_full_grid=num_columns_in_full_grid,
+            patch_size_pixels=num_rows_in_patch,
+            start_row=patch_metalocation_dict[PATCH_START_ROW_KEY],
+            start_column=patch_metalocation_dict[PATCH_START_COLUMN_KEY]
+        )
+        pld = patch_location_dict
+
+        i_start = pld[misc_utils.ROW_LIMITS_KEY][0]
+        i_end = pld[misc_utils.ROW_LIMITS_KEY][1]
+        j_start = pld[misc_utils.COLUMN_LIMITS_KEY][0]
+        j_end = pld[misc_utils.COLUMN_LIMITS_KEY][1]
+
+        if verbose:
+            print((
+                'Applying model to rows {0:d}-{1:d} of {2:d}, and '
+                'columns {3:d}-{4:d} of {5:d}, in full grid...'
+            ).format(
+                i_start, i_end, num_rows_in_full_grid,
+                j_start, j_end, num_columns_in_full_grid
+            ))
+
+        patch_predictor_matrices = []
+
+        for this_full_pred_matrix in full_predictor_matrices:
+            if len(this_full_pred_matrix.shape) < 2:
+                patch_predictor_matrices.append(this_full_pred_matrix)
+                continue
+
+            patch_predictor_matrices.append(
+                this_full_pred_matrix[:, i_start:i_end, j_start:j_end, ...]
+            )
+
+        patch_prediction_matrix = apply_model(
+            model_object=model_object,
+            predictor_matrices=patch_predictor_matrices,
+            num_examples_per_batch=num_examples_per_batch,
+            verbose=False
+        )
+
+        if summed_prediction_matrix is None:
+            ensemble_size = patch_prediction_matrix.shape[-1]
+            these_dim = (
+                num_examples, num_rows_in_full_grid, num_columns_in_full_grid,
+                num_target_fields, ensemble_size
+            )
+            summed_prediction_matrix = numpy.full(these_dim, 0.)
+
+        summed_prediction_matrix[:, i_start:i_end, j_start:j_end, ...] += (
+            weight_matrix * patch_prediction_matrix
+        )
+        prediction_count_matrix[:, i_start:i_end, j_start:j_end, ...] += (
+            weight_matrix
+        )
+
+    if verbose:
+        print('Have applied model everywhere in full grid!')
+
+    prediction_count_matrix = prediction_count_matrix.astype(float)
+    prediction_count_matrix[prediction_count_matrix < TOLERANCE] = numpy.nan
+    return summed_prediction_matrix / prediction_count_matrix

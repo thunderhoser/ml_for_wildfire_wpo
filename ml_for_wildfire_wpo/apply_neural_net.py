@@ -27,6 +27,8 @@ GFS_FCST_TARGET_DIR_ARG_NAME = 'input_gfs_fcst_target_dir_name'
 DATE_LIMITS_ARG_NAME = 'init_date_limit_strings'
 MODEL_LEAD_TIME_ARG_NAME = 'model_lead_time_days'
 TAKE_ENSEMBLE_MEAN_ARG_NAME = 'take_ensemble_mean'
+USE_TRAPEZOIDAL_WEIGHTING_ARG_NAME = 'use_trapezoidal_weighting'
+PATCH_OVERLAP_SIZE_ARG_NAME = 'patch_overlap_size_deg'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
 MODEL_FILE_HELP_STRING = (
@@ -53,6 +55,15 @@ MODEL_LEAD_TIME_HELP_STRING = 'Model lead time.'
 TAKE_ENSEMBLE_MEAN_HELP_STRING = (
     'Boolean flag.  If 1, will take ensemble mean instead of storing all '
     'ensemble members.'
+)
+USE_TRAPEZOIDAL_WEIGHTING_HELP_STRING = (
+    '[used only if NN was trained on patches] Boolean flag.  If 1, trapezoidal '
+    'weighting will be used, so that predictions in the center of a given '
+    'patch are given a higher weight than predictions at the edge.'
+)
+PATCH_OVERLAP_SIZE_HELP_STRING = (
+    '[used only if NN was trained on patches] Overlap between adjacent '
+    'patches, measured in lat/long degrees.'
 )
 OUTPUT_DIR_HELP_STRING = (
     'Name of output directory.  Results will be written here by '
@@ -90,6 +101,14 @@ INPUT_ARG_PARSER.add_argument(
     help=TAKE_ENSEMBLE_MEAN_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
+    '--' + USE_TRAPEZOIDAL_WEIGHTING_ARG_NAME, type=int, required=False,
+    default=0, help=USE_TRAPEZOIDAL_WEIGHTING_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + PATCH_OVERLAP_SIZE_ARG_NAME, type=float, required=False, default=-1.,
+    help=PATCH_OVERLAP_SIZE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
     '--' + OUTPUT_DIR_ARG_NAME, type=str, required=True,
     help=OUTPUT_DIR_HELP_STRING
 )
@@ -97,7 +116,8 @@ INPUT_ARG_PARSER.add_argument(
 
 def _run(model_file_name, gfs_directory_name, target_dir_name,
          gfs_forecast_target_dir_name, init_date_limit_strings,
-         model_lead_time_days, take_ensemble_mean, output_dir_name):
+         model_lead_time_days, take_ensemble_mean,
+         use_trapezoidal_weighting, patch_overlap_size_deg, output_dir_name):
     """Applies trained neural net -- inference time!
 
     This is effectively the main method.
@@ -109,8 +129,17 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     :param init_date_limit_strings: Same.
     :param model_lead_time_days: Same.
     :param take_ensemble_mean: Same.
+    :param use_trapezoidal_weighting: Same.
+    :param patch_overlap_size_deg: Same.
     :param output_dir_name: Same.
     """
+
+    if patch_overlap_size_deg <= 0:
+        patch_overlap_size_pixels = None
+    else:
+        patch_overlap_size_pixels = int(numpy.round(
+            patch_overlap_size_deg / neural_net.GRID_SPACING_DEG
+        ))
 
     init_date_strings = time_conversion.get_spc_dates_in_range(
         init_date_limit_strings[0], init_date_limit_strings[1]
@@ -176,10 +205,13 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     else:
         fwi_index = None
 
+    dummy_validation_option_dict = copy.deepcopy(validation_option_dict)
+    dummy_validation_option_dict[neural_net.OUTER_PATCH_SIZE_DEG_KEY] = None
+
     for this_init_date_string in init_date_strings:
         try:
             data_dict = neural_net.create_data(
-                option_dict=validation_option_dict,
+                option_dict=dummy_validation_option_dict,
                 init_date_string=this_init_date_string,
                 model_lead_time_days=model_lead_time_days
             )
@@ -192,15 +224,31 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
         target_matrix_with_weights = data_dict[
             neural_net.TARGETS_AND_WEIGHTS_KEY
         ]
-        grid_latitudes_deg_n = data_dict[neural_net.GRID_LATITUDES_KEY]
-        grid_longitudes_deg_e = data_dict[neural_net.GRID_LONGITUDES_KEY]
-
-        prediction_matrix = neural_net.apply_model(
-            model_object=model_object,
-            predictor_matrices=predictor_matrices,
-            num_examples_per_batch=NUM_EXAMPLES_PER_BATCH,
-            verbose=True
+        grid_latitudes_deg_n = (
+            data_dict[neural_net.GRID_LATITUDE_MATRIX_KEY][0, :]
         )
+        grid_longitudes_deg_e = (
+            data_dict[neural_net.GRID_LONGITUDE_MATRIX_KEY][0, :]
+        )
+
+        if validation_option_dict[neural_net.OUTER_PATCH_SIZE_DEG_KEY] is None:
+            prediction_matrix = neural_net.apply_model(
+                model_object=model_object,
+                predictor_matrices=predictor_matrices,
+                num_examples_per_batch=NUM_EXAMPLES_PER_BATCH,
+                verbose=True
+            )
+        else:
+            prediction_matrix = neural_net.apply_model_patchwise(
+                model_object=model_object,
+                full_predictor_matrices=predictor_matrices,
+                num_examples_per_batch=NUM_EXAMPLES_PER_BATCH,
+                model_metadata_dict=model_metadata_dict,
+                patch_overlap_size_pixels=patch_overlap_size_pixels,
+                use_trapezoidal_weighting=use_trapezoidal_weighting,
+                verbose=True
+            )
+
         if take_ensemble_mean:
             prediction_matrix = numpy.mean(
                 prediction_matrix, axis=-1, keepdims=True
@@ -302,6 +350,12 @@ if __name__ == '__main__':
         ),
         take_ensemble_mean=bool(
             getattr(INPUT_ARG_OBJECT, TAKE_ENSEMBLE_MEAN_ARG_NAME)
+        ),
+        use_trapezoidal_weighting=bool(
+            getattr(INPUT_ARG_OBJECT, USE_TRAPEZOIDAL_WEIGHTING_ARG_NAME)
+        ),
+        patch_overlap_size_deg=getattr(
+            INPUT_ARG_OBJECT, PATCH_OVERLAP_SIZE_ARG_NAME
         ),
         output_dir_name=getattr(INPUT_ARG_OBJECT, OUTPUT_DIR_ARG_NAME)
     )

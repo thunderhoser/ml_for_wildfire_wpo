@@ -1,4 +1,4 @@
-"""Makes templates for Experiment 18 with ConvNext."""
+"""Makes templates for Experiment 20 with ConvNext."""
 
 import os
 import sys
@@ -20,7 +20,7 @@ import file_system_utils
 
 OUTPUT_DIR_NAME = (
     '/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/'
-    'experiment18_convnext/templates'
+    'experiment20_convnext/templates'
 )
 
 # FFMC, DMC, DC, ISI, BUI, FWI, DSR
@@ -225,27 +225,28 @@ METRIC_FUNCTION_STRINGS = [
 ]
 
 NUM_CONV_LAYERS_PER_BLOCK = 1
+MODEL_DEPTH = 5
 
-OPTIMIZER_FUNCTION = keras.optimizers.AdamW(gradient_accumulation_steps=25)
+OPTIMIZER_FUNCTION = keras.optimizers.AdamW(gradient_accumulation_steps=25 * 44)
 OPTIMIZER_FUNCTION_STRING = (
-    'keras.optimizers.AdamW(gradient_accumulation_steps=25)'
+    'keras.optimizers.AdamW(gradient_accumulation_steps=25 * 44)'
 )
 
 DEFAULT_OPTION_DICT = {
     # chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY: numpy.array(
-    #     [265, 537, 2, -1, 5], dtype=int
+    #     [160, 160, 2, -1, 5], dtype=int
     # ),
     # chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
-    #     [265, 537, -1, 5], dtype=int
+    #     [160, 160, -1, 5], dtype=int
     # ),
     chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
-        [265, 537, 7], dtype=int
+        [160, 160, 7], dtype=int
     ),
     # chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
-    #     [265, 537, -1, 6], dtype=int
+    #     [160, 160, -1, 6], dtype=int
     # ),
     chiu_net_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array(
-        [265, 537, 4], dtype=int
+        [160, 160, 4], dtype=int
     ),
     chiu_net_pp_arch.USE_RESIDUAL_BLOCKS_KEY: False,
     chiu_net_pp_arch.USE_CONVNEXT_BLOCKS_KEY: True,
@@ -255,27 +256,27 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
     chiu_net_pp_arch.LAGTGT_FC_MODULE_USE_3D_CONV: True,
     chiu_net_pp_arch.LAGTGT_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
-    chiu_net_pp_arch.NUM_LEVELS_KEY: 6,
+    chiu_net_pp_arch.NUM_LEVELS_KEY: MODEL_DEPTH,
     chiu_net_pp_arch.GFS_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
-        7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
+        MODEL_DEPTH + 1, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
     ),
     # chiu_net_pp_arch.GFS_ENCODER_NUM_CHANNELS_KEY: numpy.array(
     #     [50, 75, 100, 125, 150, 175, 200], dtype=int
     # ),
-    chiu_net_pp_arch.GFS_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
+    chiu_net_pp_arch.GFS_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.),
     chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY: numpy.full(
-        7, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
+        MODEL_DEPTH + 1, NUM_CONV_LAYERS_PER_BLOCK, dtype=int
     ),
     # chiu_net_pp_arch.LAGTGT_ENCODER_NUM_CHANNELS_KEY: numpy.array(
     #     [30, 40, 50, 60, 70, 80, 90], dtype=int
     # ),
-    chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(7, 0.),
-    chiu_net_pp_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(6, 2, dtype=int),
+    chiu_net_pp_arch.LAGTGT_ENCODER_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH + 1, 0.),
+    chiu_net_pp_arch.DECODER_NUM_CONV_LAYERS_KEY: numpy.full(MODEL_DEPTH, 2, dtype=int),
     # chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY: numpy.array(
     #     [40, 58, 75, 93, 110, 128], dtype=int
     # ),
-    chiu_net_pp_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(6, 0.),
-    chiu_net_pp_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(6, 0.),
+    chiu_net_pp_arch.UPSAMPLING_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH, 0.),
+    chiu_net_pp_arch.SKIP_DROPOUT_RATES_KEY: numpy.full(MODEL_DEPTH, 0.),
     chiu_net_pp_arch.INCLUDE_PENULTIMATE_KEY: False,
     chiu_net_pp_arch.INNER_ACTIV_FUNCTION_KEY:
         architecture_utils.RELU_FUNCTION_STRING,
@@ -311,19 +312,21 @@ PREDICTOR_TIME_STRATEGY_TO_NUM_TARGET_DAYS = {
     # 'same-valid-times-for-every-model-lead': 20
 }
 
-SPECTRAL_COMPLEXITIES_AXIS2 = numpy.array([20, 25, 30, 35, 40], dtype=int)
-USE_LEAD_TIME_AS_PRED_FLAGS_AXIS4 = numpy.array([False, True], dtype=bool)
+SPECTRAL_COMPLEXITIES_AXIS2 = numpy.array(
+    [10, 15, 20, 25, 30, 35, 40], dtype=int
+)
+USE_LEAD_TIME_AS_PRED_FLAGS_AXIS3 = numpy.array([False, True], dtype=bool)
 
 
 def _run():
-    """Makes templates for Experiment 18 with ConvNext.
+    """Makes templates for Experiment 20 with ConvNext.
 
     This is effectively the main method.
     """
 
     for i in range(len(PREDICTOR_TIME_STRATEGIES_AXIS1)):
         for j in range(len(SPECTRAL_COMPLEXITIES_AXIS2)):
-            for m in range(len(USE_LEAD_TIME_AS_PRED_FLAGS_AXIS4)):
+            for k in range(len(USE_LEAD_TIME_AS_PRED_FLAGS_AXIS3)):
                 num_gfs_hours = PREDICTOR_TIME_STRATEGY_TO_NUM_GFS_HOURS[
                     PREDICTOR_TIME_STRATEGIES_AXIS1[i]
                 ]
@@ -331,7 +334,13 @@ def _run():
                     PREDICTOR_TIME_STRATEGIES_AXIS1[i]
                 ]
 
-                these_multipliers = numpy.linspace(1, 2, num=7, dtype=float)
+                these_multipliers = numpy.linspace(
+                    0, MODEL_DEPTH, num=MODEL_DEPTH + 1, dtype=float
+                )
+                these_multipliers = numpy.round(
+                    2 ** these_multipliers
+                ).astype(int)
+
                 gfs_encoder_channel_counts = numpy.round(
                     SPECTRAL_COMPLEXITIES_AXIS2[j] * these_multipliers
                 ).astype(int)
@@ -340,10 +349,14 @@ def _run():
                     SPECTRAL_COMPLEXITIES_AXIS2[j] * these_multipliers
                 ).astype(int)
 
-                decoder_channel_counts = numpy.ceil(
-                    0.5 *
-                    (gfs_encoder_channel_counts + lagtgt_encoder_channel_counts)
-                ).astype(int)[:-1]
+                decoder_channel_counts = (
+                    gfs_encoder_channel_counts + lagtgt_encoder_channel_counts
+                )[:-1]
+
+                # decoder_channel_counts = numpy.ceil(
+                #     0.5 *
+                #     (gfs_encoder_channel_counts + lagtgt_encoder_channel_counts)
+                # ).astype(int)[:-1]
 
                 option_dict = copy.deepcopy(DEFAULT_OPTION_DICT)
                 option_dict.update({
@@ -351,13 +364,13 @@ def _run():
                     chiu_net_pp_arch.LOSS_FUNCTION_KEY: LOSS_FUNCTION,
                     chiu_net_pp_arch.METRIC_FUNCTIONS_KEY: METRIC_FUNCTIONS,
                     chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY: numpy.array(
-                        [265, 537, 2, num_gfs_hours, 5], dtype=int
+                        [160, 160, 2, num_gfs_hours, 5], dtype=int
                     ),
                     chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
-                        [265, 537, num_gfs_hours, 5], dtype=int
+                        [160, 160, num_gfs_hours, 5], dtype=int
                     ),
                     chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
-                        [265, 537, num_target_days, 4], dtype=int
+                        [160, 160, num_target_days, 4], dtype=int
                     ),
                     chiu_net_pp_arch.GFS_ENCODER_NUM_CHANNELS_KEY:
                         gfs_encoder_channel_counts,
@@ -366,7 +379,7 @@ def _run():
                     chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY:
                         decoder_channel_counts,
                     chiu_net_pp_arch.USE_LEAD_TIME_AS_PRED_KEY:
-                        USE_LEAD_TIME_AS_PRED_FLAGS_AXIS4[m]
+                        USE_LEAD_TIME_AS_PRED_FLAGS_AXIS3[k]
                 })
 
                 model_object = chiu_net_pp_arch.create_model(option_dict)
@@ -379,7 +392,7 @@ def _run():
                     OUTPUT_DIR_NAME,
                     PREDICTOR_TIME_STRATEGIES_AXIS1[i],
                     SPECTRAL_COMPLEXITIES_AXIS2[j],
-                    int(USE_LEAD_TIME_AS_PRED_FLAGS_AXIS4[m])
+                    int(USE_LEAD_TIME_AS_PRED_FLAGS_AXIS3[k])
                 )
 
                 print('Writing model to: "{0:s}"...'.format(output_file_name))

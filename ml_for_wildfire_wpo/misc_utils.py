@@ -16,6 +16,9 @@ import error_checking
 
 TOLERANCE = 1e-6
 
+ROW_LIMITS_KEY = 'row_limits'
+COLUMN_LIMITS_KEY = 'column_limits'
+
 
 def _check_2d_binary_matrix(binary_matrix):
     """Error-checks 2-D binary matrix.
@@ -294,3 +297,78 @@ def dilate_binary_matrix(binary_matrix, buffer_distance_px):
         border_value=0
     )
     return dilated_binary_matrix.astype(binary_matrix.dtype)
+
+
+def determine_patch_location(
+        num_rows_in_full_grid, num_columns_in_full_grid, patch_size_pixels,
+        start_row=None, start_column=None):
+    """Determines patch location within full grid.
+
+    :param num_rows_in_full_grid: Number of rows in full grid.
+    :param num_columns_in_full_grid: Number of columns in full grid.
+    :param patch_size_pixels: Patch size, in number of pixels per side.  For
+        example, if patch_size_pixels = 448, then the patch size is 448 x 448
+        pixels.
+    :param start_row: Index of first row.  If you make this argument None, the
+        start row will be determined randomly.
+    :param start_column: Same as start_row but for column.
+    :return: location_dict: Dictionary with the following keys.
+    location_dict["row_limits"]: length-2 numpy array with indices of first and
+        last row.
+    location_dict["column_limits"]: Same as key "row_limits" but for column.
+    """
+
+    # Check input args.
+    error_checking.assert_is_integer(num_rows_in_full_grid)
+    error_checking.assert_is_greater(num_rows_in_full_grid, 0)
+    error_checking.assert_is_integer(num_columns_in_full_grid)
+    error_checking.assert_is_greater(num_columns_in_full_grid, 0)
+    error_checking.assert_is_integer(patch_size_pixels)
+    error_checking.assert_is_greater(patch_size_pixels, 0)
+
+    min_dimension_of_full_grid = min([
+        num_rows_in_full_grid, num_columns_in_full_grid
+    ])
+    error_checking.assert_is_less_than(
+        patch_size_pixels, min_dimension_of_full_grid
+    )
+
+    max_possible_start_row = num_rows_in_full_grid - patch_size_pixels + 1
+    max_possible_start_column = num_columns_in_full_grid - patch_size_pixels + 1
+
+    if start_row is None or start_column is None:
+        possible_start_rows = numpy.linspace(
+            0, max_possible_start_row, num=max_possible_start_row + 1, dtype=int
+        )
+        start_row = numpy.random.choice(possible_start_rows, size=1)[0]
+
+        possible_start_columns = numpy.linspace(
+            0, max_possible_start_column,
+            num=max_possible_start_column + 1, dtype=int
+        )
+        start_column = numpy.random.choice(
+            possible_start_columns, size=1
+        )[0]
+
+    error_checking.assert_is_integer(start_row)
+    error_checking.assert_is_geq(start_row, 0)
+    error_checking.assert_is_leq(start_row, max_possible_start_row)
+
+    error_checking.assert_is_integer(start_column)
+    error_checking.assert_is_geq(start_column, 0)
+    error_checking.assert_is_leq(start_column, max_possible_start_column)
+
+    row_limits = start_row + numpy.array(
+        [0, patch_size_pixels], dtype=int
+    )
+    column_limits = start_column + numpy.array(
+        [0, patch_size_pixels], dtype=int
+    )
+
+    row_limits[1] -= 1
+    column_limits[1] -= 1
+
+    return {
+        ROW_LIMITS_KEY: row_limits,
+        COLUMN_LIMITS_KEY: column_limits
+    }
