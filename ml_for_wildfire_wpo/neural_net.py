@@ -2901,6 +2901,10 @@ def data_generator_fast_patches(option_dict):
                     full_gfs_predictor_matrix_2d[j_start:j_end, k_start:k_end, ...]
                 )
 
+            print(laglead_target_predictor_matrix.shape)
+            print(full_laglead_target_predictor_matrix.shape)
+            print('\n\n\n')
+
             laglead_target_predictor_matrix[i, ...] = (
                 full_laglead_target_predictor_matrix[j_start:j_end, k_start:k_end, ...]
             )
