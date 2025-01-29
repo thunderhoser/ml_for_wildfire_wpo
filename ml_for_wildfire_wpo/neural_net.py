@@ -2477,9 +2477,9 @@ def data_generator_fast_patches(option_dict):
     sentinel_value = option_dict[SENTINEL_VALUE_KEY]
     do_residual_prediction = option_dict[DO_RESIDUAL_PREDICTION_KEY]
     use_lead_time_as_predictor = option_dict[USE_LEAD_TIME_AS_PRED_KEY]
-    change_model_lead_every_n_batches = option_dict[
-        CHANGE_LEAD_EVERY_N_BATCHES_KEY
-    ]
+    # change_model_lead_every_n_batches = option_dict[
+    #     CHANGE_LEAD_EVERY_N_BATCHES_KEY
+    # ]
     patch_size_deg = option_dict[OUTER_PATCH_SIZE_DEG_KEY]
     patch_overlap_size_deg = option_dict[OUTER_PATCH_OVERLAP_DEG_KEY]
 
@@ -2597,35 +2597,22 @@ def data_generator_fast_patches(option_dict):
     full_baseline_prediction_matrix = None
     full_target_matrix = None
     full_target_matrix_with_weights = None
-
-    num_batches_provided = 0
     model_lead_time_days = -1
 
-    while True:
-        matrix_dict = __init_matrices_1batch_patchwise(
-            generator_option_dict=option_dict,
-            gfs_file_names=gfs_file_names
-        )
-        gfs_predictor_matrix_3d = matrix_dict[PREDICTOR_MATRIX_3D_GFS_KEY]
-        gfs_predictor_matrix_2d = matrix_dict[PREDICTOR_MATRIX_2D_GFS_KEY]
-        laglead_target_predictor_matrix = matrix_dict[
-            PREDICTOR_MATRIX_LAGLEAD_KEY
-        ]
-        era5_constant_matrix = matrix_dict[PREDICTOR_MATRIX_ERA5_KEY]
-        baseline_prediction_matrix = matrix_dict[PREDICTOR_MATRIX_BASELINE_KEY]
-        target_matrix_with_weights = matrix_dict[TARGET_MATRIX_WITH_WEIGHTS_KEY]
+    empty_matrix_dict = __init_matrices_1batch_patchwise(
+        generator_option_dict=option_dict,
+        gfs_file_names=gfs_file_names
+    )
 
-        if change_model_lead_every_n_batches is None:
-            model_lead_time_days = random.choices(
-                model_lead_times_days, weights=model_lead_time_freqs, k=1
-            )[0]
-        else:
-            if numpy.mod(
-                    num_batches_provided, change_model_lead_every_n_batches
-            ) == 0:
-                model_lead_time_days = random.choices(
-                    model_lead_times_days, weights=model_lead_time_freqs, k=1
-                )[0]
+    while True:
+        emd = empty_matrix_dict
+
+        gfs_predictor_matrix_3d = emd[PREDICTOR_MATRIX_3D_GFS_KEY] + 0.
+        gfs_predictor_matrix_2d = emd[PREDICTOR_MATRIX_2D_GFS_KEY] + 0.
+        laglead_target_predictor_matrix = emd[PREDICTOR_MATRIX_LAGLEAD_KEY] + 0.
+        era5_constant_matrix = emd[PREDICTOR_MATRIX_ERA5_KEY] + 0.
+        baseline_prediction_matrix = emd[PREDICTOR_MATRIX_BASELINE_KEY] + 0.
+        target_matrix_with_weights = emd[TARGET_MATRIX_WITH_WEIGHTS_KEY] + 0.
 
         num_examples_in_memory = 0
 
@@ -2641,6 +2628,10 @@ def data_generator_fast_patches(option_dict):
                 full_baseline_prediction_matrix = None
                 full_target_matrix = None
                 full_target_matrix_with_weights = None
+
+                model_lead_time_days = random.choices(
+                    model_lead_times_days, weights=model_lead_time_freqs, k=1
+                )[0]
 
                 gfs_file_index, gfs_file_names = __increment_init_time(
                     current_index=gfs_file_index,
@@ -2931,7 +2922,6 @@ def data_generator_fast_patches(option_dict):
         )[0]
 
         print('MODEL LEAD TIME: {0:d} days'.format(model_lead_time_days))
-        num_batches_provided += 1
         yield predictor_matrices, target_matrix_with_weights
 
 
