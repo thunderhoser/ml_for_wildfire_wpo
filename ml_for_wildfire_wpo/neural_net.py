@@ -2584,10 +2584,6 @@ def data_generator_fast_patches(option_dict):
         __determine_num_times_for_interp(option_dict)
     )
 
-    print(num_gfs_hours_for_interp)
-    print(num_target_times_for_interp)
-    print('\n\n\n\n\n\n\n\n\n')
-
     patch_metalocation_dict = __init_patch_metalocation_dict(
         num_rows_in_full_grid=full_weight_matrix.shape[0],
         num_columns_in_full_grid=full_weight_matrix.shape[1],
@@ -2913,6 +2909,10 @@ def data_generator_fast_patches(option_dict):
                 era5_constant_matrix[i, ...] = (
                     full_era5_constant_matrix[j_start:j_end, k_start:k_end, ...]
                 )
+
+            print(full_baseline_prediction_matrix.shape)
+            print(numpy.mean(numpy.isnan(full_baseline_prediction_matrix)))
+            print('\n\n\n\n')
 
             if full_baseline_prediction_matrix is not None:
                 baseline_prediction_matrix[i, ...] = (
