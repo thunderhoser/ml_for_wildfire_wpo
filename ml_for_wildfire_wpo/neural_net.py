@@ -2572,7 +2572,7 @@ def data_generator_fast_patches(option_dict):
     )
     full_weight_matrix = numpy.expand_dims(full_weight_matrix, axis=-1)
 
-    gfs_file_index = len(gfs_file_names)
+    gfs_file_index = 0
     desired_gfs_row_indices = numpy.array([], dtype=int)
     desired_gfs_column_indices = numpy.array([], dtype=int)
     desired_target_row_indices = numpy.array([], dtype=int)
