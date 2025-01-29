@@ -196,10 +196,6 @@ def desired_longitudes_to_columns(
             start_longitude_deg_e, end_longitude_deg_e, num=num_longitudes
         )
 
-        print(grid_longitudes_deg_e)
-        print(desired_longitudes_deg_e)
-        print('\n\n\n')
-
         desired_column_indices = numpy.array([
             numpy.where(
                 numpy.absolute(grid_longitudes_deg_e - d) <= TOLERANCE

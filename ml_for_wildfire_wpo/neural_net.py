@@ -567,7 +567,7 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
             desired_row_indices=None,
             desired_column_indices=None,
             latitude_limits_deg_n=inner_latitude_limits_deg_n,
-            longitude_limits_deg_e=inner_latitude_limits_deg_n,
+            longitude_limits_deg_e=inner_longitude_limits_deg_e,
             target_field_names=target_field_names,
             norm_param_table_xarray=None,
             use_quantile_norm=False
