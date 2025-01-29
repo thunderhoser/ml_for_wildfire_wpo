@@ -2597,7 +2597,10 @@ def data_generator_fast_patches(option_dict):
     full_baseline_prediction_matrix = None
     full_target_matrix = None
     full_target_matrix_with_weights = None
-    model_lead_time_days = -1
+
+    model_lead_time_days = random.choices(
+        model_lead_times_days, weights=model_lead_time_freqs, k=1
+    )[0]
 
     empty_matrix_dict = __init_matrices_1batch_patchwise(
         generator_option_dict=option_dict,
