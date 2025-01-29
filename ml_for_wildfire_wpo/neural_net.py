@@ -1845,6 +1845,9 @@ def create_learning_curriculum(lead_times_days, start_epoch_by_lead_time,
             epoch_and_lead_time_to_freq[i + 1, lead_times_days[j]] = (
                 these_lead_time_freqs[i]
             )
+            print('Epoch {0:d} ... lead time = {1:d} days ... freq = {2:.4f}'.format(
+                i +1, lead_times_days[j], these_lead_time_freqs[i]
+            ))
 
     return epoch_and_lead_time_to_freq
 
@@ -2763,6 +2766,13 @@ def data_generator_fast_patches(option_dict):
                     )
 
                     if new_matrix is None:
+                        full_gfs_predictor_matrix_3d = None
+                        full_gfs_predictor_matrix_2d = None
+                        full_laglead_target_predictor_matrix = None
+                        full_baseline_prediction_matrix = None
+                        full_target_matrix = None
+                        full_target_matrix_with_weights = None
+
                         gfs_file_index, gfs_file_names = __increment_init_time(
                             current_index=gfs_file_index,
                             gfs_file_names=gfs_file_names
@@ -2846,6 +2856,13 @@ def data_generator_fast_patches(option_dict):
                     )
 
                     if new_target_matrix is None:
+                        full_gfs_predictor_matrix_3d = None
+                        full_gfs_predictor_matrix_2d = None
+                        full_laglead_target_predictor_matrix = None
+                        full_baseline_prediction_matrix = None
+                        full_target_matrix = None
+                        full_target_matrix_with_weights = None
+
                         gfs_file_index, gfs_file_names = __increment_init_time(
                             current_index=gfs_file_index,
                             gfs_file_names=gfs_file_names
