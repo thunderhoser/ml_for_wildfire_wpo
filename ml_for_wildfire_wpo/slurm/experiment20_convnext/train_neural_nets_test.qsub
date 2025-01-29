@@ -111,7 +111,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --do_residual_prediction=1 \
 --use_lead_time_as_predictor=${use_lead_time_as_predictor} \
 --change_model_lead_every_n_batches=-1 \
---outer_patch_size_deg=35 \
+--outer_patch_size_deg=40 \
 --outer_patch_overlap_size_deg=15 \
 --gfs_dir_name_for_training="${GFS_DIR_NAME}" \
 --target_dir_name_for_training="${TARGET_DIR_NAME}" \
