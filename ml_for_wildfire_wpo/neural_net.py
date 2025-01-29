@@ -573,7 +573,7 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
             use_quantile_norm=False
         )[0]
 
-        these_dim = (bs, psp, psp) + this_matrix[2:]
+        these_dim = (bs, psp, psp) + this_matrix.shape[2:]
         baseline_prediction_matrix = numpy.full(these_dim, numpy.nan)
     else:
         baseline_prediction_matrix = None
@@ -598,7 +598,7 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
     else:
         this_num_times = num_target_times_for_interp + 0
 
-    these_dim = (bs, psp, psp, this_num_times) + this_matrix[3:]
+    these_dim = (bs, psp, psp, this_num_times) + this_matrix.shape[3:]
     laglead_target_predictor_matrix = numpy.full(these_dim, numpy.nan)
 
     if era5_constant_predictor_field_names is None:
