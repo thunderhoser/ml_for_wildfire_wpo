@@ -10,7 +10,7 @@
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
 #SBATCH --time=168:00:00
-#SBATCH --array=0-39
+#SBATCH --array=0-55
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
@@ -30,8 +30,8 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
-TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment18_convnext/templates"
-TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment18_convnext"
+TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment20_convnext/templates"
+TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment20_convnext"
 
 GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
 TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
@@ -40,9 +40,9 @@ TARGET_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wp
 ERA5_CONSTANT_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_constants.nc"
 ERA5_CONSTANT_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/normalization_params_era5_constants.nc"
 
-TRAINING_STRATEGIES=("20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days")
-SPECTRAL_COMPLEXITIES=("020" "020" "020" "020" "020" "020" "020" "020" "025" "025" "025" "025" "025" "025" "025" "025" "030" "030" "030" "030" "030" "030" "030" "030" "035" "035" "035" "035" "035" "035" "035" "035" "040" "040" "040" "040" "040" "040" "040" "040")
-USE_LEAD_TIME_AS_PRED_FLAGS=("0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1")
+TRAINING_STRATEGIES=("20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days")
+SPECTRAL_COMPLEXITIES=("010" "010" "010" "010" "010" "010" "010" "010" "015" "015" "015" "015" "015" "015" "015" "015" "020" "020" "020" "020" "020" "020" "020" "020" "025" "025" "025" "025" "025" "025" "025" "025" "030" "030" "030" "030" "030" "030" "030" "030" "035" "035" "035" "035" "035" "035" "035" "035" "040" "040" "040" "040" "040" "040" "040" "040")
+USE_LEAD_TIME_AS_PRED_FLAGS=("0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1")
 
 training_strategy=${TRAINING_STRATEGIES[$SLURM_ARRAY_TASK_ID]}
 spectral_complexity=${SPECTRAL_COMPLEXITIES[$SLURM_ARRAY_TASK_ID]}
@@ -111,6 +111,8 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --do_residual_prediction=1 \
 --use_lead_time_as_predictor=${use_lead_time_as_predictor} \
 --change_model_lead_every_n_batches=-1 \
+--outer_patch_size_deg=35 \
+--outer_patch_overlap_size_deg=15 \
 --gfs_dir_name_for_training="${GFS_DIR_NAME}" \
 --target_dir_name_for_training="${TARGET_DIR_NAME}" \
 --gfs_forecast_target_dir_name_for_training="${GFS_FORECAST_TARGET_DIR_NAME}" \
@@ -120,8 +122,8 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --gfs_forecast_target_dir_name_for_validation="${GFS_FORECAST_TARGET_DIR_NAME}" \
 --gfs_init_date_limit_strings_for_validation "20210101" "20211210" \
 --num_epochs=10000 \
---num_training_batches_per_epoch=100 \
---num_validation_batches_per_epoch=50 \
+--num_training_batches_per_epoch=4400 \
+--num_validation_batches_per_epoch=2200 \
 --plateau_patience_epochs=50 \
 --plateau_learning_rate_multiplier=0.95 \
 --early_stopping_patience_epochs=10000
