@@ -2726,8 +2726,6 @@ def data_generator_fast_patches(option_dict):
                 full_baseline_prediction_matrix = (
                     full_baseline_prediction_matrix[..., 0, :]
                 )
-            else:
-                full_baseline_prediction_matrix = None
 
             if full_laglead_target_predictor_matrix is None:
                 (
