@@ -2590,7 +2590,10 @@ def data_generator_fast_patches(option_dict):
     full_baseline_prediction_matrix = None
     full_target_matrix = None
     full_target_matrix_with_weights = None
-    model_lead_time_days = -1
+
+    model_lead_time_days = random.choices(
+        model_lead_times_days, weights=model_lead_time_freqs, k=1
+    )[0]
 
     empty_matrix_dict = __init_matrices_1batch_patchwise(
         generator_option_dict=option_dict,
@@ -2753,6 +2756,13 @@ def data_generator_fast_patches(option_dict):
                     )
 
                     if new_matrix is None:
+                        full_gfs_predictor_matrix_3d = None
+                        full_gfs_predictor_matrix_2d = None
+                        full_laglead_target_predictor_matrix = None
+                        full_baseline_prediction_matrix = None
+                        full_target_matrix = None
+                        full_target_matrix_with_weights = None
+
                         gfs_file_index, gfs_file_names = __increment_init_time(
                             current_index=gfs_file_index,
                             gfs_file_names=gfs_file_names
@@ -2836,6 +2846,13 @@ def data_generator_fast_patches(option_dict):
                     )
 
                     if new_target_matrix is None:
+                        full_gfs_predictor_matrix_3d = None
+                        full_gfs_predictor_matrix_2d = None
+                        full_laglead_target_predictor_matrix = None
+                        full_baseline_prediction_matrix = None
+                        full_target_matrix = None
+                        full_target_matrix_with_weights = None
+
                         gfs_file_index, gfs_file_names = __increment_init_time(
                             current_index=gfs_file_index,
                             gfs_file_names=gfs_file_names
