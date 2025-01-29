@@ -2910,11 +2910,7 @@ def data_generator_fast_patches(option_dict):
                     full_era5_constant_matrix[j_start:j_end, k_start:k_end, ...]
                 )
 
-            print(full_baseline_prediction_matrix.shape)
-            print(numpy.mean(numpy.isnan(full_baseline_prediction_matrix)))
-            print('\n\n\n\n')
-
-            if full_baseline_prediction_matrix is not None:
+            if do_residual_prediction:
                 baseline_prediction_matrix[i, ...] = (
                     full_baseline_prediction_matrix[j_start:j_end, k_start:k_end, ...]
                 )
