@@ -1845,9 +1845,6 @@ def create_learning_curriculum(lead_times_days, start_epoch_by_lead_time,
             epoch_and_lead_time_to_freq[i + 1, lead_times_days[j]] = (
                 these_lead_time_freqs[i]
             )
-            print('Epoch {0:d} ... lead time = {1:d} days ... freq = {2:.4f}'.format(
-                i +1, lead_times_days[j], these_lead_time_freqs[i]
-            ))
 
     return epoch_and_lead_time_to_freq
 
@@ -2884,6 +2881,10 @@ def data_generator_fast_patches(option_dict):
                 full_target_matrix_with_weights = numpy.concatenate(
                     [full_target_matrix, full_weight_matrix], axis=-1
                 )
+
+            # Skip 75% of patches.
+            if numpy.random.uniform(low=0., high=1., size=1)[0] < 0.8:
+                continue
 
             patch_location_dict = misc_utils.determine_patch_location(
                 num_rows_in_full_grid=full_target_matrix.shape[0],
