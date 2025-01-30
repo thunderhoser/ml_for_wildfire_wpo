@@ -106,7 +106,7 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --compare_to_gfs_in_loss=1 \
 --target_normalization_file_name="${TARGET_NORM_FILE_NAME}" \
 --targets_use_quantile_norm=1 \
---num_examples_per_batch=5 \
+--num_examples_per_batch=1 \
 --sentinel_value=-10 \
 --do_residual_prediction=1 \
 --use_lead_time_as_predictor=${use_lead_time_as_predictor} \
@@ -122,8 +122,8 @@ python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
 --gfs_forecast_target_dir_name_for_validation="${GFS_FORECAST_TARGET_DIR_NAME}" \
 --gfs_init_date_limit_strings_for_validation "20210101" "20211210" \
 --num_epochs=10000 \
---num_training_batches_per_epoch=352 \
---num_validation_batches_per_epoch=352 \
+--num_training_batches_per_epoch=1760 \
+--num_validation_batches_per_epoch=1760 \
 --plateau_patience_epochs=50 \
 --plateau_learning_rate_multiplier=0.95 \
 --early_stopping_patience_epochs=10000
