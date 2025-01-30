@@ -2875,6 +2875,10 @@ def data_generator_fast_patches(option_dict):
                     [full_target_matrix, full_weight_matrix], axis=-1
                 )
 
+            # Skip 75% of patches.
+            if numpy.random.uniform(low=0., high=1., size=1)[0] < 0.75:
+                continue
+
             patch_location_dict = misc_utils.determine_patch_location(
                 num_rows_in_full_grid=full_target_matrix.shape[0],
                 num_columns_in_full_grid=full_target_matrix.shape[1],
