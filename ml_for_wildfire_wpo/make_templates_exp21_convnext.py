@@ -230,9 +230,9 @@ METRIC_FUNCTION_STRINGS = [
 NUM_CONV_LAYERS_PER_BLOCK = 1
 MODEL_DEPTH = 5
 
-OPTIMIZER_FUNCTION = keras.optimizers.AdamW(gradient_accumulation_steps=int(25 * 44 * 0.2 * 0.1))
+OPTIMIZER_FUNCTION = keras.optimizers.AdamW(gradient_accumulation_steps=int(25 * 44 * 0.2 * 0.2))
 OPTIMIZER_FUNCTION_STRING = (
-    'keras.optimizers.AdamW(gradient_accumulation_steps=int(25 * 44 * 0.2 * 0.1))'
+    'keras.optimizers.AdamW(gradient_accumulation_steps=int(25 * 44 * 0.2 * 0.2))'
 )
 
 DEFAULT_OPTION_DICT = {
