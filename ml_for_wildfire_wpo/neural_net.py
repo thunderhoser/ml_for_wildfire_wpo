@@ -2883,7 +2883,7 @@ def data_generator_fast_patches(option_dict):
                 )
 
             # Skip 75% of patches.
-            if numpy.random.uniform(low=0., high=1., size=1)[0] < 0.9:
+            if numpy.random.uniform(low=0., high=1., size=1)[0] < 0.8:
                 continue
 
             patch_location_dict = misc_utils.determine_patch_location(
