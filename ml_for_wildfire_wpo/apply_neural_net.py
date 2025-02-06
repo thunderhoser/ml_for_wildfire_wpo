@@ -254,6 +254,9 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
                 prediction_matrix, axis=-1, keepdims=True
             )
 
+        # TODO(thunderhoser): HACK!!!
+        prediction_matrix[numpy.isnan(prediction_matrix)] = 0.
+
         if constrain_bui:
             predicted_bui_matrix = canadian_fwi_utils.dmc_and_dc_to_bui(
                 dmc_value_or_array=prediction_matrix[..., dmc_index, :],
