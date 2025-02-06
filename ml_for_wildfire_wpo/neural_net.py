@@ -4173,9 +4173,9 @@ def apply_model_patchwise(
         pld = patch_location_dict
 
         i_start = pld[misc_utils.ROW_LIMITS_KEY][0]
-        i_end = pld[misc_utils.ROW_LIMITS_KEY][1]
+        i_end = pld[misc_utils.ROW_LIMITS_KEY][1] + 1
         j_start = pld[misc_utils.COLUMN_LIMITS_KEY][0]
-        j_end = pld[misc_utils.COLUMN_LIMITS_KEY][1]
+        j_end = pld[misc_utils.COLUMN_LIMITS_KEY][1] + 1
 
         if verbose:
             print((
