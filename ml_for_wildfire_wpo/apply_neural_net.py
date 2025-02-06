@@ -254,8 +254,19 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
                 prediction_matrix, axis=-1, keepdims=True
             )
 
-        # TODO(thunderhoser): HACK!!!
+        # TODO(thunderhoser): This is a HACK to deal with my patch fuckup.
+        nan_flag_matrix = numpy.any(
+            numpy.isnan(prediction_matrix), axis=(0, 3, 4)
+        )
+        print('{0:d} of {1:d} grid points have NaN predictions!'.format(
+            numpy.sum(nan_flag_matrix), nan_flag_matrix.size
+        ))
+
         prediction_matrix[numpy.isnan(prediction_matrix)] = 0.
+
+        num_examples = target_matrix_with_weights.shape[0]
+        for i in range(num_examples):
+            target_matrix_with_weights[i, ..., -1][nan_flag_matrix] = 0.
 
         if constrain_bui:
             predicted_bui_matrix = canadian_fwi_utils.dmc_and_dc_to_bui(
