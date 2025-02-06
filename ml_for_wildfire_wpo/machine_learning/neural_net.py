@@ -2876,7 +2876,7 @@ def data_generator_fast_patches(option_dict):
                 )
 
             # Skip 75% of patches.
-            if numpy.random.uniform(low=0., high=1., size=1)[0] < 0.75:
+            if numpy.random.uniform(low=0., high=1., size=1)[0] < 0.8:
                 continue
 
             patch_location_dict = misc_utils.determine_patch_location(
@@ -4166,9 +4166,9 @@ def apply_model_patchwise(
         pld = patch_location_dict
 
         i_start = pld[misc_utils.ROW_LIMITS_KEY][0]
-        i_end = pld[misc_utils.ROW_LIMITS_KEY][1]
+        i_end = pld[misc_utils.ROW_LIMITS_KEY][1] + 1
         j_start = pld[misc_utils.COLUMN_LIMITS_KEY][0]
-        j_end = pld[misc_utils.COLUMN_LIMITS_KEY][1]
+        j_end = pld[misc_utils.COLUMN_LIMITS_KEY][1] + 1
 
         if verbose:
             print((
