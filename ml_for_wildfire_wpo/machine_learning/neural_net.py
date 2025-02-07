@@ -3405,11 +3405,10 @@ def create_data(
         )
 
         num_matrices = len(predictor_matrices)
-        patch_predictor_matrices = []
+        patch_predictor_matrices = [None] * num_matrices
 
         for j in range(num_matrices):
             if predictor_matrices[j] is None:
-                patch_predictor_matrices.append(None)
                 continue
 
             if len(predictor_matrices[j].shape) < 3:
@@ -3474,11 +3473,10 @@ def create_data(
     )
 
     num_matrices = len(predictor_matrices)
-    patch_predictor_matrices = []
+    patch_predictor_matrices = [None] * num_matrices
 
     for j in range(num_matrices):
         if predictor_matrices[j] is None:
-            patch_predictor_matrices.append(None)
             continue
 
         if len(predictor_matrices[j].shape) < 3:
@@ -3489,7 +3487,7 @@ def create_data(
             (num_patches, num_rows_per_patch, num_columns_per_patch) +
             predictor_matrices[j].shape[3:]
         )
-        patch_predictor_matrices = numpy.full(these_dim, numpy.nan)
+        patch_predictor_matrices[j] = numpy.full(these_dim, numpy.nan)
 
     these_dim = (
         (num_patches, num_rows_per_patch, num_columns_per_patch) +
