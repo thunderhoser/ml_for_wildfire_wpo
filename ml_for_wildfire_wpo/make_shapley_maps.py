@@ -547,6 +547,10 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
                 )
 
         for j in range(len(these_predictor_matrices)):
+            print(these_predictor_matrices[j].shape)
+            print(baseline_predictor_matrices[j].shape)
+            print('\n\n')
+
             baseline_predictor_matrices[j][i, ...] = (
                 these_predictor_matrices[j][0, ...]
             )
