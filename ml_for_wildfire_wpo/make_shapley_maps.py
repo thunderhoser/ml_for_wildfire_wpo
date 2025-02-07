@@ -280,15 +280,16 @@ def _region_of_interest_to_patch(region_mask_table_xarray, patch_size_deg):
     center_column_in_region = int(numpy.round(
         float(numpy.min(columns_in_region) + numpy.max(columns_in_region)) / 2
     ))
+    print('center_row_in_region = {0:d}'.format(center_row_in_region))
+    print('center_column_in_region = {0:d}'.format(center_column_in_region))
 
     # Figure out where the patch needs to be.
     patch_size_pixels = int(numpy.round(
         float(patch_size_deg) / neural_net.GRID_SPACING_DEG
     ))
 
-    # TODO(thunderhoser): Need to stop subsetting before this method.
     num_rows_in_full_grid = len(mtx.coords[region_mask_io.ROW_DIM].values)
-    num_columns_in_full_grid = len(mtx.coords[region_mask_io.ROW_DIM].values)
+    num_columns_in_full_grid = len(mtx.coords[region_mask_io.COLUMN_DIM].values)
 
     first_row_in_patch = center_row_in_region - patch_size_pixels // 2
     first_row_in_patch = max([0, first_row_in_patch])
