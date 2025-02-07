@@ -1,0 +1,85 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_shapley_maps_colorado_tiny"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=01:00:00
+#SBATCH --array=5-7,13-15
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_shapley_maps_colorado_tiny_%A.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment21_convnext"
+
+GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
+TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=40-10-diff_spectral-complexity=025_use-lead-time-as-predictor=1"
+echo $model_dir_name
+
+USE_DEEP_EXPLAINER_FLAGS=("0" "0" "0" "0" "1" "1" "1" "1" "0" "0" "0" "0" "1" "1" "1" "1")
+USE_INOUT_TENSORS_FLAGS=("0" "0" "0" "0" "0" "0" "0" "0" "1" "1" "1" "1" "1" "1" "1" "1")
+DISABLE_TENSORFLOW2_FLAGS=("0" "0" "1" "1" "0" "0" "1" "1" "0" "0" "1" "1" "0" "0" "1" "1")
+DISABLE_EAGER_EXEC_FLAGS=("0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1")
+
+use_deep_explainer=${USE_DEEP_EXPLAINER_FLAGS[$SLURM_ARRAY_TASK_ID]}
+use_inout_tensors_only=${USE_INOUT_TENSORS_FLAGS[$SLURM_ARRAY_TASK_ID]}
+disable_tensorflow2=${DISABLE_TENSORFLOW2_FLAGS[$SLURM_ARRAY_TASK_ID]}
+disable_eager_execution=${DISABLE_EAGER_EXEC_FLAGS[$SLURM_ARRAY_TASK_ID]}
+
+shapley_dir_name="${model_dir_name}/validation_lead-time-days=02/shapley_maps/test_for_colorado/use-deep-explainer=${use_deep_explainer}_use-inout-tensors-only=${use_inout_tensors_only}_disable-tensorflow2=${disable_tensorflow2}_disable-eager-execution=${disable_eager_execution}"
+
+python3 -u "${CODE_DIR_NAME}/plot_shapley_maps.py" \
+--input_shapley_file_name="${shapley_dir_name}/shapley_maps_20210809.nc" \
+--input_gfs_directory_name="${GFS_DIR_NAME}" \
+--input_target_dir_name="${TARGET_DIR_NAME}" \
+--input_gfs_fcst_target_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
+--input_gfs_norm_file_name="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/normalization_params_2019-2020.nc" \
+--predictor_colour_limits_prctile 0.1 99.9 \
+--shapley_colour_limits_prctile 5.0 99.9 \
+--shapley_line_width=4 \
+--shapley_line_opacity=0.5 \
+--shapley_half_num_contours=10 \
+--plot_shapley_in_log_space=0 \
+--shapley_smoothing_radius_px=2 \
+--region_name="Colorado" \
+--output_dir_name="${shapley_dir_name}/shapley_maps_20210809"
+
+python3 -u "${CODE_DIR_NAME}/plot_shapley_maps.py" \
+--input_shapley_file_name="${shapley_dir_name}/shapley_maps_20210810.nc" \
+--input_gfs_directory_name="${GFS_DIR_NAME}" \
+--input_target_dir_name="${TARGET_DIR_NAME}" \
+--input_gfs_fcst_target_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
+--input_gfs_norm_file_name="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/normalization_params_2019-2020.nc" \
+--predictor_colour_limits_prctile 0.1 99.9 \
+--shapley_colour_limits_prctile 5.0 99.9 \
+--shapley_line_width=4 \
+--shapley_line_opacity=0.5 \
+--shapley_half_num_contours=10 \
+--plot_shapley_in_log_space=0 \
+--shapley_smoothing_radius_px=2 \
+--region_name="Colorado" \
+--output_dir_name="${shapley_dir_name}/shapley_maps_20210810"
