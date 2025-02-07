@@ -23,6 +23,7 @@ import imagemagick_utils
 import gfs_io
 import shapley_io
 import border_io
+import region_mask_io
 import misc_utils
 import gfs_utils
 import era5_constant_utils
@@ -876,6 +877,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     vod[neural_net.TARGET_NORM_FILE_KEY] = None
     vod[neural_net.ERA5_NORM_FILE_KEY] = None
     vod[neural_net.SENTINEL_VALUE_KEY] = None
+    patch_size_deg = vod[neural_net.OUTER_PATCH_SIZE_DEG_KEY]
     validation_option_dict = vod
 
     init_date_string = stx.attrs[shapley_io.INIT_DATE_KEY]
@@ -907,8 +909,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             shapley_io.PREDICTOR_BASELINE_KEY
         ]
         predictor_matrices = [
-            numpy.expand_dims(stx[k].values, axis=0) if k in stx.data_vars
-            else None
+            stx[k].values if k in stx.data_vars else None
             for k in predictor_keys
         ]
 
@@ -925,13 +926,35 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             stx[shapley_io.TARGET_VALUE_KEY].values, axis=0
         )
     else:
+        if patch_size_deg is None:
+            patch_start_latitude_deg_n = None
+            patch_start_longitude_deg_e = None
+        else:
+            region_mask_file_name = stx.attrs[shapley_io.REGION_MASK_FILE_KEY]
+
+            print('Reading mask from: "{0:s}"...'.format(region_mask_file_name))
+            mask_table_xarray = region_mask_io.read_file(region_mask_file_name)
+            mtx = mask_table_xarray
+
+            row_idxs, col_idxs = numpy.where(
+                mtx[region_mask_io.REGION_MASK_KEY].values
+            )
+            patch_start_latitude_deg_n = (
+                mtx[region_mask_io.LATITUDE_KEY].values[numpy.min(row_idxs)]
+            )
+            patch_start_longitude_deg_e = (
+                mtx[region_mask_io.LONGITUDE_KEY].values[numpy.min(col_idxs)]
+            )
+
         print(SEPARATOR_STRING)
 
         try:
             data_dict = neural_net.create_data(
                 option_dict=validation_option_dict,
                 init_date_string=init_date_string,
-                model_lead_time_days=model_lead_time_days
+                model_lead_time_days=model_lead_time_days,
+                patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+                patch_start_longitude_deg_e=patch_start_longitude_deg_e
             )
             print(SEPARATOR_STRING)
         except:
@@ -958,8 +981,6 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         for k in range(len(predictor_matrices)):
             if len(predictor_matrices[k].shape) < 2:
                 continue
-
-            print(predictor_matrices[k].shape)
 
             predictor_matrices[k] = (
                 predictor_matrices[k][:, desired_row_indices, ...]

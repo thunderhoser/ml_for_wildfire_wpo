@@ -62,11 +62,10 @@ INIT_DATES_HELP_STRING = (
     'List of forecast-init days (format "yyyymmdd") over which to composite.'
 )
 MODEL_FILE_HELP_STRING = (
-    'Path to trained model (will be read by '
-    '`neural_net.read_model_for_shapley`).`  If you are compositing only '
-    'predictor fields, this argument is needed.  If you are compositing both '
-    'predictor fields and Shapley fields, leave this argument alone and use '
-    '`{0:s}`.'
+    'Path to trained model (will be read by `neural_net.read_model`).`  If you '
+    'are compositing only predictor fields, this argument is needed.  If you '
+    'are compositing both predictor fields and Shapley fields, leave this '
+    'argument alone and use `{0:s}`.'
 ).format(
     SHAPLEY_DIR_ARG_NAME
 )
@@ -247,8 +246,8 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
 
     # Read model.
     print('Reading model from: "{0:s}"...'.format(model_file_name))
-    # model_object = neural_net.read_model(model_file_name)
-    model_object = neural_net.read_model_for_shapley(model_file_name)
+    model_object = neural_net.read_model(model_file_name)
+    # model_object = neural_net.read_model_for_shapley(model_file_name)
 
     # Read model metadata.
     model_metafile_name = neural_net.find_metafile(
@@ -258,6 +257,10 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     model_metadata_dict = neural_net.read_metafile(model_metafile_name)
 
     vod = model_metadata_dict[neural_net.VALIDATION_OPTIONS_KEY]
+    patch_size_deg = vod[neural_net.OUTER_PATCH_SIZE_DEG_KEY]
+    if patch_size_deg is not None:
+        raise ValueError('This script does not yet work for patch-trained NNs.')
+
     vod[neural_net.GFS_DIRECTORY_KEY] = gfs_directory_name
     vod[neural_net.TARGET_DIRECTORY_KEY] = target_dir_name
     vod[neural_net.GFS_FORECAST_TARGET_DIR_KEY] = gfs_forecast_target_dir_name

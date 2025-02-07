@@ -166,7 +166,7 @@ def _plot_one_extreme_case(
 
     xct = extreme_cases_table_xarray
     model_lead_time_days = xct.attrs[extreme_cases_io.MODEL_LEAD_TIME_KEY]
-    target_field_name = xct.attrs[extreme_cases_io.TARGET_FIELD_KEY]
+    target_field_names = xct.attrs[extreme_cases_io.TARGET_FIELDS_KEY]
 
     try:
         data_dict = neural_net.create_data(
@@ -184,8 +184,10 @@ def _plot_one_extreme_case(
         0, ..., :num_target_fields
     ]
     model_input_layer_names = data_dict[neural_net.INPUT_LAYER_NAMES_KEY]
-    grid_latitudes_deg_n = data_dict[neural_net.GRID_LATITUDES_KEY]
-    grid_longitudes_deg_e = data_dict[neural_net.GRID_LONGITUDES_KEY]
+    grid_latitudes_deg_n = data_dict[neural_net.GRID_LATITUDE_MATRIX_KEY][0, :]
+    grid_longitudes_deg_e = (
+        data_dict[neural_net.GRID_LONGITUDE_MATRIX_KEY][0, :]
+    )
     del data_dict
 
     if plot_latitude_limits_deg_n is not None:
@@ -573,7 +575,7 @@ def _plot_one_extreme_case(
             os.remove(this_panel_file_name)
 
     for f in range(len(all_target_field_names)):
-        if all_target_field_names[f] != target_field_name:
+        if all_target_field_names[f] not in target_field_names:
             continue
 
         this_target_matrix = target_matrix[..., f]
