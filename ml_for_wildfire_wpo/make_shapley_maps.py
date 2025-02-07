@@ -512,18 +512,27 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     good_date_indices = []
 
     for i in range(num_baseline_examples):
-        try:
-            data_dict = neural_net.create_data(
-                option_dict=validation_option_dict,
-                init_date_string=baseline_init_date_strings[i],
-                model_lead_time_days=model_lead_time_days,
-                patch_start_latitude_deg_n=patch_start_latitude_deg_n,
-                patch_start_longitude_deg_e=patch_start_longitude_deg_e
-            )
-            print(SEPARATOR_STRING)
-        except:
-            print(SEPARATOR_STRING)
-            continue
+        data_dict = neural_net.create_data(
+            option_dict=validation_option_dict,
+            init_date_string=baseline_init_date_strings[i],
+            model_lead_time_days=model_lead_time_days,
+            patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+            patch_start_longitude_deg_e=patch_start_longitude_deg_e
+        )
+        print(SEPARATOR_STRING)
+
+        # try:
+        #     data_dict = neural_net.create_data(
+        #         option_dict=validation_option_dict,
+        #         init_date_string=baseline_init_date_strings[i],
+        #         model_lead_time_days=model_lead_time_days,
+        #         patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+        #         patch_start_longitude_deg_e=patch_start_longitude_deg_e
+        #     )
+        #     print(SEPARATOR_STRING)
+        # except:
+        #     print(SEPARATOR_STRING)
+        #     continue
 
         good_date_indices.append(i)
         these_predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
