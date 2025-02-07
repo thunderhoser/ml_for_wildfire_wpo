@@ -11,6 +11,7 @@ import keras
 from scipy.interpolate import interp1d
 from gewittergefahr.gg_utils import time_conversion
 from gewittergefahr.gg_utils import number_rounding
+from gewittergefahr.gg_utils import longitude_conversion as lng_conversion
 from gewittergefahr.gg_utils import file_system_utils
 from gewittergefahr.gg_utils import error_checking
 from ml_for_wildfire_wpo.io import gfs_io
@@ -2924,6 +2925,17 @@ def data_generator_fast_patches(option_dict):
 
             num_examples_in_memory += 1
 
+        num_buffer_rows = int(numpy.round(
+            float(outer_latitude_buffer_deg) / GRID_SPACING_DEG
+        ))
+        num_buffer_columns = int(numpy.round(
+            float(outer_longitude_buffer_deg) / GRID_SPACING_DEG
+        ))
+        target_matrix_with_weights[:, :num_buffer_rows, ..., -1] = 0.
+        target_matrix_with_weights[:, -num_buffer_rows:, ..., -1] = 0.
+        target_matrix_with_weights[:, :, :num_buffer_columns, ..., -1] = 0.
+        target_matrix_with_weights[:, : -num_buffer_columns:, ..., -1] = 0.
+
         predictor_matrices = __report_data_properties(
             gfs_predictor_matrix_3d=gfs_predictor_matrix_3d,
             gfs_predictor_matrix_2d=gfs_predictor_matrix_2d,
@@ -2939,7 +2951,9 @@ def data_generator_fast_patches(option_dict):
         yield predictor_matrices, target_matrix_with_weights
 
 
-def create_data(option_dict, init_date_string, model_lead_time_days):
+def create_data(
+        option_dict, init_date_string, model_lead_time_days,
+        patch_start_latitude_deg_n=None, patch_start_longitude_deg_e=None):
     """Creates, rather than generates, neural-net inputs.
 
     E = number of examples
@@ -2950,6 +2964,16 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
     :param init_date_string: GFS initialization date (format "yyyymmdd").  Will
         always use the 00Z model run.
     :param model_lead_time_days: Model lead time.
+    :param patch_start_latitude_deg_n:
+        [used only if NN was trained with patches]
+        Will return only the patch starting at this latitude.  If you would
+        rather return all patches for the given initialization date, make this
+        argument None.
+    :param patch_start_longitude_deg_e:
+        [used only if NN was trained with patches]
+        Will return only the patch starting at this longitude.  If you would
+        rather return all patches for the given initialization date, make this
+        argument None.
 
     :return: data_dict: Dictionary with the following keys.
     data_dict["predictor_matrices"]: Same as output from `data_generator`.
@@ -3304,13 +3328,118 @@ def create_data(option_dict, init_date_string, model_lead_time_days):
             INPUT_LAYER_NAMES_KEY: input_layer_names
         }
 
-    # Determine number of patches in full grid.
+    # Deal with specific patch location.
     patch_size_pixels = int(numpy.round(
         float(patch_size_deg) / GRID_SPACING_DEG
     ))
     patch_overlap_size_pixels = int(numpy.round(
         float(patch_overlap_size_deg) / GRID_SPACING_DEG
     ))
+
+    if not (
+            patch_start_latitude_deg_n is None
+            or patch_start_longitude_deg_e is None
+    ):
+        latitude_diffs_deg = numpy.absolute(
+            grid_latitudes_deg_n - patch_start_latitude_deg_n
+        )
+        patch_start_row = numpy.argmin(latitude_diffs_deg)
+
+        if latitude_diffs_deg[patch_start_row] > TOLERANCE:
+            error_string = (
+                'Cannot find desired start latitude ({0:.4f} deg N) for '
+                'patch.  Nearest grid-point latitude is {1:.4f} deg N.'
+            ).format(
+                patch_start_latitude_deg_n,
+                grid_latitudes_deg_n[patch_start_row]
+            )
+
+            raise ValueError(error_string)
+
+        grid_longitudes_deg_e = lng_conversion.convert_lng_positive_in_west(
+            grid_longitudes_deg_e
+        )
+        patch_start_longitude_deg_e = (
+            lng_conversion.convert_lng_positive_in_west(
+                patch_start_longitude_deg_e
+            )
+        )
+        longitude_diffs_deg = numpy.absolute(
+            grid_longitudes_deg_e - patch_start_longitude_deg_e
+        )
+        patch_start_column = numpy.argmin(longitude_diffs_deg)
+
+        if longitude_diffs_deg[patch_start_column] > TOLERANCE:
+            error_string = (
+                'Cannot find desired start longitude ({0:.4f} deg E) for '
+                'patch.  Nearest grid-point longitude is {1:.4f} deg E.'
+            ).format(
+                patch_start_longitude_deg_e,
+                grid_longitudes_deg_e[patch_start_column]
+            )
+
+            raise ValueError(error_string)
+
+        patch_location_dict = misc_utils.determine_patch_location(
+            num_rows_in_full_grid=len(grid_latitudes_deg_n),
+            num_columns_in_full_grid=len(grid_longitudes_deg_e),
+            patch_size_pixels=patch_size_pixels,
+            start_row=patch_start_row,
+            start_column=patch_start_column
+        )
+        pld = patch_location_dict
+
+        j_start = pld[misc_utils.ROW_LIMITS_KEY][0]
+        j_end = pld[misc_utils.ROW_LIMITS_KEY][1] + 1
+        k_start = pld[misc_utils.COLUMN_LIMITS_KEY][0]
+        k_end = pld[misc_utils.COLUMN_LIMITS_KEY][1] + 1
+
+        patch_target_matrix_with_weights = (
+            target_matrix_with_weights[:, j_start:j_end, k_start:k_end, ...]
+        )
+        patch_latitude_matrix_deg_n = (
+            grid_latitude_matrix_deg_n[:, j_start:j_end]
+        )
+        patch_longitude_matrix_deg_e = (
+            grid_longitude_matrix_deg_e[:, k_start:k_end]
+        )
+
+        num_matrices = len(predictor_matrices)
+        patch_predictor_matrices = []
+
+        for j in range(num_matrices):
+            if predictor_matrices[j] is None:
+                patch_predictor_matrices.append(None)
+                continue
+
+            if len(predictor_matrices[j].shape) < 3:
+                patch_predictor_matrices[j] = predictor_matrices[j]
+                continue
+
+            patch_predictor_matrices[j] = (
+                predictor_matrices[j][:, j_start:j_end, k_start:k_end, ...]
+            )
+
+        num_buffer_rows = int(numpy.round(
+            float(outer_latitude_buffer_deg) / GRID_SPACING_DEG
+        ))
+        num_buffer_columns = int(numpy.round(
+            float(outer_longitude_buffer_deg) / GRID_SPACING_DEG
+        ))
+        patch_target_matrix_with_weights[:, :num_buffer_rows, ..., -1] = 0.
+        patch_target_matrix_with_weights[:, -num_buffer_rows:, ..., -1] = 0.
+        patch_target_matrix_with_weights[:, :, :num_buffer_columns, ..., -1] = 0.
+        patch_target_matrix_with_weights[:, : -num_buffer_columns:, ..., -1] = 0.
+
+        return {
+            PREDICTOR_MATRICES_KEY: patch_predictor_matrices,
+            TARGETS_AND_WEIGHTS_KEY: patch_target_matrix_with_weights,
+            GRID_LATITUDE_MATRIX_KEY: patch_latitude_matrix_deg_n,
+            GRID_LONGITUDE_MATRIX_KEY: patch_longitude_matrix_deg_e,
+            INPUT_LAYER_NAMES_KEY: input_layer_names
+        }
+
+    # Determine number of patches in full grid.
     patch_metalocation_dict = __init_patch_metalocation_dict(
         num_rows_in_full_grid=len(grid_latitudes_deg_n),
         num_columns_in_full_grid=len(grid_longitudes_deg_e),
@@ -4216,5 +4345,5 @@ def apply_model_patchwise(
         print('Have applied model everywhere in full grid!')
 
     prediction_count_matrix = prediction_count_matrix.astype(float)
-    prediction_count_matrix[prediction_count_matrix < TOLERANCE] = numpy.nan
+    prediction_count_matrix[prediction_count_matrix < TOLERANCE] = 0.
     return summed_prediction_matrix / prediction_count_matrix

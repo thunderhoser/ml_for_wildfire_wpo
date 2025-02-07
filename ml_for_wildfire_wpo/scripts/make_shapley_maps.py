@@ -244,8 +244,10 @@ def _modify_model_output(model_object, region_mask_matrix, target_field_index):
 def _apply_deepshap_1day(
         explainer_object, init_date_string, baseline_init_date_strings,
         target_field_name, validation_option_dict,
-        model_input_layer_names, model_lead_time_days, model_file_name,
-        region_mask_file_name, output_file_name):
+        model_input_layer_names, model_lead_time_days,
+        model_file_name, region_mask_file_name,
+        patch_start_latitude_deg_n, patch_start_longitude_deg_e,
+        output_file_name):
     """Applies DeepSHAP for one forecast-init day.
 
     :param explainer_object: Instance of `shap.DeepExplainer`.
@@ -260,6 +262,10 @@ def _apply_deepshap_1day(
     :param model_lead_time_days: Model lead time.
     :param model_file_name: Path to trained model.
     :param region_mask_file_name: Path to file with region mask.
+    :param patch_start_latitude_deg_n: First latitude in region patch.  If the
+        NN was not trained with patches, this should be None.
+    :param patch_start_longitude_deg_e: First longitude in region patch.  If the
+        NN was not trained with patches, this should be None.
     :param output_file_name: Path to output file.  Shapley values will be
         written here.
     """
@@ -268,7 +274,9 @@ def _apply_deepshap_1day(
         data_dict = neural_net.create_data(
             option_dict=validation_option_dict,
             init_date_string=init_date_string,
-            model_lead_time_days=model_lead_time_days
+            model_lead_time_days=model_lead_time_days,
+            patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+            patch_start_longitude_deg_e=patch_start_longitude_deg_e
         )
         print(SEPARATOR_STRING)
     except:
@@ -276,8 +284,10 @@ def _apply_deepshap_1day(
         return
 
     predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
-    grid_latitudes_deg_n = data_dict[neural_net.GRID_LATITUDES_KEY]
-    grid_longitudes_deg_e = data_dict[neural_net.GRID_LONGITUDES_KEY]
+    grid_latitudes_deg_n = data_dict[neural_net.GRID_LATITUDE_MATRIX_KEY][0, :]
+    grid_longitudes_deg_e = (
+        data_dict[neural_net.GRID_LONGITUDE_MATRIX_KEY][0, :]
+    )
     del data_dict
 
     if 'DeepExplainer' in str(type(explainer_object)):
@@ -357,6 +367,7 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     vod[neural_net.GFS_DIRECTORY_KEY] = gfs_directory_name
     vod[neural_net.TARGET_DIRECTORY_KEY] = target_dir_name
     vod[neural_net.GFS_FORECAST_TARGET_DIR_KEY] = gfs_forecast_target_dir_name
+    patch_size_deg = vod[neural_net.OUTER_PATCH_SIZE_DEG_KEY]
     print(SEPARATOR_STRING)
 
     # Check some input args.
@@ -403,6 +414,76 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
         region_mask_io.COLUMN_DIM: column_indices
     })
 
+    if patch_size_deg is None:
+        patch_start_latitude_deg_n = None
+        patch_start_longitude_deg_e = None
+    else:
+        mtx = mask_table_xarray
+        orig_num_pixels_in_region = numpy.sum(
+            mtx[region_mask_io.REGION_MASK_KEY].values
+        )
+
+        good_row_indices, good_column_indices = numpy.where(
+            mtx[region_mask_io.REGION_MASK_KEY].values
+        )
+        patch_start_row = numpy.min(good_row_indices)
+        patch_start_column = numpy.min(good_column_indices)
+        patch_start_latitude_deg_n = (
+            mtx[region_mask_io.LATITUDE_KEY].values[patch_start_row]
+        )
+        patch_start_longitude_deg_e = (
+            mtx[region_mask_io.LONGITUDE_KEY].values[patch_start_column]
+        )
+
+        patch_size_pixels = int(numpy.round(
+            float(patch_size_deg) / neural_net.GRID_SPACING_DEG
+        ))
+
+        patch_location_dict = misc_utils.determine_patch_location(
+            num_rows_in_full_grid=
+            len(mtx.coords[region_mask_io.ROW_DIM].values),
+            num_columns_in_full_grid=
+            len(mtx.coords[region_mask_io.COLUMN_DIM].values),
+            patch_size_pixels=patch_size_pixels,
+            start_row=patch_start_row,
+            start_column=patch_start_column
+        )
+        pld = patch_location_dict
+
+        j_start = pld[misc_utils.ROW_LIMITS_KEY][0]
+        j_end = pld[misc_utils.ROW_LIMITS_KEY][1]
+        k_start = pld[misc_utils.COLUMN_LIMITS_KEY][0]
+        k_end = pld[misc_utils.COLUMN_LIMITS_KEY][1]
+
+        row_indices = numpy.linspace(
+            j_start, j_end, num=j_end - j_start + 1, dtype=int
+        )
+        column_indices = numpy.linspace(
+            k_start, k_end, num=k_end - k_start + 1, dtype=int
+        )
+
+        mask_table_xarray = mask_table_xarray.isel({
+            region_mask_io.ROW_DIM: row_indices
+        })
+        mask_table_xarray = mask_table_xarray.isel({
+            region_mask_io.COLUMN_DIM: column_indices
+        })
+
+        num_pixels_in_region = numpy.sum(
+            mtx[region_mask_io.REGION_MASK_KEY].values
+        )
+
+        if num_pixels_in_region != orig_num_pixels_in_region:
+            error_string = (
+                'The region of interest cannot be contained in a {0:d}-by-{1:d}'
+                ' patch.'
+            ).format(
+                j_end - j_start + 1,
+                k_end - k_start + 1
+            )
+
+            raise ValueError(error_string)
+
     region_mask_matrix = (
         mask_table_xarray[region_mask_io.REGION_MASK_KEY].values
     )
@@ -427,7 +508,9 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             data_dict = neural_net.create_data(
                 option_dict=validation_option_dict,
                 init_date_string=baseline_init_date_strings[i],
-                model_lead_time_days=model_lead_time_days
+                model_lead_time_days=model_lead_time_days,
+                patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+                patch_start_longitude_deg_e=patch_start_longitude_deg_e
             )
             print(SEPARATOR_STRING)
         except:
@@ -489,6 +572,8 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             baseline_init_date_strings=baseline_init_date_strings,
             target_field_name=target_field_name,
             region_mask_file_name=region_mask_file_name,
+            patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+            patch_start_longitude_deg_e=patch_start_longitude_deg_e,
             validation_option_dict=validation_option_dict,
             model_input_layer_names=
             [l.name.split(':')[0] for l in model_object.input],

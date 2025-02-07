@@ -16,6 +16,7 @@ from gewittergefahr.plotting import imagemagick_utils
 from ml_for_wildfire_wpo.io import gfs_io
 from ml_for_wildfire_wpo.io import shapley_io
 from ml_for_wildfire_wpo.io import border_io
+from ml_for_wildfire_wpo.io import region_mask_io
 from ml_for_wildfire_wpo.utils import misc_utils
 from ml_for_wildfire_wpo.utils import gfs_utils
 from ml_for_wildfire_wpo.utils import era5_constant_utils
@@ -869,14 +870,20 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     vod[neural_net.TARGET_NORM_FILE_KEY] = None
     vod[neural_net.ERA5_NORM_FILE_KEY] = None
     vod[neural_net.SENTINEL_VALUE_KEY] = None
+    patch_size_deg = vod[neural_net.OUTER_PATCH_SIZE_DEG_KEY]
     validation_option_dict = vod
 
     init_date_string = stx.attrs[shapley_io.INIT_DATE_KEY]
-    init_date_string_nice = (
-        init_date_string[:4] +
-        '-' + init_date_string[4:6] +
-        '-' + init_date_string[6:]
-    )
+    if init_date_string is None:
+        init_date_string = 'composite'
+        init_date_string_nice = 'composite'
+    else:
+        init_date_string_nice = (
+            init_date_string[:4] +
+            '-' + init_date_string[4:6] +
+            '-' + init_date_string[6:]
+        )
+
     target_field_name = stx.attrs[shapley_io.TARGET_FIELD_KEY]
 
     if shapley_io.TARGET_VALUE_KEY in stx.data_vars:
@@ -908,15 +915,39 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             model_input_layer_names[k] for k in good_indices
         ]
 
-        target_matrix = stx[shapley_io.TARGET_VALUE_KEY].values
+        target_matrix = numpy.expand_dims(
+            stx[shapley_io.TARGET_VALUE_KEY].values, axis=0
+        )
     else:
+        if patch_size_deg is None:
+            patch_start_latitude_deg_n = None
+            patch_start_longitude_deg_e = None
+        else:
+            region_mask_file_name = stx.attrs[shapley_io.REGION_MASK_FILE_KEY]
+
+            print('Reading mask from: "{0:s}"...'.format(region_mask_file_name))
+            mask_table_xarray = region_mask_io.read_file(region_mask_file_name)
+            mtx = mask_table_xarray
+
+            row_idxs, col_idxs = numpy.where(
+                mtx[region_mask_io.REGION_MASK_KEY].values
+            )
+            patch_start_latitude_deg_n = (
+                mtx[region_mask_io.LATITUDE_KEY].values[numpy.min(row_idxs)]
+            )
+            patch_start_longitude_deg_e = (
+                mtx[region_mask_io.LONGITUDE_KEY].values[numpy.min(col_idxs)]
+            )
+
         print(SEPARATOR_STRING)
 
         try:
             data_dict = neural_net.create_data(
                 option_dict=validation_option_dict,
                 init_date_string=init_date_string,
-                model_lead_time_days=model_lead_time_days
+                model_lead_time_days=model_lead_time_days,
+                patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+                patch_start_longitude_deg_e=patch_start_longitude_deg_e
             )
             print(SEPARATOR_STRING)
         except:
