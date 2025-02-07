@@ -241,6 +241,107 @@ def _modify_model_output(model_object, region_mask_matrix, target_field_index):
     )
 
 
+def _region_of_interest_to_patch(region_mask_table_xarray, patch_size_deg):
+    """Converts region of interest to rectangular patch.
+
+    This rectangular patch will have the same size as the patches used during
+    NN-training.
+
+    :param region_mask_table_xarray: xarray table in format returned by
+        `region_mask_io.read_file`.
+    :param patch_size_deg: Patch size used in training.
+    :return: region_mask_table_xarray: Same as input, except that the region
+        mask is defined over a smaller grid (just the patch).
+    """
+
+    mtx = region_mask_table_xarray
+    orig_num_pixels_in_region = numpy.sum(
+        mtx[region_mask_io.REGION_MASK_KEY].values
+    )
+
+    rows_in_region, columns_in_region = numpy.where(
+        mtx[region_mask_io.REGION_MASK_KEY].values
+    )
+    if len(rows_in_region):
+        raise ValueError('Somehow the region contains zero pixels.')
+
+    # Compute the center of the region's bounding box.
+    center_row_in_region = int(numpy.round(
+        float(numpy.min(rows_in_region) + numpy.max(rows_in_region)) / 2
+    ))
+    center_column_in_region = int(numpy.round(
+        float(numpy.min(columns_in_region) + numpy.max(columns_in_region)) / 2
+    ))
+
+    # Figure out where the patch needs to be.
+    patch_size_pixels = int(numpy.round(
+        float(patch_size_deg) / neural_net.GRID_SPACING_DEG
+    ))
+
+    # TODO(thunderhoser): Need to stop subsetting before this method.
+    num_rows_in_full_grid = len(mtx.coords[region_mask_io.ROW_DIM].values)
+    num_columns_in_full_grid = len(mtx.coords[region_mask_io.ROW_DIM].values)
+
+    first_row_in_patch = center_row_in_region - patch_size_pixels // 2
+    first_row_in_patch = max([0, first_row_in_patch])
+    first_row_in_patch = min([
+        first_row_in_patch,
+        num_rows_in_full_grid - patch_size_pixels
+    ])
+
+    first_column_in_patch = center_column_in_region - patch_size_pixels // 2
+    first_column_in_patch = max([0, first_column_in_patch])
+    first_column_in_patch = min([
+        first_column_in_patch,
+        num_columns_in_full_grid - patch_size_pixels
+    ])
+
+    patch_location_dict = misc_utils.determine_patch_location(
+        num_rows_in_full_grid=num_rows_in_full_grid,
+        num_columns_in_full_grid=num_columns_in_full_grid,
+        patch_size_pixels=patch_size_pixels,
+        start_row=first_row_in_patch,
+        start_column=first_column_in_patch
+    )
+    pld = patch_location_dict
+
+    j_start = pld[misc_utils.ROW_LIMITS_KEY][0]
+    j_end = pld[misc_utils.ROW_LIMITS_KEY][1]
+    k_start = pld[misc_utils.COLUMN_LIMITS_KEY][0]
+    k_end = pld[misc_utils.COLUMN_LIMITS_KEY][1]
+
+    row_indices = numpy.linspace(
+        j_start, j_end, num=j_end - j_start + 1, dtype=int
+    )
+    column_indices = numpy.linspace(
+        k_start, k_end, num=k_end - k_start + 1, dtype=int
+    )
+
+    region_mask_table_xarray = region_mask_table_xarray.isel({
+        region_mask_io.ROW_DIM: row_indices
+    })
+    region_mask_table_xarray = region_mask_table_xarray.isel({
+        region_mask_io.COLUMN_DIM: column_indices
+    })
+
+    num_pixels_in_region = numpy.sum(
+        mtx[region_mask_io.REGION_MASK_KEY].values
+    )
+
+    if num_pixels_in_region != orig_num_pixels_in_region:
+        error_string = (
+            'The region of interest cannot be contained in a {0:d}-by-{1:d}'
+            ' patch.'
+        ).format(
+            j_end - j_start + 1,
+            k_end - k_start + 1
+        )
+
+        raise ValueError(error_string)
+
+    return region_mask_table_xarray
+
+
 def _apply_deepshap_1day(
         explainer_object, init_date_string, baseline_init_date_strings,
         target_field_name, validation_option_dict,
@@ -418,71 +519,16 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
         patch_start_latitude_deg_n = None
         patch_start_longitude_deg_e = None
     else:
+        mask_table_xarray = _region_of_interest_to_patch(
+            region_mask_table_xarray=mask_table_xarray,
+            patch_size_deg=patch_size_deg
+        )
         mtx = mask_table_xarray
-        orig_num_pixels_in_region = numpy.sum(
-            mtx[region_mask_io.REGION_MASK_KEY].values
-        )
 
-        good_row_indices, good_column_indices = numpy.where(
-            mtx[region_mask_io.REGION_MASK_KEY].values
-        )
-        patch_start_row = numpy.min(good_row_indices)
-        patch_start_column = numpy.min(good_column_indices)
-        patch_start_latitude_deg_n = (
-            mtx[region_mask_io.LATITUDE_KEY].values[patch_start_row]
-        )
+        patch_start_latitude_deg_n = mtx[region_mask_io.LATITUDE_KEY].values[0]
         patch_start_longitude_deg_e = (
-            mtx[region_mask_io.LONGITUDE_KEY].values[patch_start_column]
+            mtx[region_mask_io.LONGITUDE_KEY].values[0]
         )
-
-        patch_size_pixels = int(numpy.round(
-            float(patch_size_deg) / neural_net.GRID_SPACING_DEG
-        ))
-
-        patch_location_dict = misc_utils.determine_patch_location(
-            num_rows_in_full_grid=
-            len(mtx.coords[region_mask_io.ROW_DIM].values),
-            num_columns_in_full_grid=
-            len(mtx.coords[region_mask_io.COLUMN_DIM].values),
-            patch_size_pixels=patch_size_pixels,
-            start_row=patch_start_row,
-            start_column=patch_start_column
-        )
-        pld = patch_location_dict
-
-        j_start = pld[misc_utils.ROW_LIMITS_KEY][0]
-        j_end = pld[misc_utils.ROW_LIMITS_KEY][1]
-        k_start = pld[misc_utils.COLUMN_LIMITS_KEY][0]
-        k_end = pld[misc_utils.COLUMN_LIMITS_KEY][1]
-
-        row_indices = numpy.linspace(
-            j_start, j_end, num=j_end - j_start + 1, dtype=int
-        )
-        column_indices = numpy.linspace(
-            k_start, k_end, num=k_end - k_start + 1, dtype=int
-        )
-
-        mask_table_xarray = mask_table_xarray.isel({
-            region_mask_io.ROW_DIM: row_indices
-        })
-        mask_table_xarray = mask_table_xarray.isel({
-            region_mask_io.COLUMN_DIM: column_indices
-        })
-
-        num_pixels_in_region = numpy.sum(
-            mtx[region_mask_io.REGION_MASK_KEY].values
-        )
-
-        if num_pixels_in_region != orig_num_pixels_in_region:
-            error_string = (
-                'The region of interest cannot be contained in a {0:d}-by-{1:d}'
-                ' patch.'
-            ).format(
-                j_end - j_start + 1,
-                k_end - k_start + 1
-            )
-
-            raise ValueError(error_string)
 
     region_mask_matrix = (
         mask_table_xarray[region_mask_io.REGION_MASK_KEY].values

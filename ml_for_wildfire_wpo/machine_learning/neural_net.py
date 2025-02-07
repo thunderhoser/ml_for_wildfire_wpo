@@ -3066,6 +3066,9 @@ def create_data(
         lead_time_predictors_days = numpy.array(
             [model_lead_time_days], dtype=float
         )
+        lead_time_predictors_days = numpy.expand_dims(
+            lead_time_predictors_days, axis=0
+        )
     else:
         lead_time_predictors_days = None
 
@@ -3823,7 +3826,6 @@ def read_model_for_shapley(pickle_file_name):
         model_file_name=pickle_file_name, raise_error_if_missing=True
     )
     metadata_dict = read_metafile(metafile_name)
-    print(metadata_dict[LOSS_FUNCTION_KEY])
 
     chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
     assert chiu_net_pp_architecture_dict is not None
@@ -3836,6 +3838,7 @@ def read_model_for_shapley(pickle_file_name):
         arch_dict[chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY] = False
 
     arch_dict[chiu_net_pp_architecture.LOSS_FUNCTION_KEY] = 'mse'
+    arch_dict[chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY] = []
     arch_dict[chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY] = (
         keras.optimizers.Adam()
     )
