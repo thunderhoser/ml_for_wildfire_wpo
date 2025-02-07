@@ -270,7 +270,7 @@ def _region_of_interest_to_patch(region_mask_table_xarray, patch_size_deg):
     rows_in_region, columns_in_region = numpy.where(
         mtx[region_mask_io.REGION_MASK_KEY].values
     )
-    if len(rows_in_region):
+    if len(rows_in_region) == 0:
         raise ValueError('Somehow the region contains zero pixels.')
 
     # Compute the center of the region's bounding box.
