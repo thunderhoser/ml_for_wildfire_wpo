@@ -937,18 +937,27 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
         print(SEPARATOR_STRING)
 
-        try:
-            data_dict = neural_net.create_data(
-                option_dict=validation_option_dict,
-                init_date_string=init_date_string,
-                model_lead_time_days=model_lead_time_days,
-                patch_start_latitude_deg_n=patch_start_latitude_deg_n,
-                patch_start_longitude_deg_e=patch_start_longitude_deg_e
-            )
-            print(SEPARATOR_STRING)
-        except:
-            print(SEPARATOR_STRING)
-            return
+        data_dict = neural_net.create_data(
+            option_dict=validation_option_dict,
+            init_date_string=init_date_string,
+            model_lead_time_days=model_lead_time_days,
+            patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+            patch_start_longitude_deg_e=patch_start_longitude_deg_e
+        )
+        print(SEPARATOR_STRING)
+
+        # try:
+        #     data_dict = neural_net.create_data(
+        #         option_dict=validation_option_dict,
+        #         init_date_string=init_date_string,
+        #         model_lead_time_days=model_lead_time_days,
+        #         patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+        #         patch_start_longitude_deg_e=patch_start_longitude_deg_e
+        #     )
+        #     print(SEPARATOR_STRING)
+        # except:
+        #     print(SEPARATOR_STRING)
+        #     return
 
         num_target_fields = len(vod[neural_net.TARGET_FIELDS_KEY])
         target_matrix = data_dict[neural_net.TARGETS_AND_WEIGHTS_KEY][
