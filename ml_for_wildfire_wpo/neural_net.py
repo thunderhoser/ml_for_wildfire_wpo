@@ -3132,10 +3132,10 @@ def data_generator_fast_patches(option_dict):
             this_weight_matrix = full_target_matrix_with_weights[
                 j_start:j_end, k_start:k_end, ..., -1
             ] + 0.
-            this_weight_matrix[:num_buffer_rows, ..., -1] = 0.
-            this_weight_matrix[-num_buffer_rows:, ..., -1] = 0.
-            this_weight_matrix[:, :num_buffer_columns, ..., -1] = 0.
-            this_weight_matrix[: -num_buffer_columns:, ..., -1] = 0.
+            this_weight_matrix[:num_buffer_rows, ...] = 0.
+            this_weight_matrix[-num_buffer_rows:, ...] = 0.
+            this_weight_matrix[:, :num_buffer_columns, ...] = 0.
+            this_weight_matrix[: -num_buffer_columns:, ...] = 0.
 
             # If all evaluation weights are zero, do not train with this patch.
             if numpy.sum(this_weight_matrix) < TOLERANCE:
