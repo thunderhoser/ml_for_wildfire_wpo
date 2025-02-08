@@ -3146,10 +3146,16 @@ def data_generator_fast_patches(option_dict):
                 numpy.sum(this_weight_matrix)
             ))
 
-            this_weight_matrix[:num_buffer_rows, ...] = 0.
-            this_weight_matrix[-num_buffer_rows:, ...] = 0.
-            this_weight_matrix[:, :num_buffer_columns, ...] = 0.
-            this_weight_matrix[: -num_buffer_columns:, ...] = 0.
+            this_weight_matrix[:num_buffer_rows] = 0.
+            print(numpy.sum(this_weight_matrix))
+
+            this_weight_matrix[-num_buffer_rows:] = 0.
+            print(numpy.sum(this_weight_matrix))
+
+            this_weight_matrix[:, :num_buffer_columns] = 0.
+            print(numpy.sum(this_weight_matrix))
+
+            this_weight_matrix[: -num_buffer_columns:] = 0.
             print('Sum of this_weight_matrix = {0:.4f}'.format(
                 numpy.sum(this_weight_matrix)
             ))
