@@ -23,7 +23,6 @@ import imagemagick_utils
 import gfs_io
 import shapley_io
 import border_io
-import region_mask_io
 import misc_utils
 import gfs_utils
 import era5_constant_utils
@@ -937,27 +936,18 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
         print(SEPARATOR_STRING)
 
-        data_dict = neural_net.create_data(
-            option_dict=validation_option_dict,
-            init_date_string=init_date_string,
-            model_lead_time_days=model_lead_time_days,
-            patch_start_latitude_deg_n=patch_start_latitude_deg_n,
-            patch_start_longitude_deg_e=patch_start_longitude_deg_e
-        )
-        print(SEPARATOR_STRING)
-
-        # try:
-        #     data_dict = neural_net.create_data(
-        #         option_dict=validation_option_dict,
-        #         init_date_string=init_date_string,
-        #         model_lead_time_days=model_lead_time_days,
-        #         patch_start_latitude_deg_n=patch_start_latitude_deg_n,
-        #         patch_start_longitude_deg_e=patch_start_longitude_deg_e
-        #     )
-        #     print(SEPARATOR_STRING)
-        # except:
-        #     print(SEPARATOR_STRING)
-        #     return
+        try:
+            data_dict = neural_net.create_data(
+                option_dict=validation_option_dict,
+                init_date_string=init_date_string,
+                model_lead_time_days=model_lead_time_days,
+                patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+                patch_start_longitude_deg_e=patch_start_longitude_deg_e
+            )
+            print(SEPARATOR_STRING)
+        except:
+            print(SEPARATOR_STRING)
+            return
 
         num_target_fields = len(vod[neural_net.TARGET_FIELDS_KEY])
         target_matrix = data_dict[neural_net.TARGETS_AND_WEIGHTS_KEY][
@@ -966,6 +956,10 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
         predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
         model_input_layer_names = data_dict[neural_net.INPUT_LAYER_NAMES_KEY]
+        gfs_lead_times_hours = data_dict[neural_net.GFS_PRED_LEAD_TIMES_KEY]
+        target_laglead_times_hours = data_dict[
+            neural_net.TARGET_LAGLEAD_TIMES_KEY
+        ]
         del data_dict
 
     if plot_latitude_limits_deg_n is not None:
@@ -1002,9 +996,6 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
-    gfs_lead_times_hours = vod[neural_net.MODEL_LEAD_TO_GFS_PRED_LEADS_KEY][
-        model_lead_time_days
-    ]
     gfs_field_names = vod[neural_net.GFS_PREDICTOR_FIELDS_KEY]
     gfs_field_names_2d = [
         f for f in gfs_field_names
@@ -1030,7 +1021,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             ]
 
             title_string = (
-                'GFS {0:s} ({1:s}), {2:s} + {3:d} hours\n'
+                'GFS {0:s} ({1:s}), {2:s} + {3:.2f} hours\n'
                 'Shapley values for {4:d}-day {5:s}{6:s}'
             ).format(
                 gfs_plotting.FIELD_NAME_TO_FANCY[gfs_field_names_2d[f]],
@@ -1043,7 +1034,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             )
 
             panel_file_names[f] = (
-                '{0:s}/shapley_gfs_{1:s}_{2:03d}hours.jpg'
+                '{0:s}/shapley_gfs_{1:s}_{2:06.2f}hours.jpg'
             ).format(
                 output_dir_name,
                 gfs_field_names_2d[f].replace('_', '-'),
@@ -1055,10 +1046,11 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             else:
                 gfs_npt = gfs_norm_param_table_xarray
 
-                t_idxs = numpy.where(
-                    gfs_npt.coords[gfs_utils.FORECAST_HOUR_DIM].values ==
+                t_idx = numpy.argmin(numpy.absolute(
+                    gfs_npt.coords[gfs_utils.FORECAST_HOUR_DIM].values -
                     gfs_lead_times_hours[t]
-                )[0]
+                ))
+                t_idxs = numpy.array([t_idx], dtype=int)
                 this_npt = gfs_npt.isel({gfs_utils.FORECAST_HOUR_DIM: t_idxs})
 
                 f_idxs = numpy.where(
@@ -1119,7 +1111,9 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 output_size_pixels=PANEL_SIZE_PX
             )
 
-        concat_figure_file_name = '{0:s}/shapley_gfs2d_{1:03d}hours.jpg'.format(
+        concat_figure_file_name = (
+            '{0:s}/shapley_gfs2d_{1:06.2f}hours.jpg'
+        ).format(
             output_dir_name, gfs_lead_times_hours[t]
         )
 
@@ -1177,7 +1171,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 ]
 
                 title_string = (
-                    'GFS {0:s} ({1:s}), {2:.0f} mb, {3:s} + {4:d} hours\n'
+                    'GFS {0:s} ({1:s}), {2:.0f} mb, {3:s} + {4:.2f} hours\n'
                     'Shapley values for {5:d}-day {6:s}{7:s}'
                 ).format(
                     gfs_plotting.FIELD_NAME_TO_FANCY[gfs_field_names_3d[f]],
@@ -1191,7 +1185,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 )
 
                 panel_file_names[f] = (
-                    '{0:s}/shapley_gfs_{1:s}_{2:04d}mb_{3:03d}hours.jpg'
+                    '{0:s}/shapley_gfs_{1:s}_{2:04d}mb_{3:06.2f}hours.jpg'
                 ).format(
                     output_dir_name,
                     gfs_field_names_3d[f].replace('_', '-'),
@@ -1271,7 +1265,7 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
                 )
 
             concat_figure_file_name = (
-                '{0:s}/shapley_gfs3d_{1:04d}mb_{2:03d}hours.jpg'
+                '{0:s}/shapley_gfs3d_{1:04d}mb_{2:06.2f}hours.jpg'
             ).format(
                 output_dir_name,
                 int(numpy.round(gfs_pressure_levels_mb[p])),
@@ -1304,23 +1298,6 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             for this_panel_file_name in panel_file_names:
                 os.remove(this_panel_file_name)
 
-    if vod[neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY] is None:
-        target_lag_times_days = numpy.array([], dtype=int)
-    else:
-        target_lag_times_days = vod[neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY][
-            model_lead_time_days
-        ]
-
-    if vod[neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] is None:
-        gfs_target_lead_times_days = numpy.array([], dtype=int)
-    else:
-        gfs_target_lead_times_days = vod[
-            neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
-        ][model_lead_time_days]
-
-    target_lag_or_lead_times_days = numpy.concatenate([
-        target_lag_times_days, -1 * gfs_target_lead_times_days
-    ])
     all_target_field_names = vod[neural_net.TARGET_FIELDS_KEY]
 
     lyr_idx = model_input_layer_names.index(
@@ -1328,47 +1305,47 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
     )
     laglead_target_predictor_matrix = predictor_matrices[lyr_idx][0, ...]
 
-    for t in range(len(target_lag_or_lead_times_days)):
+    for t in range(len(target_laglead_times_hours)):
         panel_file_names = [''] * len(all_target_field_names)
 
         for f in range(len(all_target_field_names)):
             this_predictor_matrix = laglead_target_predictor_matrix[..., t, f]
 
-            if target_lag_or_lead_times_days[t] < 0:
+            if target_laglead_times_hours[t] > 0:
                 title_string = (
-                    'GFS-forecast {0:s}, {1:s} + {2:d} days\n'
+                    'GFS-forecast {0:s}, {1:s} + {2:.2f} hours\n'
                     'Shapley values for {3:d}-day {4:s}{5:s}'
                 ).format(
                     fwi_plotting.FIELD_NAME_TO_SIMPLE[
                         all_target_field_names[f]
                     ],
                     init_date_string_nice,
-                    -1 * target_lag_or_lead_times_days[t],
+                    target_laglead_times_hours[t],
                     model_lead_time_days,
                     fwi_plotting.FIELD_NAME_TO_SIMPLE[target_field_name],
                     '' if region_name is None else ' over ' + region_name
                 )
             else:
                 title_string = (
-                    'Lagged-truth {0:s}, {1:s} - {2:d} days\n'
+                    'Lagged-truth {0:s}, {1:s} - {2:.2f} hours\n'
                     'Shapley values for {3:d}-day {4:s}{5:s}'
                 ).format(
                     fwi_plotting.FIELD_NAME_TO_SIMPLE[
                         all_target_field_names[f]
                     ],
                     init_date_string_nice,
-                    target_lag_or_lead_times_days[t],
+                    -1 * target_laglead_times_hours[t],
                     model_lead_time_days,
                     fwi_plotting.FIELD_NAME_TO_SIMPLE[target_field_name],
                     '' if region_name is None else ' over ' + region_name
                 )
 
             panel_file_names[f] = (
-                '{0:s}/shapley_laglead_target_{1:s}_{2:+03d}days.jpg'
+                '{0:s}/shapley_laglead_target_{1:s}_{2:+06.2f}hours.jpg'
             ).format(
                 output_dir_name,
                 all_target_field_names[f].replace('_', '-'),
-                -1 * target_lag_or_lead_times_days[t]
+                target_laglead_times_hours[t]
             )
 
             figure_object, axes_object = _plot_one_fwi_field(
@@ -1419,10 +1396,9 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             )
 
         concat_figure_file_name = (
-            '{0:s}/shapley_laglead_targets_{1:+03d}days.jpg'
+            '{0:s}/shapley_laglead_targets_{1:+06.2f}hours.jpg'
         ).format(
-            output_dir_name,
-            -1 * target_lag_or_lead_times_days[t]
+            output_dir_name, target_laglead_times_hours[t]
         )
 
         num_panel_rows = int(numpy.floor(
@@ -1645,6 +1621,11 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
     for f in range(len(all_target_field_names)):
         this_predictor_matrix = resid_baseline_predictor_matrix[..., f]
+
+        vod = validation_option_dict
+        target_lag_times_days = vod[neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY][
+            model_lead_time_days
+        ]
 
         title_string = (
             'Baseline {0:s}, {1:s} - {2:d} days\n'

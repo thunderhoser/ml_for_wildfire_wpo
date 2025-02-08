@@ -124,6 +124,8 @@ TARGETS_AND_WEIGHTS_KEY = 'target_matrix_with_weights'
 GRID_LATITUDE_MATRIX_KEY = 'grid_latitudes_deg_n'
 GRID_LONGITUDE_MATRIX_KEY = 'grid_longitudes_deg_e'
 INPUT_LAYER_NAMES_KEY = 'input_layer_names'
+GFS_PRED_LEAD_TIMES_KEY = 'gfs_pred_lead_times_hours'
+TARGET_LAGLEAD_TIMES_KEY = 'target_laglead_times_hours'
 
 GFS_3D_LAYER_NAME = 'gfs_3d_inputs'
 GFS_2D_LAYER_NAME = 'gfs_2d_inputs'
@@ -3544,6 +3546,25 @@ def create_data(
         grid_longitudes_deg_e, axis=0
     )
 
+    gfs_pred_lead_times_hours = gfs_pred_lead_times_hours.astype(float)
+    if num_gfs_hours_for_interp is not None:
+        gfs_pred_lead_times_hours = numpy.linspace(
+            gfs_pred_lead_times_hours[0], gfs_pred_lead_times_hours[-1],
+            num=num_gfs_hours_for_interp, dtype=float
+        )
+
+    target_laglead_times_hours = 24 * numpy.concatenate([
+        numpy.sort(-1 * target_lag_times_days),
+        gfs_target_lead_times_days
+    ])
+    target_laglead_times_hours = target_laglead_times_hours.astype(float)
+
+    if num_target_times_for_interp is not None:
+        target_laglead_times_hours = numpy.linspace(
+            target_laglead_times_hours[0], target_laglead_times_hours[-1],
+            num=num_target_times_for_interp, dtype=float
+        )
+
     patch_size_deg = option_dict[OUTER_PATCH_SIZE_DEG_KEY]
     patch_overlap_size_deg = option_dict[OUTER_PATCH_OVERLAP_DEG_KEY]
 
@@ -3553,7 +3574,9 @@ def create_data(
             TARGETS_AND_WEIGHTS_KEY: target_matrix_with_weights,
             GRID_LATITUDE_MATRIX_KEY: grid_latitude_matrix_deg_n,
             GRID_LONGITUDE_MATRIX_KEY: grid_longitude_matrix_deg_e,
-            INPUT_LAYER_NAMES_KEY: input_layer_names
+            INPUT_LAYER_NAMES_KEY: input_layer_names,
+            GFS_PRED_LEAD_TIMES_KEY: gfs_pred_lead_times_hours,
+            TARGET_LAGLEAD_TIMES_KEY: target_laglead_times_hours
         }
 
     # Deal with specific patch location.
@@ -3663,7 +3686,9 @@ def create_data(
             TARGETS_AND_WEIGHTS_KEY: patch_target_matrix_with_weights,
             GRID_LATITUDE_MATRIX_KEY: patch_latitude_matrix_deg_n,
             GRID_LONGITUDE_MATRIX_KEY: patch_longitude_matrix_deg_e,
-            INPUT_LAYER_NAMES_KEY: input_layer_names
+            INPUT_LAYER_NAMES_KEY: input_layer_names,
+            GFS_PRED_LEAD_TIMES_KEY: gfs_pred_lead_times_hours,
+            TARGET_LAGLEAD_TIMES_KEY: target_laglead_times_hours
         }
 
     # Determine number of patches in full grid.
@@ -3791,7 +3816,9 @@ def create_data(
         TARGETS_AND_WEIGHTS_KEY: patch_target_matrix_with_weights,
         GRID_LATITUDE_MATRIX_KEY: patch_latitude_matrix_deg_n,
         GRID_LONGITUDE_MATRIX_KEY: patch_longitude_matrix_deg_e,
-        INPUT_LAYER_NAMES_KEY: input_layer_names
+        INPUT_LAYER_NAMES_KEY: input_layer_names,
+        GFS_PRED_LEAD_TIMES_KEY: gfs_pred_lead_times_hours,
+        TARGET_LAGLEAD_TIMES_KEY: target_laglead_times_hours
     }
 
 
