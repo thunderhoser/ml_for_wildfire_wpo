@@ -3132,34 +3132,13 @@ def data_generator_fast_patches(option_dict):
             k_start = pld[misc_utils.COLUMN_LIMITS_KEY][0]
             k_end = pld[misc_utils.COLUMN_LIMITS_KEY][1] + 1
 
-            print(j_start)
-            print(j_end)
-            print(k_start)
-            print(k_end)
-            print(num_buffer_rows)
-            print(num_buffer_columns)
-
             this_weight_matrix = full_target_matrix_with_weights[
                 j_start:j_end, k_start:k_end, ..., -1
             ] + 0.
-            print('Sum of this_weight_matrix = {0:.4f}'.format(
-                numpy.sum(this_weight_matrix)
-            ))
-
-            this_weight_matrix[:num_buffer_rows] = 0.
-            print(numpy.sum(this_weight_matrix))
-
-            this_weight_matrix[-num_buffer_rows:] = 0.
-            print(numpy.sum(this_weight_matrix))
-
-            this_weight_matrix[:, :num_buffer_columns] = 0.
-            print(numpy.sum(this_weight_matrix))
-
-            this_weight_matrix[: -num_buffer_columns:] = 0.
-            print('Sum of this_weight_matrix = {0:.4f}'.format(
-                numpy.sum(this_weight_matrix)
-            ))
-            print('\n\n')
+            this_weight_matrix[:num_buffer_rows, ...] = 0.
+            this_weight_matrix[-num_buffer_rows:, ...] = 0.
+            this_weight_matrix[:, :num_buffer_columns, ...] = 0.
+            this_weight_matrix[:, -num_buffer_columns:, ...] = 0.
 
             # If all evaluation weights are zero, do not train with this patch.
             if numpy.sum(this_weight_matrix) < TOLERANCE:
