@@ -262,7 +262,7 @@ def _region_of_interest_to_patch(region_mask_table_xarray, patch_size_deg):
     rows_in_region, columns_in_region = numpy.where(
         mtx[region_mask_io.REGION_MASK_KEY].values
     )
-    if len(rows_in_region):
+    if len(rows_in_region) == 0:
         raise ValueError('Somehow the region contains zero pixels.')
 
     # Compute the center of the region's bounding box.
@@ -278,7 +278,6 @@ def _region_of_interest_to_patch(region_mask_table_xarray, patch_size_deg):
         float(patch_size_deg) / neural_net.GRID_SPACING_DEG
     ))
 
-    # TODO(thunderhoser): Need to stop subsetting before this method.
     num_rows_in_full_grid = len(mtx.coords[region_mask_io.ROW_DIM].values)
     num_columns_in_full_grid = len(mtx.coords[region_mask_io.ROW_DIM].values)
 
