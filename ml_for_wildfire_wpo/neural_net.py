@@ -1461,7 +1461,7 @@ def _read_gfs_data_1example(
 
     if num_lead_times_for_interp is not None:
         if predictor_matrix_3d is not None:
-            predictor_matrix_3d = _interp_predictors_by_lead_time(
+            predictor_matrix_3d = _interp_predictors_by_lead_time_better(
                 predictor_matrix=predictor_matrix_3d,
                 source_lead_times_hours=lead_times_hours,
                 num_target_lead_times=num_lead_times_for_interp
@@ -1469,7 +1469,7 @@ def _read_gfs_data_1example(
             predictor_matrix_3d = predictor_matrix_3d.astype('float32')
 
         if predictor_matrix_2d is not None:
-            predictor_matrix_2d = _interp_predictors_by_lead_time(
+            predictor_matrix_2d = _interp_predictors_by_lead_time_better(
                 predictor_matrix=predictor_matrix_2d,
                 source_lead_times_hours=lead_times_hours,
                 num_target_lead_times=num_lead_times_for_interp
@@ -1624,6 +1624,224 @@ def _read_lagged_targets_1example(
     target_field_matrix = target_field_matrix.astype('float32')
 
     return target_field_matrix, desired_row_indices, desired_column_indices
+
+
+def _interp_predictors_by_lead_time_better(
+        predictor_matrix, source_lead_times_hours, num_target_lead_times):
+    """Interpolates predictors to fill missing lead times.
+
+    M = number of rows in grid
+    N = number of columns in grid
+    S = number of source lead times
+    T = number of target lead times
+    F = number of fields
+    P = number of pressure levels
+
+    :param predictor_matrix: M-by-N-by-S-by-F or M-by-N-by-P-by-S-by-F numpy
+        array of predictor values.
+    :param source_lead_times_hours: length-S numpy array of source lead times.
+        This method assumes that `source_lead_times_hours` is sorted.
+    :param num_target_lead_times: T in the above definitions.
+    :return: predictor_matrix: M-by-N-by-T-by-F or M-by-N-by-P-by-T-by-F numpy
+        array of interpolated predictor values.
+    """
+
+    target_lead_times_hours = numpy.linspace(
+        source_lead_times_hours[0], source_lead_times_hours[-1],
+        num=num_target_lead_times, dtype=float
+    )
+    target_to_source_index = numpy.full(num_target_lead_times, -1, dtype=int)
+
+    for t in range(num_target_lead_times):
+        good_indices = numpy.where(
+            numpy.absolute(source_lead_times_hours - target_lead_times_hours[t])
+            <= TOLERANCE
+        )[0]
+
+        if len(good_indices) == 0:
+            continue
+
+        target_to_source_index[t] = good_indices[0]
+
+    num_fields = predictor_matrix.shape[-1]
+    has_pressure_levels = len(predictor_matrix.shape) == 5
+
+    if has_pressure_levels:
+        num_pressure_levels = predictor_matrix.shape[-3]
+        these_dim = (
+            predictor_matrix.shape[:2] +
+            (num_pressure_levels, num_target_lead_times, num_fields)
+        )
+        new_predictor_matrix = numpy.full(these_dim, numpy.nan)
+
+        for p in range(num_pressure_levels):
+            for f in range(num_fields):
+                missing_target_time_flags = numpy.full(
+                    num_target_lead_times, True, dtype=bool
+                )
+
+                for t in range(num_target_lead_times):
+                    if target_to_source_index[t] == -1:
+                        continue
+
+                    this_predictor_matrix = predictor_matrix[
+                        ..., p, target_to_source_index[t], f
+                    ]
+                    missing_target_time_flags[t] = numpy.all(numpy.isnan(
+                        this_predictor_matrix
+                    ))
+
+                    if missing_target_time_flags[t]:
+                        continue
+
+                    new_predictor_matrix[..., p, t, f] = (
+                        this_predictor_matrix + 0.
+                    )
+
+                missing_target_time_indices = numpy.where(
+                    missing_target_time_flags
+                )[0]
+                if len(missing_target_time_indices) == 0:
+                    continue
+
+                missing_source_time_flags = numpy.all(
+                    numpy.isnan(predictor_matrix[..., p, :, f]),
+                    axis=(0, 1)
+                )
+                filled_source_time_indices = numpy.where(
+                    numpy.invert(missing_source_time_flags)
+                )[0]
+
+                if len(filled_source_time_indices) == 0:
+                    continue
+
+                missing_target_time_indices = [
+                    t for t in missing_target_time_indices
+                    if target_lead_times_hours[t] >= numpy.min(
+                        source_lead_times_hours[filled_source_time_indices]
+                    )
+                ]
+                missing_target_time_indices = [
+                    t for t in missing_target_time_indices
+                    if target_lead_times_hours[t] <= numpy.max(
+                        source_lead_times_hours[filled_source_time_indices]
+                    )
+                ]
+
+                missing_target_time_indices = numpy.array(
+                    missing_target_time_indices, dtype=int
+                )
+                if len(missing_target_time_indices) == 0:
+                    continue
+
+                interp_object = interp1d(
+                    x=source_lead_times_hours[filled_source_time_indices],
+                    y=predictor_matrix[..., p, filled_source_time_indices, f],
+                    axis=3,
+                    kind='linear',
+                    bounds_error=True,
+                    assume_sorted=True
+                )
+
+                print((
+                    'Interpolating data from lead times of {0:s} hours to lead '
+                    'times of {1:s} hours...'
+                ).format(
+                    str(source_lead_times_hours[filled_source_time_indices]),
+                    str(target_lead_times_hours[missing_target_time_indices])
+                ))
+
+                new_predictor_matrix[
+                    ..., p, missing_target_time_indices, f
+                ] = interp_object(
+                    target_lead_times_hours[missing_target_time_indices]
+                )
+
+        return new_predictor_matrix
+
+    these_dim = (
+        predictor_matrix.shape[:2] + (num_target_lead_times, num_fields)
+    )
+    new_predictor_matrix = numpy.full(these_dim, numpy.nan)
+
+    for f in range(num_fields):
+        missing_target_time_flags = numpy.full(
+            num_target_lead_times, True, dtype=bool
+        )
+
+        for t in range(num_target_lead_times):
+            if target_to_source_index[t] == -1:
+                continue
+
+            this_predictor_matrix = predictor_matrix[
+                ..., target_to_source_index[t], f
+            ]
+            missing_target_time_flags[t] = numpy.all(numpy.isnan(
+                this_predictor_matrix
+            ))
+
+            if missing_target_time_flags[t]:
+                continue
+
+            new_predictor_matrix[..., t, f] = this_predictor_matrix + 0.
+
+        missing_target_time_indices = numpy.where(missing_target_time_flags)[0]
+        if len(missing_target_time_indices) == 0:
+            continue
+
+        missing_source_time_flags = numpy.all(
+            numpy.isnan(predictor_matrix[..., f]), axis=(0, 1)
+        )
+        filled_source_time_indices = numpy.where(
+            numpy.invert(missing_source_time_flags)
+        )[0]
+
+        if len(filled_source_time_indices) == 0:
+            continue
+
+        missing_target_time_indices = [
+            t for t in missing_target_time_indices
+            if target_lead_times_hours[t] >= numpy.min(
+                source_lead_times_hours[filled_source_time_indices]
+            )
+        ]
+        missing_target_time_indices = [
+            t for t in missing_target_time_indices
+            if target_lead_times_hours[t] <= numpy.max(
+                source_lead_times_hours[filled_source_time_indices]
+            )
+        ]
+
+        missing_target_time_indices = numpy.array(
+            missing_target_time_indices, dtype=int
+        )
+        if len(missing_target_time_indices) == 0:
+            continue
+
+        interp_object = interp1d(
+            x=source_lead_times_hours[filled_source_time_indices],
+            y=predictor_matrix[..., filled_source_time_indices, f],
+            axis=2,
+            kind='linear',
+            bounds_error=True,
+            assume_sorted=True
+        )
+
+        print((
+            'Interpolating data from lead times of {0:s} hours to lead '
+            'times of {1:s} hours...'
+        ).format(
+            str(source_lead_times_hours[filled_source_time_indices]),
+            str(target_lead_times_hours[missing_target_time_indices])
+        ))
+
+        new_predictor_matrix[
+            ..., missing_target_time_indices, f
+        ] = interp_object(
+            target_lead_times_hours[missing_target_time_indices]
+        )
+
+    return new_predictor_matrix
 
 
 def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
@@ -2308,7 +2526,7 @@ def data_generator(option_dict):
                 ])
 
                 this_laglead_target_predictor_matrix = (
-                    _interp_predictors_by_lead_time(
+                    _interp_predictors_by_lead_time_better(
                         predictor_matrix=this_laglead_target_predictor_matrix,
                         source_lead_times_hours=
                         DAYS_TO_HOURS * source_lead_times_days,
@@ -2790,7 +3008,7 @@ def data_generator_fast_patches(option_dict):
                     ])
 
                     full_laglead_target_predictor_matrix = (
-                        _interp_predictors_by_lead_time(
+                        _interp_predictors_by_lead_time_better(
                             predictor_matrix=
                             full_laglead_target_predictor_matrix,
                             source_lead_times_hours=
@@ -3250,7 +3468,7 @@ def create_data(
         ])
 
         laglead_target_predictor_matrix = (
-            _interp_predictors_by_lead_time(
+            _interp_predictors_by_lead_time_better(
                 predictor_matrix=laglead_target_predictor_matrix,
                 source_lead_times_hours=
                 DAYS_TO_HOURS * source_lead_times_days,
