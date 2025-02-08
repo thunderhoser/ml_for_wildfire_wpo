@@ -2828,6 +2828,13 @@ def data_generator_fast_patches(option_dict):
         gfs_file_names=gfs_file_names
     )
 
+    num_buffer_rows = int(numpy.round(
+        float(outer_latitude_buffer_deg) / GRID_SPACING_DEG
+    ))
+    num_buffer_columns = int(numpy.round(
+        float(outer_longitude_buffer_deg) / GRID_SPACING_DEG
+    ))
+
     while True:
         emd = empty_matrix_dict
 
@@ -3103,7 +3110,8 @@ def data_generator_fast_patches(option_dict):
                     [full_target_matrix, full_weight_matrix], axis=-1
                 )
 
-            # Skip 75% of patches.
+            # TODO(thunderhoser): This option (skipping 80% of patches) should
+            # not be hard-coded.
             if numpy.random.uniform(low=0., high=1., size=1)[0] < 0.8:
                 continue
 
@@ -3120,6 +3128,19 @@ def data_generator_fast_patches(option_dict):
             j_end = pld[misc_utils.ROW_LIMITS_KEY][1] + 1
             k_start = pld[misc_utils.COLUMN_LIMITS_KEY][0]
             k_end = pld[misc_utils.COLUMN_LIMITS_KEY][1] + 1
+
+            this_weight_matrix = full_target_matrix_with_weights[
+                j_start:j_end, k_start:k_end, ..., -1
+            ] + 0.
+            this_weight_matrix[:num_buffer_rows, ..., -1] = 0.
+            this_weight_matrix[-num_buffer_rows:, ..., -1] = 0.
+            this_weight_matrix[:, :num_buffer_columns, ..., -1] = 0.
+            this_weight_matrix[: -num_buffer_columns:, ..., -1] = 0.
+
+            # If all evaluation weights are zero, do not train with this patch.
+            if numpy.sum(this_weight_matrix) < TOLERANCE:
+                continue
+
             i = num_examples_in_memory + 0
 
             if full_gfs_predictor_matrix_3d is not None:
@@ -3152,12 +3173,6 @@ def data_generator_fast_patches(option_dict):
 
             num_examples_in_memory += 1
 
-        num_buffer_rows = int(numpy.round(
-            float(outer_latitude_buffer_deg) / GRID_SPACING_DEG
-        ))
-        num_buffer_columns = int(numpy.round(
-            float(outer_longitude_buffer_deg) / GRID_SPACING_DEG
-        ))
         target_matrix_with_weights[:, :num_buffer_rows, ..., -1] = 0.
         target_matrix_with_weights[:, -num_buffer_rows:, ..., -1] = 0.
         target_matrix_with_weights[:, :, :num_buffer_columns, ..., -1] = 0.
