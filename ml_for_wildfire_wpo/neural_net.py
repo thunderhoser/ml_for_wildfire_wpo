@@ -3695,7 +3695,7 @@ def create_data(
         patch_target_matrix_with_weights[:, :num_buffer_rows, ..., -1] = 0.
         patch_target_matrix_with_weights[:, -num_buffer_rows:, ..., -1] = 0.
         patch_target_matrix_with_weights[:, :, :num_buffer_columns, ..., -1] = 0.
-        patch_target_matrix_with_weights[:, : -num_buffer_columns:, ..., -1] = 0.
+        patch_target_matrix_with_weights[:, :, -num_buffer_columns:, ..., -1] = 0.
 
         return {
             PREDICTOR_MATRICES_KEY: patch_predictor_matrices,
@@ -3825,7 +3825,7 @@ def create_data(
     patch_target_matrix_with_weights[:, :num_buffer_rows, ..., -1] = 0.
     patch_target_matrix_with_weights[:, -num_buffer_rows:, ..., -1] = 0.
     patch_target_matrix_with_weights[:, :, :num_buffer_columns, ..., -1] = 0.
-    patch_target_matrix_with_weights[:, : -num_buffer_columns:, ..., -1] = 0.
+    patch_target_matrix_with_weights[:, : ,-num_buffer_columns:, ..., -1] = 0.
 
     return {
         PREDICTOR_MATRICES_KEY: patch_predictor_matrices,
