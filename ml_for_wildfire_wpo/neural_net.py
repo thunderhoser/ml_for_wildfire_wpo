@@ -1737,7 +1737,7 @@ def _interp_predictors_by_lead_time_better(
                 interp_object = interp1d(
                     x=source_lead_times_hours[filled_source_time_indices],
                     y=predictor_matrix[..., p, filled_source_time_indices, f],
-                    axis=3,
+                    axis=2,
                     kind='linear',
                     bounds_error=True,
                     assume_sorted=True
