@@ -3177,7 +3177,7 @@ def data_generator_fast_patches(option_dict):
         target_matrix_with_weights[:, :num_buffer_rows, ..., -1] = 0.
         target_matrix_with_weights[:, -num_buffer_rows:, ..., -1] = 0.
         target_matrix_with_weights[:, :, :num_buffer_columns, ..., -1] = 0.
-        target_matrix_with_weights[:, : -num_buffer_columns:, ..., -1] = 0.
+        target_matrix_with_weights[:, :, -num_buffer_columns:, ..., -1] = 0.
 
         predictor_matrices = __report_data_properties(
             gfs_predictor_matrix_3d=gfs_predictor_matrix_3d,
