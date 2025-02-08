@@ -2792,9 +2792,6 @@ def data_generator_fast_patches(option_dict):
         outer_longitude_buffer_deg=outer_longitude_buffer_deg
     )
     full_weight_matrix = numpy.expand_dims(full_weight_matrix, axis=-1)
-    print('Sum of full_weight_matrix = {0:.4f}'.format(
-        numpy.sum(full_weight_matrix)
-    ))
 
     gfs_file_index = 0
     desired_gfs_row_indices = numpy.array([], dtype=int)
@@ -3140,8 +3137,9 @@ def data_generator_fast_patches(option_dict):
             this_weight_matrix[:, :num_buffer_columns, ...] = 0.
             this_weight_matrix[:, -num_buffer_columns:, ...] = 0.
 
-            # If all evaluation weights are zero, do not train with this patch.
-            if numpy.sum(this_weight_matrix) < TOLERANCE:
+            # If all evaluation weights are too small, do not train with this
+            # patch.
+            if numpy.all(this_weight_matrix) < MASK_PIXEL_IF_WEIGHT_BELOW:
                 continue
 
             i = num_examples_in_memory + 0
