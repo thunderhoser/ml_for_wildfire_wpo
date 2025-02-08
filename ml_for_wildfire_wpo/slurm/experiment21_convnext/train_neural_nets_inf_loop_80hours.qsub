@@ -1,0 +1,131 @@
+#!/bin/bash
+
+#SBATCH --job-name="train_neural_nets_inf_loop"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=80:00:00
+#SBATCH --array=0-55
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=train_neural_nets_inf_loop_%A_%a.out
+
+module load cuda/12.3.1
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TEMPLATE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment21_convnext/templates"
+TOP_OUTPUT_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment21_convnext"
+
+GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
+TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
+TARGET_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi/normalization_params_2019-2020.nc"
+ERA5_CONSTANT_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/era5_constants.nc"
+ERA5_CONSTANT_NORM_FILE_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/normalization_params_era5_constants.nc"
+
+TRAINING_STRATEGIES=("20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days")
+SPECTRAL_COMPLEXITIES=("010" "010" "010" "010" "010" "010" "010" "010" "015" "015" "015" "015" "015" "015" "015" "015" "020" "020" "020" "020" "020" "020" "020" "020" "025" "025" "025" "025" "025" "025" "025" "025" "030" "030" "030" "030" "030" "030" "030" "030" "035" "035" "035" "035" "035" "035" "035" "035" "040" "040" "040" "040" "040" "040" "040" "040")
+USE_LEAD_TIME_AS_PRED_FLAGS=("0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1")
+
+training_strategy=${TRAINING_STRATEGIES[$SLURM_ARRAY_TASK_ID]}
+spectral_complexity=${SPECTRAL_COMPLEXITIES[$SLURM_ARRAY_TASK_ID]}
+use_lead_time_as_predictor=${USE_LEAD_TIME_AS_PRED_FLAGS[$SLURM_ARRAY_TASK_ID]}
+
+if [ "$training_strategy" = "20-50-diff-plus2days" ]; then
+    gfs_pred_leads_hours_by_model_lead="0 12 24 36 48 60 72 -1   0 24 48 72 96 -1   0 24 48 72 96 120 -1   0 24 48 72 96 120 144 -1   0 24 48 72 96 120 144 168 -1   0 48 96 144 192 -1   0 72 144 216 -1   0 48 96 144 192 240 -1   0 24 48 72 96 120 144 168 192 216 240 264 -1   0 72 144 216 288 -1   0 24 48 72 96 120 144 168 192 216 240 264 288 312 -1   0 48 96 144 192 240 288 336 -1   0 48 96 144 192 240 288 336 -1   0 48 96 144 192 240 288 336 -1"                                
+    gfs_target_leads_days_by_model_lead="1 2 3 -1   1 2 3 4 -1   1 2 3 4 5 -1   2 4 6 -1   1 3 5 7 -1   2 4 6 8 -1   1 3 5 7 9 -1   2 4 6 8 10 -1   1 3 5 7 9 11 -1   2 4 6 8 10 12 -1   1 3 5 7 9 11 13 -1   2 4 6 8 10 12 14 -1   2 4 6 8 10 11 12 13 14 -1   2 4 6 8 10 11 12 13 14"
+    target_lags_days_by_model_lead="1 2 3 -1   1 2 3 4 -1   1 2 3 4 5 -1   2 4 6 -1   1 3 5 7 -1   2 4 6 8 -1   1 3 5 7 9 -1   2 4 6 8 10 -1   1 3 5 7 9 11 -1   2 4 6 8 10 12 -1   1 3 5 7 9 11 13 -1   2 4 6 8 10 12 14 -1   2 4 6 8 10 11 12 13 14 -1   2 4 6 8 10 11 12 13 14"
+    predictor_time_strategy="different-valid-times-up-to-target-time-plus2days"
+    second_lead_time_start_epoch=20
+    num_rampup_epochs=50
+elif [ "$training_strategy" = "40-10-diff" ]; then
+    gfs_pred_leads_hours_by_model_lead="0 6 12 18 24 -1   0 12 24 36 48 -1   0 24 48 72 -1   0 24 48 72 96 -1   0 24 48 72 96 120 -1   0 24 48 72 96 120 144 -1   0 24 48 72 96 120 144 168 -1   0 48 96 144 192 -1   0 72 144 216 -1   0 48 96 144 192 240 -1   0 24 48 72 96 120 144 168 192 216 240 264 -1   0 72 144 216 288 -1   0 24 48 72 96 120 144 168 192 216 240 264 288 312 -1   0 48 96 144 192 240 288 336"
+    gfs_target_leads_days_by_model_lead="1 -1   1 2 -1   1 2 3 -1   1 2 3 4 -1   1 2 3 4 5 -1   2 4 6 -1   1 3 5 7 -1   2 4 6 8 -1   1 3 5 7 9 -1   2 4 6 8 10 -1   1 3 5 7 9 11 -1   2 4 6 8 10 12 -1   1 3 5 7 9 11 13 -1   2 4 6 8 10 12 14"
+    target_lags_days_by_model_lead="1 -1   1 2 -1   1 2 3 -1   1 2 3 4 -1   1 2 3 4 5 -1   2 4 6 -1   1 3 5 7 -1   2 4 6 8 -1   1 3 5 7 9 -1   2 4 6 8 10 -1   1 3 5 7 9 11 -1   2 4 6 8 10 12 -1   1 3 5 7 9 11 13 -1   2 4 6 8 10 12 14"
+    predictor_time_strategy="different-valid-times-up-to-target-time"
+    second_lead_time_start_epoch=40
+    num_rampup_epochs=10
+elif [ "$training_strategy" = "20-30-daily" ]; then
+    gfs_pred_leads_hours_by_model_lead="0 24 -1   0 24 48 -1   0 24 48 72 -1   0 24 48 72 96 -1    0 24 48 72 96 120 -1    0 24 48 72 96 120 144 -1    0 24 48 72 96 120 144 168 -1    0 24 48 72 96 120 144 168 192 -1    0 24 48 72 96 120 144 168 192 216 -1    0 24 48 72 96 120 144 168 192 216 240 -1    0 24 48 72 96 120 144 168 192 216 240 264 -1    0 24 48 72 96 120 144 168 192 216 240 264 288 -1    0 24 48 72 96 120 144 168 192 216 240 264 288 312 -1    0 24 48 72 96 120 144 168 192 216 240 264 288 312 336"
+    gfs_target_leads_days_by_model_lead="1 -1   1 2 -1   1 2 3 -1   1 2 3 4 -1   1 2 3 4 5 -1   1 2 3 4 5 6 -1   1 2 3 4 5 6 7 -1   1 2 3 4 5 6 7 8 -1   1 2 3 4 5 6 7 8 9 -1   1 2 3 4 5 6 7 8 9 10 -1   1 2 3 4 5 6 7 8 9 10 11 -1   1 2 3 4 5 6 7 8 9 10 11 12 -1   1 2 3 4 5 6 7 8 9 10 11 12 13 -1   1 2 3 4 5 6 7 8 9 10 11 12 13 14"
+    target_lags_days_by_model_lead="1 -1   1 2 -1   1 2 3 -1   1 2 3 4 -1   1 2 3 4 5 -1   1 2 3 4 5 6 -1   1 2 3 4 5 6 7 -1   1 2 3 4 5 6 7 8 -1   1 2 3 4 5 6 7 8 9 -1   1 2 3 4 5 6 7 8 9 10 -1   1 2 3 4 5 6 7 8 9 10 11 -1   1 2 3 4 5 6 7 8 9 10 11 12 -1   1 2 3 4 5 6 7 8 9 10 11 12 13 -1   1 2 3 4 5 6 7 8 9 10 11 12 13 14"
+    predictor_time_strategy="all-daily-valid-times-up-to-target-time"
+    second_lead_time_start_epoch=20
+    num_rampup_epochs=30
+elif [ "$training_strategy" = "80-40-diff-plus2days" ]; then
+    gfs_pred_leads_hours_by_model_lead="0 12 24 36 48 60 72 -1   0 24 48 72 96 -1   0 24 48 72 96 120 -1   0 24 48 72 96 120 144 -1   0 24 48 72 96 120 144 168 -1   0 48 96 144 192 -1   0 72 144 216 -1   0 48 96 144 192 240 -1   0 24 48 72 96 120 144 168 192 216 240 264 -1   0 72 144 216 288 -1   0 24 48 72 96 120 144 168 192 216 240 264 288 312 -1   0 48 96 144 192 240 288 336 -1   0 48 96 144 192 240 288 336 -1   0 48 96 144 192 240 288 336 -1"                                
+    gfs_target_leads_days_by_model_lead="1 2 3 -1   1 2 3 4 -1   1 2 3 4 5 -1   2 4 6 -1   1 3 5 7 -1   2 4 6 8 -1   1 3 5 7 9 -1   2 4 6 8 10 -1   1 3 5 7 9 11 -1   2 4 6 8 10 12 -1   1 3 5 7 9 11 13 -1   2 4 6 8 10 12 14 -1   2 4 6 8 10 11 12 13 14 -1   2 4 6 8 10 11 12 13 14"
+    target_lags_days_by_model_lead="1 2 3 -1   1 2 3 4 -1   1 2 3 4 5 -1   2 4 6 -1   1 3 5 7 -1   2 4 6 8 -1   1 3 5 7 9 -1   2 4 6 8 10 -1   1 3 5 7 9 11 -1   2 4 6 8 10 12 -1   1 3 5 7 9 11 13 -1   2 4 6 8 10 12 14 -1   2 4 6 8 10 11 12 13 14 -1   2 4 6 8 10 11 12 13 14"
+    predictor_time_strategy="different-valid-times-up-to-target-time-plus2days"
+    second_lead_time_start_epoch=80
+    num_rampup_epochs=40
+fi
+
+template_file_name="${TEMPLATE_DIR_NAME}/predictor-time-strategy=${predictor_time_strategy}_spectral-complexity=${spectral_complexity}_use-lead-time-as-predictor=${use_lead_time_as_predictor}/model.keras"
+output_dir_name="${TOP_OUTPUT_DIR_NAME}/training-strategy=${training_strategy}_spectral-complexity=${spectral_complexity}_use-lead-time-as-predictor=${use_lead_time_as_predictor}"
+echo $output_dir_name
+
+while true; do
+    python3 -u "${CODE_DIR_NAME}/train_neural_net.py" \
+    --input_template_file_name="${template_file_name}" \
+    --output_model_dir_name="${output_dir_name}" \
+    --inner_latitude_limits_deg_n 17 73 \
+    --inner_longitude_limits_deg_e 171 -65 \
+    --outer_latitude_buffer_deg=5 \
+    --outer_longitude_buffer_deg=5 \
+    --gfs_predictor_field_names "temperature_kelvins" "specific_humidity_kg_kg01" "geopotential_height_m_asl" "u_wind_m_s01" "v_wind_m_s01" "temperature_2m_agl_kelvins" "specific_humidity_2m_agl_kg_kg01" "u_wind_10m_agl_m_s01" "v_wind_10m_agl_m_s01" "accumulated_precip_metres" \
+    --gfs_pressure_levels_mb 500 700 \
+    --model_lead_times_days 1 2 3 4 5 6 7 8 9 10 11 12 13 14 \
+    --curriculum_start_epoch_by_model_lead 0 ${second_lead_time_start_epoch} $((second_lead_time_start_epoch + num_rampup_epochs)) $((second_lead_time_start_epoch + 2 * num_rampup_epochs)) $((second_lead_time_start_epoch + 3 * num_rampup_epochs)) $((second_lead_time_start_epoch + 4 * num_rampup_epochs)) $((second_lead_time_start_epoch + 5 * num_rampup_epochs)) $((second_lead_time_start_epoch + 6 * num_rampup_epochs)) $((second_lead_time_start_epoch + 7 * num_rampup_epochs)) $((second_lead_time_start_epoch + 8 * num_rampup_epochs)) $((second_lead_time_start_epoch + 9 * num_rampup_epochs)) $((second_lead_time_start_epoch + 10 * num_rampup_epochs)) $((second_lead_time_start_epoch + 11 * num_rampup_epochs)) $((second_lead_time_start_epoch + 12 * num_rampup_epochs)) \
+    --curriculum_num_rampup_epochs=${num_rampup_epochs} \
+    --gfs_pred_leads_hours_by_model_lead ${gfs_pred_leads_hours_by_model_lead} \
+    --gfs_normalization_file_name="" \
+    --era5_constant_file_name="${ERA5_CONSTANT_FILE_NAME}" \
+    --era5_normalization_file_name="${ERA5_CONSTANT_NORM_FILE_NAME}" \
+    --era5_use_quantile_norm=1 \
+    --era5_constant_predictor_field_names "subgrid_orography_angle_sine" "subgrid_orography_angle_cosine" "subgrid_orography_angle_anisotropy" "geopotential_m2_s02" "subgrid_orography_angle_slope" "filtered_subgrid_orography_stdev_metres" "resolved_orography_stdev_metres" \
+    --target_field_names "fine_fuel_moisture_code" "duff_moisture_code" "drought_code" "initial_spread_index" \
+    --target_lags_days_by_model_lead ${target_lags_days_by_model_lead} \
+    --gfs_target_leads_days_by_model_lead ${gfs_target_leads_days_by_model_lead} \
+    --compare_to_gfs_in_loss=1 \
+    --target_normalization_file_name="${TARGET_NORM_FILE_NAME}" \
+    --targets_use_quantile_norm=1 \
+    --num_examples_per_batch=1 \
+    --sentinel_value=-10 \
+    --do_residual_prediction=1 \
+    --use_lead_time_as_predictor=${use_lead_time_as_predictor} \
+    --change_model_lead_every_n_batches=-1 \
+    --outer_patch_size_deg=40 \
+    --outer_patch_overlap_size_deg=15 \
+    --gfs_dir_name_for_training="${GFS_DIR_NAME}" \
+    --target_dir_name_for_training="${TARGET_DIR_NAME}" \
+    --gfs_forecast_target_dir_name_for_training="${GFS_FORECAST_TARGET_DIR_NAME}" \
+    --gfs_init_date_limit_strings_for_training "20190101" "20201210" \
+    --gfs_dir_name_for_validation="${GFS_DIR_NAME}" \
+    --target_dir_name_for_validation="${TARGET_DIR_NAME}" \
+    --gfs_forecast_target_dir_name_for_validation="${GFS_FORECAST_TARGET_DIR_NAME}" \
+    --gfs_init_date_limit_strings_for_validation "20210101" "20211210" \
+    --num_epochs=10000 \
+    --num_training_batches_per_epoch=704 \
+    --num_validation_batches_per_epoch=264 \
+    --plateau_patience_epochs=${num_rampup_epochs} \
+    --plateau_learning_rate_multiplier=0.95 \
+    --early_stopping_patience_epochs=10000
+done
