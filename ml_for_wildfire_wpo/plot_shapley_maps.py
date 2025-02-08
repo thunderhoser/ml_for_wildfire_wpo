@@ -930,20 +930,9 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
             patch_start_latitude_deg_n = None
             patch_start_longitude_deg_e = None
         else:
-            region_mask_file_name = stx.attrs[shapley_io.REGION_MASK_FILE_KEY]
-
-            print('Reading mask from: "{0:s}"...'.format(region_mask_file_name))
-            mask_table_xarray = region_mask_io.read_file(region_mask_file_name)
-            mtx = mask_table_xarray
-
-            row_idxs, col_idxs = numpy.where(
-                mtx[region_mask_io.REGION_MASK_KEY].values
-            )
-            patch_start_latitude_deg_n = (
-                mtx[region_mask_io.LATITUDE_KEY].values[numpy.min(row_idxs)]
-            )
+            patch_start_latitude_deg_n = stx[shapley_io.LATITUDE_KEY].values[0]
             patch_start_longitude_deg_e = (
-                mtx[region_mask_io.LONGITUDE_KEY].values[numpy.min(col_idxs)]
+                stx[shapley_io.LONGITUDE_KEY].values[0]
             )
 
         print(SEPARATOR_STRING)
