@@ -117,6 +117,8 @@ TARGETS_AND_WEIGHTS_KEY = 'target_matrix_with_weights'
 GRID_LATITUDE_MATRIX_KEY = 'grid_latitudes_deg_n'
 GRID_LONGITUDE_MATRIX_KEY = 'grid_longitudes_deg_e'
 INPUT_LAYER_NAMES_KEY = 'input_layer_names'
+GFS_PRED_LEAD_TIMES_KEY = 'gfs_pred_lead_times_hours'
+TARGET_LAGLEAD_TIMES_KEY = 'target_laglead_times_hours'
 
 GFS_3D_LAYER_NAME = 'gfs_3d_inputs'
 GFS_2D_LAYER_NAME = 'gfs_2d_inputs'
@@ -1454,7 +1456,7 @@ def _read_gfs_data_1example(
 
     if num_lead_times_for_interp is not None:
         if predictor_matrix_3d is not None:
-            predictor_matrix_3d = _interp_predictors_by_lead_time(
+            predictor_matrix_3d = _interp_predictors_by_lead_time_better(
                 predictor_matrix=predictor_matrix_3d,
                 source_lead_times_hours=lead_times_hours,
                 num_target_lead_times=num_lead_times_for_interp
@@ -1462,7 +1464,7 @@ def _read_gfs_data_1example(
             predictor_matrix_3d = predictor_matrix_3d.astype('float32')
 
         if predictor_matrix_2d is not None:
-            predictor_matrix_2d = _interp_predictors_by_lead_time(
+            predictor_matrix_2d = _interp_predictors_by_lead_time_better(
                 predictor_matrix=predictor_matrix_2d,
                 source_lead_times_hours=lead_times_hours,
                 num_target_lead_times=num_lead_times_for_interp
@@ -1730,7 +1732,7 @@ def _interp_predictors_by_lead_time_better(
                 interp_object = interp1d(
                     x=source_lead_times_hours[filled_source_time_indices],
                     y=predictor_matrix[..., p, filled_source_time_indices, f],
-                    axis=3,
+                    axis=2,
                     kind='linear',
                     bounds_error=True,
                     assume_sorted=True
@@ -2519,7 +2521,7 @@ def data_generator(option_dict):
                 ])
 
                 this_laglead_target_predictor_matrix = (
-                    _interp_predictors_by_lead_time(
+                    _interp_predictors_by_lead_time_better(
                         predictor_matrix=this_laglead_target_predictor_matrix,
                         source_lead_times_hours=
                         DAYS_TO_HOURS * source_lead_times_days,
@@ -3001,7 +3003,7 @@ def data_generator_fast_patches(option_dict):
                     ])
 
                     full_laglead_target_predictor_matrix = (
-                        _interp_predictors_by_lead_time(
+                        _interp_predictors_by_lead_time_better(
                             predictor_matrix=
                             full_laglead_target_predictor_matrix,
                             source_lead_times_hours=
@@ -3461,7 +3463,7 @@ def create_data(
         ])
 
         laglead_target_predictor_matrix = (
-            _interp_predictors_by_lead_time(
+            _interp_predictors_by_lead_time_better(
                 predictor_matrix=laglead_target_predictor_matrix,
                 source_lead_times_hours=
                 DAYS_TO_HOURS * source_lead_times_days,
@@ -3537,6 +3539,25 @@ def create_data(
         grid_longitudes_deg_e, axis=0
     )
 
+    gfs_pred_lead_times_hours = gfs_pred_lead_times_hours.astype(float)
+    if num_gfs_hours_for_interp is not None:
+        gfs_pred_lead_times_hours = numpy.linspace(
+            gfs_pred_lead_times_hours[0], gfs_pred_lead_times_hours[-1],
+            num=num_gfs_hours_for_interp, dtype=float
+        )
+
+    target_laglead_times_hours = 24 * numpy.concatenate([
+        numpy.sort(-1 * target_lag_times_days),
+        gfs_target_lead_times_days
+    ])
+    target_laglead_times_hours = target_laglead_times_hours.astype(float)
+
+    if num_target_times_for_interp is not None:
+        target_laglead_times_hours = numpy.linspace(
+            target_laglead_times_hours[0], target_laglead_times_hours[-1],
+            num=num_target_times_for_interp, dtype=float
+        )
+
     patch_size_deg = option_dict[OUTER_PATCH_SIZE_DEG_KEY]
     patch_overlap_size_deg = option_dict[OUTER_PATCH_OVERLAP_DEG_KEY]
 
@@ -3546,7 +3567,9 @@ def create_data(
             TARGETS_AND_WEIGHTS_KEY: target_matrix_with_weights,
             GRID_LATITUDE_MATRIX_KEY: grid_latitude_matrix_deg_n,
             GRID_LONGITUDE_MATRIX_KEY: grid_longitude_matrix_deg_e,
-            INPUT_LAYER_NAMES_KEY: input_layer_names
+            INPUT_LAYER_NAMES_KEY: input_layer_names,
+            GFS_PRED_LEAD_TIMES_KEY: gfs_pred_lead_times_hours,
+            TARGET_LAGLEAD_TIMES_KEY: target_laglead_times_hours
         }
 
     # Deal with specific patch location.
@@ -3656,7 +3679,9 @@ def create_data(
             TARGETS_AND_WEIGHTS_KEY: patch_target_matrix_with_weights,
             GRID_LATITUDE_MATRIX_KEY: patch_latitude_matrix_deg_n,
             GRID_LONGITUDE_MATRIX_KEY: patch_longitude_matrix_deg_e,
-            INPUT_LAYER_NAMES_KEY: input_layer_names
+            INPUT_LAYER_NAMES_KEY: input_layer_names,
+            GFS_PRED_LEAD_TIMES_KEY: gfs_pred_lead_times_hours,
+            TARGET_LAGLEAD_TIMES_KEY: target_laglead_times_hours
         }
 
     # Determine number of patches in full grid.
@@ -3784,7 +3809,9 @@ def create_data(
         TARGETS_AND_WEIGHTS_KEY: patch_target_matrix_with_weights,
         GRID_LATITUDE_MATRIX_KEY: patch_latitude_matrix_deg_n,
         GRID_LONGITUDE_MATRIX_KEY: patch_longitude_matrix_deg_e,
-        INPUT_LAYER_NAMES_KEY: input_layer_names
+        INPUT_LAYER_NAMES_KEY: input_layer_names,
+        GFS_PRED_LEAD_TIMES_KEY: gfs_pred_lead_times_hours,
+        TARGET_LAGLEAD_TIMES_KEY: target_laglead_times_hours
     }
 
 
