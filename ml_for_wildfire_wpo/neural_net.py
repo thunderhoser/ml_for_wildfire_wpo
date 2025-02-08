@@ -1696,7 +1696,9 @@ def _interp_predictors_by_lead_time_better(
                     if missing_target_time_flags[t]:
                         continue
 
-                    new_predictor_matrix[..., p, t, f] = this_predictor_matrix
+                    new_predictor_matrix[..., p, t, f] = (
+                        this_predictor_matrix + 0.
+                    )
 
                 missing_target_time_indices = numpy.where(
                     missing_target_time_flags
@@ -1783,7 +1785,7 @@ def _interp_predictors_by_lead_time_better(
             if missing_target_time_flags[t]:
                 continue
 
-            new_predictor_matrix[..., t, f] = this_predictor_matrix
+            new_predictor_matrix[..., t, f] = this_predictor_matrix + 0.
 
         missing_target_time_indices = numpy.where(missing_target_time_flags)[0]
         if len(missing_target_time_indices) == 0:
