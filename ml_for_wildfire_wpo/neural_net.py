@@ -3169,7 +3169,7 @@ def data_generator_fast_patches(option_dict):
                 )
 
             target_matrix_with_weights[i, ...] = (
-                full_target_matrix_with_weights[j_start:j_end, k_start:k_end, ...] + 0.
+                full_target_matrix_with_weights[j_start:j_end, k_start:k_end, ...]
             )
 
             num_examples_in_memory += 1
@@ -3825,7 +3825,7 @@ def create_data(
     patch_target_matrix_with_weights[:, :num_buffer_rows, ..., -1] = 0.
     patch_target_matrix_with_weights[:, -num_buffer_rows:, ..., -1] = 0.
     patch_target_matrix_with_weights[:, :, :num_buffer_columns, ..., -1] = 0.
-    patch_target_matrix_with_weights[:, : ,-num_buffer_columns:, ..., -1] = 0.
+    patch_target_matrix_with_weights[:, :, -num_buffer_columns:, ..., -1] = 0.
 
     return {
         PREDICTOR_MATRICES_KEY: patch_predictor_matrices,

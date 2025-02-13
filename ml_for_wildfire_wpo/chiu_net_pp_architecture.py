@@ -9,6 +9,7 @@ import sys
 import numpy
 import keras
 import tensorflow
+from tensorflow.keras import backend as K
 
 THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
     os.path.join(os.getcwd(), os.path.expanduser(__file__))
@@ -139,6 +140,105 @@ class StochasticDepth(keras.layers.Layer):
                 "survival_prob": self.survival_prob
             }
         )
+        return config
+
+
+class DeriveBUIPredictions(keras.layers.Layer):
+    def __init__(self, dmc_index, dc_index, expect_ensemble=False, **kwargs):
+        """Constructor.
+        
+        :param dmc_index: Array index for DMC.  This tells the method that DMC
+        predictions can be found at prediction_tensor[:, :, :, dmc_index, ...].
+        :param dc_index: Same as above but for DC.
+        :param expect_ensemble: Boolean flag, indicating whether to expect
+        ensemble or deterministic predictions.
+        :param kwargs: Keyword arguments.
+        """
+        
+        super(DeriveBUIPredictions, self).__init__(**kwargs)
+        self.dmc_index = dmc_index
+        self.dc_index = dc_index
+        self.expect_ensemble = expect_ensemble
+
+    def _power(self, input_tensor, exponent):
+        """Computes power.
+    
+        :param input_tensor: Keras tensor.
+        :param exponent: Scalar exponent (float).
+        :return: power_tensor: Keras tensor with the same shape as 
+            input_tensor`.
+        """
+
+        power_tensor = K.pow(K.maximum(input_tensor, K.epsilon()), exponent)
+        return K.maximum(power_tensor, K.epsilon())
+
+    def _compute_bui(self, dmc_tensor, dc_tensor):
+        """Computes BUI from DMC and DC.
+        
+        :param dmc_tensor: Tensor of DMC values.
+        :param dc_tensor: Tensor of DC values.
+        :return: bui_tensor: Tensor of BUI values.
+        """
+        
+        new_dmc_tensor = K.maximum(dmc_tensor, K.epsilon())
+        new_dc_tensor = K.maximum(dc_tensor, K.epsilon())
+
+        bui_tensor = (
+            (0.8 * new_dmc_tensor * new_dc_tensor) /
+            (new_dmc_tensor + 0.4 * new_dc_tensor)
+        )
+        first_term = (new_dmc_tensor - bui_tensor) / new_dmc_tensor
+        second_term = 0.92 + self._power(0.0114 * new_dmc_tensor, 1.7)
+        prelim_bui_tensor = new_dmc_tensor - first_term * second_term
+        prelim_bui_tensor = K.maximum(prelim_bui_tensor, 0.)
+
+        return tensorflow.where(
+            bui_tensor < new_dmc_tensor,
+            prelim_bui_tensor,
+            bui_tensor
+        )
+
+    def call(self, prediction_tensor):
+        """Main method.
+        
+        :param prediction_tensor: Prediction tensor created by model's final
+            layer.
+        :return: prediction_tensor: Same as input, except with BUI along last
+            slice of channel axis.
+        """
+        
+        if self.expect_ensemble:
+            predicted_dmc_tensor = prediction_tensor[..., self.dmc_index, :]
+            predicted_dc_tensor = prediction_tensor[..., self.dc_index, :]
+        else:
+            predicted_dmc_tensor = prediction_tensor[..., self.dmc_index]
+            predicted_dc_tensor = prediction_tensor[..., self.dc_index]
+
+        predicted_bui_tensor = self._compute_bui(
+            dmc_tensor=predicted_dmc_tensor,
+            dc_tensor=predicted_dc_tensor
+        )
+
+        if self.expect_ensemble:
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_bui_tensor, axis=-2)
+            ], axis=-2)
+        else:
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_bui_tensor, axis=-1)
+            ], axis=-1)
+
+        return prediction_tensor
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "dmc_index": self.dmc_index,
+            "dc_index": self.dc_index,
+            "expect_ensemble": self.expect_ensemble
+        })
         return config
 
 
