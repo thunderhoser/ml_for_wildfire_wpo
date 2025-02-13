@@ -380,6 +380,10 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
         ))
 
     print('\n')
+    print(' '.join([
+        '"{0:s}"'.format(init_date_strings[k]) for k in min_date_indices
+    ]))
+    print('\n')
 
     for i in range(len(max_date_indices)):
         print((
@@ -395,6 +399,10 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
             init_date_strings[max_date_indices[i]]
         ))
 
+    print('\n')
+    print(' '.join([
+        '"{0:s}"'.format(init_date_strings[k]) for k in max_date_indices
+    ]))
     print('\n')
 
     min_values_file_name = output_file_names[0]

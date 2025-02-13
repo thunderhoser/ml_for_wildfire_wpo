@@ -18,6 +18,8 @@ THIS_DIRECTORY_NAME = os.path.dirname(os.path.realpath(
 ))
 sys.path.append(os.path.normpath(os.path.join(THIS_DIRECTORY_NAME, '..')))
 
+import time_conversion
+import error_checking
 import region_mask_io
 import shapley_io
 import misc_utils
@@ -26,6 +28,7 @@ import chiu_net_pp_architecture
 import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
+DATE_FORMAT = '%Y%m%d'
 
 # TODO(thunderhoser): This code does not work.  The line itself throws an error.
 # tensorflow.compat.v1.keras.backend.set_learning_phase(0)
@@ -41,6 +44,8 @@ TARGET_DIR_ARG_NAME = 'input_target_dir_name'
 GFS_FCST_TARGET_DIR_ARG_NAME = 'input_gfs_fcst_target_dir_name'
 MODEL_LEAD_TIME_ARG_NAME = 'model_lead_time_days'
 BASELINE_INIT_DATES_ARG_NAME = 'baseline_init_date_strings'
+BASELINE_YEARS_ARG_NAME = 'baseline_years'
+BASELINE_WINDOW_ARG_NAME = 'baseline_window_days'
 NEW_INIT_DATES_ARG_NAME = 'new_init_date_strings'
 REGION_MASK_FILE_ARG_NAME = 'input_region_mask_file_name'
 TARGET_FIELD_ARG_NAME = 'target_field_name'
@@ -69,7 +74,20 @@ GFS_FCST_TARGET_DIR_HELP_STRING = (
 MODEL_LEAD_TIME_HELP_STRING = 'Model lead time.'
 BASELINE_INIT_DATES_HELP_STRING = (
     'List of forecast-init days (format "yyyymmdd") used to create baseline '
-    'for DeepSHAP.'
+    'for DeepSHAP.  If you would rather specify the baseline period by years '
+    'and window, leave this argument alone.'
+)
+BASELINE_YEARS_HELP_STRING = (
+    'List of baseline years.  When computing Shapley values for init date '
+    'yyyymmdd, the baseline period will be K days before mmdd to K days after '
+    'mmdd in each year from the list `{0:s}`, where K = `{1:s}`.  If you would '
+    'rather specify the baseline period as just a list of days, leave this '
+    'argument alone.'
+).format(
+    BASELINE_YEARS_ARG_NAME, BASELINE_WINDOW_ARG_NAME
+)
+BASELINE_WINDOW_HELP_STRING = 'See documentation for `{0:s}`.'.format(
+    BASELINE_YEARS_ARG_NAME
 )
 NEW_INIT_DATES_HELP_STRING = (
     'List of forecast-init days (format "yyyymmdd") for which to compute '
@@ -129,8 +147,16 @@ INPUT_ARG_PARSER.add_argument(
     help=MODEL_LEAD_TIME_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
-    '--' + BASELINE_INIT_DATES_ARG_NAME, type=str, nargs='+', required=True,
-    help=BASELINE_INIT_DATES_HELP_STRING
+    '--' + BASELINE_INIT_DATES_ARG_NAME, type=str, nargs='+', required=False,
+    default=[''], help=BASELINE_INIT_DATES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + BASELINE_YEARS_ARG_NAME, type=int, nargs='+', required=False,
+    default=[-1], help=BASELINE_YEARS_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + BASELINE_WINDOW_ARG_NAME, type=int, required=False,
+    default=-1, help=BASELINE_WINDOW_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + NEW_INIT_DATES_ARG_NAME, type=str, nargs='+', required=True,
@@ -493,8 +519,8 @@ def _apply_deepshap_1day(
 
 def _run(model_file_name, gfs_directory_name, target_dir_name,
          gfs_forecast_target_dir_name, model_lead_time_days,
-         baseline_init_date_strings, new_init_date_strings,
-         region_mask_file_name, target_field_name,
+         baseline_init_date_strings, baseline_years, baseline_window_days,
+         new_init_date_strings, region_mask_file_name, target_field_name,
          use_inout_tensors_only, disable_tensorflow2, disable_eager_execution,
          output_dir_name):
     """Uses DeepSHAP algorithm to create Shapley maps.
@@ -507,6 +533,8 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     :param gfs_forecast_target_dir_name: Same.
     :param model_lead_time_days: Same.
     :param baseline_init_date_strings: Same.
+    :param baseline_years: Same.
+    :param baseline_window_days: Same.
     :param new_init_date_strings: Same.
     :param region_mask_file_name: Same.
     :param target_field_name: Same.
@@ -608,68 +636,190 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     except:
         pass
 
-    # Read baseline examples.
-    num_baseline_examples = len(baseline_init_date_strings)
-    baseline_predictor_matrices = []
-    good_date_indices = []
-
-    for i in range(num_baseline_examples):
-        try:
-            data_dict = neural_net.create_data(
-                option_dict=validation_option_dict,
-                init_date_string=baseline_init_date_strings[i],
-                model_lead_time_days=model_lead_time_days,
-                patch_start_latitude_deg_n=patch_start_latitude_deg_n,
-                patch_start_longitude_deg_e=patch_start_longitude_deg_e
-            )
-            print(SEPARATOR_STRING)
-        except:
-            print(SEPARATOR_STRING)
-            continue
-
-        good_date_indices.append(i)
-        these_predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
-
-        if len(baseline_predictor_matrices) == 0:
-            for this_predictor_matrix in these_predictor_matrices:
-                these_dim = (
-                    (num_baseline_examples,) + this_predictor_matrix.shape[1:]
-                )
-                baseline_predictor_matrices.append(
-                    numpy.full(these_dim, numpy.nan)
-                )
-
-        for j in range(len(these_predictor_matrices)):
-            baseline_predictor_matrices[j][i, ...] = (
-                these_predictor_matrices[j][0, ...]
-            )
-
-    del data_dict
-    good_date_indices = numpy.array(good_date_indices, dtype=int)
-    baseline_predictor_matrices = [
-        m[good_date_indices, ...] for m in baseline_predictor_matrices
-    ]
-    baseline_init_date_strings = [
-        baseline_init_date_strings[k] for k in good_date_indices
-    ]
-
-    # Do actual stuff.
     print(model_object.inputs)
     print(model_object.output)
 
-    if use_inout_tensors_only:
-        explainer_object = shap.DeepExplainer(
-            model=(model_object.inputs, model_object.output),
-            data=baseline_predictor_matrices
-        )
-    else:
-        explainer_object = shap.DeepExplainer(
-            model=model_object, data=baseline_predictor_matrices
-        )
-
+    # Do actual stuff.
     num_new_examples = len(new_init_date_strings)
 
+    if (
+            len(baseline_init_date_strings) == 1 and
+            baseline_init_date_strings[0] == ''
+    ):
+        baseline_init_date_strings = None
+
+    if baseline_init_date_strings is not None:
+        num_baseline_examples = len(baseline_init_date_strings)
+        baseline_predictor_matrices = []
+        good_date_indices = []
+
+        for i in range(num_baseline_examples):
+            try:
+                data_dict = neural_net.create_data(
+                    option_dict=validation_option_dict,
+                    init_date_string=baseline_init_date_strings[i],
+                    model_lead_time_days=model_lead_time_days,
+                    patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+                    patch_start_longitude_deg_e=patch_start_longitude_deg_e
+                )
+                print(SEPARATOR_STRING)
+            except:
+                print(SEPARATOR_STRING)
+                continue
+
+            good_date_indices.append(i)
+            these_predictor_matrices = data_dict[
+                neural_net.PREDICTOR_MATRICES_KEY
+            ]
+
+            if len(baseline_predictor_matrices) == 0:
+                for this_predictor_matrix in these_predictor_matrices:
+                    these_dim = (
+                        (num_baseline_examples,) +
+                        this_predictor_matrix.shape[1:]
+                    )
+                    baseline_predictor_matrices.append(
+                        numpy.full(these_dim, numpy.nan)
+                    )
+
+            for j in range(len(these_predictor_matrices)):
+                baseline_predictor_matrices[j][i, ...] = (
+                    these_predictor_matrices[j][0, ...]
+                )
+
+        del data_dict
+        good_date_indices = numpy.array(good_date_indices, dtype=int)
+        baseline_predictor_matrices = [
+            m[good_date_indices, ...] for m in baseline_predictor_matrices
+        ]
+        baseline_init_date_strings = [
+            baseline_init_date_strings[k] for k in good_date_indices
+        ]
+
+        if use_inout_tensors_only:
+            explainer_object = shap.DeepExplainer(
+                model=(model_object.inputs, model_object.output),
+                data=baseline_predictor_matrices
+            )
+        else:
+            explainer_object = shap.DeepExplainer(
+                model=model_object, data=baseline_predictor_matrices
+            )
+
+        for i in range(num_new_examples):
+            this_output_file_name = shapley_io.find_file(
+                directory_name=output_dir_name,
+                init_date_string=new_init_date_strings[i],
+                raise_error_if_missing=False
+            )
+
+            _apply_deepshap_1day(
+                explainer_object=explainer_object,
+                init_date_string=new_init_date_strings[i],
+                baseline_init_date_strings=baseline_init_date_strings,
+                target_field_name=target_field_name,
+                region_mask_file_name=region_mask_file_name,
+                patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+                patch_start_longitude_deg_e=patch_start_longitude_deg_e,
+                validation_option_dict=validation_option_dict,
+                model_input_layer_names=
+                [l.name.split(':')[0] for l in model_object.input],
+                model_lead_time_days=model_lead_time_days,
+                model_file_name=model_file_name,
+                output_file_name=this_output_file_name
+            )
+
+        return
+
     for i in range(num_new_examples):
+        error_checking.assert_is_greater_numpy_array(baseline_years, 0)
+        error_checking.assert_is_greater(baseline_window_days, 0)
+        error_checking.assert_is_leq(baseline_window_days, 30)
+
+        day_offsets = numpy.linspace(
+            -1 * baseline_window_days, baseline_window_days,
+            num=2 * baseline_window_days + 1, dtype=int
+        )
+        baseline_init_date_strings = []
+
+        for this_year in baseline_years:
+            this_init_date_string = '{0:04d}{1:s}'.format(
+                this_year, new_init_date_strings[i][4:]
+            )
+            this_init_date_unix_sec = time_conversion.string_to_unix_sec(
+                this_init_date_string, DATE_FORMAT
+            )
+            these_init_dates_unix_sec = (
+                this_init_date_unix_sec + day_offsets * DAYS_TO_SECONDS
+            )
+            these_init_date_strings = [
+                time_conversion.unix_sec_to_string(t, DATE_FORMAT)
+                for t in these_init_dates_unix_sec
+            ]
+            these_init_date_strings = [
+                t for t in these_init_date_strings
+                if int(t[:4]) == this_year
+            ]
+            baseline_init_date_strings += these_init_date_strings
+
+        baseline_init_date_strings.sort()
+        num_baseline_examples = len(baseline_init_date_strings)
+        baseline_predictor_matrices = []
+        good_date_indices = []
+
+        for j in range(num_baseline_examples):
+            try:
+                data_dict = neural_net.create_data(
+                    option_dict=validation_option_dict,
+                    init_date_string=baseline_init_date_strings[j],
+                    model_lead_time_days=model_lead_time_days,
+                    patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+                    patch_start_longitude_deg_e=patch_start_longitude_deg_e
+                )
+                print(SEPARATOR_STRING)
+            except:
+                print(SEPARATOR_STRING)
+                continue
+
+            good_date_indices.append(j)
+            these_predictor_matrices = data_dict[
+                neural_net.PREDICTOR_MATRICES_KEY
+            ]
+
+            if len(baseline_predictor_matrices) == 0:
+                for this_predictor_matrix in these_predictor_matrices:
+                    these_dim = (
+                        (num_baseline_examples,) +
+                        this_predictor_matrix.shape[1:]
+                    )
+                    baseline_predictor_matrices.append(
+                        numpy.full(these_dim, numpy.nan)
+                    )
+
+            for k in range(len(these_predictor_matrices)):
+                baseline_predictor_matrices[k][j, ...] = (
+                    these_predictor_matrices[k][0, ...]
+                )
+
+        del data_dict
+        good_date_indices = numpy.array(good_date_indices, dtype=int)
+        baseline_predictor_matrices = [
+            m[good_date_indices, ...] for m in baseline_predictor_matrices
+        ]
+        baseline_init_date_strings = [
+            baseline_init_date_strings[k] for k in good_date_indices
+        ]
+
+        if use_inout_tensors_only:
+            explainer_object = shap.DeepExplainer(
+                model=(model_object.inputs, model_object.output),
+                data=baseline_predictor_matrices
+            )
+        else:
+            explainer_object = shap.DeepExplainer(
+                model=model_object, data=baseline_predictor_matrices
+            )
+
         this_output_file_name = shapley_io.find_file(
             directory_name=output_dir_name,
             init_date_string=new_init_date_strings[i],
@@ -708,6 +858,12 @@ if __name__ == '__main__':
         ),
         baseline_init_date_strings=getattr(
             INPUT_ARG_OBJECT, BASELINE_INIT_DATES_ARG_NAME
+        ),
+        baseline_years=numpy.array(
+            getattr(INPUT_ARG_OBJECT, BASELINE_YEARS_ARG_NAME), dtype=int
+        ),
+        baseline_window_days=getattr(
+            INPUT_ARG_OBJECT, BASELINE_WINDOW_ARG_NAME
         ),
         new_init_date_strings=getattr(
             INPUT_ARG_OBJECT, NEW_INIT_DATES_ARG_NAME
