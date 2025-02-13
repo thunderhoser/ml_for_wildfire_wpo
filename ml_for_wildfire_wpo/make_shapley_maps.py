@@ -29,6 +29,7 @@ import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 DATE_FORMAT = '%Y%m%d'
+DAYS_TO_SECONDS = 86400
 
 # TODO(thunderhoser): This code does not work.  The line itself throws an error.
 # tensorflow.compat.v1.keras.backend.set_learning_phase(0)
