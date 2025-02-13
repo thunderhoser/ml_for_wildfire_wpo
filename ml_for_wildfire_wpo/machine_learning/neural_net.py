@@ -3125,13 +3125,14 @@ def data_generator_fast_patches(option_dict):
             this_weight_matrix = full_target_matrix_with_weights[
                 j_start:j_end, k_start:k_end, ..., -1
             ] + 0.
-            this_weight_matrix[:num_buffer_rows, ..., -1] = 0.
-            this_weight_matrix[-num_buffer_rows:, ..., -1] = 0.
-            this_weight_matrix[:, :num_buffer_columns, ..., -1] = 0.
-            this_weight_matrix[: -num_buffer_columns:, ..., -1] = 0.
+            this_weight_matrix[:num_buffer_rows, ...] = 0.
+            this_weight_matrix[-num_buffer_rows:, ...] = 0.
+            this_weight_matrix[:, :num_buffer_columns, ...] = 0.
+            this_weight_matrix[:, -num_buffer_columns:, ...] = 0.
 
-            # If all evaluation weights are zero, do not train with this patch.
-            if numpy.sum(this_weight_matrix) < TOLERANCE:
+            # If all evaluation weights are too small, do not train with this
+            # patch.
+            if numpy.all(this_weight_matrix < MASK_PIXEL_IF_WEIGHT_BELOW):
                 continue
 
             i = num_examples_in_memory + 0
@@ -3169,7 +3170,7 @@ def data_generator_fast_patches(option_dict):
         target_matrix_with_weights[:, :num_buffer_rows, ..., -1] = 0.
         target_matrix_with_weights[:, -num_buffer_rows:, ..., -1] = 0.
         target_matrix_with_weights[:, :, :num_buffer_columns, ..., -1] = 0.
-        target_matrix_with_weights[:, : -num_buffer_columns:, ..., -1] = 0.
+        target_matrix_with_weights[:, :, -num_buffer_columns:, ..., -1] = 0.
 
         predictor_matrices = __report_data_properties(
             gfs_predictor_matrix_3d=gfs_predictor_matrix_3d,
@@ -3687,7 +3688,7 @@ def create_data(
         patch_target_matrix_with_weights[:, :num_buffer_rows, ..., -1] = 0.
         patch_target_matrix_with_weights[:, -num_buffer_rows:, ..., -1] = 0.
         patch_target_matrix_with_weights[:, :, :num_buffer_columns, ..., -1] = 0.
-        patch_target_matrix_with_weights[:, : -num_buffer_columns:, ..., -1] = 0.
+        patch_target_matrix_with_weights[:, :, -num_buffer_columns:, ..., -1] = 0.
 
         return {
             PREDICTOR_MATRICES_KEY: patch_predictor_matrices,
@@ -3817,7 +3818,7 @@ def create_data(
     patch_target_matrix_with_weights[:, :num_buffer_rows, ..., -1] = 0.
     patch_target_matrix_with_weights[:, -num_buffer_rows:, ..., -1] = 0.
     patch_target_matrix_with_weights[:, :, :num_buffer_columns, ..., -1] = 0.
-    patch_target_matrix_with_weights[:, : -num_buffer_columns:, ..., -1] = 0.
+    patch_target_matrix_with_weights[:, :, -num_buffer_columns:, ..., -1] = 0.
 
     return {
         PREDICTOR_MATRICES_KEY: patch_predictor_matrices,

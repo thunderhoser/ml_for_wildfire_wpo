@@ -12,6 +12,8 @@ from tensorflow.keras import backend as K
 from ml_for_wildfire_wpo.io import region_mask_io
 from ml_for_wildfire_wpo.io import shapley_io
 from ml_for_wildfire_wpo.utils import misc_utils
+from ml_for_wildfire_wpo.utils import canadian_fwi_utils
+from ml_for_wildfire_wpo.machine_learning import chiu_net_pp_architecture
 from ml_for_wildfire_wpo.machine_learning import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
@@ -164,7 +166,8 @@ def __dimension_to_int(dimension_object):
         return dimension_object
 
 
-def _modify_model_output(model_object, region_mask_matrix, target_field_index):
+def _modify_model_output(model_object, region_mask_matrix, model_metadata_dict,
+                         target_field_name):
     """Modifies model output.
 
     The original model output should have dimensions E x M x N x F or
@@ -179,14 +182,32 @@ def _modify_model_output(model_object, region_mask_matrix, target_field_index):
         `keras.models.Sequential`).
     :param region_mask_matrix: M-by-N numpy array of Boolean flags, where True
         means that the pixel is within the desired region.
-    :param target_field_index: Index of desired target field, along the target-
-        field axis of the model's output tensor.
+    :param model_metadata_dict: Dictionary with model metadata, returned by
+        `neural_net.read_metafile`.
+    :param target_field_name: Name of desired target field.
     :return: model_object: Equivalent model to input, but returning a length-E
         vector.
     """
 
     output_layer_object = model_object.output
     has_ensemble = len(output_layer_object.shape) == 5
+
+    vod = model_metadata_dict[neural_net.VALIDATION_OPTIONS_KEY]
+    all_target_field_names = vod[neural_net.TARGET_FIELDS_KEY]
+    if not isinstance(all_target_field_names, list):
+        all_target_field_names = all_target_field_names.tolist()
+
+    if (
+            target_field_name == canadian_fwi_utils.BUI_NAME
+            and target_field_name not in all_target_field_names
+    ):
+        dmc_index = all_target_field_names.index(canadian_fwi_utils.DMC_NAME)
+        dc_index = all_target_field_names.index(canadian_fwi_utils.DC_NAME)
+        output_layer_object = chiu_net_pp_architecture.DeriveBUIPredictions(
+            dmc_index=dmc_index, dc_index=dc_index, expect_ensemble=has_ensemble
+        )(output_layer_object)
+
+        target_field_index = -1
 
     # Extract the relevant target field.
     if has_ensemble:
@@ -468,15 +489,8 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     vod[neural_net.TARGET_DIRECTORY_KEY] = target_dir_name
     vod[neural_net.GFS_FORECAST_TARGET_DIR_KEY] = gfs_forecast_target_dir_name
     patch_size_deg = vod[neural_net.OUTER_PATCH_SIZE_DEG_KEY]
-    print(SEPARATOR_STRING)
-
-    # Check some input args.
-    all_target_field_names = vod[neural_net.TARGET_FIELDS_KEY]
-    if not isinstance(all_target_field_names, list):
-        all_target_field_names = all_target_field_names.tolist()
-
-    target_field_index = all_target_field_names.index(target_field_name)
     validation_option_dict = vod
+    print(SEPARATOR_STRING)
 
     # Change model's output layer to include only the given region and target
     # field.
@@ -535,7 +549,8 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     model_object = _modify_model_output(
         model_object=model_object,
         region_mask_matrix=region_mask_matrix,
-        target_field_index=target_field_index
+        model_metadata_dict=model_metadata_dict,
+        target_field_name=target_field_name
     )
 
     try:
