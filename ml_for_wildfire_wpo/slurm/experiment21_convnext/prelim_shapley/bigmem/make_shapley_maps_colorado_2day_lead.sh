@@ -1,11 +1,8 @@
 #!/bin/sh
 
 model_file_name=$1
-use_deep_explainer=$2
-use_inout_tensors_only=$3
-disable_tensorflow2=$4
-disable_eager_execution=$5
-output_dir_name=$6
+new_init_date_string=$2
+output_dir_name=$3
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
 
@@ -21,10 +18,10 @@ python3 -u "${CODE_DIR_NAME}/make_shapley_maps.py" \
 --model_lead_time_days=2 \
 --baseline_years 2019 2020 \
 --baseline_window_days=7 \
---new_init_date_strings "20210809" \
+--new_init_date_strings ${new_init_date_string} \
 --input_region_mask_file_name="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/colorado_mask.nc" \
 --target_field_name="daily_severity_rating" \
---use_inout_tensors_only=${use_inout_tensors_only} \
---disable_tensorflow2=${disable_tensorflow2} \
---disable_eager_execution=${disable_eager_execution} \
+--use_inout_tensors_only=0 \
+--disable_tensorflow2=0 \
+--disable_eager_execution=1 \
 --output_dir_name="${output_dir_name}"
