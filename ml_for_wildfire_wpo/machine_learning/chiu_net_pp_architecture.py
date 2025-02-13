@@ -139,15 +139,16 @@ class StochasticDepth(keras.layers.Layer):
 class DeriveBUIPredictions(keras.layers.Layer):
     def __init__(self, dmc_index, dc_index, expect_ensemble=False, **kwargs):
         """Constructor.
-        
+
         :param dmc_index: Array index for DMC.  This tells the method that DMC
-        predictions can be found at prediction_tensor[:, :, :, dmc_index, ...].
+            predictions can be found at
+            prediction_tensor[:, :, :, dmc_index, ...].
         :param dc_index: Same as above but for DC.
         :param expect_ensemble: Boolean flag, indicating whether to expect
-        ensemble or deterministic predictions.
+            ensemble or deterministic predictions.
         :param kwargs: Keyword arguments.
         """
-        
+
         super(DeriveBUIPredictions, self).__init__(**kwargs)
         self.dmc_index = dmc_index
         self.dc_index = dc_index
@@ -155,10 +156,10 @@ class DeriveBUIPredictions(keras.layers.Layer):
 
     def _power(self, input_tensor, exponent):
         """Computes power.
-    
+
         :param input_tensor: Keras tensor.
         :param exponent: Scalar exponent (float).
-        :return: power_tensor: Keras tensor with the same shape as 
+        :return: power_tensor: Keras tensor with the same shape as
             input_tensor`.
         """
 
@@ -167,12 +168,12 @@ class DeriveBUIPredictions(keras.layers.Layer):
 
     def _compute_bui(self, dmc_tensor, dc_tensor):
         """Computes BUI from DMC and DC.
-        
+
         :param dmc_tensor: Tensor of DMC values.
         :param dc_tensor: Tensor of DC values.
         :return: bui_tensor: Tensor of BUI values.
         """
-        
+
         new_dmc_tensor = K.maximum(dmc_tensor, K.epsilon())
         new_dc_tensor = K.maximum(dc_tensor, K.epsilon())
 
@@ -193,13 +194,13 @@ class DeriveBUIPredictions(keras.layers.Layer):
 
     def call(self, prediction_tensor):
         """Main method.
-        
+
         :param prediction_tensor: Prediction tensor created by model's final
             layer.
         :return: prediction_tensor: Same as input, except with BUI along last
             slice of channel axis.
         """
-        
+
         if self.expect_ensemble:
             predicted_dmc_tensor = prediction_tensor[..., self.dmc_index, :]
             predicted_dc_tensor = prediction_tensor[..., self.dc_index, :]
@@ -226,11 +227,191 @@ class DeriveBUIPredictions(keras.layers.Layer):
         return prediction_tensor
 
     def get_config(self):
+        """Returns layer configuration."""
+
         config = super().get_config()
         config.update({
-            "dmc_index": self.dmc_index,
-            "dc_index": self.dc_index,
-            "expect_ensemble": self.expect_ensemble
+            'dmc_index': self.dmc_index,
+            'dc_index': self.dc_index,
+            'expect_ensemble': self.expect_ensemble
+        })
+        return config
+
+
+class DeriveFWIPredictions(keras.layers.Layer):
+    def __init__(self, isi_index, bui_index, expect_ensemble=False, **kwargs):
+        """Constructor.
+
+        :param isi_index: Array index for ISI.  This tells the method that ISI
+            predictions can be found at
+            prediction_tensor[:, :, :, isi_index, ...].
+        :param bui_index: Same as above but for BUI.
+        :param expect_ensemble: Boolean flag, indicating whether to expect
+            ensemble or deterministic predictions.
+        :param kwargs: Keyword arguments.
+        """
+
+        super(DeriveFWIPredictions, self).__init__(**kwargs)
+        self.isi_index = isi_index
+        self.bui_index = bui_index
+        self.expect_ensemble = expect_ensemble
+
+    def _power(self, input_tensor, exponent):
+        """Computes power.
+
+        :param input_tensor: Keras tensor.
+        :param exponent: Scalar exponent (float).
+        :return: power_tensor: Keras tensor with the same shape as
+            input_tensor`.
+        """
+
+        power_tensor = K.pow(K.maximum(input_tensor, K.epsilon()), exponent)
+        return K.maximum(power_tensor, K.epsilon())
+
+    def _exponential(self, input_tensor):
+        """Computes exponential function.
+
+        :param input_tensor: Keras tensor.
+        :return: exp_tensor: Keras tensor with the same shape as `input_tensor`.
+        """
+
+        return K.maximum(K.exp(input_tensor), K.epsilon())
+
+    def _natural_log(self, input_tensor):
+        """Computes natural logarithm.
+
+        :param input_tensor: Keras tensor.
+        :return: logarithm_tensor: Keras tensor with the same shape as
+            `input_tensor`.
+        """
+
+        return K.log(K.maximum(input_tensor, K.epsilon()))
+
+    def call(self, prediction_tensor):
+        """Main method.
+
+        :param prediction_tensor: Prediction tensor created by model's final
+            layer.
+        :return: prediction_tensor: Same as input, except with FWI along last
+            slice of channel axis.
+        """
+
+        if self.expect_ensemble:
+            predicted_isi_tensor = prediction_tensor[..., self.isi_index, :]
+            predicted_bui_tensor = prediction_tensor[..., self.bui_index, :]
+        else:
+            predicted_isi_tensor = prediction_tensor[..., self.isi_index]
+            predicted_bui_tensor = prediction_tensor[..., self.bui_index]
+
+        duff_moisture_func = tensorflow.where(
+            predicted_bui_tensor <= 80.,
+            0.626 * self._power(predicted_bui_tensor, 0.809) + 2,
+            1000. / (25 + 108.64 * self._exponential(-0.023 * predicted_bui_tensor))
+        )
+        prelim_fwi = 0.1 * predicted_isi_tensor * duff_moisture_func
+        predicted_fwi_tensor = tensorflow.where(
+            prelim_fwi > 1.,
+            self._exponential(2.72 * self._power(0.434 * self._natural_log(prelim_fwi), 0.647)),
+            prelim_fwi
+        )
+
+        predicted_fwi_tensor = tensorflow.where(
+            tensorflow.math.is_finite(predicted_fwi_tensor),
+            predicted_fwi_tensor,
+            tensorflow.zeros_like(predicted_fwi_tensor)
+        )
+        predicted_fwi_tensor = K.maximum(predicted_fwi_tensor, 0.)
+
+        if self.expect_ensemble:
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_fwi_tensor, axis=-2)
+            ], axis=-2)
+        else:
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_fwi_tensor, axis=-1)
+            ], axis=-1)
+
+        return prediction_tensor
+
+    def get_config(self):
+        """Returns layer configuration."""
+
+        config = super().get_config()
+        config.update({
+            'isi_index': self.isi_index,
+            'bui_index': self.bui_index,
+            'expect_ensemble': self.expect_ensemble
+        })
+        return config
+
+
+class DeriveDSRPredictions(keras.layers.Layer):
+    def __init__(self, fwi_index, expect_ensemble=False, **kwargs):
+        """Constructor.
+
+        :param fwi_index: Array index for FWI.  This tells the method that FWI
+            predictions can be found at
+            prediction_tensor[:, :, :, fwi_index, ...].
+        :param expect_ensemble: Boolean flag, indicating whether to expect
+            ensemble or deterministic predictions.
+        :param kwargs: Keyword arguments.
+        """
+
+        super(DeriveDSRPredictions, self).__init__(**kwargs)
+        self.fwi_index = fwi_index
+        self.expect_ensemble = expect_ensemble
+
+    def _power(self, input_tensor, exponent):
+        """Computes power.
+
+        :param input_tensor: Keras tensor.
+        :param exponent: Scalar exponent (float).
+        :return: power_tensor: Keras tensor with the same shape as
+            input_tensor`.
+        """
+
+        power_tensor = K.pow(K.maximum(input_tensor, K.epsilon()), exponent)
+        return K.maximum(power_tensor, K.epsilon())
+
+    def call(self, prediction_tensor):
+        """Main method.
+
+        :param prediction_tensor: Prediction tensor created by model's final
+            layer.
+        :return: prediction_tensor: Same as input, except with DSR along last
+            slice of channel axis.
+        """
+
+        if self.expect_ensemble:
+            predicted_fwi_tensor = prediction_tensor[..., self.fwi_index, :]
+        else:
+            predicted_fwi_tensor = prediction_tensor[..., self.fwi_index]
+
+        predicted_dsr_tensor = 0.0272 * self._power(predicted_fwi_tensor, 1.77)
+        predicted_dsr_tensor = K.maximum(predicted_dsr_tensor, 0.)
+
+        if self.expect_ensemble:
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-2)
+            ], axis=-2)
+        else:
+            prediction_tensor = K.concatenate([
+                prediction_tensor,
+                K.expand_dims(predicted_dsr_tensor, axis=-1)
+            ], axis=-1)
+
+        return prediction_tensor
+
+    def get_config(self):
+        """Returns layer configuration."""
+
+        config = super().get_config()
+        config.update({
+            'fwi_index': self.fwi_index,
+            'expect_ensemble': self.expect_ensemble
         })
         return config
 

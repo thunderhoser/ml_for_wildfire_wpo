@@ -3162,7 +3162,7 @@ def data_generator_fast_patches(option_dict):
                 )
 
             target_matrix_with_weights[i, ...] = (
-                full_target_matrix_with_weights[j_start:j_end, k_start:k_end, ...]
+                full_target_matrix_with_weights[j_start:j_end, k_start:k_end, ...] + 0.
             )
 
             num_examples_in_memory += 1
