@@ -22,7 +22,7 @@ python3 -u "${CODE_DIR_NAME}/make_shapley_maps.py" \
 --baseline_init_date_strings "20200801" \
 --new_init_date_strings "20210809" "20210810" \
 --input_region_mask_file_name="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/colorado_mask.nc" \
---target_field_name="buildup_index" \
+--target_field_name="daily_severity_rating" \
 --use_inout_tensors_only=${use_inout_tensors_only} \
 --disable_tensorflow2=${disable_tensorflow2} \
 --disable_eager_execution=${disable_eager_execution} \

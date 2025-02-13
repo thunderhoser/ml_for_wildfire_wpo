@@ -2,6 +2,7 @@
 
 import os
 import sys
+import copy
 import argparse
 import numpy
 import tensorflow
@@ -201,21 +202,62 @@ def _modify_model_output(model_object, region_mask_matrix, model_metadata_dict,
     has_ensemble = len(output_layer_object.shape) == 5
 
     vod = model_metadata_dict[neural_net.VALIDATION_OPTIONS_KEY]
-    all_target_field_names = vod[neural_net.TARGET_FIELDS_KEY]
+    all_target_field_names = copy.deepcopy(vod[neural_net.TARGET_FIELDS_KEY])
     if not isinstance(all_target_field_names, list):
         all_target_field_names = all_target_field_names.tolist()
 
-    if (
-            target_field_name == canadian_fwi_utils.BUI_NAME
-            and target_field_name not in all_target_field_names
-    ):
+    need_bui = (
+        target_field_name == canadian_fwi_utils.BUI_NAME
+        and target_field_name not in all_target_field_names
+    )
+    need_fwi = (
+        target_field_name == canadian_fwi_utils.FWI_NAME
+        and target_field_name not in all_target_field_names
+    )
+    need_dsr = (
+        target_field_name == canadian_fwi_utils.DSR_NAME
+        and target_field_name not in all_target_field_names
+    )
+
+    if need_dsr:
+        need_fwi = (
+            need_fwi or
+            canadian_fwi_utils.FWI_NAME not in all_target_field_names
+        )
+    if need_fwi:
+        need_bui = (
+            need_bui or
+            canadian_fwi_utils.BUI_NAME not in all_target_field_names
+        )
+
+    if need_bui:
         dmc_index = all_target_field_names.index(canadian_fwi_utils.DMC_NAME)
         dc_index = all_target_field_names.index(canadian_fwi_utils.DC_NAME)
         output_layer_object = chiu_net_pp_architecture.DeriveBUIPredictions(
             dmc_index=dmc_index, dc_index=dc_index, expect_ensemble=has_ensemble
         )(output_layer_object)
 
-        target_field_index = -1
+        all_target_field_names.append(canadian_fwi_utils.BUI_NAME)
+
+    if need_fwi:
+        isi_index = all_target_field_names.index(canadian_fwi_utils.ISI_NAME)
+        bui_index = all_target_field_names.index(canadian_fwi_utils.BUI_NAME)
+        output_layer_object = chiu_net_pp_architecture.DeriveFWIPredictions(
+            isi_index=isi_index, bui_index=bui_index,
+            expect_ensemble=has_ensemble
+        )(output_layer_object)
+
+        all_target_field_names.append(canadian_fwi_utils.FWI_NAME)
+
+    if need_dsr:
+        fwi_index = all_target_field_names.index(canadian_fwi_utils.FWI_NAME)
+        output_layer_object = chiu_net_pp_architecture.DeriveDSRPredictions(
+            fwi_index=fwi_index, expect_ensemble=has_ensemble
+        )(output_layer_object)
+
+        all_target_field_names.append(canadian_fwi_utils.DSR_NAME)
+
+    target_field_index = all_target_field_names.index(target_field_name)
 
     # Extract the relevant target field.
     if has_ensemble:
