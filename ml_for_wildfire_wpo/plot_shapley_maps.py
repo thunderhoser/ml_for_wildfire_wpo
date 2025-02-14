@@ -23,6 +23,7 @@ import imagemagick_utils
 import gfs_io
 import shapley_io
 import border_io
+import extreme_cases_io
 import misc_utils
 import gfs_utils
 import era5_constant_utils
@@ -52,7 +53,11 @@ FIGURE_RESOLUTION_DPI = 300
 PANEL_SIZE_PX = int(2.5e6)
 CONCAT_FIGURE_SIZE_PX = int(1e7)
 
-SHAPLEY_FILE_ARG_NAME = 'input_shapley_file_name'
+SHAPLEY_DIR_ARG_NAME = 'input_shapley_dir_name'
+INIT_DATE_ARG_NAME = 'init_date_string'
+EXTREME_CASE_FILE_ARG_NAME = 'input_extreme_case_file_name'
+EXTREME_CASE_INDEX_ARG_NAME = 'extreme_case_index'
+
 GFS_DIRECTORY_ARG_NAME = 'input_gfs_directory_name'
 TARGET_DIR_ARG_NAME = 'input_target_dir_name'
 GFS_FCST_TARGET_DIR_ARG_NAME = 'input_gfs_fcst_target_dir_name'
@@ -69,9 +74,27 @@ SHAPLEY_LOG_SPACE_ARG_NAME = 'plot_shapley_in_log_space'
 SHAPLEY_SMOOTHING_RADIUS_ARG_NAME = 'shapley_smoothing_radius_px'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
-SHAPLEY_FILE_HELP_STRING = (
-    'Path to input file.  Shapley values will be read from here by '
-    '`shapley_io.read_file`.'
+SHAPLEY_DIR_HELP_STRING = (
+    'Path to directory with Shapley outputs.  The relevant file will be found '
+    'therein by `shapley_io.find_file` and read by `shapley_io.read_file`.'
+)
+INIT_DATE_HELP_STRING = (
+    'Will plot Shapley outputs for this forecast-init day (format "yyyymmdd").'
+    '  If you would rather specify an extreme-case file containing init dates, '
+    'leave this argument alone and use `{0:s}`.'
+).format(
+    EXTREME_CASE_FILE_ARG_NAME
+)
+EXTREME_CASE_FILE_HELP_STRING = (
+    'Path to extreme-case file (readable by `extreme_cases_io.read_file`) -- '
+    'will plot Shapley outputs for the [k]th forecast-init day in this file, '
+    'where k = `{0:s}`.  If you would rather specify a forecast-init day '
+    'directly, leave this argument alone and use `{1:s}`.'
+).format(
+    EXTREME_CASE_INDEX_ARG_NAME, INIT_DATE_ARG_NAME
+)
+EXTREME_CASE_INDEX_HELP_STRING = 'See documentation for `{0:s}`.'.format(
+    EXTREME_CASE_FILE_ARG_NAME
 )
 GFS_DIRECTORY_HELP_STRING = (
     'Name of directory with *unnormalized* GFS weather forecasts.  Files '
@@ -142,8 +165,20 @@ OUTPUT_DIR_HELP_STRING = (
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
-    '--' + SHAPLEY_FILE_ARG_NAME, type=str, required=True,
-    help=SHAPLEY_FILE_HELP_STRING
+    '--' + SHAPLEY_DIR_ARG_NAME, type=str, required=True,
+    help=SHAPLEY_DIR_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + INIT_DATE_ARG_NAME, type=str, required=False, default='',
+    help=INIT_DATE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + EXTREME_CASE_FILE_ARG_NAME, type=str, required=False, default='',
+    help=EXTREME_CASE_FILE_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + EXTREME_CASE_INDEX_ARG_NAME, type=int, required=False, default=-1,
+    help=EXTREME_CASE_INDEX_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + GFS_DIRECTORY_ARG_NAME, type=str, required=True,
@@ -738,7 +773,8 @@ def _plot_one_era5_field(
     return figure_object, axes_object
 
 
-def _run(shapley_file_name, gfs_directory_name, target_dir_name,
+def _run(shapley_dir_name, init_date_string,
+         extreme_case_file_name, extreme_case_index, gfs_directory_name, target_dir_name,
          gfs_forecast_target_dir_name, gfs_normalization_file_name,
          predictor_colour_limits_prctile, shapley_colour_limits_prctile,
          region_name, shapley_line_width, shapley_line_opacity,
@@ -749,7 +785,10 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
 
     This is effectively the main method.
 
-    :param shapley_file_name: See documentation at top of this script.
+    :param shapley_dir_name: See documentation at top of this script.
+    :param init_date_string: Same.
+    :param extreme_case_file_name: Same.
+    :param extreme_case_index: Same.
     :param gfs_directory_name: Same.
     :param target_dir_name: Same.
     :param gfs_forecast_target_dir_name: Same.
@@ -842,6 +881,28 @@ def _run(shapley_file_name, gfs_directory_name, target_dir_name,
         gfs_norm_param_table_xarray = gfs_io.read_normalization_file(
             gfs_normalization_file_name
         )
+
+    if init_date_string == '':
+        init_date_string = None
+
+    if init_date_string is None:
+        error_checking.assert_is_geq(extreme_case_index, 0)
+
+        print('Reading forecast-init day from: "{0:s}"...'.format(
+            extreme_case_file_name
+        ))
+        extreme_case_table_xarray = extreme_cases_io.read_file(
+            extreme_case_file_name
+        )
+        init_date_string = extreme_case_table_xarray[
+            extreme_cases_io.INIT_DATE_KEY
+        ].values[extreme_case_index]
+
+    shapley_file_name = shapley_io.find_file(
+        directory_name=shapley_dir_name,
+        init_date_string=init_date_string,
+        raise_error_if_missing=True
+    )
 
     file_system_utils.mkdir_recursive_if_necessary(
         directory_name=output_dir_name
@@ -1725,7 +1786,14 @@ if __name__ == '__main__':
     INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
 
     _run(
-        shapley_file_name=getattr(INPUT_ARG_OBJECT, SHAPLEY_FILE_ARG_NAME),
+        shapley_dir_name=getattr(INPUT_ARG_OBJECT, SHAPLEY_DIR_ARG_NAME),
+        init_date_string=getattr(INPUT_ARG_OBJECT, INIT_DATE_ARG_NAME),
+        extreme_case_file_name=getattr(
+            INPUT_ARG_OBJECT, EXTREME_CASE_FILE_ARG_NAME
+        ),
+        extreme_case_index=getattr(
+            INPUT_ARG_OBJECT, EXTREME_CASE_INDEX_ARG_NAME
+        ),
         gfs_directory_name=getattr(INPUT_ARG_OBJECT, GFS_DIRECTORY_ARG_NAME),
         target_dir_name=getattr(INPUT_ARG_OBJECT, TARGET_DIR_ARG_NAME),
         gfs_forecast_target_dir_name=getattr(
