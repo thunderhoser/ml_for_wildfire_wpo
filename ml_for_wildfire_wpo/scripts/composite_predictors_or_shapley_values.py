@@ -18,6 +18,7 @@ import numpy
 from gewittergefahr.gg_utils import prob_matched_means as pmm
 from ml_for_wildfire_wpo.io import shapley_io
 from ml_for_wildfire_wpo.io import composite_io
+from ml_for_wildfire_wpo.io import extreme_cases_io
 from ml_for_wildfire_wpo.machine_learning import neural_net
 
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
@@ -32,6 +33,7 @@ GFS_DIRECTORY_ARG_NAME = 'input_gfs_directory_name'
 TARGET_DIR_ARG_NAME = 'input_target_dir_name'
 GFS_FCST_TARGET_DIR_ARG_NAME = 'input_gfs_fcst_target_dir_name'
 INIT_DATES_ARG_NAME = 'init_date_strings'
+EXTREME_CASE_FILE_ARG_NAME = 'input_extreme_case_file_name'
 MODEL_FILE_ARG_NAME = 'input_model_file_name'
 MODEL_LEAD_TIME_ARG_NAME = 'model_lead_time_days'
 SHAPLEY_DIR_ARG_NAME = 'input_shapley_dir_name'
@@ -52,7 +54,19 @@ GFS_FCST_TARGET_DIR_HELP_STRING = (
     '`gfs_daily_io.read_file`.'
 )
 INIT_DATES_HELP_STRING = (
-    'List of forecast-init days (format "yyyymmdd") over which to composite.'
+    'List of forecast-init days (format "yyyymmdd") over which to composite.  '
+    'If you would rather specify an extreme-case file containing init dates, '
+    'leave this argument alone and use `{0:s}`.'
+).format(
+    EXTREME_CASE_FILE_ARG_NAME
+)
+EXTREME_CASE_FILE_HELP_STRING = (
+    'Path to extreme-case file (readable by `extreme_cases_io.read_file`), '
+    'from which forecast-init days will be read.  If you would rather specify '
+    'a list of forecast-init days directly, leave this argument alone and use '
+    '`{0:s}`.'
+).format(
+    INIT_DATES_ARG_NAME
 )
 MODEL_FILE_HELP_STRING = (
     'Path to trained model (will be read by `neural_net.read_model`).`  If you '
@@ -100,6 +114,10 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + INIT_DATES_ARG_NAME, type=str, nargs='+', required=False,
     default=[''], help=INIT_DATES_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + EXTREME_CASE_FILE_ARG_NAME, type=str, required=False,
+    default='', help=EXTREME_CASE_FILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + MODEL_FILE_ARG_NAME, type=str, required=False, default='',
@@ -154,7 +172,8 @@ def _composite_one_matrix(data_matrix, use_pmm):
 
 
 def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
-         init_date_strings, model_file_name, model_lead_time_days,
+         init_date_strings, extreme_case_file_name,
+         model_file_name, model_lead_time_days,
          shapley_dir_name, use_pmm, output_file_name):
     """Composites predictor fields and/or Shapley fields over many days.
 
@@ -164,6 +183,7 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     :param target_dir_name: Same.
     :param gfs_forecast_target_dir_name: Same.
     :param init_date_strings: Same.
+    :param extreme_case_file_name: Same.
     :param model_file_name: Same.
     :param model_lead_time_days: Same.
     :param shapley_dir_name: Same.
@@ -171,7 +191,19 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     :param output_file_name: Same.
     """
 
-    # TODO(thunderhoser): I should probably eventually worry about NaN's in PMM.
+    if len(init_date_strings) == 1 and init_date_strings[0] == '':
+        init_date_strings = None
+
+    if init_date_strings is None:
+        print('Reading forecast-init days from: "{0:s}"...'.format(
+            extreme_case_file_name
+        ))
+        extreme_case_table_xarray = extreme_cases_io.read_file(
+            extreme_case_file_name
+        )
+        init_date_strings = extreme_case_table_xarray[
+            extreme_cases_io.INIT_DATE_KEY
+        ].values
 
     # Read and composite Shapley fields, if necessary.
     include_shapley = shapley_dir_name != ''
@@ -378,6 +410,9 @@ if __name__ == '__main__':
             INPUT_ARG_OBJECT, GFS_FCST_TARGET_DIR_ARG_NAME
         ),
         init_date_strings=getattr(INPUT_ARG_OBJECT, INIT_DATES_ARG_NAME),
+        extreme_case_file_name=getattr(
+            INPUT_ARG_OBJECT, EXTREME_CASE_FILE_ARG_NAME
+        ),
         model_file_name=getattr(INPUT_ARG_OBJECT, MODEL_FILE_ARG_NAME),
         model_lead_time_days=getattr(
             INPUT_ARG_OBJECT, MODEL_LEAD_TIME_ARG_NAME
