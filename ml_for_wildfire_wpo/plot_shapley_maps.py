@@ -33,6 +33,7 @@ import gfs_plotting
 import fwi_plotting
 
 TOLERANCE = 1e-6
+DAYS_TO_HOURS = 24
 
 DATE_FORMAT = '%Y%m%d'
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
@@ -53,7 +54,7 @@ FIGURE_RESOLUTION_DPI = 300
 PANEL_SIZE_PX = int(2.5e6)
 CONCAT_FIGURE_SIZE_PX = int(1e7)
 
-SHAPLEY_DIR_ARG_NAME = 'input_shapley_dir_name'
+SHAPLEY_DIR_OR_FILE_ARG_NAME = 'input_shapley_dir_or_file_name'
 INIT_DATE_ARG_NAME = 'init_date_string'
 EXTREME_CASE_FILE_ARG_NAME = 'input_extreme_case_file_name'
 EXTREME_CASE_INDEX_ARG_NAME = 'extreme_case_index'
@@ -65,6 +66,7 @@ GFS_NORM_FILE_ARG_NAME = 'input_gfs_norm_file_name'
 PREDICTOR_COLOUR_LIMITS_ARG_NAME = 'predictor_colour_limits_prctile'
 SHAPLEY_COLOUR_LIMITS_ARG_NAME = 'shapley_colour_limits_prctile'
 REGION_ARG_NAME = 'region_name'
+THIN_LEAD_TIMES_ARG_NAME = 'thin_out_lead_times'
 SHAPLEY_LINE_WIDTH_ARG_NAME = 'shapley_line_width'
 SHAPLEY_LINE_OPACITY_ARG_NAME = 'shapley_line_opacity'
 PLOT_LATITUDE_LIMITS_ARG_NAME = 'plot_latitude_limits_deg_n'
@@ -74,9 +76,10 @@ SHAPLEY_LOG_SPACE_ARG_NAME = 'plot_shapley_in_log_space'
 SHAPLEY_SMOOTHING_RADIUS_ARG_NAME = 'shapley_smoothing_radius_px'
 OUTPUT_DIR_ARG_NAME = 'output_dir_name'
 
-SHAPLEY_DIR_HELP_STRING = (
-    'Path to directory with Shapley outputs.  The relevant file will be found '
-    'therein by `shapley_io.find_file` and read by `shapley_io.read_file`.'
+SHAPLEY_DIR_OR_FILE_HELP_STRING = (
+    'Path to directory or file with Shapley outputs.  If directory, the '
+    'relevant file will be found therein by `shapley_io.find_file`.  Either '
+    'way, the file will be read by `shapley_io.read_file`.'
 )
 INIT_DATE_HELP_STRING = (
     'Will plot Shapley outputs for this forecast-init day (format "yyyymmdd").'
@@ -96,6 +99,7 @@ EXTREME_CASE_FILE_HELP_STRING = (
 EXTREME_CASE_INDEX_HELP_STRING = 'See documentation for `{0:s}`.'.format(
     EXTREME_CASE_FILE_ARG_NAME
 )
+
 GFS_DIRECTORY_HELP_STRING = (
     'Name of directory with *unnormalized* GFS weather forecasts.  Files '
     'therein will be found by `gfs_io.find_file` and read by '
@@ -134,6 +138,11 @@ REGION_HELP_STRING = (
     'Name of region for which Shapley values will be computed.  If you leave '
     'this empty, the region will not be reported in figure titles.'
 )
+THIN_LEAD_TIMES_HELP_STRING = (
+    'Boolean flag.  If 1, will thin out lead times, plotting only those '
+    'closest to pre-interpolation lead times in the generator.  If 0, will '
+    'plot all lead times, post-interpolation.'
+)
 SHAPLEY_LINE_WIDTH_HELP_STRING = 'Line width for Shapley-value contours.'
 SHAPLEY_LINE_OPACITY_HELP_STRING = (
     'Line opacity (in range 0...1) for Shapley contours.'
@@ -165,8 +174,8 @@ OUTPUT_DIR_HELP_STRING = (
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER.add_argument(
-    '--' + SHAPLEY_DIR_ARG_NAME, type=str, required=True,
-    help=SHAPLEY_DIR_HELP_STRING
+    '--' + SHAPLEY_DIR_OR_FILE_ARG_NAME, type=str, required=True,
+    help=SHAPLEY_DIR_OR_FILE_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + INIT_DATE_ARG_NAME, type=str, required=False, default='',
@@ -207,6 +216,10 @@ INPUT_ARG_PARSER.add_argument(
 INPUT_ARG_PARSER.add_argument(
     '--' + REGION_ARG_NAME, type=str, required=False, default='',
     help=REGION_HELP_STRING
+)
+INPUT_ARG_PARSER.add_argument(
+    '--' + THIN_LEAD_TIMES_ARG_NAME, type=int, required=False, default=0,
+    help=THIN_LEAD_TIMES_HELP_STRING
 )
 INPUT_ARG_PARSER.add_argument(
     '--' + SHAPLEY_LINE_WIDTH_ARG_NAME, type=float, required=True,
@@ -773,11 +786,12 @@ def _plot_one_era5_field(
     return figure_object, axes_object
 
 
-def _run(shapley_dir_name, init_date_string,
-         extreme_case_file_name, extreme_case_index, gfs_directory_name, target_dir_name,
+def _run(shapley_dir_or_file_name, init_date_string, extreme_case_file_name,
+         extreme_case_index, gfs_directory_name, target_dir_name,
          gfs_forecast_target_dir_name, gfs_normalization_file_name,
          predictor_colour_limits_prctile, shapley_colour_limits_prctile,
-         region_name, shapley_line_width, shapley_line_opacity,
+         region_name, thin_out_lead_times,
+         shapley_line_width, shapley_line_opacity,
          plot_latitude_limits_deg_n, plot_longitude_limits_deg_e,
          shapley_half_num_contours, plot_shapley_in_log_space,
          shapley_smoothing_radius_px, output_dir_name):
@@ -785,7 +799,7 @@ def _run(shapley_dir_name, init_date_string,
 
     This is effectively the main method.
 
-    :param shapley_dir_name: See documentation at top of this script.
+    :param shapley_dir_or_file_name: See documentation at top of this script.
     :param init_date_string: Same.
     :param extreme_case_file_name: Same.
     :param extreme_case_index: Same.
@@ -796,6 +810,7 @@ def _run(shapley_dir_name, init_date_string,
     :param predictor_colour_limits_prctile: Same.
     :param shapley_colour_limits_prctile: Same.
     :param region_name: Same.
+    :param thin_out_lead_times: Same.
     :param shapley_line_width: Same.
     :param shapley_line_opacity: Same.
     :param plot_latitude_limits_deg_n: Same.
@@ -885,24 +900,28 @@ def _run(shapley_dir_name, init_date_string,
     if init_date_string == '':
         init_date_string = None
 
-    if init_date_string is None:
-        error_checking.assert_is_geq(extreme_case_index, 0)
+    if os.path.isfile(shapley_dir_or_file_name):
+        shapley_file_name = shapley_dir_or_file_name
+    else:
+        if init_date_string is None:
+            error_checking.assert_is_geq(extreme_case_index, 0)
 
-        print('Reading forecast-init day from: "{0:s}"...'.format(
-            extreme_case_file_name
-        ))
-        extreme_case_table_xarray = extreme_cases_io.read_file(
-            extreme_case_file_name
+            print('Reading forecast-init day from: "{0:s}"...'.format(
+                extreme_case_file_name
+            ))
+            extreme_case_table_xarray = extreme_cases_io.read_file(
+                extreme_case_file_name
+            )
+            init_date_string = extreme_case_table_xarray[
+                extreme_cases_io.INIT_DATE_KEY
+            ].values[extreme_case_index]
+
+        shapley_dir_name = shapley_dir_or_file_name
+        shapley_file_name = shapley_io.find_file(
+            directory_name=shapley_dir_name,
+            init_date_string=init_date_string,
+            raise_error_if_missing=True
         )
-        init_date_string = extreme_case_table_xarray[
-            extreme_cases_io.INIT_DATE_KEY
-        ].values[extreme_case_index]
-
-    shapley_file_name = shapley_io.find_file(
-        directory_name=shapley_dir_name,
-        init_date_string=init_date_string,
-        raise_error_if_missing=True
-    )
 
     file_system_utils.mkdir_recursive_if_necessary(
         directory_name=output_dir_name
@@ -985,6 +1004,14 @@ def _run(shapley_dir_name, init_date_string,
         target_matrix = numpy.expand_dims(
             stx[shapley_io.TARGET_VALUE_KEY].values, axis=0
         )
+
+        gfs_lead_times_hours = stx[shapley_io.GFS_LEAD_TIME_KEY].values
+        if shapley_io.TARGET_LAGLEAD_TIME_KEY in stx.data_vars:
+            target_laglead_times_hours = (
+                stx[shapley_io.TARGET_LAGLEAD_TIME_KEY].values
+            )
+        else:
+            target_laglead_times_hours = numpy.array([])
     else:
         if patch_size_deg is None:
             patch_start_latitude_deg_n = None
@@ -1022,6 +1049,62 @@ def _run(shapley_dir_name, init_date_string,
             neural_net.TARGET_LAGLEAD_TIMES_KEY
         ]
         del data_dict
+
+    if thin_out_lead_times:
+        vod = validation_option_dict
+        orig_gfs_lead_times_hours = vod[
+            neural_net.MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
+        ][model_lead_time_days]
+
+        good_indices = numpy.array([
+            numpy.argmin(numpy.absolute(gfs_lead_times_hours - og))
+            for og in orig_gfs_lead_times_hours
+        ], dtype=int)
+
+        gfs_lead_times_hours = gfs_lead_times_hours[good_indices]
+
+        for k in range(len(model_input_layer_names)):
+            if model_input_layer_names[k] not in [
+                    neural_net.GFS_3D_LAYER_NAME, neural_net.GFS_2D_LAYER_NAME
+            ]:
+                continue
+
+            predictor_matrices[k] = predictor_matrices[k][..., good_indices, :]
+
+    if thin_out_lead_times and len(target_laglead_times_hours) > 0:
+        if vod[neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY] is None:
+            first_times_days = numpy.array([], dtype=int)
+        else:
+            first_times_days = vod[
+                neural_net.MODEL_LEAD_TO_TARGET_LAGS_KEY
+            ][model_lead_time_days]
+
+        if vod[neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] is None:
+            second_times_days = numpy.array([], dtype=int)
+        else:
+            second_times_days = vod[
+                neural_net.MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
+            ][model_lead_time_days]
+
+        orig_laglead_times_hours = DAYS_TO_HOURS * numpy.concatenate([
+            numpy.sort(-1 * first_times_days),
+            second_times_days
+        ])
+
+        good_indices = numpy.array([
+            numpy.argmin(numpy.absolute(target_laglead_times_hours - og))
+            for og in orig_laglead_times_hours
+        ], dtype=int)
+
+        target_laglead_times_hours = target_laglead_times_hours[good_indices]
+
+        for k in range(len(model_input_layer_names)):
+            if model_input_layer_names[k] not in [
+                    neural_net.LAGLEAD_TARGET_LAYER_NAME
+            ]:
+                continue
+
+            predictor_matrices[k] = predictor_matrices[k][..., good_indices, :]
 
     if plot_latitude_limits_deg_n is not None:
         desired_row_indices = misc_utils.desired_latitudes_to_rows(
@@ -1786,7 +1869,9 @@ if __name__ == '__main__':
     INPUT_ARG_OBJECT = INPUT_ARG_PARSER.parse_args()
 
     _run(
-        shapley_dir_name=getattr(INPUT_ARG_OBJECT, SHAPLEY_DIR_ARG_NAME),
+        shapley_dir_or_file_name=getattr(
+            INPUT_ARG_OBJECT, SHAPLEY_DIR_OR_FILE_ARG_NAME
+        ),
         init_date_string=getattr(INPUT_ARG_OBJECT, INIT_DATE_ARG_NAME),
         extreme_case_file_name=getattr(
             INPUT_ARG_OBJECT, EXTREME_CASE_FILE_ARG_NAME
@@ -1811,6 +1896,9 @@ if __name__ == '__main__':
             dtype=float
         ),
         region_name=getattr(INPUT_ARG_OBJECT, REGION_ARG_NAME),
+        thin_out_lead_times=bool(
+            getattr(INPUT_ARG_OBJECT, THIN_LEAD_TIMES_ARG_NAME)
+        ),
         shapley_line_width=getattr(
             INPUT_ARG_OBJECT, SHAPLEY_LINE_WIDTH_ARG_NAME
         ),

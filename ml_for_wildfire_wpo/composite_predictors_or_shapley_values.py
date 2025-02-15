@@ -28,6 +28,7 @@ import composite_io
 import extreme_cases_io
 import neural_net
 
+TOLERANCE = 1e-6
 SEPARATOR_STRING = '\n\n' + '*' * 50 + '\n\n'
 
 SHAPLEY_KEYS = [
@@ -102,7 +103,7 @@ USE_PMM_HELP_STRING = (
 OUTPUT_FILE_HELP_STRING = (
     'Path to output file.  Will be written by either '
     '`composite_io.write_file` (if this script is running in mode #1) or '
-    '`shapley_io.write_composite_file` (if this script is running in mode #2).'
+    '`shapley_io.write_file` (if this script is running in mode #2).'
 )
 
 INPUT_ARG_PARSER = argparse.ArgumentParser()
@@ -212,9 +213,47 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
             extreme_cases_io.INIT_DATE_KEY
         ].values
 
+    # Read model.
+    print('Reading model from: "{0:s}"...'.format(model_file_name))
+    model_object = neural_net.read_model(model_file_name)
+    # model_object = neural_net.read_model_for_shapley(model_file_name)
+
+    # Read model metadata.
+    model_metafile_name = neural_net.find_metafile(
+        model_file_name=model_file_name, raise_error_if_missing=True
+    )
+    print('Reading model metadata from: "{0:s}"...'.format(model_metafile_name))
+    model_metadata_dict = neural_net.read_metafile(model_metafile_name)
+
+    vod = model_metadata_dict[neural_net.VALIDATION_OPTIONS_KEY]
+    patch_size_deg = vod[neural_net.OUTER_PATCH_SIZE_DEG_KEY]
+    if patch_size_deg is not None:
+
+        # TODO(thunderhoser): For patch-trained NNs, these input args will be
+        # MANDATORY.
+        error_string = (
+            'This script does not currently support patches with '
+            'include_shapley == False.  If you want to support patches without '
+            'Shapley values, the patch-start position (lat/long) will need to '
+            'be included as input args to script.'
+        )
+        raise ValueError(error_string)
+
+    vod[neural_net.GFS_DIRECTORY_KEY] = gfs_directory_name
+    vod[neural_net.TARGET_DIRECTORY_KEY] = target_dir_name
+    vod[neural_net.GFS_FORECAST_TARGET_DIR_KEY] = gfs_forecast_target_dir_name
+    vod[neural_net.USE_LEAD_TIME_AS_PRED_KEY] = False
+    vod[neural_net.GFS_NORM_FILE_KEY] = None
+    vod[neural_net.TARGET_NORM_FILE_KEY] = None
+    vod[neural_net.ERA5_NORM_FILE_KEY] = None
+    num_target_fields = len(vod[neural_net.TARGET_FIELDS_KEY])
+    validation_option_dict = vod
+
     # Read and composite Shapley fields, if necessary.
     include_shapley = shapley_dir_name != ''
     shapley_table_xarray = None
+    patch_start_latitude_deg_n = numpy.nan
+    patch_start_longitude_deg_e = numpy.nan
 
     if include_shapley:
         shapley_matrices = []
@@ -244,13 +283,39 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
             this_model_lead_time_days = stx.attrs[
                 shapley_io.MODEL_LEAD_TIME_KEY
             ]
+            if patch_size_deg is None:
+                this_patch_start_latitude_deg_n = numpy.nan
+                this_patch_start_longitude_deg_e = numpy.nan
+            else:
+                this_patch_start_latitude_deg_n = (
+                    stx[shapley_io.LATITUDE_KEY].values[0]
+                )
+                this_patch_start_longitude_deg_e = (
+                    stx[shapley_io.LONGITUDE_KEY].values[0]
+                )
 
             if model_file_name == '':
                 model_file_name = copy.deepcopy(this_model_file_name)
                 model_lead_time_days = this_model_lead_time_days + 0
 
+                if patch_size_deg is not None:
+                    patch_start_latitude_deg_n = (
+                        this_patch_start_latitude_deg_n + 0.
+                    )
+                    patch_start_longitude_deg_e = (
+                        this_patch_start_longitude_deg_e + 0.
+                    )
+
             assert model_file_name == this_model_file_name
             assert model_lead_time_days == this_model_lead_time_days
+            assert numpy.isclose(
+                patch_start_latitude_deg_n, this_patch_start_latitude_deg_n,
+                atol=TOLERANCE, equal_nan=True
+            )
+            assert numpy.isclose(
+                patch_start_longitude_deg_e, this_patch_start_longitude_deg_e,
+                atol=TOLERANCE, equal_nan=True
+            )
 
             these_shapley_matrices = [
                 stx[k].values if k in stx.data_vars else None
@@ -276,33 +341,6 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     else:
         shapley_matrices = None
 
-    # Read model.
-    print('Reading model from: "{0:s}"...'.format(model_file_name))
-    model_object = neural_net.read_model(model_file_name)
-    # model_object = neural_net.read_model_for_shapley(model_file_name)
-
-    # Read model metadata.
-    model_metafile_name = neural_net.find_metafile(
-        model_file_name=model_file_name, raise_error_if_missing=True
-    )
-    print('Reading model metadata from: "{0:s}"...'.format(model_metafile_name))
-    model_metadata_dict = neural_net.read_metafile(model_metafile_name)
-
-    vod = model_metadata_dict[neural_net.VALIDATION_OPTIONS_KEY]
-    patch_size_deg = vod[neural_net.OUTER_PATCH_SIZE_DEG_KEY]
-    if patch_size_deg is not None:
-        raise ValueError('This script does not yet work for patch-trained NNs.')
-
-    vod[neural_net.GFS_DIRECTORY_KEY] = gfs_directory_name
-    vod[neural_net.TARGET_DIRECTORY_KEY] = target_dir_name
-    vod[neural_net.GFS_FORECAST_TARGET_DIR_KEY] = gfs_forecast_target_dir_name
-    vod[neural_net.USE_LEAD_TIME_AS_PRED_KEY] = False
-    vod[neural_net.GFS_NORM_FILE_KEY] = None
-    vod[neural_net.TARGET_NORM_FILE_KEY] = None
-    vod[neural_net.ERA5_NORM_FILE_KEY] = None
-    num_target_fields = len(vod[neural_net.TARGET_FIELDS_KEY])
-    validation_option_dict = vod
-
     # Read predictor data to composite.
     predictor_matrices = []
     target_matrix = numpy.array([])
@@ -317,7 +355,9 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
             data_dict = neural_net.create_data(
                 option_dict=validation_option_dict,
                 init_date_string=init_date_strings[i],
-                model_lead_time_days=model_lead_time_days
+                model_lead_time_days=model_lead_time_days,
+                patch_start_latitude_deg_n=patch_start_latitude_deg_n,
+                patch_start_longitude_deg_e=patch_start_longitude_deg_e
             )
             print(SEPARATOR_STRING)
         except:
@@ -377,8 +417,14 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
         shapley_io.write_file(
             netcdf_file_name=output_file_name,
             shapley_matrices=composite_shapley_matrices,
-            grid_latitudes_deg_n=data_dict[neural_net.GRID_LATITUDES_KEY],
-            grid_longitudes_deg_e=data_dict[neural_net.GRID_LONGITUDES_KEY],
+            grid_latitudes_deg_n=
+            data_dict[neural_net.GRID_LATITUDE_MATRIX_KEY][0, :],
+            grid_longitudes_deg_e=
+            data_dict[neural_net.GRID_LONGITUDE_MATRIX_KEY][0, :],
+            gfs_pred_lead_times_hours=
+            data_dict[neural_net.GFS_PRED_LEAD_TIMES_KEY],
+            target_laglead_times_hours=
+            data_dict[neural_net.TARGET_LAGLEAD_TIMES_KEY],
             composite_init_date_strings=init_date_strings,
             region_mask_file_name=stx.attrs[shapley_io.REGION_MASK_FILE_KEY],
             target_field_name=stx.attrs[shapley_io.TARGET_FIELD_KEY],
@@ -395,8 +441,10 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     print('Writing results to: "{0:s}"...'.format(output_file_name))
     composite_io.write_file(
         netcdf_file_name=output_file_name,
-        grid_latitudes_deg_n=data_dict[neural_net.GRID_LATITUDES_KEY],
-        grid_longitudes_deg_e=data_dict[neural_net.GRID_LONGITUDES_KEY],
+        grid_latitudes_deg_n=
+        data_dict[neural_net.GRID_LATITUDE_MATRIX_KEY][0, :],
+        grid_longitudes_deg_e=
+        data_dict[neural_net.GRID_LONGITUDE_MATRIX_KEY][0, :],
         init_date_strings=init_date_strings,
         model_input_layer_names=
         [l.name.split(':')[0] for l in model_object.input],

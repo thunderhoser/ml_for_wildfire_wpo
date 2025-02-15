@@ -486,6 +486,8 @@ def _apply_deepshap_1day(
     grid_longitudes_deg_e = (
         data_dict[neural_net.GRID_LONGITUDE_MATRIX_KEY][0, :]
     )
+    gfs_pred_lead_times_hours = data_dict[neural_net.GFS_PRED_LEAD_TIMES_KEY]
+    target_laglead_times_hours = data_dict[neural_net.TARGET_LAGLEAD_TIMES_KEY]
     del data_dict
 
     if 'DeepExplainer' in str(type(explainer_object)):
@@ -508,6 +510,8 @@ def _apply_deepshap_1day(
         shapley_matrices=shapley_matrices,
         grid_latitudes_deg_n=grid_latitudes_deg_n,
         grid_longitudes_deg_e=grid_longitudes_deg_e,
+        gfs_pred_lead_times_hours=gfs_pred_lead_times_hours,
+        target_laglead_times_hours=target_laglead_times_hours,
         init_date_string=init_date_string,
         baseline_init_date_strings=baseline_init_date_strings,
         region_mask_file_name=region_mask_file_name,

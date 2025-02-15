@@ -39,6 +39,8 @@ MODEL_FILE_KEY = 'model_file_name'
 
 LATITUDE_KEY = 'latitude_deg_n'
 LONGITUDE_KEY = 'longitude_deg_e'
+GFS_LEAD_TIME_KEY = 'gfs_lead_time_hours'
+TARGET_LAGLEAD_TIME_KEY = 'target_laglead_time_hours'
 SHAPLEY_FOR_3D_GFS_KEY = 'shapley_gfs_3d_inputs'
 SHAPLEY_FOR_2D_GFS_KEY = 'shapley_gfs_2d_inputs'
 SHAPLEY_FOR_ERA5_KEY = 'shapley_for_era5_inputs'
@@ -87,6 +89,7 @@ def find_file(directory_name, init_date_string, raise_error_if_missing=True):
 def write_file(
         netcdf_file_name, shapley_matrices,
         grid_latitudes_deg_n, grid_longitudes_deg_e,
+        gfs_pred_lead_times_hours, target_laglead_times_hours,
         region_mask_file_name, target_field_name,
         model_input_layer_names, model_lead_time_days, model_file_name,
         init_date_string=None, baseline_init_date_strings=None,
@@ -108,6 +111,10 @@ def write_file(
     :param shapley_matrices: 1-D list of numpy arrays with Shapley values.
     :param grid_latitudes_deg_n: length-M numpy array of latitudes (deg north).
     :param grid_longitudes_deg_e: length-N numpy array of longitudes (deg east).
+    :param gfs_pred_lead_times_hours: 1-D numpy array of lead times for
+        GFS-based predictors.
+    :param target_laglead_times_hours: 1-D numpy array of lag/lead times for
+        target (FWI) fields used in predictors.
     :param region_mask_file_name: Path to file with region mask (readable by
         `region_mask_io.read_file`).  Shapley values should pertain only to the
         given target field averaged over this spatial region.
@@ -147,6 +154,13 @@ def write_file(
 
     num_grid_rows = shapley_matrices[lyr_idx].shape[0]
     num_grid_columns = shapley_matrices[lyr_idx].shape[1]
+    num_gfs_lead_times = shapley_matrices[lyr_idx].shape[-2]
+
+    error_checking.assert_is_numpy_array(
+        gfs_pred_lead_times_hours,
+        exact_dimensions=numpy.array([num_gfs_lead_times], dtype=int)
+    )
+    error_checking.assert_is_geq_numpy_array(gfs_pred_lead_times_hours, 0.)
 
     error_checking.assert_is_numpy_array(
         grid_latitudes_deg_n,
@@ -325,6 +339,13 @@ def write_file(
                 )
 
         elif model_input_layer_names[k] == neural_net.LAGLEAD_TARGET_LAYER_NAME:
+            num_target_laglead_times = shapley_matrices[k].shape[2]
+            error_checking.assert_is_numpy_array(
+                target_laglead_times_hours,
+                exact_dimensions=
+                numpy.array([num_target_laglead_times], dtype=int)
+            )
+
             if ROW_DIM not in dataset_object.dimensions:
                 dataset_object.createDimension(ROW_DIM, num_grid_rows)
             if COLUMN_DIM not in dataset_object.dimensions:
@@ -423,6 +444,20 @@ def write_file(
         LONGITUDE_KEY, datatype=numpy.float64, dimensions=COLUMN_DIM
     )
     dataset_object.variables[LONGITUDE_KEY][:] = grid_longitudes_deg_e
+
+    dataset_object.createVariable(
+        GFS_LEAD_TIME_KEY, datatype=numpy.float64, dimensions=GFS_LEAD_TIME_DIM
+    )
+    dataset_object.variables[GFS_LEAD_TIME_KEY][:] = gfs_pred_lead_times_hours
+
+    if neural_net.LAGLEAD_TARGET_LAYER_NAME in model_input_layer_names:
+        dataset_object.createVariable(
+            TARGET_LAGLEAD_TIME_KEY, datatype=numpy.float64,
+            dimensions=LAGLEAD_TIME_DIM
+        )
+        dataset_object.variables[TARGET_LAGLEAD_TIME_KEY][:] = (
+            target_laglead_times_hours
+        )
 
     dataset_object.close()
 
