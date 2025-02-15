@@ -239,78 +239,6 @@ def __report_data_properties(
     return predictor_matrices, input_layer_names
 
 
-def __determine_num_times_for_interp(generator_option_dict):
-    """For both GFS Wx variables and lag/lead targets, computes # interp times.
-
-    :param generator_option_dict: See documentation for `data_generator`.
-    :return: num_gfs_hours_for_interp: Number of time steps to which GFS Wx
-        variables will be interpolated.  If no interpolation is needed (i.e.,
-        all model lead times require the same number of GFS Wx lead times), this
-        will be None.
-    :return: num_target_times_for_interp: Number of time steps to which lag/lead
-        targets will be interpolated.  If no interpolation is needed (i.e.,
-        all model lead times require the same number of lag/lead target times),
-        this will be None.
-    """
-
-    model_lead_days_to_gfs_pred_leads_hours = generator_option_dict[
-        MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
-    ]
-    model_lead_days_to_target_lags_days = generator_option_dict[
-        MODEL_LEAD_TO_TARGET_LAGS_KEY
-    ]
-    model_lead_days_to_gfs_target_leads_days = generator_option_dict[
-        MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
-    ]
-    model_lead_times_days = numpy.array(
-        list(model_lead_days_to_gfs_pred_leads_hours.keys()),
-        dtype=int
-    )
-
-    num_gfs_hours_by_model_lead = numpy.array([
-        len(model_lead_days_to_gfs_pred_leads_hours[l])
-        for l in model_lead_times_days
-    ], dtype=int)
-
-    if len(numpy.unique(num_gfs_hours_by_model_lead)) == 1:
-        num_gfs_hours_for_interp = None
-    else:
-        num_gfs_hours_for_interp = numpy.max(num_gfs_hours_by_model_lead)
-
-    if model_lead_days_to_target_lags_days is None:
-        num_target_lags_by_model_lead = numpy.full(
-            len(model_lead_times_days), 0, dtype=int
-        )
-    else:
-        num_target_lags_by_model_lead = numpy.array([
-            len(model_lead_days_to_target_lags_days[l])
-            for l in model_lead_times_days
-        ], dtype=int)
-
-    if model_lead_days_to_gfs_target_leads_days is None:
-        num_gfs_target_leads_by_model_lead = numpy.full(
-            len(model_lead_times_days), 0, dtype=int
-        )
-    else:
-        num_gfs_target_leads_by_model_lead = numpy.array([
-            len(model_lead_days_to_gfs_target_leads_days[l])
-            for l in model_lead_times_days
-        ], dtype=int)
-
-    num_target_time_steps_by_model_lead = (
-        num_target_lags_by_model_lead + num_gfs_target_leads_by_model_lead
-    )
-
-    if len(numpy.unique(num_target_time_steps_by_model_lead)) == 1:
-        num_target_times_for_interp = None
-    else:
-        num_target_times_for_interp = numpy.max(
-            num_target_time_steps_by_model_lead
-        )
-
-    return num_gfs_hours_for_interp, num_target_times_for_interp
-
-
 def __make_trapezoidal_weight_matrix(patch_size_pixels,
                                      patch_overlap_size_pixels):
     """Creates trapezoidal weight matrix for applying patchwise NN to full grid.
@@ -498,7 +426,7 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
         dtype=int
     )
     num_gfs_hours_for_interp, num_target_times_for_interp = (
-        __determine_num_times_for_interp(option_dict)
+        _determine_num_times_for_interp(option_dict)
     )
 
     # TODO(thunderhoser): The longitude command below might fail.
@@ -928,6 +856,78 @@ def _check_generator_args(option_dict):
     )
 
     return option_dict
+
+
+def _determine_num_times_for_interp(generator_option_dict):
+    """For both GFS Wx variables and lag/lead targets, computes # interp times.
+
+    :param generator_option_dict: See documentation for `data_generator`.
+    :return: num_gfs_hours_for_interp: Number of time steps to which GFS Wx
+        variables will be interpolated.  If no interpolation is needed (i.e.,
+        all model lead times require the same number of GFS Wx lead times), this
+        will be None.
+    :return: num_target_times_for_interp: Number of time steps to which lag/lead
+        targets will be interpolated.  If no interpolation is needed (i.e.,
+        all model lead times require the same number of lag/lead target times),
+        this will be None.
+    """
+
+    model_lead_days_to_gfs_pred_leads_hours = generator_option_dict[
+        MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
+    ]
+    model_lead_days_to_target_lags_days = generator_option_dict[
+        MODEL_LEAD_TO_TARGET_LAGS_KEY
+    ]
+    model_lead_days_to_gfs_target_leads_days = generator_option_dict[
+        MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
+    ]
+    model_lead_times_days = numpy.array(
+        list(model_lead_days_to_gfs_pred_leads_hours.keys()),
+        dtype=int
+    )
+
+    num_gfs_hours_by_model_lead = numpy.array([
+        len(model_lead_days_to_gfs_pred_leads_hours[l])
+        for l in model_lead_times_days
+    ], dtype=int)
+
+    if len(numpy.unique(num_gfs_hours_by_model_lead)) == 1:
+        num_gfs_hours_for_interp = None
+    else:
+        num_gfs_hours_for_interp = numpy.max(num_gfs_hours_by_model_lead)
+
+    if model_lead_days_to_target_lags_days is None:
+        num_target_lags_by_model_lead = numpy.full(
+            len(model_lead_times_days), 0, dtype=int
+        )
+    else:
+        num_target_lags_by_model_lead = numpy.array([
+            len(model_lead_days_to_target_lags_days[l])
+            for l in model_lead_times_days
+        ], dtype=int)
+
+    if model_lead_days_to_gfs_target_leads_days is None:
+        num_gfs_target_leads_by_model_lead = numpy.full(
+            len(model_lead_times_days), 0, dtype=int
+        )
+    else:
+        num_gfs_target_leads_by_model_lead = numpy.array([
+            len(model_lead_days_to_gfs_target_leads_days[l])
+            for l in model_lead_times_days
+        ], dtype=int)
+
+    num_target_time_steps_by_model_lead = (
+        num_target_lags_by_model_lead + num_gfs_target_leads_by_model_lead
+    )
+
+    if len(numpy.unique(num_target_time_steps_by_model_lead)) == 1:
+        num_target_times_for_interp = None
+    else:
+        num_target_times_for_interp = numpy.max(
+            num_target_time_steps_by_model_lead
+        )
+
+    return num_gfs_hours_for_interp, num_target_times_for_interp
 
 
 def _find_gfs_forecast_target_file_1example(daily_gfs_dir_name,
@@ -2333,7 +2333,7 @@ def data_generator(option_dict):
     desired_gfs_fcst_target_column_indices = numpy.array([], dtype=int)
 
     num_gfs_hours_for_interp, num_target_times_for_interp = (
-        __determine_num_times_for_interp(option_dict)
+        _determine_num_times_for_interp(option_dict)
     )
     num_batches_provided = 0
 
@@ -2795,7 +2795,7 @@ def data_generator_fast_patches(option_dict):
     desired_gfs_fcst_target_column_indices = numpy.array([], dtype=int)
 
     num_gfs_hours_for_interp, num_target_times_for_interp = (
-        __determine_num_times_for_interp(option_dict)
+        _determine_num_times_for_interp(option_dict)
     )
 
     patch_metalocation_dict = __init_patch_metalocation_dict(
@@ -3277,7 +3277,7 @@ def create_data(
     use_lead_time_as_predictor = option_dict[USE_LEAD_TIME_AS_PRED_KEY]
 
     num_gfs_hours_for_interp, num_target_times_for_interp = (
-        __determine_num_times_for_interp(option_dict)
+        _determine_num_times_for_interp(option_dict)
     )
 
     gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
