@@ -369,7 +369,7 @@ def _region_of_interest_to_patch(region_mask_table_xarray, patch_size_deg):
     ))
 
     num_rows_in_full_grid = len(mtx.coords[region_mask_io.ROW_DIM].values)
-    num_columns_in_full_grid = len(mtx.coords[region_mask_io.ROW_DIM].values)
+    num_columns_in_full_grid = len(mtx.coords[region_mask_io.COLUMN_DIM].values)
 
     first_row_in_patch = center_row_in_region - patch_size_pixels // 2
     first_row_in_patch = max([0, first_row_in_patch])
@@ -412,6 +412,8 @@ def _region_of_interest_to_patch(region_mask_table_xarray, patch_size_deg):
     region_mask_table_xarray = region_mask_table_xarray.isel({
         region_mask_io.COLUMN_DIM: column_indices
     })
+    print(region_mask_table_xarray[region_mask_io.LATITUDE_KEY].values)
+    print(region_mask_table_xarray[region_mask_io.LONGITUDE_KEY].values)
 
     num_pixels_in_region = numpy.sum(
         mtx[region_mask_io.REGION_MASK_KEY].values
@@ -569,6 +571,7 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
 
     # Change model's output layer to include only the given region and target
     # field.
+    print('Reading mask from: "{0:s}"...'.format(region_mask_file_name))
     mask_table_xarray = region_mask_io.read_file(region_mask_file_name)
 
     row_indices = misc_utils.desired_latitudes_to_rows(
