@@ -46,7 +46,7 @@ model_file_name="${model_dir_name}/model.weights.p"
 this_directory_name=`pwd`
 j=$SLURM_ARRAY_TASK_ID
 
-while [ $j -le $(( $SLURM_ARRAY_TASK_ID + 4 )) ] && [ $j -lt ${#INIT_DATE_STRINGS[@]} ]; do
+while [ $j -le $(( $SLURM_ARRAY_TASK_ID + 1 )) ] && [ $j -lt ${#INIT_DATE_STRINGS[@]} ]; do
     for region_name in "${REGION_NAMES[@]}"; do
         input_dir_name="${model_dir_name}/validation_and_testing/lead_time_days=05/shapley_maps/${region_name}/daily_severity_rating"
     
