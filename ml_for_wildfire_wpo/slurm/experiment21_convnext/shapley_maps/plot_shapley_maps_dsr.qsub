@@ -18,8 +18,6 @@
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
 #SBATCH --output=plot_shapley_maps_dsr_%A_%a.out
 
-# TODO(thunderhoser): Plotting everything might be too computationally expensive.  Might need to thin out lead times.
-
 module load cuda/12.3.1
 conda init
 conda activate base
