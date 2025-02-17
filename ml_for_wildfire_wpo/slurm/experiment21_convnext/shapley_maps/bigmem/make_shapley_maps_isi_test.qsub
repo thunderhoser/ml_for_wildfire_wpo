@@ -1,25 +1,24 @@
 #!/bin/bash
 
-#SBATCH --job-name="plot_shapley_maps_bui_test"
-#SBATCH --partition="fge"
-#SBATCH --account="rda-ghpcs"
-#SBATCH --qos="gpuwf"
+#SBATCH --job-name="make_shapley_maps_isi"
+#SBATCH --partition="bigmem"
+#SBATCH --account="gsd-hpcs"
+#SBATCH --qos="batch"
 #SBATCH --nodes=1
 #SBATCH --ntasks=8           # 8 tasks per node
 #SBATCH --cpus-per-task=2
 #SBATCH --ntasks-per-node=8  # 8 GPUs per node
 #SBATCH --exclusive
-#SBATCH --time=24:00:00
+#SBATCH --time=08:00:00
 #SBATCH --array=60
 #SBATCH --exclude=h28n12
 ##SBATCH --exclude=h31n03,h28n12
 ##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
 #SBATCH --mail-type=BEGIN,END,FAIL
 #SBATCH --mail-user=ryan.lagerquist@noaa.gov
-#SBATCH --output=plot_shapley_maps_bui_%A_%a.out
+#SBATCH --output=make_shapley_maps_isi_%A_%a.out
 
-
-module load imagemagick/7.1.1-11
+module load cuda/12.3.1
 conda init
 conda activate base
 
@@ -33,7 +32,7 @@ echo $PATH
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
 TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment21_convnext"
 
-GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed"
+GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
 TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
 GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
 
@@ -47,27 +46,10 @@ model_file_name="${model_dir_name}/model.weights.p"
 this_directory_name=`pwd`
 j=$SLURM_ARRAY_TASK_ID
 
-while [ $j -le $(( $SLURM_ARRAY_TASK_ID + 1 )) ] && [ $j -lt ${#INIT_DATE_STRINGS[@]} ]; do
+while [ $j -le $(( $SLURM_ARRAY_TASK_ID + 4 )) ] && [ $j -lt ${#INIT_DATE_STRINGS[@]} ]; do
     for region_name in "${REGION_NAMES[@]}"; do
-        input_dir_name="${model_dir_name}/validation_and_testing/lead_time_days=05/shapley_maps/${region_name}/buildup_index"
-    
-        python3 -u "${CODE_DIR_NAME}/plot_shapley_maps.py" \
-        --input_shapley_dir_or_file_name="${input_dir_name}" \
-        --init_date_string="${INIT_DATE_STRINGS[$j]}" \
-        --input_gfs_directory_name="${GFS_DIR_NAME}" \
-        --input_target_dir_name="${TARGET_DIR_NAME}" \
-        --input_gfs_fcst_target_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
-        --input_gfs_norm_file_name="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/normalization_params_2019-2020.nc" \
-        --predictor_colour_limits_prctile 0.1 99.9 \
-        --shapley_colour_limits_prctile 5.0 99.9 \
-        --region_name="${region_name}" \
-        --thin_out_lead_times=1 \
-        --shapley_line_width=4 \
-        --shapley_line_opacity=0.5 \
-        --shapley_half_num_contours=10 \
-        --plot_shapley_in_log_space=0 \
-        --shapley_smoothing_radius_px=2 \
-        --output_dir_name="${input_dir_name}/plots_${INIT_DATE_STRINGS[$j]}"
+        output_dir_name="${model_dir_name}/validation_and_testing/lead_time_days=05/shapley_maps/${region_name}/initial_spread_index"
+        singularity exec --nv /scratch1/RDARCH/rda-ghpcs/Jebb.Q.Stewart/ml-ryan.simg /bin/sh -c "cd ${this_directory_name}; sh make_shapley_maps_isi.sh ${model_file_name} ${INIT_DATE_STRINGS[$j]} ${region_name} ${output_dir_name}"
     done
 
     j=$(( $j + 1 ))
