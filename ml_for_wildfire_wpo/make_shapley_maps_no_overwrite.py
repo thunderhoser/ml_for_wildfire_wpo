@@ -740,6 +740,15 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
         return
 
     for i in range(num_new_examples):
+        this_output_file_name = shapley_io.find_file(
+            directory_name=output_dir_name,
+            init_date_string=new_init_date_strings[i],
+            raise_error_if_missing=False
+        )
+
+        if os.path.isfile(this_output_file_name):
+            continue
+
         error_checking.assert_is_greater_numpy_array(baseline_years, 0)
         error_checking.assert_is_greater(baseline_window_days, 0)
         error_checking.assert_is_leq(baseline_window_days, 30)
@@ -827,12 +836,6 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             explainer_object = shap.DeepExplainer(
                 model=model_object, data=baseline_predictor_matrices
             )
-
-        this_output_file_name = shapley_io.find_file(
-            directory_name=output_dir_name,
-            init_date_string=new_init_date_strings[i],
-            raise_error_if_missing=False
-        )
 
         _apply_deepshap_1day(
             explainer_object=explainer_object,
