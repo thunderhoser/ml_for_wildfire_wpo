@@ -20,7 +20,7 @@
 
 # TODO(thunderhoser): Plotting everything might be too computationally expensive.  Might need to thin out lead times.
 
-module load cuda/12.3.1
+module load imagemagick/7.1.1-11
 conda init
 conda activate base
 

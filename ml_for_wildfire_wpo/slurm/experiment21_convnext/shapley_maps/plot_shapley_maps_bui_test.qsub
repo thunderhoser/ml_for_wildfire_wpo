@@ -19,7 +19,7 @@
 #SBATCH --output=plot_shapley_maps_bui_%A_%a.out
 
 
-module load cuda/12.3.1
+module load imagemagick/7.1.1-11
 conda init
 conda activate base
 
