@@ -11,7 +11,7 @@ GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project
 TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
 GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
 
-python3 -u "${CODE_DIR_NAME}/make_shapley_maps_no_overwrite.py" \
+python3 -u "${CODE_DIR_NAME}/make_shapley_maps_no_overwrite_after_feb17.py" \
 --input_model_file_name="${model_file_name}" \
 --input_gfs_directory_name="${GFS_DIR_NAME}" \
 --input_target_dir_name="${TARGET_DIR_NAME}" \
