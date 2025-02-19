@@ -753,9 +753,9 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
         skip_flag = False
 
         if os.path.isfile(this_output_file_name):
-            last_modified_time_unix_sec = os.path.getmtime(
+            last_modified_time_unix_sec = int(numpy.round(os.path.getmtime(
                 this_output_file_name
-            )
+            )))
             if last_modified_time_unix_sec >= CUTOFF_TIME_UNIX_SEC:
                 message_string = (
                     'File "{0:s}" was last modified at {1:s}, so will not be '
