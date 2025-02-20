@@ -221,10 +221,6 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             continue
 
         predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
-
-        for p in predictor_matrices:
-            print(p.shape)
-
         target_matrix_with_weights = data_dict[
             neural_net.TARGETS_AND_WEIGHTS_KEY
         ]

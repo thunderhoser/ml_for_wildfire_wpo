@@ -4580,7 +4580,7 @@ def apply_model_patchwise(
         patch_predictor_matrices = []
 
         for this_full_pred_matrix in full_predictor_matrices:
-            if len(this_full_pred_matrix.shape) < 2:
+            if len(this_full_pred_matrix.shape) <= 2:
                 patch_predictor_matrices.append(this_full_pred_matrix)
                 continue
 
