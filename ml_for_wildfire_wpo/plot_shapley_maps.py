@@ -988,7 +988,9 @@ def _run(shapley_dir_or_file_name, init_date_string, extreme_case_file_name,
             shapley_io.PREDICTOR_BASELINE_KEY
         ]
         predictor_matrices = [
-            stx[k].values if k in stx.data_vars else None
+            numpy.expand_dims(stx[k].values, axis=0)
+            if k in stx.data_vars
+            else None
             for k in predictor_keys
         ]
 
@@ -1160,7 +1162,6 @@ def _run(shapley_dir_or_file_name, init_date_string, extreme_case_file_name,
 
         for f in range(len(gfs_field_names_2d)):
             this_predictor_matrix = gfs_2d_predictor_matrix[..., t, f] + 0.
-            print(this_predictor_matrix.shape)
             unit_string = gfs_plotting.FIELD_TO_PLOTTING_UNIT_STRING[
                 gfs_field_names_2d[f]
             ]
