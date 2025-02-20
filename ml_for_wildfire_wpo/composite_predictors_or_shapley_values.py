@@ -422,17 +422,17 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     del target_matrix
 
     if include_shapley:
+        for this_matrix in shapley_matrices:
+            print(this_matrix.shape)
+        for this_layer_name in [l.name.split(':')[0] for l in model_object.input]:
+            print(this_layer_name)
+
         shapley_matrices = [m[good_date_indices, ...] for m in shapley_matrices]
         composite_shapley_matrices = [
             _composite_one_matrix(data_matrix=sm, use_pmm=use_pmm)
             for sm in shapley_matrices
         ]
         del shapley_matrices
-
-        for this_matrix in shapley_matrices:
-            print(this_matrix.shape)
-        for this_layer_name in [l.name.split(':')[0] for l in model_object.input]:
-            print(this_layer_name)
 
         stx = shapley_table_xarray
 
