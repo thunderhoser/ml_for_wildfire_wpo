@@ -4614,7 +4614,7 @@ def apply_model_patchwise(
             this_weight_matrix[:, -outer_patch_buffer_px:] = 1.
 
         summed_prediction_matrix[:, i_start:i_end, j_start:j_end, ...] += (
-                this_weight_matrix * patch_prediction_matrix
+            this_weight_matrix * patch_prediction_matrix
         )
         prediction_count_matrix[:, i_start:i_end, j_start:j_end, ...] += (
             this_weight_matrix

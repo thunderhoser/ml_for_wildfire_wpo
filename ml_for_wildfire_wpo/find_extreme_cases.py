@@ -183,10 +183,17 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
     ]
 
     # Find model lead time.
-    regex_match_object = re.search(
-        r'lead-time-days=(\d{2})', prediction_dir_name
-    )
-    assert regex_match_object
+    try:
+        regex_match_object = re.search(
+            r'lead-time-days=(\d{2})', prediction_dir_name
+        )
+        assert regex_match_object
+    except:
+        regex_match_object = re.search(
+            r'lead_time_days=(\d{2})', prediction_dir_name
+        )
+        assert regex_match_object
+
     model_lead_time_days = int(regex_match_object.group(1))
 
     # Read region mask.

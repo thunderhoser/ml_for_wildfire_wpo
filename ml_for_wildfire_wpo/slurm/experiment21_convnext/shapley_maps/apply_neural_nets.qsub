@@ -53,4 +53,4 @@ python3 -u "${CODE_DIR_NAME}/apply_neural_net.py" \
 --model_lead_time_days=5 \
 --take_ensemble_mean=1 \
 --patch_overlap_size_deg=15 \
---output_dir_name="${model_dir_name}/validation_and_testing/lead-time-days=05"
+--output_dir_name="${model_dir_name}/validation_and_testing/lead_time_days=05"
