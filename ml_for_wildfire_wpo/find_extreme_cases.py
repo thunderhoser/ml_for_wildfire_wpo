@@ -201,6 +201,10 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
     mask_table_xarray = region_mask_io.read_file(region_mask_file_name)
     mtx = mask_table_xarray
 
+    row_indices, column_indices = numpy.where(mtx[region_mask_io.REGION_MASK_KEY].values)
+    latitudes_in_mask_deg_n = mtx[region_mask_io.LATITUDE_KEY].values[row_indices]
+    longitudes_in_mask_deg_e = mtx[region_mask_io.LONGITUDE_KEY].values[column_indices]
+
     # Read target-normalization file, if necessary.
     if target_norm_file_name is None:
         target_norm_param_table_xarray = None
@@ -232,25 +236,15 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
             model_file_name = copy.deepcopy(this_model_file_name)
 
         assert model_file_name == this_model_file_name
-
-        print(ptx[prediction_io.LATITUDE_KEY].values)
-        print('\n')
-        print(mtx[region_mask_io.LATITUDE_KEY].values)
-        print('\n\n\n\n\n\n')
-
         desired_row_indices = misc_utils.desired_latitudes_to_rows(
             grid_latitudes_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
-            start_latitude_deg_n=
-            numpy.min(mtx[region_mask_io.LATITUDE_KEY].values),
-            end_latitude_deg_n=
-            numpy.max(mtx[region_mask_io.LATITUDE_KEY].values)
+            start_latitude_deg_n=numpy.min(latitudes_in_mask_deg_n),
+            end_latitude_deg_n=numpy.max(latitudes_in_mask_deg_n)
         )
         desired_column_indices = misc_utils.desired_longitudes_to_columns(
             grid_longitudes_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
-            start_longitude_deg_e=
-            numpy.min(mtx[region_mask_io.LONGITUDE_KEY].values),
-            end_longitude_deg_e=
-            numpy.max(mtx[region_mask_io.LONGITUDE_KEY].values)
+            start_longitude_deg_e=numpy.min(longitudes_in_mask_deg_e),
+            end_longitude_deg_e=numpy.max(longitudes_in_mask_deg_e)
         )
 
         ptx = ptx.isel({prediction_io.ROW_DIM: desired_row_indices})
