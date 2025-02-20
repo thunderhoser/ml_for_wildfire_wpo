@@ -255,6 +255,10 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
             )
 
         if constrain_bui:
+            these_indices = numpy.where(numpy.isnan(prediction_matrix[0, ...]))
+            print(numpy.unique(these_indices[0]))
+            print(numpy.unique(these_indices[1]))
+
             predicted_bui_matrix = canadian_fwi_utils.dmc_and_dc_to_bui(
                 dmc_value_or_array=prediction_matrix[..., dmc_index, :],
                 dc_value_or_array=prediction_matrix[..., dc_index, :]
