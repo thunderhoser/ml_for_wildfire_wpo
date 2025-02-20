@@ -246,8 +246,8 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
 
     vod = model_metadata_dict[neural_net.VALIDATION_OPTIONS_KEY]
     patch_size_deg = vod[neural_net.OUTER_PATCH_SIZE_DEG_KEY]
-    if patch_size_deg is not None:
 
+    if patch_size_deg is not None and not include_shapley:
         # TODO(thunderhoser): For patch-trained NNs, these input args will be
         # MANDATORY.
         error_string = (
