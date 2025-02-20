@@ -410,6 +410,10 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     predictor_matrices = [m[good_date_indices, ...] for m in predictor_matrices]
     init_date_strings = [init_date_strings[k] for k in good_date_indices]
 
+    for pm in predictor_matrices:
+        print(pm.shape)
+    print('\n\n\n')
+
     composite_predictor_matrices = [
         _composite_one_matrix(data_matrix=pm, use_pmm=use_pmm)
         for pm in predictor_matrices
