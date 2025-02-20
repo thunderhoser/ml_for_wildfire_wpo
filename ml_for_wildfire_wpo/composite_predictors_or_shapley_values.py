@@ -214,6 +214,23 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
         ].values
 
     # Read model.
+    include_shapley = shapley_dir_name != ''
+
+    if include_shapley:
+        for i in range(len(init_date_strings)):
+            this_file_name = shapley_io.find_file(
+                directory_name=shapley_dir_name,
+                init_date_string=init_date_strings[i],
+                raise_error_if_missing=False
+            )
+            if not os.path.isfile(this_file_name):
+                continue
+
+            model_file_name = shapley_io.read_file(this_file_name).attrs[
+                shapley_io.MODEL_FILE_KEY
+            ]
+            break
+
     print('Reading model from: "{0:s}"...'.format(model_file_name))
     model_object = neural_net.read_model(model_file_name)
     # model_object = neural_net.read_model_for_shapley(model_file_name)
@@ -250,7 +267,6 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     validation_option_dict = vod
 
     # Read and composite Shapley fields, if necessary.
-    include_shapley = shapley_dir_name != ''
     shapley_table_xarray = None
     patch_start_latitude_deg_n = numpy.nan
     patch_start_longitude_deg_e = numpy.nan
