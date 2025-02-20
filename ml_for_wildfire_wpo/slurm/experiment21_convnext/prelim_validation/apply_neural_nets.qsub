@@ -60,5 +60,6 @@ for model_lead_time_days in "${MODEL_LEAD_TIMES_DAYS[@]}"; do
     --init_date_limit_strings "20210101" "20211210" \
     --model_lead_time_days=${model_lead_time_days} \
     --take_ensemble_mean=1 \
+    --patch_overlap_size_deg=15 \
     --output_dir_name="${model_dir_name}/validation_lead-time-days=${model_lead_time_days}"
 done
