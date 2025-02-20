@@ -900,7 +900,6 @@ def _run(shapley_dir_or_file_name, init_date_string, extreme_case_file_name,
     if init_date_string == '':
         init_date_string = None
 
-    print(shapley_dir_or_file_name)
     if os.path.isfile(shapley_dir_or_file_name):
         shapley_file_name = shapley_dir_or_file_name
     else:
@@ -1161,6 +1160,7 @@ def _run(shapley_dir_or_file_name, init_date_string, extreme_case_file_name,
 
         for f in range(len(gfs_field_names_2d)):
             this_predictor_matrix = gfs_2d_predictor_matrix[..., t, f] + 0.
+            print(this_predictor_matrix.shape)
             unit_string = gfs_plotting.FIELD_TO_PLOTTING_UNIT_STRING[
                 gfs_field_names_2d[f]
             ]
