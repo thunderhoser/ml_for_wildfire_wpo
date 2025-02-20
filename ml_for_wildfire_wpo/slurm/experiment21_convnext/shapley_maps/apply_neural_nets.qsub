@@ -1,0 +1,55 @@
+#!/bin/bash
+
+#SBATCH --job-name="apply_neural_nets"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=04:00:00
+#SBATCH --array=0-104%40
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=apply_neural_nets_%A_%a.out
+
+module load cuda/12.3.1
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment21_convnext"
+
+GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed/quantile_normalized_params_from_2019-2020"
+TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=40-10-diff_spectral-complexity=025_use-lead-time-as-predictor=1"
+echo $model_dir_name
+
+FIRST_INIT_DATE_STRINGS=("20210101" "20210108" "20210115" "20210122" "20210129" "20210205" "20210212" "20210219" "20210226" "20210305" "20210312" "20210319" "20210326" "20210402" "20210409" "20210416" "20210423" "20210430" "20210507" "20210514" "20210521" "20210528" "20210604" "20210611" "20210618" "20210625" "20210702" "20210709" "20210716" "20210723" "20210730" "20210806" "20210813" "20210820" "20210827" "20210903" "20210910" "20210917" "20210924" "20211001" "20211008" "20211015" "20211022" "20211029" "20211105" "20211112" "20211119" "20211126" "20211203" "20211210" "20211217" "20211224" "20211231" "20220107" "20220114" "20220121" "20220128" "20220204" "20220211" "20220218" "20220225" "20220304" "20220311" "20220318" "20220325" "20220401" "20220408" "20220415" "20220422" "20220429" "20220506" "20220513" "20220520" "20220527" "20220603" "20220610" "20220617" "20220624" "20220701" "20220708" "20220715" "20220722" "20220729" "20220805" "20220812" "20220819" "20220826" "20220902" "20220909" "20220916" "20220923" "20220930" "20221007" "20221014" "20221021" "20221028" "20221104" "20221111" "20221118" "20221125" "20221202" "20221209" "20221216" "20221223" "20221230")
+LAST_INIT_DATE_STRINGS=("20210108" "20210115" "20210122" "20210129" "20210205" "20210212" "20210219" "20210226" "20210305" "20210312" "20210319" "20210326" "20210402" "20210409" "20210416" "20210423" "20210430" "20210507" "20210514" "20210521" "20210528" "20210604" "20210611" "20210618" "20210625" "20210702" "20210709" "20210716" "20210723" "20210730" "20210806" "20210813" "20210820" "20210827" "20210903" "20210910" "20210917" "20210924" "20211001" "20211008" "20211015" "20211022" "20211029" "20211105" "20211112" "20211119" "20211126" "20211203" "20211210" "20211217" "20211224" "20211231" "20220107" "20220114" "20220121" "20220128" "20220204" "20220211" "20220218" "20220225" "20220304" "20220311" "20220318" "20220325" "20220401" "20220408" "20220415" "20220422" "20220429" "20220506" "20220513" "20220520" "20220527" "20220603" "20220610" "20220617" "20220624" "20220701" "20220708" "20220715" "20220722" "20220729" "20220805" "20220812" "20220819" "20220826" "20220902" "20220909" "20220916" "20220923" "20220930" "20221007" "20221014" "20221021" "20221028" "20221104" "20221111" "20221118" "20221125" "20221202" "20221209" "20221216" "20221223" "20221230" "20221231")
+
+python3 -u "${CODE_DIR_NAME}/apply_neural_net.py" \
+--input_model_file_name="${model_dir_name}/model.weights.h5" \
+--input_gfs_directory_name="${GFS_DIR_NAME}" \
+--input_target_dir_name="${TARGET_DIR_NAME}" \
+--input_gfs_fcst_target_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
+--init_date_limit_strings "${FIRST_INIT_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}" "${LAST_INIT_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}" \
+--model_lead_time_days=5 \
+--take_ensemble_mean=1 \
+--output_dir_name="${model_dir_name}/validation_and_testing/lead-time-days=05"
