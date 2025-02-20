@@ -1,0 +1,65 @@
+#!/bin/bash
+
+#SBATCH --job-name="composite_shapley_maps_isi_only"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --nodes=1
+#SBATCH --ntasks=8           # 8 tasks per node
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=8  # 8 GPUs per node
+#SBATCH --exclusive
+#SBATCH --time=24:00:00
+#SBATCH --array=0-41
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=composite_shapley_maps_isi_only_%A_%a.out
+
+# TODO(thunderhoser): Plotting everything might be too computationally expensive.  Might need to thin out lead times.
+
+module load cuda/12.3.1
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment21_convnext"
+
+GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed"
+TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
+GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=40-10-diff_spectral-complexity=025_use-lead-time-as-predictor=1"
+echo $model_dir_name
+
+REGION_NAMES=("pacific_northwest" "pacific_northwest" "pacific_northwest" "pacific_central_west" "pacific_central_west" "pacific_central_west" "pacific_southwest" "pacific_southwest" "pacific_southwest" "mountain_northwest" "mountain_northwest" "mountain_northwest" "mountain_central_west" "mountain_central_west" "mountain_central_west" "mountain_southwest" "mountain_southwest" "mountain_southwest" "northern_plains" "northern_plains" "northern_plains" "central_plains" "central_plains" "central_plains" "southern_plains" "southern_plains" "southern_plains" "northeast" "northeast" "northeast" "central_east" "central_east" "central_east" "southeast" "southeast" "southeast" "small_alaska" "small_alaska" "small_alaska" "hawaii" "hawaii" "hawaii" "pacific_northwest" "pacific_northwest" "pacific_northwest" "pacific_central_west" "pacific_central_west" "pacific_central_west" "pacific_southwest" "pacific_southwest" "pacific_southwest" "mountain_northwest" "mountain_northwest" "mountain_northwest" "mountain_central_west" "mountain_central_west" "mountain_central_west" "mountain_southwest" "mountain_southwest" "mountain_southwest" "northern_plains" "northern_plains" "northern_plains" "central_plains" "central_plains" "central_plains" "southern_plains" "southern_plains" "southern_plains" "northeast" "northeast" "northeast" "central_east" "central_east" "central_east" "southeast" "southeast" "southeast" "small_alaska" "small_alaska" "small_alaska" "hawaii" "hawaii" "hawaii" "pacific_northwest" "pacific_northwest" "pacific_northwest" "pacific_central_west" "pacific_central_west" "pacific_central_west" "pacific_southwest" "pacific_southwest" "pacific_southwest" "mountain_northwest" "mountain_northwest" "mountain_northwest" "mountain_central_west" "mountain_central_west" "mountain_central_west" "mountain_southwest" "mountain_southwest" "mountain_southwest" "northern_plains" "northern_plains" "northern_plains" "central_plains" "central_plains" "central_plains" "southern_plains" "southern_plains" "southern_plains" "northeast" "northeast" "northeast" "central_east" "central_east" "central_east" "southeast" "southeast" "southeast" "small_alaska" "small_alaska" "small_alaska" "hawaii" "hawaii" "hawaii")
+TARGET_FIELD_NAMES=("initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "initial_spread_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "buildup_index" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating" "daily_severity_rating")
+QUANTITY_NAMES=("target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target" "target" "prediction_minus_target" "prediction_minus_target")
+EXTREME_VALUE_TYPES=("maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima" "maxima" "minima" "maxima")
+
+region_name=${REGION_NAMES[$SLURM_ARRAY_TASK_ID]}
+target_field_name=${TARGET_FIELD_NAMES[$SLURM_ARRAY_TASK_ID]}
+quantity_name=${QUANTITY_NAMES[$SLURM_ARRAY_TASK_ID]}
+extreme_value_type=${EXTREME_VALUE_TYPES[$SLURM_ARRAY_TASK_ID]}
+
+region_name_with_dashes=$(echo "$region_name" | sed 's/_/-/g')
+target_field_name_with_dashes=$(echo "$target_field_name" | sed 's/_/-/g')
+quantity_name_with_dashes=$(echo "$quantity_name" | sed 's/_/-/g')
+
+python3 -u "${CODE_DIR_NAME}/composite_predictors_or_shapley_values.py" \
+--input_gfs_directory_name="${GFS_DIR_NAME}" \
+--input_target_dir_name="${TARGET_DIR_NAME}" \
+--input_gfs_fcst_target_dir_name="${GFS_FORECAST_TARGET_DIR_NAME}" \
+--input_extreme_case_file_name="${model_dir_name}/validation_and_testing/lead_time_days=05/extreme_cases/region=${region_name_with_dashes}_target=${target_field_name_with_dashes}_quantity=${quantity_name_with_dashes}/extreme_${extreme_value_type}.nc" \
+--input_shapley_dir_name="${model_dir_name}/validation_and_testing/lead_time_days=05/shapley_maps/${region_name}/${target_field_name}" \
+--use_pmm=1 \
+--output_file_name="${model_dir_name}/validation_and_testing/lead_time_days=05/shapley_maps/${region_name}/${target_field_name}/composite_shapley_maps_isi_only_quantity=${quantity_name_with_dashes}_extreme_${extreme_value_type}.nc"
