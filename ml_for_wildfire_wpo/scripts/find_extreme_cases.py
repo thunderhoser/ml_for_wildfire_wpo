@@ -191,6 +191,19 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
     # Read region mask.
     print('Reading region mask from: "{0:s}"...'.format(region_mask_file_name))
     mask_table_xarray = region_mask_io.read_file(region_mask_file_name)
+
+    row_indices, column_indices = numpy.where(
+        mask_table_xarray[region_mask_io.REGION_MASK_KEY].values
+    )
+    row_indices = numpy.unique(row_indices)
+    column_indices = numpy.unique(column_indices)
+
+    mask_table_xarray = mask_table_xarray.isel({
+        region_mask_io.ROW_DIM: row_indices
+    })
+    mask_table_xarray = mask_table_xarray.isel({
+        region_mask_io.COLUMN_DIM: column_indices
+    })
     mtx = mask_table_xarray
 
     # Read target-normalization file, if necessary.
@@ -224,7 +237,6 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
             model_file_name = copy.deepcopy(this_model_file_name)
 
         assert model_file_name == this_model_file_name
-
         desired_row_indices = misc_utils.desired_latitudes_to_rows(
             grid_latitudes_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
             start_latitude_deg_n=

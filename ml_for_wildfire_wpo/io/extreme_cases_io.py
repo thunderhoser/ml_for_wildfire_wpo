@@ -123,6 +123,11 @@ def write_file(
     dataset_object.setncattr(MODEL_FILE_KEY, model_file_name)
     dataset_object.setncattr(MODEL_LEAD_TIME_KEY, model_lead_time_days)
 
+    num_times = len(init_date_strings)
+    num_time_chars = max([len(d) for d in init_date_strings])
+    dataset_object.createDimension(TIME_DIM, num_times)
+    dataset_object.createDimension(TIME_CHAR_DIM, num_time_chars)
+
     dataset_object.createVariable(
         STATISTIC_VALUE_KEY, datatype=numpy.float64, dimensions=TIME_DIM
     )
