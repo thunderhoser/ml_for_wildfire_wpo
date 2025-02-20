@@ -410,10 +410,6 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     predictor_matrices = [m[good_date_indices, ...] for m in predictor_matrices]
     init_date_strings = [init_date_strings[k] for k in good_date_indices]
 
-    for pm in predictor_matrices:
-        print(pm.shape)
-    print('\n\n\n')
-
     composite_predictor_matrices = [
         _composite_one_matrix(data_matrix=pm, use_pmm=use_pmm)
         for pm in predictor_matrices
@@ -425,12 +421,13 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     )
     del target_matrix
 
-    if include_shapley:
-        for this_matrix in shapley_matrices:
-            print(this_matrix.shape)
-        for this_layer_name in [l.name.split(':')[0] for l in model_object.input]:
-            print(this_layer_name)
+    input_layer_names = [l.name.split(':')[0] for l in model_object.input]
+    input_layer_names = [
+        l for l in input_layer_names
+        if neural_net.LEAD_TIME_LAYER_NAME not in l
+    ]
 
+    if include_shapley:
         shapley_matrices = [m[good_date_indices, ...] for m in shapley_matrices]
         composite_shapley_matrices = [
             _composite_one_matrix(data_matrix=sm, use_pmm=use_pmm)
@@ -455,8 +452,7 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
             composite_init_date_strings=init_date_strings,
             region_mask_file_name=stx.attrs[shapley_io.REGION_MASK_FILE_KEY],
             target_field_name=stx.attrs[shapley_io.TARGET_FIELD_KEY],
-            model_input_layer_names=
-            [l.name.split(':')[0] for l in model_object.input],
+            model_input_layer_names=input_layer_names,
             model_lead_time_days=model_lead_time_days,
             model_file_name=model_file_name,
             predictor_matrices=composite_predictor_matrices,
@@ -473,8 +469,7 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
         grid_longitudes_deg_e=
         data_dict[neural_net.GRID_LONGITUDE_MATRIX_KEY][0, :],
         init_date_strings=init_date_strings,
-        model_input_layer_names=
-        [l.name.split(':')[0] for l in model_object.input],
+        model_input_layer_names=input_layer_names,
         model_lead_time_days=model_lead_time_days,
         model_file_name=model_file_name,
         composite_predictor_matrices=composite_predictor_matrices,
