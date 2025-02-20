@@ -200,15 +200,19 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
     print('Reading region mask from: "{0:s}"...'.format(region_mask_file_name))
     mask_table_xarray = region_mask_io.read_file(region_mask_file_name)
 
-    row_indices, column_indices = numpy.where(mask_table_xarray[region_mask_io.REGION_MASK_KEY].values)
+    row_indices, column_indices = numpy.where(
+        mask_table_xarray[region_mask_io.REGION_MASK_KEY].values
+    )
     row_indices = numpy.unique(row_indices)
     column_indices = numpy.unique(column_indices)
-    print(len(row_indices))
-    print(len(column_indices))
-    mask_table_xarray = mask_table_xarray.isel({region_mask_io.ROW_DIM: row_indices})
-    mask_table_xarray = mask_table_xarray.isel({region_mask_io.COLUMN_DIM: column_indices})
+
+    mask_table_xarray = mask_table_xarray.isel({
+        region_mask_io.ROW_DIM: row_indices
+    })
+    mask_table_xarray = mask_table_xarray.isel({
+        region_mask_io.COLUMN_DIM: column_indices
+    })
     mtx = mask_table_xarray
-    print(mtx)
 
     # Read target-normalization file, if necessary.
     if target_norm_file_name is None:
@@ -243,13 +247,17 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
         assert model_file_name == this_model_file_name
         desired_row_indices = misc_utils.desired_latitudes_to_rows(
             grid_latitudes_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
-            start_latitude_deg_n=numpy.min(mtx[region_mask_io.LATITUDE_KEY].values),
-            end_latitude_deg_n=numpy.max(mtx[region_mask_io.LATITUDE_KEY].values)
+            start_latitude_deg_n=
+            numpy.min(mtx[region_mask_io.LATITUDE_KEY].values),
+            end_latitude_deg_n=
+            numpy.max(mtx[region_mask_io.LATITUDE_KEY].values)
         )
         desired_column_indices = misc_utils.desired_longitudes_to_columns(
             grid_longitudes_deg_e=ptx[prediction_io.LONGITUDE_KEY].values,
-            start_longitude_deg_e=numpy.min(mtx[region_mask_io.LONGITUDE_KEY].values),
-            end_longitude_deg_e=numpy.max(mtx[region_mask_io.LONGITUDE_KEY].values)
+            start_longitude_deg_e=
+            numpy.min(mtx[region_mask_io.LONGITUDE_KEY].values),
+            end_longitude_deg_e=
+            numpy.max(mtx[region_mask_io.LONGITUDE_KEY].values)
         )
 
         ptx = ptx.isel({prediction_io.ROW_DIM: desired_row_indices})
@@ -349,9 +357,6 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
         region_mask_matrix = numpy.expand_dims(
             mtx[region_mask_io.REGION_MASK_KEY].values, axis=-1
         )
-
-        print(region_mask_matrix.shape)
-        print(data_matrix.shape)
         data_matrix[region_mask_matrix == False] = numpy.nan
 
         if spatial_statistic_name == extreme_cases_io.SPATIAL_MIN_STAT_NAME:
