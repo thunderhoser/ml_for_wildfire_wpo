@@ -429,6 +429,11 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
         ]
         del shapley_matrices
 
+        for this_matrix in shapley_matrices:
+            print(this_matrix.shape)
+        for this_layer_name in [l.name.split(':')[0] for l in model_object.input]:
+            print(this_layer_name)
+
         stx = shapley_table_xarray
 
         print('Writing results to: "{0:s}"...'.format(output_file_name))
