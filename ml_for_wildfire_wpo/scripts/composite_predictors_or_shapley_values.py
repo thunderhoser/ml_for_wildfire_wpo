@@ -207,9 +207,28 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
         ].values
 
     # Read model.
-    print('Reading model from: "{0:s}"...'.format(model_file_name))
-    model_object = neural_net.read_model(model_file_name)
-    # model_object = neural_net.read_model_for_shapley(model_file_name)
+    include_shapley = shapley_dir_name != ''
+
+    if include_shapley:
+        for i in range(len(init_date_strings)):
+            this_file_name = shapley_io.find_file(
+                directory_name=shapley_dir_name,
+                init_date_string=init_date_strings[i],
+                raise_error_if_missing=False
+            )
+            if not os.path.isfile(this_file_name):
+                continue
+
+            model_file_name = shapley_io.read_file(this_file_name).attrs[
+                shapley_io.MODEL_FILE_KEY
+            ]
+            break
+
+        print('Reading model from: "{0:s}"...'.format(model_file_name))
+        model_object = neural_net.read_model_for_shapley(model_file_name)
+    else:
+        print('Reading model from: "{0:s}"...'.format(model_file_name))
+        model_object = neural_net.read_model(model_file_name)
 
     # Read model metadata.
     model_metafile_name = neural_net.find_metafile(
@@ -220,8 +239,8 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
 
     vod = model_metadata_dict[neural_net.VALIDATION_OPTIONS_KEY]
     patch_size_deg = vod[neural_net.OUTER_PATCH_SIZE_DEG_KEY]
-    if patch_size_deg is not None:
 
+    if patch_size_deg is not None and not include_shapley:
         # TODO(thunderhoser): For patch-trained NNs, these input args will be
         # MANDATORY.
         error_string = (
@@ -243,7 +262,6 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     validation_option_dict = vod
 
     # Read and composite Shapley fields, if necessary.
-    include_shapley = shapley_dir_name != ''
     shapley_table_xarray = None
     patch_start_latitude_deg_n = numpy.nan
     patch_start_longitude_deg_e = numpy.nan
@@ -296,7 +314,7 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
                         this_patch_start_latitude_deg_n + 0.
                     )
                     patch_start_longitude_deg_e = (
-                        this_patch_start_longitude_deg_e + 0.
+                         this_patch_start_longitude_deg_e + 0.
                     )
 
             assert model_file_name == this_model_file_name
@@ -396,6 +414,12 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
     )
     del target_matrix
 
+    input_layer_names = [l.name.split(':')[0] for l in model_object.input]
+    input_layer_names = [
+        l for l in input_layer_names
+        if neural_net.LEAD_TIME_LAYER_NAME not in l
+    ]
+
     if include_shapley:
         shapley_matrices = [m[good_date_indices, ...] for m in shapley_matrices]
         composite_shapley_matrices = [
@@ -421,8 +445,7 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
             composite_init_date_strings=init_date_strings,
             region_mask_file_name=stx.attrs[shapley_io.REGION_MASK_FILE_KEY],
             target_field_name=stx.attrs[shapley_io.TARGET_FIELD_KEY],
-            model_input_layer_names=
-            [l.name.split(':')[0] for l in model_object.input],
+            model_input_layer_names=input_layer_names,
             model_lead_time_days=model_lead_time_days,
             model_file_name=model_file_name,
             predictor_matrices=composite_predictor_matrices,
@@ -439,8 +462,7 @@ def _run(gfs_directory_name, target_dir_name, gfs_forecast_target_dir_name,
         grid_longitudes_deg_e=
         data_dict[neural_net.GRID_LONGITUDE_MATRIX_KEY][0, :],
         init_date_strings=init_date_strings,
-        model_input_layer_names=
-        [l.name.split(':')[0] for l in model_object.input],
+        model_input_layer_names=input_layer_names,
         model_lead_time_days=model_lead_time_days,
         model_file_name=model_file_name,
         composite_predictor_matrices=composite_predictor_matrices,
