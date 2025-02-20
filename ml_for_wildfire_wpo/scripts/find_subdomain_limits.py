@@ -177,6 +177,7 @@ def _run():
         raw_gfs_io.GRID_LATITUDES_DEG_N[row_indices[-1]],
         raw_gfs_io.GRID_LONGITUDES_POSITIVE_IN_WEST_DEG_E[column_indices[0]],
         raw_gfs_io.GRID_LONGITUDES_POSITIVE_IN_WEST_DEG_E[column_indices[-1]],
+        raw_gfs_io.GRID_LONGITUDES_POSITIVE_IN_WEST_DEG_E[column_indices[-1]],
         len(row_indices),
         len(column_indices)
     ))

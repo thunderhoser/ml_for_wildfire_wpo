@@ -4573,7 +4573,7 @@ def apply_model_patchwise(
         patch_predictor_matrices = []
 
         for this_full_pred_matrix in full_predictor_matrices:
-            if len(this_full_pred_matrix.shape) < 2:
+            if len(this_full_pred_matrix.shape) <= 2:
                 patch_predictor_matrices.append(this_full_pred_matrix)
                 continue
 
@@ -4596,11 +4596,21 @@ def apply_model_patchwise(
             )
             summed_prediction_matrix = numpy.full(these_dim, 0.)
 
+        this_weight_matrix = weight_matrix + 0.
+        if i_start == 0:
+            this_weight_matrix[:outer_patch_buffer_px, :] = 1.
+        if i_end == num_rows_in_full_grid:
+            this_weight_matrix[-outer_patch_buffer_px:, :] = 1.
+        if j_start == 0:
+            this_weight_matrix[:, outer_patch_buffer_px] = 1.
+        if j_end == num_columns_in_full_grid:
+            this_weight_matrix[:, -outer_patch_buffer_px:] = 1.
+
         summed_prediction_matrix[:, i_start:i_end, j_start:j_end, ...] += (
-            weight_matrix * patch_prediction_matrix
+            this_weight_matrix * patch_prediction_matrix
         )
         prediction_count_matrix[:, i_start:i_end, j_start:j_end, ...] += (
-            weight_matrix
+            this_weight_matrix
         )
 
     if verbose:
