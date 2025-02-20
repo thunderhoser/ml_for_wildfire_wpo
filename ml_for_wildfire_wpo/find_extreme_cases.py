@@ -344,6 +344,9 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
         region_mask_matrix = numpy.expand_dims(
             mtx[region_mask_io.REGION_MASK_KEY].values, axis=-1
         )
+
+        print(region_mask_matrix.shape)
+        print(data_matrix.shape)
         data_matrix[region_mask_matrix == False] = numpy.nan
 
         if spatial_statistic_name == extreme_cases_io.SPATIAL_MIN_STAT_NAME:
