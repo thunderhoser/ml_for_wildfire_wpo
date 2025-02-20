@@ -201,6 +201,8 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
     mask_table_xarray = region_mask_io.read_file(region_mask_file_name)
 
     row_indices, column_indices = numpy.where(mask_table_xarray[region_mask_io.REGION_MASK_KEY].values)
+    print(len(row_indices))
+    print(len(column_indices))
     mask_table_xarray = mask_table_xarray.isel({region_mask_io.ROW_DIM: row_indices})
     mask_table_xarray = mask_table_xarray.isel({region_mask_io.COLUMN_DIM: column_indices})
     mtx = mask_table_xarray
