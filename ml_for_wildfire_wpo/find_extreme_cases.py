@@ -233,6 +233,11 @@ def _run(prediction_dir_name, init_date_limit_strings, target_field_names,
 
         assert model_file_name == this_model_file_name
 
+        print(ptx[prediction_io.LATITUDE_KEY].values)
+        print('\n')
+        print(mtx[region_mask_io.LATITUDE_KEY].values)
+        print('\n\n\n\n\n\n')
+
         desired_row_indices = misc_utils.desired_latitudes_to_rows(
             grid_latitudes_deg_n=ptx[prediction_io.LATITUDE_KEY].values,
             start_latitude_deg_n=
