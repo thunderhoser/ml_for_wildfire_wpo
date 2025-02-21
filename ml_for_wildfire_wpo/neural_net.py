@@ -1169,6 +1169,7 @@ def _get_gfs_forecast_target_fields(
 
 def _get_target_fields(
         target_file_name, desired_row_indices, desired_column_indices,
+        latitude_limits_deg_n, longitude_limits_deg_e,
         field_names, norm_param_table_xarray, use_quantile_norm):
     """Reads target fields from one file.
 
@@ -1179,16 +1180,38 @@ def _get_target_fields(
     :param target_file_name: Path to input file.
     :param desired_row_indices: length-M numpy array of indices.
     :param desired_column_indices: length-N numpy array of indices.
+    :param latitude_limits_deg_n: See documentation for `data_generator`.  If
+        `desired_row_indices is not None`, this argument is not used.
+    :param longitude_limits_deg_e: See documentation for `data_generator`.  If
+        `desired_column_indices is not None`, this argument is not used.
     :param field_names: length-T list of field names.
     :param norm_param_table_xarray: xarray table with normalization parameters.
         If you do not want normalization, make this None.
     :param use_quantile_norm: Boolean flag.  If True, will use quantile
         normalization before converting to z-scores.
     :return: data_matrix: M-by-N-by-T numpy array of data values.
+    :return: desired_row_indices: See input documentation.
+    :return: desired_column_indices: See input documentation.
     """
 
     print('Reading data from: "{0:s}"...'.format(target_file_name))
     fwi_table_xarray = canadian_fwi_io.read_file(target_file_name)
+
+    if desired_row_indices is None or len(desired_row_indices) == 0:
+        fwit = fwi_table_xarray
+
+        desired_row_indices = misc_utils.desired_latitudes_to_rows(
+            grid_latitudes_deg_n=
+            fwit.coords[canadian_fwi_utils.LATITUDE_DIM].values,
+            start_latitude_deg_n=latitude_limits_deg_n[0],
+            end_latitude_deg_n=latitude_limits_deg_n[1]
+        )
+        desired_column_indices = misc_utils.desired_longitudes_to_columns(
+            grid_longitudes_deg_e=
+            fwit.coords[canadian_fwi_utils.LONGITUDE_DIM].values,
+            start_longitude_deg_e=longitude_limits_deg_e[0],
+            end_longitude_deg_e=longitude_limits_deg_e[1]
+        )
 
     fwi_table_xarray = canadian_fwi_utils.subset_by_row(
         fwi_table_xarray=fwi_table_xarray,
@@ -1205,8 +1228,6 @@ def _get_target_fields(
             use_quantile_norm=use_quantile_norm
         )
 
-    print(fwi_table_xarray)
-
     data_matrix = numpy.stack([
         canadian_fwi_utils.get_field(
             fwi_table_xarray=fwi_table_xarray, field_name=f
@@ -1215,7 +1236,7 @@ def _get_target_fields(
     ], axis=-1)
 
     assert not numpy.any(numpy.isnan(data_matrix))
-    return data_matrix
+    return data_matrix, desired_row_indices, desired_column_indices
 
 
 def _create_weight_matrix(
@@ -1629,10 +1650,12 @@ def _read_lagged_targets_1example(
             target_file_name=f,
             desired_row_indices=desired_row_indices,
             desired_column_indices=desired_column_indices,
+            latitude_limits_deg_n=latitude_limits_deg_n,
+            longitude_limits_deg_e=longitude_limits_deg_e,
             field_names=target_field_names,
             norm_param_table_xarray=norm_param_table_xarray,
             use_quantile_norm=use_quantile_norm
-        )
+        )[0]
         for f in target_file_names
     ], axis=-2)
 
@@ -2441,10 +2464,16 @@ def data_generator(option_dict):
                 numpy.array([model_lead_time_days], dtype=int)
             )[0]
 
-            this_target_matrix = _get_target_fields(
+            (
+                this_target_matrix,
+                desired_target_row_indices,
+                desired_target_column_indices
+            ) = _get_target_fields(
                 target_file_name=target_file_name,
                 desired_row_indices=desired_target_row_indices,
                 desired_column_indices=desired_target_column_indices,
+                latitude_limits_deg_n=inner_latitude_limits_deg_n,
+                longitude_limits_deg_e=inner_longitude_limits_deg_e,
                 field_names=target_field_names,
                 norm_param_table_xarray=None,
                 use_quantile_norm=False
@@ -2961,10 +2990,16 @@ def data_generator_fast_patches(option_dict):
                     numpy.array([model_lead_time_days], dtype=int)
                 )[0]
 
-                full_target_matrix = _get_target_fields(
+                (
+                    full_target_matrix,
+                    desired_target_row_indices,
+                    desired_target_column_indices
+                ) = _get_target_fields(
                     target_file_name=target_file_name,
                     desired_row_indices=desired_target_row_indices,
                     desired_column_indices=desired_target_column_indices,
+                    latitude_limits_deg_n=inner_latitude_limits_deg_n,
+                    longitude_limits_deg_e=inner_longitude_limits_deg_e,
                     field_names=target_field_names,
                     norm_param_table_xarray=None,
                     use_quantile_norm=False
@@ -3433,10 +3468,16 @@ def create_data(
         numpy.array([model_lead_time_days], dtype=int)
     )[0]
 
-    target_matrix = _get_target_fields(
+    (
+        target_matrix,
+        desired_target_row_indices,
+        desired_target_column_indices
+    )  = _get_target_fields(
         target_file_name=target_file_name,
         desired_row_indices=desired_target_row_indices,
         desired_column_indices=desired_target_column_indices,
+        latitude_limits_deg_n=inner_latitude_limits_deg_n,
+        longitude_limits_deg_e=inner_longitude_limits_deg_e,
         field_names=target_field_names,
         norm_param_table_xarray=None,
         use_quantile_norm=False
