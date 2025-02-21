@@ -373,7 +373,7 @@ def _run():
                 
                 if RESID_PREDICTION_FLAGS_AXIS3[k]:
                     input_dimensions_predn_baseline = numpy.array(
-                        [160, 160, 4], dtype=int
+                        [160, 160, 7], dtype=int
                     )
                 else:
                     input_dimensions_predn_baseline = None
