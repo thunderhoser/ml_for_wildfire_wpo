@@ -1,9 +1,10 @@
 """Custom metrics."""
 
+import tensorflow
 from tensorflow.keras import backend as K
 from gewittergefahr.gg_utils import error_checking
-from ml_for_wildfire_wpo.machine_learning import custom_losses
 
+INFINITY = tensorflow.constant(float('inf'))
 MASK_PIXEL_IF_WEIGHT_BELOW = 0.05
 
 
@@ -58,35 +59,6 @@ def max_prediction_anywhere(channel_index, function_name, expect_ensemble=True,
             Otherwise, will expect E x M x N x T.
         :return: metric: Max prediction.
         """
-
-        num_target_fields = custom_losses.__get_num_target_fields(
-            prediction_tensor=prediction_tensor,
-            expect_ensemble=expect_ensemble
-        )
-
-        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
-        target_tensor_no_mask = target_tensor[..., :num_target_fields]
-
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            dmc_index=1,
-            dc_index=2,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            isi_index=3,
-            bui_index=-1,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            fwi_index=-1,
-            expect_ensemble=expect_ensemble
-        )
 
         if is_nn_evidential:
             return K.max(prediction_tensor[:, :, :, channel_index, 0])
@@ -149,36 +121,7 @@ def max_target_anywhere(channel_index, function_name, expect_ensemble=True,
         :return: metric: Max target.
         """
 
-        num_target_fields = custom_losses.__get_num_target_fields(
-            prediction_tensor=prediction_tensor,
-            expect_ensemble=expect_ensemble
-        )
-
-        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
-        target_tensor_no_mask = target_tensor[..., :num_target_fields]
-
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            dmc_index=1,
-            dc_index=2,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            isi_index=3,
-            bui_index=-1,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            fwi_index=-1,
-            expect_ensemble=expect_ensemble
-        )
-
-        return K.max(target_tensor_no_mask[:, :, :, channel_index])
+        return K.max(target_tensor[:, :, :, channel_index])
 
     metric.__name__ = function_name
     return metric
@@ -235,35 +178,6 @@ def min_prediction_anywhere(channel_index, function_name, expect_ensemble=True,
             Otherwise, will expect E x M x N x T.
         :return: metric: min prediction.
         """
-
-        num_target_fields = custom_losses.__get_num_target_fields(
-            prediction_tensor=prediction_tensor,
-            expect_ensemble=expect_ensemble
-        )
-
-        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
-        target_tensor_no_mask = target_tensor[..., :num_target_fields]
-
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            dmc_index=1,
-            dc_index=2,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            isi_index=3,
-            bui_index=-1,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            fwi_index=-1,
-            expect_ensemble=expect_ensemble
-        )
 
         if is_nn_evidential:
             return K.min(prediction_tensor[:, :, :, channel_index, 0])
@@ -326,36 +240,7 @@ def min_target_anywhere(channel_index, function_name, expect_ensemble=True,
         :return: metric: Min target.
         """
 
-        num_target_fields = custom_losses.__get_num_target_fields(
-            prediction_tensor=prediction_tensor,
-            expect_ensemble=expect_ensemble
-        )
-
-        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
-        target_tensor_no_mask = target_tensor[..., :num_target_fields]
-
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            dmc_index=1,
-            dc_index=2,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            isi_index=3,
-            bui_index=-1,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            fwi_index=-1,
-            expect_ensemble=expect_ensemble
-        )
-
-        return K.min(target_tensor_no_mask[:, :, :, channel_index])
+        return K.min(target_tensor[:, :, :, channel_index])
 
     metric.__name__ = function_name
     return metric
@@ -391,34 +276,7 @@ def max_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
         :return: metric: Max prediction.
         """
 
-        num_target_fields = custom_losses.__get_num_target_fields(
-            prediction_tensor=prediction_tensor,
-            expect_ensemble=expect_ensemble
-        )
-
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
-        target_tensor_no_mask = target_tensor[..., :num_target_fields]
-
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            dmc_index=1,
-            dc_index=2,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            isi_index=3,
-            bui_index=-1,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            fwi_index=-1,
-            expect_ensemble=expect_ensemble
-        )
 
         # Output shape: E x M x N
         weight_tensor = target_tensor[..., -1]
@@ -481,34 +339,7 @@ def max_target_unmasked(channel_index, function_name, expect_ensemble=True,
         :return: metric: Max target.
         """
 
-        num_target_fields = custom_losses.__get_num_target_fields(
-            prediction_tensor=prediction_tensor,
-            expect_ensemble=expect_ensemble
-        )
-
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
-        target_tensor_no_mask = target_tensor[..., :num_target_fields]
-
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            dmc_index=1,
-            dc_index=2,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            isi_index=3,
-            bui_index=-1,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            fwi_index=-1,
-            expect_ensemble=expect_ensemble
-        )
 
         # Output shape: E x M x N
         weight_tensor = target_tensor[..., -1]
@@ -518,7 +349,7 @@ def max_target_unmasked(channel_index, function_name, expect_ensemble=True,
         )
 
         return K.max(
-            target_tensor_no_mask[:, :, :, channel_index] *
+            target_tensor[:, :, :, channel_index] *
             mask_tensor
         )
 
@@ -556,41 +387,14 @@ def min_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
         :return: metric: min prediction.
         """
 
-        num_target_fields = custom_losses.__get_num_target_fields(
-            prediction_tensor=prediction_tensor,
-            expect_ensemble=expect_ensemble
-        )
-
-        target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
-        target_tensor_no_mask = target_tensor[..., :num_target_fields]
-
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            dmc_index=1,
-            dc_index=2,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            isi_index=3,
-            bui_index=-1,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            fwi_index=-1,
-            expect_ensemble=expect_ensemble
-        )
-
         # Output shape: E x M x N
         weight_tensor = target_tensor[..., -1]
-        mask_tensor = K.cast(
-            weight_tensor < MASK_PIXEL_IF_WEIGHT_BELOW,
-            prediction_tensor.dtype
+        mask_tensor = tensorflow.where(
+            weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW,
+            weight_tensor,
+            INFINITY
         )
+        mask_tensor = K.cast(mask_tensor, prediction_tensor.dtype)
 
         if is_nn_evidential:
             # Input shapes for multiplication: E x M x N and E x M x N
@@ -646,44 +450,19 @@ def min_target_unmasked(channel_index, function_name, expect_ensemble=True,
         :return: metric: Min target.
         """
 
-        num_target_fields = custom_losses.__get_num_target_fields(
-            prediction_tensor=prediction_tensor,
-            expect_ensemble=expect_ensemble
-        )
-
         target_tensor = K.cast(target_tensor, prediction_tensor.dtype)
-        target_tensor_no_mask = target_tensor[..., :num_target_fields]
-
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_bui_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            dmc_index=1,
-            dc_index=2,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_fwi_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            isi_index=3,
-            bui_index=-1,
-            expect_ensemble=expect_ensemble
-        )
-        prediction_tensor, target_tensor_no_mask = custom_losses._add_dsr_to_tensors(
-            prediction_tensor=prediction_tensor,
-            target_tensor_no_mask=target_tensor_no_mask,
-            fwi_index=-1,
-            expect_ensemble=expect_ensemble
-        )
 
         # Output shape: E x M x N
         weight_tensor = target_tensor[..., -1]
-        mask_tensor = K.cast(
-            weight_tensor < MASK_PIXEL_IF_WEIGHT_BELOW,
-            prediction_tensor.dtype
+        mask_tensor = tensorflow.where(
+            weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW,
+            weight_tensor,
+            INFINITY
         )
+        mask_tensor = K.cast(mask_tensor, target_tensor.dtype)
 
         return K.min(
-            target_tensor_no_mask[:, :, :, channel_index] *
+            target_tensor[:, :, :, channel_index] *
             mask_tensor
         )
 

@@ -425,6 +425,7 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
         list(model_lead_days_to_freq.keys()),
         dtype=int
     )
+
     num_gfs_hours_for_interp, num_target_times_for_interp = (
         _determine_num_times_for_interp(option_dict)
     )
@@ -485,9 +486,7 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
         this_matrix = _read_lagged_targets_1example(
             gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_names[0]),
             target_dir_name=target_dir_name,
-            target_lag_times_days=numpy.array(
-                [numpy.min(target_lag_times_days)]
-            ),
+            target_lag_times_days=numpy.array([0], dtype=int),
             desired_row_indices=None,
             desired_column_indices=None,
             latitude_limits_deg_n=inner_latitude_limits_deg_n,
@@ -502,19 +501,6 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
     else:
         baseline_prediction_matrix = None
 
-    this_matrix = _read_lagged_targets_1example(
-        gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_names[0]),
-        target_dir_name=target_dir_name,
-        target_lag_times_days=target_lag_times_days,
-        desired_row_indices=None,
-        desired_column_indices=None,
-        latitude_limits_deg_n=inner_latitude_limits_deg_n,
-        longitude_limits_deg_e=inner_longitude_limits_deg_e,
-        target_field_names=target_field_names,
-        norm_param_table_xarray=None,
-        use_quantile_norm=False
-    )[0]
-
     if num_target_times_for_interp is None:
         this_num_times = (
             len(target_lag_times_days) + len(gfs_target_lead_times_days)
@@ -522,8 +508,24 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
     else:
         this_num_times = num_target_times_for_interp + 0
 
-    these_dim = (bs, psp, psp, this_num_times) + this_matrix.shape[3:]
-    laglead_target_predictor_matrix = numpy.full(these_dim, numpy.nan)
+    if this_num_times == 0:
+        laglead_target_predictor_matrix = None
+    else:
+        this_matrix = _read_lagged_targets_1example(
+            gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_names[0]),
+            target_dir_name=target_dir_name,
+            target_lag_times_days=numpy.aray([1], dtype=int),
+            desired_row_indices=None,
+            desired_column_indices=None,
+            latitude_limits_deg_n=inner_latitude_limits_deg_n,
+            longitude_limits_deg_e=inner_longitude_limits_deg_e,
+            target_field_names=target_field_names,
+            norm_param_table_xarray=None,
+            use_quantile_norm=False
+        )[0]
+
+        these_dim = (bs, psp, psp, this_num_times) + this_matrix.shape[3:]
+        laglead_target_predictor_matrix = numpy.full(these_dim, numpy.nan)
 
     if era5_constant_predictor_field_names is None:
         era5_constant_matrix = None
@@ -691,29 +693,30 @@ def _check_generator_args(option_dict):
         these_pred_lead_times_hours = numpy.sort(these_pred_lead_times_hours)
         model_lead_days_to_gfs_pred_leads_hours[d] = these_pred_lead_times_hours
 
-    model_lead_days_to_target_lags_days = option_dict[
-        MODEL_LEAD_TO_TARGET_LAGS_KEY
-    ]
-    new_lead_times_days = numpy.array(
-        list(model_lead_days_to_target_lags_days.keys()),
-        dtype=int
-    )
-    assert numpy.array_equal(
-        numpy.sort(model_lead_times_days),
-        numpy.sort(new_lead_times_days)
-    )
-
-    for d in model_lead_times_days:
-        these_lag_times_days = model_lead_days_to_target_lags_days[d]
-
-        error_checking.assert_is_numpy_array(
-            these_lag_times_days, num_dimensions=1
+    if option_dict[MODEL_LEAD_TO_TARGET_LAGS_KEY] is not None:
+        model_lead_days_to_target_lags_days = option_dict[
+            MODEL_LEAD_TO_TARGET_LAGS_KEY
+        ]
+        new_lead_times_days = numpy.array(
+            list(model_lead_days_to_target_lags_days.keys()),
+            dtype=int
         )
-        error_checking.assert_is_integer_numpy_array(these_lag_times_days)
-        error_checking.assert_is_greater_numpy_array(these_lag_times_days, 0)
+        assert numpy.array_equal(
+            numpy.sort(model_lead_times_days),
+            numpy.sort(new_lead_times_days)
+        )
 
-        these_lag_times_days = numpy.sort(these_lag_times_days)[::-1]
-        model_lead_days_to_target_lags_days[d] = these_lag_times_days
+        for d in model_lead_times_days:
+            these_lag_times_days = model_lead_days_to_target_lags_days[d]
+
+            error_checking.assert_is_numpy_array(
+                these_lag_times_days, num_dimensions=1
+            )
+            error_checking.assert_is_integer_numpy_array(these_lag_times_days)
+            error_checking.assert_is_greater_numpy_array(these_lag_times_days, 0)
+
+            these_lag_times_days = numpy.sort(these_lag_times_days)[::-1]
+            model_lead_days_to_target_lags_days[d] = these_lag_times_days
 
     model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
     new_lead_times_days = numpy.array(
@@ -775,6 +778,14 @@ def _check_generator_args(option_dict):
         model_lead_days_to_gfs_target_leads_days = option_dict[
             MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
         ]
+        new_lead_times_days = numpy.array(
+            list(model_lead_days_to_gfs_target_leads_days.keys()),
+            dtype=int
+        )
+        assert numpy.array_equal(
+            numpy.sort(model_lead_times_days),
+            numpy.sort(new_lead_times_days)
+        )
 
         for d in model_lead_times_days:
             these_target_lead_times_days = (
@@ -1641,6 +1652,8 @@ def _interp_predictors_by_lead_time_better(
         array of interpolated predictor values.
     """
 
+    # TODO: Make sure this is called only when needed.
+
     target_lead_times_hours = numpy.linspace(
         source_lead_times_hours[0], source_lead_times_hours[-1],
         num=num_target_lead_times, dtype=float
@@ -1835,149 +1848,6 @@ def _interp_predictors_by_lead_time_better(
         ] = interp_object(
             target_lead_times_hours[missing_target_time_indices]
         )
-
-    return new_predictor_matrix
-
-
-def _interp_predictors_by_lead_time(predictor_matrix, source_lead_times_hours,
-                                    num_target_lead_times):
-    """Interpolates predictors to fill missing lead times.
-
-    M = number of rows in grid
-    N = number of columns in grid
-    S = number of source lead times
-    T = number of target lead times
-    F = number of fields
-    P = number of pressure levels
-
-    :param predictor_matrix: M-by-N-by-S-by-F or M-by-N-by-P-by-S-by-F numpy
-        array of predictor values.
-    :param source_lead_times_hours: length-S numpy array of source lead times.
-        This method assumes that `source_lead_times_hours` is sorted.
-    :param num_target_lead_times: T in the above definitions.
-    :return: predictor_matrix: M-by-N-by-T-by-F or M-by-N-by-P-by-T-by-F numpy
-        array of interpolated predictor values.
-    """
-
-    target_lead_times_hours = numpy.linspace(
-        source_lead_times_hours[0], source_lead_times_hours[-1],
-        num=num_target_lead_times, dtype=float
-    )
-    target_to_source_index = numpy.full(num_target_lead_times, -1, dtype=int)
-
-    for t in range(num_target_lead_times):
-        good_indices = numpy.where(
-            numpy.absolute(source_lead_times_hours - target_lead_times_hours[t])
-            <= TOLERANCE
-        )[0]
-
-        if len(good_indices) == 0:
-            continue
-
-        target_to_source_index[t] = good_indices[0]
-
-    num_source_lead_times = predictor_matrix.shape[-2]
-    num_fields = predictor_matrix.shape[-1]
-    has_pressure_levels = len(predictor_matrix.shape) == 5
-
-    if has_pressure_levels:
-        num_pressure_levels = predictor_matrix.shape[2]
-        these_dims = (
-            predictor_matrix.shape[:2] +
-            (num_source_lead_times, num_pressure_levels * num_fields)
-        )
-        predictor_matrix = numpy.reshape(predictor_matrix, these_dims)
-    else:
-        num_pressure_levels = 0
-
-    num_pressure_field_combos = predictor_matrix.shape[-1]
-    new_predictor_matrix = numpy.full(
-        predictor_matrix.shape[:2] +
-        (num_target_lead_times, num_pressure_field_combos),
-        numpy.nan
-    )
-
-    for p in range(num_pressure_field_combos):
-        missing_target_time_flags = numpy.full(
-            num_target_lead_times, True, dtype=bool
-        )
-
-        for t in range(num_target_lead_times):
-            if target_to_source_index[t] == -1:
-                continue
-
-            this_predictor_matrix = predictor_matrix[
-                ..., target_to_source_index[t], p
-            ]
-            missing_target_time_flags[t] = numpy.all(numpy.isnan(
-                this_predictor_matrix
-            ))
-
-            if missing_target_time_flags[t]:
-                continue
-
-            new_predictor_matrix[..., t, p] = this_predictor_matrix
-
-        missing_target_time_indices = numpy.where(missing_target_time_flags)[0]
-        if len(missing_target_time_indices) == 0:
-            continue
-
-        missing_source_time_flags = numpy.all(
-            numpy.isnan(predictor_matrix[..., p]),
-            axis=(0, 1)
-        )
-        filled_source_time_indices = numpy.where(
-            numpy.invert(missing_source_time_flags)
-        )[0]
-
-        if len(filled_source_time_indices) == 0:
-            continue
-
-        missing_target_time_indices = [
-            t for t in missing_target_time_indices
-            if target_lead_times_hours[t] >= numpy.min(
-                source_lead_times_hours[filled_source_time_indices]
-            )
-        ]
-        missing_target_time_indices = [
-            t for t in missing_target_time_indices
-            if target_lead_times_hours[t] <= numpy.max(
-                source_lead_times_hours[filled_source_time_indices]
-            )
-        ]
-        missing_target_time_indices = numpy.array(
-            missing_target_time_indices, dtype=int
-        )
-        if len(missing_target_time_indices) == 0:
-            continue
-
-        interp_object = interp1d(
-            x=source_lead_times_hours[filled_source_time_indices],
-            y=predictor_matrix[..., filled_source_time_indices, p],
-            axis=2,
-            kind='linear',
-            bounds_error=True,
-            assume_sorted=True
-        )
-
-        print((
-            'Interpolating data from lead times of {0:s} hours to lead '
-            'times of {1:s} hours...'
-        ).format(
-            str(source_lead_times_hours[filled_source_time_indices]),
-            str(target_lead_times_hours[missing_target_time_indices])
-        ))
-
-        new_predictor_matrix[
-            ..., missing_target_time_indices, p
-        ] = interp_object(target_lead_times_hours[missing_target_time_indices])
-
-    if has_pressure_levels:
-        these_dims = (
-            predictor_matrix.shape[:2] +
-            (num_pressure_levels, num_target_lead_times, num_fields)
-        )
-        new_predictor_matrix = numpy.reshape(new_predictor_matrix, these_dims)
 
     return new_predictor_matrix
 
@@ -2438,9 +2308,7 @@ def data_generator(option_dict):
                         gfs_file_names[gfs_file_index]
                     ),
                     target_dir_name=target_dir_name,
-                    target_lag_times_days=numpy.array(
-                        [numpy.min(target_lag_times_days)]
-                    ),
+                    target_lag_times_days=numpy.array([0], dtype=int),
                     desired_row_indices=desired_target_row_indices,
                     desired_column_indices=desired_target_column_indices,
                     latitude_limits_deg_n=inner_latitude_limits_deg_n,
@@ -2464,28 +2332,33 @@ def data_generator(option_dict):
                 )
                 del this_baseline_prediction_matrix
 
-            (
-                this_laglead_target_predictor_matrix,
-                desired_target_row_indices,
-                desired_target_column_indices
-            ) = _read_lagged_targets_1example(
-                gfs_init_date_string=gfs_io.file_name_to_date(
-                    gfs_file_names[gfs_file_index]
-                ),
-                target_dir_name=target_dir_name,
-                target_lag_times_days=target_lag_times_days,
-                desired_row_indices=desired_target_row_indices,
-                desired_column_indices=desired_target_column_indices,
-                latitude_limits_deg_n=inner_latitude_limits_deg_n,
-                longitude_limits_deg_e=inner_longitude_limits_deg_e,
-                target_field_names=target_field_names,
-                norm_param_table_xarray=target_norm_param_table_xarray,
-                use_quantile_norm=targets_use_quantile_norm
-            )
-
-            if len(gfs_target_lead_times_days) > 0:
+            if len(target_lag_times_days) == 0:
+                this_lagged_matrix = None
+            else:
                 (
-                    new_matrix,
+                    this_lagged_matrix,
+                    desired_target_row_indices,
+                    desired_target_column_indices
+                ) = _read_lagged_targets_1example(
+                    gfs_init_date_string=gfs_io.file_name_to_date(
+                        gfs_file_names[gfs_file_index]
+                    ),
+                    target_dir_name=target_dir_name,
+                    target_lag_times_days=target_lag_times_days,
+                    desired_row_indices=desired_target_row_indices,
+                    desired_column_indices=desired_target_column_indices,
+                    latitude_limits_deg_n=inner_latitude_limits_deg_n,
+                    longitude_limits_deg_e=inner_longitude_limits_deg_e,
+                    target_field_names=target_field_names,
+                    norm_param_table_xarray=target_norm_param_table_xarray,
+                    use_quantile_norm=targets_use_quantile_norm
+                )
+
+            if len(gfs_target_lead_times_days) == 0:
+                this_lead_matrix = None
+            else:
+                (
+                    this_lead_matrix,
                     desired_gfs_fcst_target_row_indices,
                     desired_gfs_fcst_target_column_indices
                 ) = _read_gfs_forecast_targets_1example(
@@ -2504,15 +2377,20 @@ def data_generator(option_dict):
                     use_quantile_norm=targets_use_quantile_norm
                 )
 
-                if new_matrix is None:
+                if this_lead_matrix is None:
                     gfs_file_index += 1
                     continue
 
+            these_matrices = [this_lagged_matrix, this_lead_matrix]
+            these_matrices = [m for m in these_matrices if m is not None]
+            if len(these_matrices) == 0:
+                this_laglead_target_predictor_matrix = None
+            else:
                 this_laglead_target_predictor_matrix = numpy.concatenate(
-                    [this_laglead_target_predictor_matrix, new_matrix],
-                    axis=-2
+                    these_matrices, axis=-2
                 )
-                del new_matrix
+
+            del this_lagged_matrix, this_lead_matrix, these_matrices
 
             if num_target_times_for_interp is not None:
                 source_lead_times_days = numpy.concatenate([
@@ -2533,15 +2411,18 @@ def data_generator(option_dict):
                     this_laglead_target_predictor_matrix.astype('float32')
                 )
 
-            if laglead_target_predictor_matrix is None:
-                these_dim = (bs,) + this_laglead_target_predictor_matrix.shape
-                laglead_target_predictor_matrix = numpy.full(
-                    these_dim, numpy.nan
-                )
+            if this_laglead_target_predictor_matrix is not None:
+                if laglead_target_predictor_matrix is None:
+                    these_dim = (
+                        (bs,) + this_laglead_target_predictor_matrix.shape
+                    )
+                    laglead_target_predictor_matrix = numpy.full(
+                        these_dim, numpy.nan
+                    )
 
-            laglead_target_predictor_matrix[num_examples_in_memory, ...] = (
-                this_laglead_target_predictor_matrix
-            )
+                laglead_target_predictor_matrix[num_examples_in_memory, ...] = (
+                    this_laglead_target_predictor_matrix
+                )
 
             target_file_name = _find_target_files_needed_1example(
                 gfs_init_date_string=
@@ -2612,12 +2493,13 @@ def data_generator(option_dict):
             )
             baseline_prediction_matrix = baseline_prediction_matrix[..., 0, :]
 
-        laglead_target_predictor_matrix = _pad_inner_to_outer_domain(
-            data_matrix=laglead_target_predictor_matrix,
-            outer_latitude_buffer_deg=outer_latitude_buffer_deg,
-            outer_longitude_buffer_deg=outer_longitude_buffer_deg,
-            is_example_axis_present=True, fill_value=sentinel_value
-        )
+        if laglead_target_predictor_matrix is not None:
+            laglead_target_predictor_matrix = _pad_inner_to_outer_domain(
+                data_matrix=laglead_target_predictor_matrix,
+                outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+                outer_longitude_buffer_deg=outer_longitude_buffer_deg,
+                is_example_axis_present=True, fill_value=sentinel_value
+            )
 
         target_matrix = _pad_inner_to_outer_domain(
             data_matrix=target_matrix,
@@ -2831,12 +2713,30 @@ def data_generator_fast_patches(option_dict):
     while True:
         emd = empty_matrix_dict
 
-        gfs_predictor_matrix_3d = emd[PREDICTOR_MATRIX_3D_GFS_KEY] + 0.
-        gfs_predictor_matrix_2d = emd[PREDICTOR_MATRIX_2D_GFS_KEY] + 0.
-        laglead_target_predictor_matrix = emd[PREDICTOR_MATRIX_LAGLEAD_KEY] + 0.
-        era5_constant_matrix = emd[PREDICTOR_MATRIX_ERA5_KEY] + 0.
-        baseline_prediction_matrix = emd[PREDICTOR_MATRIX_BASELINE_KEY] + 0.
-        target_matrix_with_weights = emd[TARGET_MATRIX_WITH_WEIGHTS_KEY] + 0.
+        gfs_predictor_matrix_3d = (
+            None if emd[PREDICTOR_MATRIX_3D_GFS_KEY] is None
+            else emd[PREDICTOR_MATRIX_3D_GFS_KEY] + 0.
+        )
+        gfs_predictor_matrix_2d = (
+            None if emd[PREDICTOR_MATRIX_2D_GFS_KEY] is None
+            else emd[PREDICTOR_MATRIX_2D_GFS_KEY] + 0.
+        )
+        laglead_target_predictor_matrix = (
+            None if emd[PREDICTOR_MATRIX_LAGLEAD_KEY] is None
+            else emd[PREDICTOR_MATRIX_LAGLEAD_KEY] + 0.
+        )
+        era5_constant_matrix = (
+            None if emd[PREDICTOR_MATRIX_ERA5_KEY] is None
+            else emd[PREDICTOR_MATRIX_ERA5_KEY] + 0.
+        )
+        baseline_prediction_matrix = (
+            None if emd[PREDICTOR_MATRIX_BASELINE_KEY] is None
+            else emd[PREDICTOR_MATRIX_BASELINE_KEY] + 0.
+        )
+        target_matrix_with_weights = (
+            None if emd[TARGET_MATRIX_WITH_WEIGHTS_KEY] is None
+            else emd[TARGET_MATRIX_WITH_WEIGHTS_KEY] + 0.
+        )
 
         num_examples_in_memory = 0
 
@@ -2920,9 +2820,7 @@ def data_generator_fast_patches(option_dict):
                         gfs_file_names[gfs_file_index]
                     ),
                     target_dir_name=target_dir_name,
-                    target_lag_times_days=numpy.array(
-                        [numpy.min(target_lag_times_days)]
-                    ),
+                    target_lag_times_days=numpy.array([0], dtype=int),
                     desired_row_indices=desired_target_row_indices,
                     desired_column_indices=desired_target_column_indices,
                     latitude_limits_deg_n=inner_latitude_limits_deg_n,
@@ -2943,28 +2841,33 @@ def data_generator_fast_patches(option_dict):
                 )
 
             if full_laglead_target_predictor_matrix is None:
-                (
-                    full_laglead_target_predictor_matrix,
-                    desired_target_row_indices,
-                    desired_target_column_indices
-                ) = _read_lagged_targets_1example(
-                    gfs_init_date_string=gfs_io.file_name_to_date(
-                        gfs_file_names[gfs_file_index]
-                    ),
-                    target_dir_name=target_dir_name,
-                    target_lag_times_days=target_lag_times_days,
-                    desired_row_indices=desired_target_row_indices,
-                    desired_column_indices=desired_target_column_indices,
-                    latitude_limits_deg_n=inner_latitude_limits_deg_n,
-                    longitude_limits_deg_e=inner_longitude_limits_deg_e,
-                    target_field_names=target_field_names,
-                    norm_param_table_xarray=target_norm_param_table_xarray,
-                    use_quantile_norm=targets_use_quantile_norm
-                )
-
-                if len(gfs_target_lead_times_days) > 0:
+                if len(target_lag_times_days) == 0:
+                    this_lagged_matrix = None
+                else:
                     (
-                        new_matrix,
+                        this_lagged_matrix,
+                        desired_target_row_indices,
+                        desired_target_column_indices
+                    ) = _read_lagged_targets_1example(
+                        gfs_init_date_string=gfs_io.file_name_to_date(
+                            gfs_file_names[gfs_file_index]
+                        ),
+                        target_dir_name=target_dir_name,
+                        target_lag_times_days=target_lag_times_days,
+                        desired_row_indices=desired_target_row_indices,
+                        desired_column_indices=desired_target_column_indices,
+                        latitude_limits_deg_n=inner_latitude_limits_deg_n,
+                        longitude_limits_deg_e=inner_longitude_limits_deg_e,
+                        target_field_names=target_field_names,
+                        norm_param_table_xarray=target_norm_param_table_xarray,
+                        use_quantile_norm=targets_use_quantile_norm
+                    )
+
+                if len(gfs_target_lead_times_days) == 0:
+                    this_lead_matrix = None
+                else:
+                    (
+                        this_lead_matrix,
                         desired_gfs_fcst_target_row_indices,
                         desired_gfs_fcst_target_column_indices
                     ) = _read_gfs_forecast_targets_1example(
@@ -2983,7 +2886,7 @@ def data_generator_fast_patches(option_dict):
                         use_quantile_norm=targets_use_quantile_norm
                     )
 
-                    if new_matrix is None:
+                    if this_lead_matrix is None:
                         full_gfs_predictor_matrix_3d = None
                         full_gfs_predictor_matrix_2d = None
                         full_laglead_target_predictor_matrix = None
@@ -2997,11 +2900,16 @@ def data_generator_fast_patches(option_dict):
                         )
                         continue
 
+                these_matrices = [this_lagged_matrix, this_lead_matrix]
+                these_matrices = [m for m in these_matrices if m is not None]
+                if len(these_matrices) == 0:
+                    full_laglead_target_predictor_matrix = None
+                else:
                     full_laglead_target_predictor_matrix = numpy.concatenate(
-                        [full_laglead_target_predictor_matrix, new_matrix],
-                        axis=-2
+                        these_matrices, axis=-2
                     )
-                    del new_matrix
+
+                del this_lagged_matrix, this_lead_matrix, these_matrices
 
                 if num_target_times_for_interp is not None:
                     source_lead_times_days = numpy.concatenate([
@@ -3023,14 +2931,17 @@ def data_generator_fast_patches(option_dict):
                         full_laglead_target_predictor_matrix.astype('float32')
                     )
 
-                full_laglead_target_predictor_matrix = (
-                    _pad_inner_to_outer_domain(
-                        data_matrix=full_laglead_target_predictor_matrix,
-                        outer_latitude_buffer_deg=outer_latitude_buffer_deg,
-                        outer_longitude_buffer_deg=outer_longitude_buffer_deg,
-                        is_example_axis_present=False, fill_value=sentinel_value
+                if full_laglead_target_predictor_matrix is not None:
+                    full_laglead_target_predictor_matrix = (
+                        _pad_inner_to_outer_domain(
+                            data_matrix=full_laglead_target_predictor_matrix,
+                            outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+                            outer_longitude_buffer_deg=
+                            outer_longitude_buffer_deg,
+                            is_example_axis_present=False,
+                            fill_value=sentinel_value
+                        )
                     )
-                )
 
             if full_target_matrix is None:
                 target_file_name = _find_target_files_needed_1example(
@@ -3147,9 +3058,10 @@ def data_generator_fast_patches(option_dict):
                     full_gfs_predictor_matrix_2d[j_start:j_end, k_start:k_end, ...]
                 )
 
-            laglead_target_predictor_matrix[i, ...] = (
-                full_laglead_target_predictor_matrix[j_start:j_end, k_start:k_end, ...]
-            )
+            if full_laglead_target_predictor_matrix is not None:
+                laglead_target_predictor_matrix[i, ...] = (
+                    full_laglead_target_predictor_matrix[j_start:j_end, k_start:k_end, ...]
+                )
 
             if full_era5_constant_matrix is not None:
                 era5_constant_matrix[i, ...] = (
@@ -3232,7 +3144,7 @@ def create_data(
     option_dict[BATCH_SIZE_KEY] = 32
 
     all_model_leads_days = numpy.array(
-        list(option_dict[MODEL_LEAD_TO_TARGET_LAGS_KEY].keys()),
+        list(option_dict[MODEL_LEAD_TO_FREQ_KEY].keys()),
         dtype=int
     )
     all_model_leads_days = numpy.unique(all_model_leads_days)
@@ -3414,30 +3326,31 @@ def create_data(
             gfs_predictor_matrix_2d, axis=0
         )
 
-    (
-        laglead_target_predictor_matrix,
-        desired_target_row_indices,
-        desired_target_column_indices
-    ) = _read_lagged_targets_1example(
-        gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_name),
-        target_dir_name=target_dir_name,
-        target_lag_times_days=target_lag_times_days,
-        desired_row_indices=None,
-        desired_column_indices=None,
-        latitude_limits_deg_n=inner_latitude_limits_deg_n,
-        longitude_limits_deg_e=inner_longitude_limits_deg_e,
-        target_field_names=target_field_names,
-        norm_param_table_xarray=target_norm_param_table_xarray,
-        use_quantile_norm=targets_use_quantile_norm
-    )
+    if len(target_lag_times_days) == 0:
+        this_lagged_matrix = None
+    else:
+        (
+            this_lagged_matrix,
+            desired_target_row_indices,
+            desired_target_column_indices
+        ) = _read_lagged_targets_1example(
+            gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_name),
+            target_dir_name=target_dir_name,
+            target_lag_times_days=target_lag_times_days,
+            desired_row_indices=None,
+            desired_column_indices=None,
+            latitude_limits_deg_n=inner_latitude_limits_deg_n,
+            longitude_limits_deg_e=inner_longitude_limits_deg_e,
+            target_field_names=target_field_names,
+            norm_param_table_xarray=target_norm_param_table_xarray,
+            use_quantile_norm=targets_use_quantile_norm
+        )
 
     if do_residual_prediction:
         baseline_prediction_matrix, _, _ = _read_lagged_targets_1example(
             gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_name),
             target_dir_name=target_dir_name,
-            target_lag_times_days=numpy.array(
-                [numpy.min(target_lag_times_days)]
-            ),
+            target_lag_times_days=numpy.array([0], dtype=int),
             desired_row_indices=desired_target_row_indices,
             desired_column_indices=desired_target_column_indices,
             latitude_limits_deg_n=inner_latitude_limits_deg_n,
@@ -3453,8 +3366,10 @@ def create_data(
     else:
         baseline_prediction_matrix = None
 
-    if len(gfs_target_lead_times_days) > 0:
-        new_matrix = _read_gfs_forecast_targets_1example(
+    if len(gfs_target_lead_times_days) == 0:
+        this_lead_matrix = None
+    else:
+        this_lead_matrix = _read_gfs_forecast_targets_1example(
             daily_gfs_dir_name=gfs_forecast_target_dir_name,
             init_date_string=gfs_io.file_name_to_date(gfs_file_name),
             target_lead_times_days=gfs_target_lead_times_days,
@@ -3467,10 +3382,16 @@ def create_data(
             use_quantile_norm=targets_use_quantile_norm
         )[0]
 
+    these_matrices = [this_lagged_matrix, this_lead_matrix]
+    these_matrices = [m for m in these_matrices if m is not None]
+    if len(these_matrices) == 0:
+        laglead_target_predictor_matrix = None
+    else:
         laglead_target_predictor_matrix = numpy.concatenate(
-            (laglead_target_predictor_matrix, new_matrix),
-            axis=-2
+            these_matrices, axis=-2
         )
+
+    del this_lagged_matrix, this_lead_matrix, these_matrices
 
     if num_target_times_for_interp is not None:
         source_lead_times_days = numpy.concatenate([
@@ -3491,9 +3412,10 @@ def create_data(
             laglead_target_predictor_matrix.astype('float32')
         )
 
-    laglead_target_predictor_matrix = numpy.expand_dims(
-        laglead_target_predictor_matrix, axis=0
-    )
+    if laglead_target_predictor_matrix is not None:
+        laglead_target_predictor_matrix = numpy.expand_dims(
+            laglead_target_predictor_matrix, axis=0
+        )
 
     target_file_name = _find_target_files_needed_1example(
         gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_name),
@@ -3520,12 +3442,13 @@ def create_data(
     )
     baseline_prediction_matrix = baseline_prediction_matrix[..., 0, :]
 
-    laglead_target_predictor_matrix = _pad_inner_to_outer_domain(
-        data_matrix=laglead_target_predictor_matrix,
-        outer_latitude_buffer_deg=outer_latitude_buffer_deg,
-        outer_longitude_buffer_deg=outer_longitude_buffer_deg,
-        is_example_axis_present=True, fill_value=sentinel_value
-    )
+    if laglead_target_predictor_matrix is not None:
+        laglead_target_predictor_matrix = _pad_inner_to_outer_domain(
+            data_matrix=laglead_target_predictor_matrix,
+            outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+            outer_longitude_buffer_deg=outer_longitude_buffer_deg,
+            is_example_axis_present=True, fill_value=sentinel_value
+        )
 
     target_matrix = _pad_inner_to_outer_domain(
         data_matrix=target_matrix,
@@ -4304,7 +4227,7 @@ def train_model(
     max_epoch_in_dict = numpy.max(epochs_in_dict)
 
     model_lead_times_days = numpy.unique(numpy.array(
-        list(training_option_dict[MODEL_LEAD_TO_TARGET_LAGS_KEY].keys()),
+        list(training_option_dict[MODEL_LEAD_TO_FREQ_KEY].keys()),
         dtype=int
     ))
 

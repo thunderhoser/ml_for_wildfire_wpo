@@ -110,6 +110,12 @@ def _run(template_file_name, output_dir_name,
         era5_constant_predictor_field_names = None
 
     if (
+            len(target_lags_days_by_model_lead) == 1 and
+            target_lags_days_by_model_lead[0] <= 0
+    ):
+        target_lags_days_by_model_lead = None
+
+    if (
             len(gfs_target_leads_days_by_model_lead) == 1 and
             gfs_target_leads_days_by_model_lead[0] <= 0
     ):
@@ -145,14 +151,17 @@ def _run(template_file_name, output_dir_name,
     ))
 
     this_array = target_lags_days_by_model_lead
-    this_array = this_array.astype(float)
-    this_array[this_array < -0.1] = numpy.nan
-    this_array = misc_utils.split_array_by_nan(this_array)
-    this_array = [numpy.round(l).astype(int) for l in this_array]
+    if this_array is None:
+        model_lead_days_to_target_lags_days = None
+    else:
+        this_array = this_array.astype(float)
+        this_array[this_array < -0.1] = numpy.nan
+        this_array = misc_utils.split_array_by_nan(this_array)
+        this_array = [numpy.round(l).astype(int) for l in this_array]
 
-    model_lead_days_to_target_lags_days = dict(zip(
-        model_lead_times_days, this_array
-    ))
+        model_lead_days_to_target_lags_days = dict(zip(
+            model_lead_times_days, this_array
+        ))
 
     this_array = gfs_target_leads_days_by_model_lead
     if this_array is None:

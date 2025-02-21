@@ -142,7 +142,8 @@ TARGET_LAG_TIMES_HELP_STRING = (
     'list must have L items, where L = length of `{0:s}`.  To separate one '
     'inner list from the next, please use -1.  For example, if you want lag '
     'times of (1, 2) days for the first model lead time and lag times of'
-    '(1, 2, 3) days for the second model lead time: "1 2 -1 1 2 3".'
+    '(1, 2, 3) days for the second model lead time: "1 2 -1 1 2 3".  If you do '
+    'not want to use lagged targets as predictors, leave this argument alone.'
 ).format(
     MODEL_LEAD_TIMES_ARG_NAME
 )
@@ -152,7 +153,8 @@ GFS_FCST_TARGET_LEAD_TIMES_HELP_STRING = (
     'inner list from the next, please use -1.  For example, if you want '
     'GFS-target lead times of (1, 2) days for the first model lead time and '
     'GFS-target lead times of (1, 2, 3) days for the second model lead time: '
-    '"1 2 -1 1 2 3".'
+    '"1 2 -1 1 2 3".  If you do not want to use GFS-forecast targets as '
+    'predictors, leave this argument alone.'
 ).format(
     MODEL_LEAD_TIMES_ARG_NAME
 )
@@ -340,11 +342,12 @@ def add_input_args(parser_object):
     )
     parser_object.add_argument(
         '--' + TARGET_LAG_TIMES_ARG_NAME, type=int, nargs='+',
-        required=True, help=TARGET_LAG_TIMES_HELP_STRING
+        required=False, default=[-1], help=TARGET_LAG_TIMES_HELP_STRING
     )
     parser_object.add_argument(
         '--' + GFS_FCST_TARGET_LEAD_TIMES_ARG_NAME, type=int, nargs='+',
-        required=True, help=GFS_FCST_TARGET_LEAD_TIMES_HELP_STRING
+        required=False, default=[-1],
+        help=GFS_FCST_TARGET_LEAD_TIMES_HELP_STRING
     )
     parser_object.add_argument(
         '--' + COMPARE_TO_GFS_IN_LOSS_ARG_NAME, type=int, required=True,

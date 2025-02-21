@@ -21,6 +21,7 @@ PREDN_BASELINE_DIMENSIONS_KEY = 'input_dimensions_predn_baseline'
 USE_RESIDUAL_BLOCKS_KEY = 'use_residual_blocks'
 USE_CONVNEXT_BLOCKS_KEY = 'use_convnext_blocks'
 USE_LEAD_TIME_AS_PRED_KEY = 'use_lead_time_as_predictor'
+CONSTRAINT_INDICES_KEY = 'dmc_dc_isi_indices_for_constraints'
 
 GFS_FC_MODULE_NUM_CONV_LAYERS_KEY = (
     chiu_net_arch.GFS_FC_MODULE_NUM_CONV_LAYERS_KEY
@@ -62,7 +63,6 @@ L1_WEIGHT_KEY = chiu_net_arch.L1_WEIGHT_KEY
 L2_WEIGHT_KEY = chiu_net_arch.L2_WEIGHT_KEY
 USE_BATCH_NORM_KEY = chiu_net_arch.USE_BATCH_NORM_KEY
 ENSEMBLE_SIZE_KEY = chiu_net_arch.ENSEMBLE_SIZE_KEY
-USE_EVIDENTIAL_KEY = chiu_net_arch.USE_EVIDENTIAL_KEY
 
 OPTIMIZER_FUNCTION_KEY = chiu_net_arch.OPTIMIZER_FUNCTION_KEY
 LOSS_FUNCTION_KEY = chiu_net_arch.LOSS_FUNCTION_KEY
@@ -1171,6 +1171,7 @@ def create_model(option_dict, omit_model_summary=False):
     use_residual_blocks = option_dict[USE_RESIDUAL_BLOCKS_KEY]
     use_convnext_blocks = option_dict[USE_CONVNEXT_BLOCKS_KEY]
     use_lead_time_as_predictor = option_dict[USE_LEAD_TIME_AS_PRED_KEY]
+    dmc_dc_isi_indices_for_constraints = option_dict[CONSTRAINT_INDICES_KEY]
 
     if input_dimensions_predn_baseline is not None:
         these_indices = numpy.array([0, 1, 3], dtype=int)
@@ -1223,14 +1224,10 @@ def create_model(option_dict, omit_model_summary=False):
     l2_weight = option_dict[L2_WEIGHT_KEY]
     use_batch_normalization = option_dict[USE_BATCH_NORM_KEY]
     ensemble_size = option_dict[ENSEMBLE_SIZE_KEY]
-    use_evidential_nn = option_dict[USE_EVIDENTIAL_KEY]
 
     optimizer_function = option_dict[OPTIMIZER_FUNCTION_KEY]
     loss_function = option_dict[LOSS_FUNCTION_KEY]
     metric_functions = option_dict[METRIC_FUNCTIONS_KEY]
-
-    if use_evidential_nn:
-        ensemble_size = 4
 
     num_gfs_lead_times = None
 
@@ -1334,7 +1331,7 @@ def create_model(option_dict, omit_model_summary=False):
         )
 
     num_target_lag_times = input_dimensions_lagged_target[-2]
-    num_target_fields = input_dimensions_lagged_target[-1]
+    num_free_target_fields = input_dimensions_lagged_target[-1]
 
     if input_dimensions_era5 is None:
         input_layer_object_era5 = None
@@ -1649,7 +1646,7 @@ def create_model(option_dict, omit_model_summary=False):
             do_convnext=use_convnext_blocks,
             num_conv_layers=1,
             filter_size_px=3,
-            num_filters=2 * num_target_fields * ensemble_size,
+            num_filters=2 * num_free_target_fields * ensemble_size,
             do_time_distributed_conv=False,
             regularizer_object=regularizer_object,
             activation_function_name=inner_activ_function_name,
@@ -1665,7 +1662,7 @@ def create_model(option_dict, omit_model_summary=False):
         do_convnext=use_convnext_blocks,
         num_conv_layers=1,
         filter_size_px=1,
-        num_filters=num_target_fields * ensemble_size,
+        num_filters=num_free_target_fields * ensemble_size,
         do_time_distributed_conv=False,
         regularizer_object=regularizer_object,
         activation_function_name=None,
@@ -1679,7 +1676,7 @@ def create_model(option_dict, omit_model_summary=False):
         new_dims = (
             input_dimensions_lagged_target[0],
             input_dimensions_lagged_target[1],
-            num_target_fields,
+            num_free_target_fields,
             ensemble_size
         )
         output_layer_object = keras.layers.Reshape(
@@ -1699,23 +1696,6 @@ def create_model(option_dict, omit_model_summary=False):
                 target_shape=new_dims,
                 name='reshape_predn_baseline'
             )(input_layer_object_predn_baseline)
-
-            if use_evidential_nn:
-                layer_object_predn_baseline = keras.layers.Permute(
-                    dims=(1, 2, 4, 3),
-                    name='permute_predn_baseline'
-                )(layer_object_predn_baseline)
-
-                padding_arg = ((0, 0), (0, 0), (0, ensemble_size - 1))
-                layer_object_predn_baseline = keras.layers.ZeroPadding3D(
-                    padding=padding_arg,
-                    name='pad_predn_baseline'
-                )(layer_object_predn_baseline)
-
-                layer_object_predn_baseline = keras.layers.Permute(
-                    dims=(1, 2, 4, 3),
-                    name='permute_predn_baseline_back'
-                )(layer_object_predn_baseline)
         else:
             layer_object_predn_baseline = input_layer_object_predn_baseline
 
@@ -1729,6 +1709,27 @@ def create_model(option_dict, omit_model_summary=False):
             alpha_for_relu=output_activ_function_alpha,
             alpha_for_elu=output_activ_function_alpha,
             layer_name='output_activation'
+        )(output_layer_object)
+
+    if dmc_dc_isi_indices_for_constraints is not None:
+        output_layer_object = DeriveBUIPredictions(
+            dmc_index=dmc_dc_isi_indices_for_constraints[0],
+            dc_index=dmc_dc_isi_indices_for_constraints[1],
+            expect_ensemble=ensemble_size > 1,
+            name='constrain_bui'
+        )(output_layer_object)
+
+        output_layer_object = DeriveFWIPredictions(
+            isi_index=dmc_dc_isi_indices_for_constraints[2],
+            bui_index=-1,
+            expect_ensemble=ensemble_size > 1,
+            name='constrain_fwi'
+        )(output_layer_object)
+
+        output_layer_object = DeriveDSRPredictions(
+            fwi_index=-1,
+            expect_ensemble=ensemble_size > 1,
+            name='constrain_dsr'
         )(output_layer_object)
 
     input_layer_objects = [
