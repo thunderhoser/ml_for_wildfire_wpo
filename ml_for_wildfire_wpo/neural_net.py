@@ -4233,10 +4233,10 @@ def train_model(
     ))
     max_epoch_in_dict = numpy.max(epochs_in_dict)
 
-    model_lead_times_days = numpy.unique(numpy.array(
-        list(training_option_dict[MODEL_LEAD_TO_FREQ_KEY].keys()),
-        dtype=int
+    model_lead_times_days = list(set(
+        this_key[1] for this_key in training_option_dict[MODEL_LEAD_TO_FREQ_KEY]
     ))
+    model_lead_times_days = numpy.array(model_lead_times_days, dtype=int)
 
     for this_epoch in range(initial_epoch, num_epochs):
         epoch_in_dict = min([this_epoch + 1, max_epoch_in_dict])
