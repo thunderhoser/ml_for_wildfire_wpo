@@ -361,7 +361,7 @@ def _run():
 
                 if USE_LAGGED_TARGET_FLAGS_AXIS2[j]:
                     input_dimensions_lagged_target = numpy.array(
-                        [160, 160, num_target_days, 4], dtype=int
+                        [160, 160, num_target_days, 7], dtype=int
                     )
                     decoder_channel_counts = (
                         gfs_encoder_channel_counts +
