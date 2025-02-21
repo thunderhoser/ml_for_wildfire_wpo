@@ -231,6 +231,8 @@ def _run(template_file_name, output_dir_name,
         neural_net.MODEL_LEAD_TO_FREQ_KEY: epoch_and_lead_time_to_freq
     }
 
+    print('epoch_and_lead_time_to_freq = {0:s}'.format(str(epoch_and_lead_time_to_freq)))
+
     validation_option_dict = {
         neural_net.INIT_DATE_LIMITS_KEY: init_date_limit_strings_for_validation,
         neural_net.GFS_DIRECTORY_KEY: gfs_dir_name_for_validation,
