@@ -405,10 +405,7 @@ def _run():
 
                 model_object = chiu_net_pp_arch.create_model(option_dict)
                 output_file_name = (
-                    '{0:s}/num-model-leads={1:02d}_'
-                    'use-lagged-targets={2:d}_'
-                    'do-residual-prediction={3:d}/'
-                    'model.keras'
+                    '{0:s}/num-model-leads={1:02d}_use-lagged-targets={2:d}_do-residual-prediction={3:d}/model.keras'
                 ).format(
                     OUTPUT_DIR_NAME,
                     NUM_MODEL_LEADS_AXIS1[i],

@@ -1702,6 +1702,10 @@ def create_model(option_dict, omit_model_summary=False):
         )(output_layer_object)
 
     if input_layer_object_predn_baseline is not None:
+        layer_object_predn_baseline = (
+            input_layer_object_predn_baseline[..., :num_free_target_fields]
+        )
+
         if ensemble_size > 1:
             new_dims = (
                 input_dimensions_predn_baseline[0],
@@ -1713,9 +1717,7 @@ def create_model(option_dict, omit_model_summary=False):
             layer_object_predn_baseline = keras.layers.Reshape(
                 target_shape=new_dims,
                 name='reshape_predn_baseline'
-            )(input_layer_object_predn_baseline)
-        else:
-            layer_object_predn_baseline = input_layer_object_predn_baseline
+            )(layer_object_predn_baseline)
 
         output_layer_object = keras.layers.Add(name='output_add_baseline')([
             output_layer_object, layer_object_predn_baseline
