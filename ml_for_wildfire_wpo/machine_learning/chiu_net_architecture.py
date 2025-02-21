@@ -152,7 +152,8 @@ def check_args(option_dict):
         make this None.
     option_dict["input_dimensions_lagged_targets"]: numpy array with input
         dimensions for lagged targets.  Array elements should be [num_rows,
-        num_columns, num_lag_times, num_target_fields].
+        num_columns, num_lag_times, num_target_fields].  If predictors do not
+        include lagged targets, make this None.
     option_dict["gfs_forecast_module_num_conv_layers"]: Number of conv layers in
         forecasting module applied to GFS data.
     option_dict["lagged_target_forecast_module_num_conv_layers"]: Same as
@@ -280,21 +281,24 @@ def check_args(option_dict):
 
         assert numpy.array_equal(input_dimensions_era5_constants, these_dim)
 
-    error_checking.assert_is_numpy_array(
-        input_dimensions_lagged_target,
-        exact_dimensions=numpy.array([4], dtype=int)
-    )
-    error_checking.assert_is_integer_numpy_array(input_dimensions_lagged_target)
-    error_checking.assert_is_greater_numpy_array(
-        input_dimensions_lagged_target, 0
-    )
+    if input_dimensions_lagged_target is not None:
+        error_checking.assert_is_numpy_array(
+            input_dimensions_lagged_target,
+            exact_dimensions=numpy.array([4], dtype=int)
+        )
+        error_checking.assert_is_integer_numpy_array(
+            input_dimensions_lagged_target
+        )
+        error_checking.assert_is_greater_numpy_array(
+            input_dimensions_lagged_target, 0
+        )
 
-    these_dim = numpy.array([
-        num_grid_rows, num_grid_columns,
-        input_dimensions_lagged_target[2], input_dimensions_lagged_target[3]
-    ], dtype=int)
+        these_dim = numpy.array([
+            num_grid_rows, num_grid_columns,
+            input_dimensions_lagged_target[2], input_dimensions_lagged_target[3]
+        ], dtype=int)
 
-    assert numpy.array_equal(input_dimensions_lagged_target, these_dim)
+        assert numpy.array_equal(input_dimensions_lagged_target, these_dim)
 
     gfs_fcst_num_conv_layers = option_dict[GFS_FC_MODULE_NUM_CONV_LAYERS_KEY]
     error_checking.assert_is_integer(gfs_fcst_num_conv_layers)
@@ -457,6 +461,8 @@ def create_model(option_dict):
     # TODO(thunderhoser): Might want more efficient way to incorporate ERA5 data
     # in network -- one that doesn't involve repeating ERA5 data over the
     # GFS-lead-time axis and target-lag/lead-time axis.
+
+    # TODO(thunderhoser): Need to handle case with no lagged-target predictors.
 
     option_dict = check_args(option_dict)
 
