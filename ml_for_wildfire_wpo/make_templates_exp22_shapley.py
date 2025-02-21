@@ -338,11 +338,11 @@ def _run():
                 )
                 
                 if USE_LAGGED_TARGET_FLAGS_AXIS2[j]:
-                    num_target_days = 0
-                else:
                     num_target_days = NUM_MODEL_LEADS_TO_NUM_TARGET_DAYS[
                         NUM_MODEL_LEADS_AXIS1[i]
                     ]
+                else:
+                    num_target_days = 0
 
                 these_multipliers = numpy.linspace(
                     0, MODEL_DEPTH, num=MODEL_DEPTH + 1, dtype=float
