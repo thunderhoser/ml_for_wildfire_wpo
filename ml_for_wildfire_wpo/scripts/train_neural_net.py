@@ -219,7 +219,8 @@ def _run(template_file_name, output_dir_name,
         neural_net.GFS_DIRECTORY_KEY: gfs_dir_name_for_training,
         neural_net.TARGET_DIRECTORY_KEY: target_dir_name_for_training,
         neural_net.GFS_FORECAST_TARGET_DIR_KEY:
-            gfs_forecast_target_dir_name_for_training
+            gfs_forecast_target_dir_name_for_training,
+        neural_net.MODEL_LEAD_TO_FREQ_KEY: epoch_and_lead_time_to_freq
     }
 
     validation_option_dict = {
