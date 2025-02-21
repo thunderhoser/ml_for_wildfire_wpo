@@ -2799,6 +2799,7 @@ def data_generator_fast_patches(option_dict):
                     current_index=gfs_file_index,
                     gfs_file_names=gfs_file_names
                 )
+                print('FOOOOO1')
                 continue
 
             gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
@@ -2936,6 +2937,7 @@ def data_generator_fast_patches(option_dict):
                             current_index=gfs_file_index,
                             gfs_file_names=gfs_file_names
                         )
+                        print('FOOOOO2')
                         continue
 
                 these_matrices = [this_lagged_matrix, this_lead_matrix]
@@ -3040,6 +3042,7 @@ def data_generator_fast_patches(option_dict):
                             current_index=gfs_file_index,
                             gfs_file_names=gfs_file_names
                         )
+                        print('FOOOOO3')
                         continue
 
                     new_target_matrix = new_target_matrix[..., 0, :]
