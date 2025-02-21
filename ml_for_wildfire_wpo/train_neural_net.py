@@ -107,6 +107,10 @@ def _run(template_file_name, output_dir_name,
         target_normalization_file_name = None
     if era5_normalization_file_name == '':
         era5_normalization_file_name = None
+    if gfs_forecast_target_dir_name_for_training == '':
+        gfs_forecast_target_dir_name_for_training = None
+    if gfs_forecast_target_dir_name_for_validation == '':
+        gfs_forecast_target_dir_name_for_validation = None
 
     if era5_constant_file_name == '':
         era5_constant_file_name = None
