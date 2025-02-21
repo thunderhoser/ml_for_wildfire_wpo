@@ -369,7 +369,7 @@ def _run():
                     )[:-1]
                 else:
                     input_dimensions_lagged_target = None
-                    decoder_channel_counts = gfs_encoder_channel_counts + 0
+                    decoder_channel_counts = gfs_encoder_channel_counts[:-1]
                 
                 if RESID_PREDICTION_FLAGS_AXIS3[k]:
                     input_dimensions_predn_baseline = numpy.array(
