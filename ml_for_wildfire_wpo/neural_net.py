@@ -521,7 +521,7 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
         this_matrix = _read_lagged_targets_1example(
             gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_names[0]),
             target_dir_name=target_dir_name,
-            target_lag_times_days=numpy.aray([1], dtype=int),
+            target_lag_times_days=numpy.array([1], dtype=int),
             desired_row_indices=None,
             desired_column_indices=None,
             latitude_limits_deg_n=inner_latitude_limits_deg_n,
