@@ -235,15 +235,14 @@ DEFAULT_OPTION_DICT = {
     chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
         [160, 160, 7], dtype=int
     ),
-    # chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
-    #     [160, 160, -1, 6], dtype=int
-    # ),
+    chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: None,
     chiu_net_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array(
         [160, 160, 4], dtype=int
     ),
     chiu_net_pp_arch.USE_RESIDUAL_BLOCKS_KEY: False,
     chiu_net_pp_arch.USE_CONVNEXT_BLOCKS_KEY: True,
     chiu_net_pp_arch.CONSTRAINT_INDICES_KEY: numpy.array([1, 2, 3], dtype=int),
+    chiu_net_pp_arch.NUM_FREE_TARGETS_KEY: 4,
     chiu_net_pp_arch.GFS_FC_MODULE_NUM_CONV_LAYERS_KEY: 1,
     chiu_net_pp_arch.GFS_FC_MODULE_USE_3D_CONV: True,
     chiu_net_pp_arch.GFS_FC_MODULE_DROPOUT_RATES_KEY: numpy.array([0.]),
@@ -362,9 +361,6 @@ def _run():
                     ),
                     chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
                         [160, 160, num_gfs_hours, 5], dtype=int
-                    ),
-                    chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: numpy.array(
-                        [160, 160, num_target_days, 4], dtype=int
                     ),
                     chiu_net_pp_arch.GFS_ENCODER_NUM_CHANNELS_KEY:
                         gfs_encoder_channel_counts,

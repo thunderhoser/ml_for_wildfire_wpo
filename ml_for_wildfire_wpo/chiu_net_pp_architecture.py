@@ -29,6 +29,7 @@ USE_RESIDUAL_BLOCKS_KEY = 'use_residual_blocks'
 USE_CONVNEXT_BLOCKS_KEY = 'use_convnext_blocks'
 USE_LEAD_TIME_AS_PRED_KEY = 'use_lead_time_as_predictor'
 CONSTRAINT_INDICES_KEY = 'dmc_dc_isi_indices_for_constraints'
+NUM_FREE_TARGETS_KEY = 'num_free_target_fields'
 
 GFS_FC_MODULE_NUM_CONV_LAYERS_KEY = (
     chiu_net_arch.GFS_FC_MODULE_NUM_CONV_LAYERS_KEY
@@ -1180,12 +1181,9 @@ def create_model(option_dict, omit_model_summary=False):
     use_lead_time_as_predictor = option_dict[USE_LEAD_TIME_AS_PRED_KEY]
     dmc_dc_isi_indices_for_constraints = option_dict[CONSTRAINT_INDICES_KEY]
 
-    if input_dimensions_predn_baseline is not None:
-        these_indices = numpy.array([0, 1, 3], dtype=int)
-        assert numpy.array_equal(
-            input_dimensions_predn_baseline,
-            input_dimensions_lagged_target[these_indices]
-        )
+    # TODO(thunderhoser): Error-checking for this input arg and other keys
+    # not defined in chiu_net_architecture.py.
+    num_free_target_fields = option_dict[NUM_FREE_TARGETS_KEY]
 
     gfs_fcst_num_conv_layers = option_dict[GFS_FC_MODULE_NUM_CONV_LAYERS_KEY]
     gfs_fcst_dropout_rates = option_dict[GFS_FC_MODULE_DROPOUT_RATES_KEY]
@@ -1237,6 +1235,8 @@ def create_model(option_dict, omit_model_summary=False):
     metric_functions = option_dict[METRIC_FUNCTIONS_KEY]
 
     num_gfs_lead_times = None
+    num_grid_rows = None
+    num_grid_columns = None
 
     if input_dimensions_gfs_3d is None:
         input_layer_object_gfs_3d = None
@@ -1262,6 +1262,8 @@ def create_model(option_dict, omit_model_summary=False):
             name='gfs_3d_flatten-pressure-levels'
         )(layer_object_gfs_3d)
 
+        num_grid_rows = input_dimensions_gfs_3d[0]
+        num_grid_columns = input_dimensions_gfs_3d[1]
         num_gfs_lead_times = input_dimensions_gfs_3d[-2]
 
     if input_dimensions_gfs_2d is None:
@@ -1277,6 +1279,8 @@ def create_model(option_dict, omit_model_summary=False):
             name='gfs_2d_put-time-first'
         )(input_layer_object_gfs_2d)
 
+        num_grid_rows = input_dimensions_gfs_2d[0]
+        num_grid_columns = input_dimensions_gfs_2d[1]
         num_gfs_lead_times = input_dimensions_gfs_2d[-2]
 
     if input_dimensions_gfs_3d is None:
@@ -1289,9 +1293,6 @@ def create_model(option_dict, omit_model_summary=False):
         )(
             [layer_object_gfs_3d, layer_object_gfs_2d]
         )
-
-    num_grid_rows = input_dimensions_lagged_target[0]
-    num_grid_columns = input_dimensions_lagged_target[1]
 
     if use_lead_time_as_predictor:
         input_layer_object_lead_time = keras.layers.Input(
@@ -1321,13 +1322,21 @@ def create_model(option_dict, omit_model_summary=False):
         input_layer_object_lead_time = None
         layer_object_lead_time = None
 
-    input_layer_object_lagged_target = keras.layers.Input(
-        shape=tuple(input_dimensions_lagged_target.tolist()),
-        name='lagged_target_inputs'
-    )
-    layer_object_lagged_target = keras.layers.Permute(
-        dims=(3, 1, 2, 4), name='lagged_targets_put-time-first'
-    )(input_layer_object_lagged_target)
+    num_target_lag_times = None
+
+    if input_dimensions_lagged_target is None:
+        input_layer_object_lagged_target = None
+        layer_object_lagged_target = None
+    else:
+        input_layer_object_lagged_target = keras.layers.Input(
+            shape=tuple(input_dimensions_lagged_target.tolist()),
+            name='lagged_target_inputs'
+        )
+        layer_object_lagged_target = keras.layers.Permute(
+            dims=(3, 1, 2, 4), name='lagged_targets_put-time-first'
+        )(input_layer_object_lagged_target)
+
+        num_target_lag_times = input_dimensions_lagged_target[-2]
 
     if input_dimensions_predn_baseline is None:
         input_layer_object_predn_baseline = None
@@ -1336,9 +1345,6 @@ def create_model(option_dict, omit_model_summary=False):
             shape=tuple(input_dimensions_predn_baseline.tolist()),
             name='predn_baseline_inputs'
         )
-
-    num_target_lag_times = input_dimensions_lagged_target[-2]
-    num_free_target_fields = input_dimensions_lagged_target[-1]
 
     if input_dimensions_era5 is None:
         input_layer_object_era5 = None
@@ -1385,17 +1391,18 @@ def create_model(option_dict, omit_model_summary=False):
             [layer_object_gfs, this_layer_object]
         )
 
-        this_layer_object = keras.layers.Concatenate(
-            axis=-4, name='const_add-lag-times'
-        )(
-            num_target_lag_times * [layer_object_constants]
-        )
+        if input_dimensions_lagged_target is not None:
+            this_layer_object = keras.layers.Concatenate(
+                axis=-4, name='const_add-lag-times'
+            )(
+                num_target_lag_times * [layer_object_constants]
+            )
 
-        layer_object_lagged_target = keras.layers.Concatenate(
-            axis=-1, name='lagged_targets_concat-const'
-        )(
-            [layer_object_lagged_target, this_layer_object]
-        )
+            layer_object_lagged_target = keras.layers.Concatenate(
+                axis=-1, name='lagged_targets_concat-const'
+            )(
+                [layer_object_lagged_target, this_layer_object]
+            )
 
     regularizer_object = architecture_utils.get_weight_regularizer(
         l1_weight=l1_weight, l2_weight=l2_weight
@@ -1488,8 +1495,9 @@ def create_model(option_dict, omit_model_summary=False):
     lagtgt_encoder_conv_layer_objects = [None] * (num_levels + 1)
     lagtgt_fcst_module_layer_objects = [None] * (num_levels + 1)
     lagtgt_encoder_pooling_layer_objects = [None] * num_levels
+    loop_max = 0 if input_dimensions_lagged_target is None else num_levels + 1
 
-    for i in range(num_levels + 1):
+    for i in range(loop_max):
         if i == 0:
             this_input_layer_object = layer_object_lagged_target
         else:
@@ -1577,12 +1585,15 @@ def create_model(option_dict, omit_model_summary=False):
     for i in range(num_levels + 1):
         this_name = 'fcst_level{0:d}_concat'.format(i)
 
-        last_conv_layer_matrix[i, 0] = keras.layers.Concatenate(
-            axis=-1, name=this_name
-        )([
-            gfs_fcst_module_layer_objects[i],
-            lagtgt_fcst_module_layer_objects[i]
-        ])
+        if input_dimensions_lagged_target is None:
+            last_conv_layer_matrix[i, 0] = gfs_fcst_module_layer_objects[i]
+        else:
+            last_conv_layer_matrix[i, 0] = keras.layers.Concatenate(
+                axis=-1, name=this_name
+            )([
+                gfs_fcst_module_layer_objects[i],
+                lagtgt_fcst_module_layer_objects[i]
+            ])
 
         i_new = i + 0
         j = 0
@@ -1681,8 +1692,8 @@ def create_model(option_dict, omit_model_summary=False):
 
     if ensemble_size > 1:
         new_dims = (
-            input_dimensions_lagged_target[0],
-            input_dimensions_lagged_target[1],
+            num_grid_rows,
+            num_grid_columns,
             num_free_target_fields,
             ensemble_size
         )
