@@ -1205,6 +1205,8 @@ def _get_target_fields(
             use_quantile_norm=use_quantile_norm
         )
 
+    print(fwi_table_xarray)
+
     data_matrix = numpy.stack([
         canadian_fwi_utils.get_field(
             fwi_table_xarray=fwi_table_xarray, field_name=f
