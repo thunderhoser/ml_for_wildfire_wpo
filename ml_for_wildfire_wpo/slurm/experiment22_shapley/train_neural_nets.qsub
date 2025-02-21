@@ -114,11 +114,11 @@ if [ "$num_model_leads" = "14" ]; then
     --outer_patch_overlap_size_deg=15 \
     --gfs_dir_name_for_training="${GFS_DIR_NAME}" \
     --target_dir_name_for_training="${TARGET_DIR_NAME}" \
-    --gfs_forecast_target_dir_name_for_training="" \
+    --gfs_forecast_target_dir_name_for_training="${GFS_FORECAST_TARGET_DIR_NAME}" \
     --gfs_init_date_limit_strings_for_training "20190101" "20201210" \
     --gfs_dir_name_for_validation="${GFS_DIR_NAME}" \
     --target_dir_name_for_validation="${TARGET_DIR_NAME}" \
-    --gfs_forecast_target_dir_name_for_validation="" \
+    --gfs_forecast_target_dir_name_for_validation="${GFS_FORECAST_TARGET_DIR_NAME}" \
     --gfs_init_date_limit_strings_for_validation "20210101" "20211210" \
     --num_epochs=10000 \
     --num_training_batches_per_epoch=704 \
@@ -160,11 +160,11 @@ else
     --outer_patch_overlap_size_deg=15 \
     --gfs_dir_name_for_training="${GFS_DIR_NAME}" \
     --target_dir_name_for_training="${TARGET_DIR_NAME}" \
-    --gfs_forecast_target_dir_name_for_training="" \
+    --gfs_forecast_target_dir_name_for_training="${GFS_FORECAST_TARGET_DIR_NAME}" \
     --gfs_init_date_limit_strings_for_training "20190101" "20201210" \
     --gfs_dir_name_for_validation="${GFS_DIR_NAME}" \
     --target_dir_name_for_validation="${TARGET_DIR_NAME}" \
-    --gfs_forecast_target_dir_name_for_validation="" \
+    --gfs_forecast_target_dir_name_for_validation="${GFS_FORECAST_TARGET_DIR_NAME}" \
     --gfs_init_date_limit_strings_for_validation "20210101" "20211210" \
     --num_epochs=10000 \
     --num_training_batches_per_epoch=704 \
