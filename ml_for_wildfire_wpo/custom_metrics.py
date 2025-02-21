@@ -400,7 +400,7 @@ def min_prediction_unmasked(channel_index, function_name, expect_ensemble=True,
         mask_tensor = tensorflow.where(
             weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW,
             weight_tensor,
-            INFINITY
+            K.cast(INFINITY, weight_tensor.dtype)
         )
         mask_tensor = K.cast(mask_tensor, prediction_tensor.dtype)
 
@@ -465,7 +465,7 @@ def min_target_unmasked(channel_index, function_name, expect_ensemble=True,
         mask_tensor = tensorflow.where(
             weight_tensor >= MASK_PIXEL_IF_WEIGHT_BELOW,
             weight_tensor,
-            INFINITY
+            K.cast(INFINITY, weight_tensor.dtype)
         )
         mask_tensor = K.cast(mask_tensor, target_tensor.dtype)
 
