@@ -42,7 +42,7 @@ spectral_complexity=${SPECTRAL_COMPLEXITIES[$SLURM_ARRAY_TASK_ID]}
 use_lead_time_as_predictor=${USE_LEAD_TIME_AS_PRED_FLAGS[$SLURM_ARRAY_TASK_ID]}
 
 model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=${training_strategy}_spectral-complexity=${spectral_complexity}_use-lead-time-as-predictor=${use_lead_time_as_predictor}"
-baseline_model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=10-40-diff_spectral-complexity=025_use-lead-time-as-predictor=1"
+baseline_model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=40-10-diff_spectral-complexity=025_use-lead-time-as-predictor=1"
 echo $model_dir_name
 
 python3 -u "${CODE_DIR_NAME}/plot_evaluation_by_lead_time.py" \
