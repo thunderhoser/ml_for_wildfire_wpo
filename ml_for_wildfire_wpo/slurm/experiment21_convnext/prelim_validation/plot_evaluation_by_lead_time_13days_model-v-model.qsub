@@ -1,0 +1,54 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_evaluation_by_lead_time_13days_model-v-model"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --array=0-55
+#SBATCH --time=02:00:00
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_evaluation_by_lead_time_13days_model-v-model_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment21_convnext"
+
+TRAINING_STRATEGIES=("20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days" "20-50-diff-plus2days" "20-50-diff-plus2days" "40-10-diff" "40-10-diff" "20-30-daily" "20-30-daily" "80-40-diff-plus2days" "80-40-diff-plus2days")
+SPECTRAL_COMPLEXITIES=("010" "010" "010" "010" "010" "010" "010" "010" "015" "015" "015" "015" "015" "015" "015" "015" "020" "020" "020" "020" "020" "020" "020" "020" "025" "025" "025" "025" "025" "025" "025" "025" "030" "030" "030" "030" "030" "030" "030" "030" "035" "035" "035" "035" "035" "035" "035" "035" "040" "040" "040" "040" "040" "040" "040" "040")
+USE_LEAD_TIME_AS_PRED_FLAGS=("0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1" "0" "1")
+
+training_strategy=${TRAINING_STRATEGIES[$SLURM_ARRAY_TASK_ID]}
+spectral_complexity=${SPECTRAL_COMPLEXITIES[$SLURM_ARRAY_TASK_ID]}
+use_lead_time_as_predictor=${USE_LEAD_TIME_AS_PRED_FLAGS[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=${training_strategy}_spectral-complexity=${spectral_complexity}_use-lead-time-as-predictor=${use_lead_time_as_predictor}"
+baseline_model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=10-40-diff_spectral-complexity=025_use-lead-time-as-predictor=1"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/plot_evaluation_by_lead_time.py" \
+--model_eval_file_name_by_lead "${model_dir_name}/validation_lead-time-days=01/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=02/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=03/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=04/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=05/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=06/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=07/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=08/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=09/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=10/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=11/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=12/ungridded_evaluation.nc" "${model_dir_name}/validation_lead-time-days=13/ungridded_evaluation.nc" \
+--baseline_eval_file_name_by_lead "${baseline_model_dir_name}/validation_lead-time-days=01/ungridded_evaluation.nc" "${baseline_model_dir_name}/validation_lead-time-days=02/ungridded_evaluation.nc" "${baseline_model_dir_name}/validation_lead-time-days=03/ungridded_evaluation.nc" "${baseline_model_dir_name}/validation_lead-time-days=04/ungridded_evaluation.nc" "${baseline_model_dir_name}/validation_lead-time-days=05/ungridded_evaluation.nc" "${baseline_model_dir_name}/validation_lead-time-days=06/ungridded_evaluation.nc" "${baseline_model_dir_name}/validation_lead-time-days=07/ungridded_evaluation.nc" "${baseline_model_dir_name}/validation_lead-time-days=08/ungridded_evaluation.nc" "${baseline_model_dir_name}/validation_lead-time-days=09/ungridded_evaluation.nc" "${baseline_model_dir_name}/validation_lead-time-days=10/ungridded_evaluation.nc" "${baseline_model_dir_name}/validation_lead-time-days=11/ungridded_evaluation.nc" "${baseline_model_dir_name}/validation_lead-time-days=12/ungridded_evaluation.nc" "${baseline_model_dir_name}/validation_lead-time-days=13/ungridded_evaluation.nc" \
+--lead_times_days 1 2 3 4 5 6 7 8 9 10 11 12 13 \
+--model_description_string="NN" \
+--baseline_description_string="10-40-diff, SC = 25, scalar = 1" \
+--output_dir_name="${model_dir_name}/validation_by_lead_time"
