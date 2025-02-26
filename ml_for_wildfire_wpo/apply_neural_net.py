@@ -207,8 +207,6 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
 
     dummy_validation_option_dict = copy.deepcopy(validation_option_dict)
     dummy_validation_option_dict[neural_net.OUTER_PATCH_SIZE_DEG_KEY] = None
-    second_parts = [key[1] for key in dummy_validation_option_dict[neural_net.MODEL_LEAD_TO_FREQ_KEY].keys()]
-    print(second_parts)
 
     for this_init_date_string in init_date_strings:
         data_dict = neural_net.create_data(
