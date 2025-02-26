@@ -734,7 +734,8 @@ def _check_generator_args(option_dict):
 
     model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
 
-    print(list(model_lead_days_to_freq.keys()))
+    for this_key in model_lead_days_to_freq:
+        print(this_key)
 
     new_lead_times_days = list(set(
         this_key[1] for this_key in model_lead_days_to_freq
