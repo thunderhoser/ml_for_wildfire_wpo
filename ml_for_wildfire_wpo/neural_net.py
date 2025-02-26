@@ -428,10 +428,17 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
     patch_size_pixels = int(numpy.round(
         float(patch_size_deg) / GRID_SPACING_DEG
     ))
-    model_lead_times_days = numpy.array(
-        list(model_lead_days_to_freq.keys()),
-        dtype=int
-    )
+
+    try:
+        model_lead_times_days = list(set(
+            this_key[1] for this_key in model_lead_days_to_freq
+        ))
+        model_lead_times_days = numpy.array(model_lead_times_days, dtype=int)
+    except:
+        model_lead_times_days = numpy.array(
+            list(model_lead_days_to_freq.keys()),
+            dtype=int
+        )
 
     num_gfs_hours_for_interp, num_target_times_for_interp = (
         _determine_num_times_for_interp(option_dict)
@@ -726,10 +733,25 @@ def _check_generator_args(option_dict):
             model_lead_days_to_target_lags_days[d] = these_lag_times_days
 
     model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
-    new_lead_times_days = numpy.array(
-        list(model_lead_days_to_freq.keys()),
-        dtype=int
-    )
+
+    try:
+        new_lead_times_days = list(set(
+            this_key[1] for this_key in model_lead_days_to_freq
+        ))
+        new_lead_times_days = numpy.array(new_lead_times_days, dtype=int)
+        model_lead_time_freqs = numpy.array(
+            [model_lead_days_to_freq[1, d] for d in model_lead_times_days],
+            dtype=float
+        )
+    except:
+        new_lead_times_days = numpy.array(
+            list(model_lead_days_to_freq.keys()),
+            dtype=int
+        )
+        model_lead_time_freqs = numpy.array(
+            [model_lead_days_to_freq[d] for d in model_lead_times_days],
+            dtype=float
+        )
 
     print(model_lead_times_days)
     print(new_lead_times_days)
@@ -738,10 +760,6 @@ def _check_generator_args(option_dict):
         numpy.sort(new_lead_times_days)
     )
 
-    model_lead_time_freqs = numpy.array(
-        [model_lead_days_to_freq[d] for d in model_lead_times_days],
-        dtype=float
-    )
     error_checking.assert_is_geq_numpy_array(model_lead_time_freqs, 0.)
     error_checking.assert_is_leq_numpy_array(model_lead_time_freqs, 1.)
     model_lead_time_freqs = (
