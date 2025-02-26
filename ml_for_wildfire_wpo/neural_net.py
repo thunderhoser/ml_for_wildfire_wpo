@@ -3516,13 +3516,14 @@ def create_data(
     )
     target_matrix = numpy.expand_dims(target_matrix, axis=0)
 
-    baseline_prediction_matrix = _pad_inner_to_outer_domain(
-        data_matrix=baseline_prediction_matrix,
-        outer_latitude_buffer_deg=outer_latitude_buffer_deg,
-        outer_longitude_buffer_deg=outer_longitude_buffer_deg,
-        is_example_axis_present=True, fill_value=sentinel_value
-    )
-    baseline_prediction_matrix = baseline_prediction_matrix[..., 0, :]
+    if baseline_prediction_matrix is not None:
+        baseline_prediction_matrix = _pad_inner_to_outer_domain(
+            data_matrix=baseline_prediction_matrix,
+            outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+            outer_longitude_buffer_deg=outer_longitude_buffer_deg,
+            is_example_axis_present=True, fill_value=sentinel_value
+        )
+        baseline_prediction_matrix = baseline_prediction_matrix[..., 0, :]
 
     if laglead_target_predictor_matrix is not None:
         laglead_target_predictor_matrix = _pad_inner_to_outer_domain(
