@@ -734,6 +734,15 @@ def _check_generator_args(option_dict):
 
     model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
 
+    new_lead_times_days = list(set(
+        this_key[1] for this_key in model_lead_days_to_freq
+    ))
+    new_lead_times_days = numpy.array(new_lead_times_days, dtype=int)
+    model_lead_time_freqs = numpy.array(
+        [model_lead_days_to_freq[1, d] for d in model_lead_times_days],
+        dtype=float
+    )
+
     try:
         new_lead_times_days = list(set(
             this_key[1] for this_key in model_lead_days_to_freq
