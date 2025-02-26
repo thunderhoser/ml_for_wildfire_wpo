@@ -3213,11 +3213,19 @@ def create_data(
     option_dict[INIT_DATE_LIMITS_KEY] = [init_date_string] * 2
     option_dict[BATCH_SIZE_KEY] = 32
 
-    all_model_leads_days = numpy.array(
-        list(option_dict[MODEL_LEAD_TO_FREQ_KEY].keys()),
-        dtype=int
-    )
-    all_model_leads_days = numpy.unique(all_model_leads_days)
+    try:
+        all_model_leads_days = list(set(
+            this_key[1] for this_key in
+            option_dict[MODEL_LEAD_TO_FREQ_KEY].keys()
+        ))
+        all_model_leads_days = numpy.array(all_model_leads_days, dtype=int)
+    except:
+        all_model_leads_days = numpy.array(
+            list(option_dict[MODEL_LEAD_TO_FREQ_KEY].keys()),
+            dtype=int
+        )
+        all_model_leads_days = numpy.unique(all_model_leads_days)
+
     dummy_frequencies = numpy.full(len(all_model_leads_days), 0.1)
     option_dict[MODEL_LEAD_TO_FREQ_KEY] = dict(
         zip(all_model_leads_days, dummy_frequencies)
