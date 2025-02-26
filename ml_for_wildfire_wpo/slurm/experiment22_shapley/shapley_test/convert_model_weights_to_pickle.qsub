@@ -30,7 +30,7 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
-TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment22_shapley"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment22_shapley/test"
 
 model_dir_name="${TOP_MODEL_DIR_NAME}/num-model-leads=01_use-lagged-targets=1_do-residual-prediction=0_random-seed=1"
 echo $model_dir_name
