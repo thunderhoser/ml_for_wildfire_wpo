@@ -733,6 +733,7 @@ def _check_generator_args(option_dict):
             model_lead_days_to_target_lags_days[d] = these_lag_times_days
 
     model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
+    print(model_lead_days_to_freq)
     print([key[1] for key in model_lead_days_to_freq.keys()])
 
     try:
