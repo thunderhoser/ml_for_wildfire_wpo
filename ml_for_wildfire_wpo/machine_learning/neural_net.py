@@ -421,10 +421,17 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
     patch_size_pixels = int(numpy.round(
         float(patch_size_deg) / GRID_SPACING_DEG
     ))
-    model_lead_times_days = numpy.array(
-        list(model_lead_days_to_freq.keys()),
-        dtype=int
-    )
+
+    try:
+        model_lead_times_days = list(set(
+            this_key[1] for this_key in model_lead_days_to_freq.keys()
+        ))
+        model_lead_times_days = numpy.array(model_lead_times_days, dtype=int)
+    except:
+        model_lead_times_days = numpy.array(
+            list(model_lead_days_to_freq.keys()),
+            dtype=int
+        )
 
     num_gfs_hours_for_interp, num_target_times_for_interp = (
         _determine_num_times_for_interp(option_dict)
@@ -514,7 +521,7 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
         this_matrix = _read_lagged_targets_1example(
             gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_names[0]),
             target_dir_name=target_dir_name,
-            target_lag_times_days=numpy.aray([1], dtype=int),
+            target_lag_times_days=numpy.array([1], dtype=int),
             desired_row_indices=None,
             desired_column_indices=None,
             latitude_limits_deg_n=inner_latitude_limits_deg_n,
@@ -719,19 +726,31 @@ def _check_generator_args(option_dict):
             model_lead_days_to_target_lags_days[d] = these_lag_times_days
 
     model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
-    new_lead_times_days = numpy.array(
-        list(model_lead_days_to_freq.keys()),
-        dtype=int
-    )
+
+    try:
+        new_lead_times_days = list(set(
+            this_key[1] for this_key in model_lead_days_to_freq.keys()
+        ))
+        new_lead_times_days = numpy.array(new_lead_times_days, dtype=int)
+        model_lead_time_freqs = numpy.array(
+            [model_lead_days_to_freq[1, d] for d in model_lead_times_days],
+            dtype=float
+        )
+    except:
+        new_lead_times_days = numpy.array(
+            list(model_lead_days_to_freq.keys()),
+            dtype=int
+        )
+        model_lead_time_freqs = numpy.array(
+            [model_lead_days_to_freq[d] for d in model_lead_times_days],
+            dtype=float
+        )
+
     assert numpy.array_equal(
         numpy.sort(model_lead_times_days),
         numpy.sort(new_lead_times_days)
     )
 
-    model_lead_time_freqs = numpy.array(
-        [model_lead_days_to_freq[d] for d in model_lead_times_days],
-        dtype=float
-    )
     error_checking.assert_is_geq_numpy_array(model_lead_time_freqs, 0.)
     error_checking.assert_is_leq_numpy_array(model_lead_time_freqs, 1.)
     model_lead_time_freqs = (
@@ -1162,6 +1181,7 @@ def _get_gfs_forecast_target_fields(
 
 def _get_target_fields(
         target_file_name, desired_row_indices, desired_column_indices,
+        latitude_limits_deg_n, longitude_limits_deg_e,
         field_names, norm_param_table_xarray, use_quantile_norm):
     """Reads target fields from one file.
 
@@ -1172,16 +1192,38 @@ def _get_target_fields(
     :param target_file_name: Path to input file.
     :param desired_row_indices: length-M numpy array of indices.
     :param desired_column_indices: length-N numpy array of indices.
+    :param latitude_limits_deg_n: See documentation for `data_generator`.  If
+        `desired_row_indices is not None`, this argument is not used.
+    :param longitude_limits_deg_e: See documentation for `data_generator`.  If
+        `desired_column_indices is not None`, this argument is not used.
     :param field_names: length-T list of field names.
     :param norm_param_table_xarray: xarray table with normalization parameters.
         If you do not want normalization, make this None.
     :param use_quantile_norm: Boolean flag.  If True, will use quantile
         normalization before converting to z-scores.
     :return: data_matrix: M-by-N-by-T numpy array of data values.
+    :return: desired_row_indices: See input documentation.
+    :return: desired_column_indices: See input documentation.
     """
 
     print('Reading data from: "{0:s}"...'.format(target_file_name))
     fwi_table_xarray = canadian_fwi_io.read_file(target_file_name)
+
+    if desired_row_indices is None or len(desired_row_indices) == 0:
+        fwit = fwi_table_xarray
+
+        desired_row_indices = misc_utils.desired_latitudes_to_rows(
+            grid_latitudes_deg_n=
+            fwit.coords[canadian_fwi_utils.LATITUDE_DIM].values,
+            start_latitude_deg_n=latitude_limits_deg_n[0],
+            end_latitude_deg_n=latitude_limits_deg_n[1]
+        )
+        desired_column_indices = misc_utils.desired_longitudes_to_columns(
+            grid_longitudes_deg_e=
+            fwit.coords[canadian_fwi_utils.LONGITUDE_DIM].values,
+            start_longitude_deg_e=longitude_limits_deg_e[0],
+            end_longitude_deg_e=longitude_limits_deg_e[1]
+        )
 
     fwi_table_xarray = canadian_fwi_utils.subset_by_row(
         fwi_table_xarray=fwi_table_xarray,
@@ -1206,7 +1248,7 @@ def _get_target_fields(
     ], axis=-1)
 
     assert not numpy.any(numpy.isnan(data_matrix))
-    return data_matrix
+    return data_matrix, desired_row_indices, desired_column_indices
 
 
 def _create_weight_matrix(
@@ -1620,10 +1662,12 @@ def _read_lagged_targets_1example(
             target_file_name=f,
             desired_row_indices=desired_row_indices,
             desired_column_indices=desired_column_indices,
+            latitude_limits_deg_n=latitude_limits_deg_n,
+            longitude_limits_deg_e=longitude_limits_deg_e,
             field_names=target_field_names,
             norm_param_table_xarray=norm_param_table_xarray,
             use_quantile_norm=use_quantile_norm
-        )
+        )[0]
         for f in target_file_names
     ], axis=-2)
 
@@ -2432,10 +2476,16 @@ def data_generator(option_dict):
                 numpy.array([model_lead_time_days], dtype=int)
             )[0]
 
-            this_target_matrix = _get_target_fields(
+            (
+                this_target_matrix,
+                desired_target_row_indices,
+                desired_target_column_indices
+            ) = _get_target_fields(
                 target_file_name=target_file_name,
                 desired_row_indices=desired_target_row_indices,
                 desired_column_indices=desired_target_column_indices,
+                latitude_limits_deg_n=inner_latitude_limits_deg_n,
+                longitude_limits_deg_e=inner_longitude_limits_deg_e,
                 field_names=target_field_names,
                 norm_param_table_xarray=None,
                 use_quantile_norm=False
@@ -2761,6 +2811,7 @@ def data_generator_fast_patches(option_dict):
                     current_index=gfs_file_index,
                     gfs_file_names=gfs_file_names
                 )
+                print('FOOOOO1')
                 continue
 
             gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
@@ -2898,6 +2949,7 @@ def data_generator_fast_patches(option_dict):
                             current_index=gfs_file_index,
                             gfs_file_names=gfs_file_names
                         )
+                        print('FOOOOO2')
                         continue
 
                 these_matrices = [this_lagged_matrix, this_lead_matrix]
@@ -2952,10 +3004,16 @@ def data_generator_fast_patches(option_dict):
                     numpy.array([model_lead_time_days], dtype=int)
                 )[0]
 
-                full_target_matrix = _get_target_fields(
+                (
+                    full_target_matrix,
+                    desired_target_row_indices,
+                    desired_target_column_indices
+                ) = _get_target_fields(
                     target_file_name=target_file_name,
                     desired_row_indices=desired_target_row_indices,
                     desired_column_indices=desired_target_column_indices,
+                    latitude_limits_deg_n=inner_latitude_limits_deg_n,
+                    longitude_limits_deg_e=inner_longitude_limits_deg_e,
                     field_names=target_field_names,
                     norm_param_table_xarray=None,
                     use_quantile_norm=False
@@ -2996,6 +3054,7 @@ def data_generator_fast_patches(option_dict):
                             current_index=gfs_file_index,
                             gfs_file_names=gfs_file_names
                         )
+                        print('FOOOOO3')
                         continue
 
                     new_target_matrix = new_target_matrix[..., 0, :]
@@ -3143,11 +3202,19 @@ def create_data(
     option_dict[INIT_DATE_LIMITS_KEY] = [init_date_string] * 2
     option_dict[BATCH_SIZE_KEY] = 32
 
-    all_model_leads_days = numpy.array(
-        list(option_dict[MODEL_LEAD_TO_FREQ_KEY].keys()),
-        dtype=int
-    )
-    all_model_leads_days = numpy.unique(all_model_leads_days)
+    try:
+        all_model_leads_days = list(set(
+            this_key[1] for this_key in
+            option_dict[MODEL_LEAD_TO_FREQ_KEY].keys()
+        ))
+        all_model_leads_days = numpy.array(all_model_leads_days, dtype=int)
+    except:
+        all_model_leads_days = numpy.array(
+            list(option_dict[MODEL_LEAD_TO_FREQ_KEY].keys()),
+            dtype=int
+        )
+        all_model_leads_days = numpy.unique(all_model_leads_days)
+
     dummy_frequencies = numpy.full(len(all_model_leads_days), 0.1)
     option_dict[MODEL_LEAD_TO_FREQ_KEY] = dict(
         zip(all_model_leads_days, dummy_frequencies)
@@ -3424,23 +3491,30 @@ def create_data(
         numpy.array([model_lead_time_days], dtype=int)
     )[0]
 
-    target_matrix = _get_target_fields(
+    (
+        target_matrix,
+        desired_target_row_indices,
+        desired_target_column_indices
+    ) = _get_target_fields(
         target_file_name=target_file_name,
         desired_row_indices=desired_target_row_indices,
         desired_column_indices=desired_target_column_indices,
+        latitude_limits_deg_n=inner_latitude_limits_deg_n,
+        longitude_limits_deg_e=inner_longitude_limits_deg_e,
         field_names=target_field_names,
         norm_param_table_xarray=None,
         use_quantile_norm=False
     )
     target_matrix = numpy.expand_dims(target_matrix, axis=0)
 
-    baseline_prediction_matrix = _pad_inner_to_outer_domain(
-        data_matrix=baseline_prediction_matrix,
-        outer_latitude_buffer_deg=outer_latitude_buffer_deg,
-        outer_longitude_buffer_deg=outer_longitude_buffer_deg,
-        is_example_axis_present=True, fill_value=sentinel_value
-    )
-    baseline_prediction_matrix = baseline_prediction_matrix[..., 0, :]
+    if baseline_prediction_matrix is not None:
+        baseline_prediction_matrix = _pad_inner_to_outer_domain(
+            data_matrix=baseline_prediction_matrix,
+            outer_latitude_buffer_deg=outer_latitude_buffer_deg,
+            outer_longitude_buffer_deg=outer_longitude_buffer_deg,
+            is_example_axis_present=True, fill_value=sentinel_value
+        )
+        baseline_prediction_matrix = baseline_prediction_matrix[..., 0, :]
 
     if laglead_target_predictor_matrix is not None:
         laglead_target_predictor_matrix = _pad_inner_to_outer_domain(
@@ -4226,10 +4300,10 @@ def train_model(
     ))
     max_epoch_in_dict = numpy.max(epochs_in_dict)
 
-    model_lead_times_days = numpy.unique(numpy.array(
-        list(training_option_dict[MODEL_LEAD_TO_FREQ_KEY].keys()),
-        dtype=int
+    model_lead_times_days = list(set(
+        this_key[1] for this_key in training_option_dict[MODEL_LEAD_TO_FREQ_KEY]
     ))
+    model_lead_times_days = numpy.array(model_lead_times_days, dtype=int)
 
     for this_epoch in range(initial_epoch, num_epochs):
         epoch_in_dict = min([this_epoch + 1, max_epoch_in_dict])
