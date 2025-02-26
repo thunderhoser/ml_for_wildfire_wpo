@@ -753,8 +753,6 @@ def _check_generator_args(option_dict):
             dtype=float
         )
 
-    print(model_lead_times_days)
-    print(new_lead_times_days)
     assert numpy.array_equal(
         numpy.sort(model_lead_times_days),
         numpy.sort(new_lead_times_days)
@@ -3504,7 +3502,7 @@ def create_data(
         target_matrix,
         desired_target_row_indices,
         desired_target_column_indices
-    )  = _get_target_fields(
+    ) = _get_target_fields(
         target_file_name=target_file_name,
         desired_row_indices=desired_target_row_indices,
         desired_column_indices=desired_target_column_indices,
