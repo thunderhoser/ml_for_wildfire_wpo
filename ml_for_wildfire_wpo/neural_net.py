@@ -730,6 +730,9 @@ def _check_generator_args(option_dict):
         list(model_lead_days_to_freq.keys()),
         dtype=int
     )
+
+    print(model_lead_times_days)
+    print(new_lead_times_days)
     assert numpy.array_equal(
         numpy.sort(model_lead_times_days),
         numpy.sort(new_lead_times_days)
