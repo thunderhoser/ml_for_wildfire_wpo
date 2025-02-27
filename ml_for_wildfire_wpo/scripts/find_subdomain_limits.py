@@ -177,7 +177,6 @@ def _run():
         raw_gfs_io.GRID_LATITUDES_DEG_N[row_indices[-1]],
         raw_gfs_io.GRID_LONGITUDES_POSITIVE_IN_WEST_DEG_E[column_indices[0]],
         raw_gfs_io.GRID_LONGITUDES_POSITIVE_IN_WEST_DEG_E[column_indices[-1]],
-        raw_gfs_io.GRID_LONGITUDES_POSITIVE_IN_WEST_DEG_E[column_indices[-1]],
         len(row_indices),
         len(column_indices)
     ))
@@ -614,6 +613,38 @@ def _run():
     mask_matrix[numpy.ix_(row_indices, column_indices)] = True
 
     output_file_name = '{0:s}/hawaii_mask.nc'.format(OUTPUT_DIR_NAME)
+    print('Writing mask to: "{0:s}"...'.format(output_file_name))
+    region_mask_io.write_file(
+        netcdf_file_name=output_file_name,
+        mask_matrix=mask_matrix,
+        grid_latitudes_deg_n=raw_gfs_io.GRID_LATITUDES_DEG_N,
+        grid_longitudes_deg_e=raw_gfs_io.GRID_LONGITUDES_POSITIVE_IN_WEST_DEG_E
+    )
+
+    row_indices = raw_gfs_io.desired_latitudes_to_rows(
+        start_latitude_deg_n=40.03, end_latitude_deg_n=40.04
+    )
+    row_indices = [row_indices[0]]
+    column_indices = raw_gfs_io.desired_longitudes_to_columns(
+        start_longitude_deg_e=-105.26, end_longitude_deg_e=-105.25
+    )
+    column_indices = [column_indices[-1]]
+    print((
+        'Subdomain limits for Boulder = {0:.2f} to {1:.2f} deg N, '
+        '{2:.2f} to {3:.2f} deg E, {4:d} rows x {5:d} columns'
+    ).format(
+        raw_gfs_io.GRID_LATITUDES_DEG_N[row_indices[0]],
+        raw_gfs_io.GRID_LATITUDES_DEG_N[row_indices[-1]],
+        raw_gfs_io.GRID_LONGITUDES_POSITIVE_IN_WEST_DEG_E[column_indices[0]],
+        raw_gfs_io.GRID_LONGITUDES_POSITIVE_IN_WEST_DEG_E[column_indices[-1]],
+        len(row_indices),
+        len(column_indices)
+    ))
+
+    mask_matrix = numpy.full(gfs_latitude_matrix_deg_n.shape, 0, dtype=bool)
+    mask_matrix[numpy.ix_(row_indices, column_indices)] = True
+
+    output_file_name = '{0:s}/boulder_colorado_mask.nc'.format(OUTPUT_DIR_NAME)
     print('Writing mask to: "{0:s}"...'.format(output_file_name))
     region_mask_io.write_file(
         netcdf_file_name=output_file_name,
