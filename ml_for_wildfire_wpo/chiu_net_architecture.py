@@ -255,7 +255,7 @@ def check_args(option_dict):
         error_checking.assert_is_integer_numpy_array(input_dimensions_gfs_2d)
         error_checking.assert_is_greater_numpy_array(input_dimensions_gfs_2d, 0)
 
-        if input_dimensions_gfs_3d is not None:
+        if num_grid_rows > 0:
             these_dim = numpy.array([
                 num_grid_rows, num_grid_columns, num_gfs_lead_times,
                 input_dimensions_gfs_2d[3]
@@ -279,9 +279,11 @@ def check_args(option_dict):
             input_dimensions_era5_constants, 0
         )
 
-        these_dim = numpy.array([
-            num_grid_rows, num_grid_columns, input_dimensions_era5_constants[2]
-        ], dtype=int)
+        if num_grid_rows > 0:
+            these_dim = numpy.array([
+                num_grid_rows, num_grid_columns,
+                input_dimensions_era5_constants[2]
+            ], dtype=int)
 
         assert numpy.array_equal(input_dimensions_era5_constants, these_dim)
 
@@ -297,10 +299,12 @@ def check_args(option_dict):
             input_dimensions_lagged_target, 0
         )
 
-        these_dim = numpy.array([
-            num_grid_rows, num_grid_columns,
-            input_dimensions_lagged_target[2], input_dimensions_lagged_target[3]
-        ], dtype=int)
+        if num_grid_rows > 0:
+            these_dim = numpy.array([
+                num_grid_rows, num_grid_columns,
+                input_dimensions_lagged_target[2],
+                input_dimensions_lagged_target[3]
+            ], dtype=int)
 
         assert numpy.array_equal(input_dimensions_lagged_target, these_dim)
 
@@ -568,17 +572,16 @@ def create_model(option_dict):
 
         num_gfs_lead_times = input_dimensions_gfs_2d[-2]
 
-    layer_objects_gfs = [layer_object_gfs_3d, layer_object_gfs_2d]
-    layer_objects_gfs = [l for l in layer_objects_gfs if l is not None]
-
-    if len(layer_objects_gfs) > 1:
+    if input_dimensions_gfs_3d is None:
+        layer_object_gfs = layer_object_gfs_2d
+    elif input_dimensions_gfs_2d is None:
+        layer_object_gfs = layer_object_gfs_3d
+    else:
         layer_object_gfs = keras.layers.Concatenate(
             axis=-1, name='gfs_concat-2d-and-3d'
-        )(layer_objects_gfs)
-    elif len(layer_objects_gfs) == 1:
-        layer_object_gfs = layer_objects_gfs[0]
-    else:
-        layer_object_gfs = None
+        )(
+            [layer_object_gfs_3d, layer_object_gfs_2d]
+        )
 
     input_layer_object_lagged_target = keras.layers.Input(
         shape=tuple(input_dimensions_lagged_target.tolist()),
