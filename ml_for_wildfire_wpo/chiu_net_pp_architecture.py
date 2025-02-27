@@ -1417,7 +1417,7 @@ def create_model(option_dict, omit_model_summary=False):
     gfs_encoder_pooling_layer_objects = [None] * num_levels
     loop_max = 0 if layer_object_gfs is None else num_levels + 1
 
-    for i in range(num_levels + 1):
+    for i in range(loop_max):
         if i == 0:
             this_input_layer_object = layer_object_gfs
         else:
