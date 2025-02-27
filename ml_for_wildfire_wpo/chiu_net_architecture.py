@@ -231,10 +231,6 @@ def check_args(option_dict):
     input_dimensions_era5_constants = option_dict[ERA5_CONST_DIMENSIONS_KEY]
     input_dimensions_lagged_target = option_dict[LAGTGT_DIMENSIONS_KEY]
 
-    assert not (
-        input_dimensions_gfs_3d is None and input_dimensions_gfs_2d is None
-    )
-
     num_grid_rows = -1
     num_grid_columns = -1
     num_gfs_lead_times = -1
@@ -572,16 +568,17 @@ def create_model(option_dict):
 
         num_gfs_lead_times = input_dimensions_gfs_2d[-2]
 
-    if input_dimensions_gfs_3d is None:
-        layer_object_gfs = layer_object_gfs_2d
-    elif input_dimensions_gfs_2d is None:
-        layer_object_gfs = layer_object_gfs_3d
-    else:
+    layer_objects_gfs = [layer_object_gfs_3d, layer_object_gfs_2d]
+    layer_objects_gfs = [l for l in layer_objects_gfs if l is not None]
+
+    if len(layer_objects_gfs) > 1:
         layer_object_gfs = keras.layers.Concatenate(
             axis=-1, name='gfs_concat-2d-and-3d'
-        )(
-            [layer_object_gfs_3d, layer_object_gfs_2d]
-        )
+        )(layer_objects_gfs)
+    elif len(layer_objects_gfs) == 1:
+        layer_object_gfs = layer_objects_gfs[0]
+    else:
+        layer_object_gfs = None
 
     input_layer_object_lagged_target = keras.layers.Input(
         shape=tuple(input_dimensions_lagged_target.tolist()),
