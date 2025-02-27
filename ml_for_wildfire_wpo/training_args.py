@@ -290,7 +290,7 @@ def add_input_args(parser_object):
     )
     parser_object.add_argument(
         '--' + GFS_PREDICTORS_ARG_NAME, type=str, nargs='+',
-        required=True, help=GFS_PREDICTORS_HELP_STRING
+        required=False, default=[''], help=GFS_PREDICTORS_HELP_STRING
     )
     parser_object.add_argument(
         '--' + GFS_PRESSURE_LEVELS_ARG_NAME, type=int, nargs='+',
@@ -310,7 +310,7 @@ def add_input_args(parser_object):
     )
     parser_object.add_argument(
         '--' + GFS_PREDICTOR_LEADS_ARG_NAME, type=int, nargs='+',
-        required=True, help=GFS_PREDICTOR_LEADS_HELP_STRING
+        required=False, default=[-1], help=GFS_PREDICTOR_LEADS_HELP_STRING
     )
     parser_object.add_argument(
         '--' + GFS_NORM_FILE_ARG_NAME, type=str,

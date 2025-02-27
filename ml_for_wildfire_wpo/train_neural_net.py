@@ -99,6 +99,18 @@ def _run(template_file_name, output_dir_name,
         str(curriculum_start_epoch_by_model_lead)
     ))
 
+    if (
+            len(gfs_predictor_field_names) == 1
+            and gfs_predictor_field_names[0] == ''
+    ):
+        gfs_predictor_field_names = None
+
+    if (
+            len(gfs_pred_leads_hours_by_model_lead) == 1
+            and gfs_pred_leads_hours_by_model_lead[0] < 0
+    ):
+        gfs_pred_leads_hours_by_model_lead = None
+
     if len(gfs_pressure_levels_mb) == 1 and gfs_pressure_levels_mb[0] <= 0:
         gfs_pressure_levels_mb = None
     if gfs_normalization_file_name == '':

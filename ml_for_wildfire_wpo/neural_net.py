@@ -452,20 +452,24 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
         -1 * outer_longitude_buffer_deg, outer_longitude_buffer_deg
     ])
 
-    this_3d_matrix, this_2d_matrix = _read_gfs_data_1example(
-        gfs_file_name=gfs_file_names[0],
-        desired_row_indices=None,
-        desired_column_indices=None,
-        latitude_limits_deg_n=outer_latitude_limits_deg_n,
-        longitude_limits_deg_e=outer_longitude_limits_deg_e,
-        lead_times_hours=
-        model_lead_days_to_gfs_pred_leads_hours[model_lead_times_days[0]],
-        field_names=gfs_predictor_field_names,
-        pressure_levels_mb=gfs_pressure_levels_mb,
-        norm_param_table_xarray=None,
-        use_quantile_norm=False,
-        num_lead_times_for_interp=num_gfs_hours_for_interp
-    )[:2]
+    if len(gfs_predictor_field_names) == 0:
+        this_3d_matrix = None
+        this_2d_matrix = None
+    else:
+        this_3d_matrix, this_2d_matrix = _read_gfs_data_1example(
+            gfs_file_name=gfs_file_names[0],
+            desired_row_indices=None,
+            desired_column_indices=None,
+            latitude_limits_deg_n=outer_latitude_limits_deg_n,
+            longitude_limits_deg_e=outer_longitude_limits_deg_e,
+            lead_times_hours=
+            model_lead_days_to_gfs_pred_leads_hours[model_lead_times_days[0]],
+            field_names=gfs_predictor_field_names,
+            pressure_levels_mb=gfs_pressure_levels_mb,
+            norm_param_table_xarray=None,
+            use_quantile_norm=False,
+            num_lead_times_for_interp=num_gfs_hours_for_interp
+        )[:2]
 
     bs = num_examples_per_batch
     psp = patch_size_pixels
@@ -604,120 +608,183 @@ def _check_generator_args(option_dict):
     option_dict = DEFAULT_GENERATOR_OPTION_DICT.copy()
     option_dict.update(orig_option_dict)
 
+    # Check coordinates.
+    inner_latitude_limits_deg_n = option_dict[INNER_LATITUDE_LIMITS_KEY]
+    inner_longitude_limits_deg_e = option_dict[INNER_LONGITUDE_LIMITS_KEY]
+    outer_latitude_buffer_deg = option_dict[OUTER_LATITUDE_BUFFER_KEY]
+    outer_longitude_buffer_deg = option_dict[OUTER_LONGITUDE_BUFFER_KEY]
+
     error_checking.assert_is_numpy_array(
-        option_dict[INNER_LATITUDE_LIMITS_KEY],
+        inner_latitude_limits_deg_n,
         exact_dimensions=numpy.array([2], dtype=int)
     )
     error_checking.assert_is_valid_lat_numpy_array(
-        option_dict[INNER_LATITUDE_LIMITS_KEY], allow_nan=False
+        inner_latitude_limits_deg_n, allow_nan=False
     )
     error_checking.assert_is_greater_numpy_array(
-        numpy.diff(option_dict[INNER_LATITUDE_LIMITS_KEY]),
+        numpy.diff(inner_latitude_limits_deg_n),
         0
     )
 
     error_checking.assert_is_numpy_array(
-        option_dict[INNER_LONGITUDE_LIMITS_KEY],
+        inner_longitude_limits_deg_e,
         exact_dimensions=numpy.array([2], dtype=int)
     )
     error_checking.assert_is_valid_lng_numpy_array(
-        option_dict[INNER_LONGITUDE_LIMITS_KEY],
+        inner_longitude_limits_deg_e,
         positive_in_west_flag=False, negative_in_west_flag=False,
         allow_nan=False
     )
     error_checking.assert_is_greater_numpy_array(
-        numpy.absolute(numpy.diff(option_dict[INNER_LONGITUDE_LIMITS_KEY])),
+        numpy.absolute(numpy.diff(inner_longitude_limits_deg_e)),
         0
     )
 
-    error_checking.assert_is_greater(option_dict[OUTER_LATITUDE_BUFFER_KEY], 0)
-    option_dict[OUTER_LATITUDE_BUFFER_KEY] = number_rounding.round_to_nearest(
-        option_dict[OUTER_LATITUDE_BUFFER_KEY], GRID_SPACING_DEG
+    error_checking.assert_is_greater(outer_latitude_buffer_deg, 0)
+    outer_latitude_buffer_deg = number_rounding.round_to_nearest(
+        outer_latitude_buffer_deg, GRID_SPACING_DEG
     )
 
-    outer_latitude_limits_deg_n = option_dict[INNER_LATITUDE_LIMITS_KEY] + (
-        numpy.array([
-            -1 * option_dict[OUTER_LATITUDE_BUFFER_KEY],
-            option_dict[OUTER_LATITUDE_BUFFER_KEY]
-        ])
+    outer_latitude_limits_deg_n = (
+        inner_latitude_limits_deg_n +
+        numpy.array([-1, 1.]) * outer_latitude_buffer_deg
     )
     error_checking.assert_is_valid_lat_numpy_array(outer_latitude_limits_deg_n)
 
-    error_checking.assert_is_greater(option_dict[OUTER_LONGITUDE_BUFFER_KEY], 0)
-    option_dict[OUTER_LONGITUDE_BUFFER_KEY] = number_rounding.round_to_nearest(
-        option_dict[OUTER_LONGITUDE_BUFFER_KEY], GRID_SPACING_DEG
+    error_checking.assert_is_greater(outer_longitude_buffer_deg, 0)
+    outer_longitude_buffer_deg = number_rounding.round_to_nearest(
+        outer_longitude_buffer_deg, GRID_SPACING_DEG
     )
 
-    error_checking.assert_is_string_list(option_dict[INIT_DATE_LIMITS_KEY])
+    option_dict[OUTER_LATITUDE_BUFFER_KEY] = outer_latitude_buffer_deg
+
+    # Check time period.
+    init_date_limit_strings = option_dict[INIT_DATE_LIMITS_KEY]
+    error_checking.assert_is_string_list(init_date_limit_strings)
     init_dates_unix_sec = numpy.array([
         time_conversion.string_to_unix_sec(t, DATE_FORMAT)
-        for t in option_dict[INIT_DATE_LIMITS_KEY]
+        for t in init_date_limit_strings
     ], dtype=int)
     error_checking.assert_is_greater_numpy_array(init_dates_unix_sec, 0)
 
-    error_checking.assert_is_string_list(option_dict[GFS_PREDICTOR_FIELDS_KEY])
-    for this_field_name in option_dict[GFS_PREDICTOR_FIELDS_KEY]:
+    # Check basic GFS predictors and lagged-target predictors.
+    gfs_directory_name = option_dict[GFS_DIRECTORY_KEY]
+    gfs_norm_file_name = option_dict[GFS_NORM_FILE_KEY]
+    gfs_use_quantile_norm = option_dict[GFS_USE_QUANTILE_NORM_KEY]
+    compare_to_gfs_in_loss = option_dict[COMPARE_TO_GFS_IN_LOSS_KEY]
+
+    error_checking.assert_directory_exists(gfs_directory_name)
+    if gfs_norm_file_name is None:
+        gfs_use_quantile_norm = False
+    else:
+        error_checking.assert_file_exists(gfs_norm_file_name)
+        error_checking.assert_is_boolean(gfs_use_quantile_norm)
+
+    error_checking.assert_is_boolean(compare_to_gfs_in_loss)
+
+    gfs_predictor_field_names = option_dict[GFS_PREDICTOR_FIELDS_KEY]
+    gfs_pressure_levels_mb = option_dict[GFS_PRESSURE_LEVELS_KEY]
+
+    if gfs_predictor_field_names is None:
+        gfs_predictor_field_names = []
+
+    use_basic_gfs = len(gfs_predictor_field_names) > 0
+
+    error_checking.assert_is_string_list(gfs_predictor_field_names)
+    for this_field_name in gfs_predictor_field_names:
         gfs_utils.check_field_name(this_field_name)
 
-    if any([
-            f in gfs_utils.ALL_3D_FIELD_NAMES
-            for f in option_dict[GFS_PREDICTOR_FIELDS_KEY]
-    ]):
-        assert option_dict[GFS_PRESSURE_LEVELS_KEY] is not None
+    use_3d_gfs = any([
+        f in gfs_utils.ALL_3D_FIELD_NAMES for f in gfs_predictor_field_names
+    ])
+
+    if use_3d_gfs:
+        error_checking.assert_is_numpy_array(
+            gfs_pressure_levels_mb, num_dimensions=1
+        )
+        error_checking.assert_is_integer_numpy_array(gfs_pressure_levels_mb)
+        error_checking.assert_is_greater_numpy_array(gfs_pressure_levels_mb, 0)
     else:
-        option_dict[GFS_PRESSURE_LEVELS_KEY] = None
+        gfs_pressure_levels_mb = None
 
-    if option_dict[GFS_PRESSURE_LEVELS_KEY] is not None:
-        error_checking.assert_is_numpy_array(
-            option_dict[GFS_PRESSURE_LEVELS_KEY], num_dimensions=1
+    model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
+
+    try:
+        model_lead_times_days = list(set(
+            this_key[1] for this_key in model_lead_days_to_freq.keys()
+        ))
+        model_lead_times_days = numpy.array(model_lead_times_days, dtype=int)
+        model_lead_time_freqs = numpy.array(
+            [model_lead_days_to_freq[1, d] for d in model_lead_times_days],
+            dtype=float
         )
-        error_checking.assert_is_integer_numpy_array(
-            option_dict[GFS_PRESSURE_LEVELS_KEY]
+    except:
+        model_lead_times_days = numpy.array(
+            list(model_lead_days_to_freq.keys()),
+            dtype=int
         )
-        error_checking.assert_is_greater_numpy_array(
-            option_dict[GFS_PRESSURE_LEVELS_KEY], 0
+        model_lead_times_days = numpy.sort(model_lead_times_days)
+        model_lead_time_freqs = numpy.array(
+            [model_lead_days_to_freq[d] for d in model_lead_times_days],
+            dtype=float
         )
 
-    model_lead_days_to_gfs_pred_leads_hours = option_dict[
-        MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
-    ]
-    model_lead_times_days = numpy.array(
-        list(model_lead_days_to_gfs_pred_leads_hours.keys()),
-        dtype=int
+    error_checking.assert_is_geq_numpy_array(model_lead_time_freqs, 0.)
+    error_checking.assert_is_leq_numpy_array(model_lead_time_freqs, 1.)
+    model_lead_time_freqs = (
+        model_lead_time_freqs / numpy.sum(model_lead_time_freqs)
     )
 
-    error_checking.assert_is_integer_numpy_array(model_lead_times_days)
-    error_checking.assert_is_greater_numpy_array(model_lead_times_days, 0)
-    error_checking.assert_equals(
-        len(model_lead_times_days),
-        len(numpy.unique(model_lead_times_days))
-    )
-
-    for d in model_lead_times_days:
-        these_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[d]
-
-        error_checking.assert_is_numpy_array(
-            these_pred_lead_times_hours, num_dimensions=1
-        )
-        error_checking.assert_is_integer_numpy_array(
-            these_pred_lead_times_hours
-        )
-        error_checking.assert_is_geq_numpy_array(these_pred_lead_times_hours, 0)
-
-        these_pred_lead_times_hours = numpy.sort(these_pred_lead_times_hours)
-        model_lead_days_to_gfs_pred_leads_hours[d] = these_pred_lead_times_hours
-
-    if option_dict[MODEL_LEAD_TO_TARGET_LAGS_KEY] is not None:
-        model_lead_days_to_target_lags_days = option_dict[
-            MODEL_LEAD_TO_TARGET_LAGS_KEY
+    if use_basic_gfs:
+        model_lead_days_to_gfs_pred_leads_hours = option_dict[
+            MODEL_LEAD_TO_GFS_PRED_LEADS_KEY
         ]
+        new_lead_times_days = numpy.array(
+            list(model_lead_days_to_gfs_pred_leads_hours.keys()),
+            dtype=int
+        )
+        new_lead_times_days = numpy.sort(new_lead_times_days)
+        error_checking.assert_equals_numpy_array(
+            new_lead_times_days, model_lead_times_days
+        )
+
+        for d in model_lead_times_days:
+            these_pred_lead_times_hours = (
+                model_lead_days_to_gfs_pred_leads_hours[d]
+            )
+
+            error_checking.assert_is_numpy_array(
+                these_pred_lead_times_hours, num_dimensions=1
+            )
+            error_checking.assert_is_integer_numpy_array(
+                these_pred_lead_times_hours
+            )
+            error_checking.assert_is_geq_numpy_array(
+                these_pred_lead_times_hours, 0
+            )
+
+            these_pred_lead_times_hours = numpy.sort(
+                these_pred_lead_times_hours
+            )
+            model_lead_days_to_gfs_pred_leads_hours[d] = (
+                these_pred_lead_times_hours
+            )
+    else:
+        model_lead_days_to_gfs_pred_leads_hours = None
+
+    model_lead_days_to_target_lags_days = option_dict[
+        MODEL_LEAD_TO_TARGET_LAGS_KEY
+    ]
+    use_lagged_targets = model_lead_days_to_target_lags_days is not None
+
+    if use_lagged_targets:
         new_lead_times_days = numpy.array(
             list(model_lead_days_to_target_lags_days.keys()),
             dtype=int
         )
-        assert numpy.array_equal(
-            numpy.sort(model_lead_times_days),
-            numpy.sort(new_lead_times_days)
+        new_lead_times_days = numpy.sort(new_lead_times_days)
+        error_checking.assert_equals_numpy_array(
+            new_lead_times_days, model_lead_times_days
         )
 
         for d in model_lead_times_days:
@@ -727,90 +794,91 @@ def _check_generator_args(option_dict):
                 these_lag_times_days, num_dimensions=1
             )
             error_checking.assert_is_integer_numpy_array(these_lag_times_days)
-            error_checking.assert_is_greater_numpy_array(these_lag_times_days, 0)
+            error_checking.assert_is_greater_numpy_array(
+                these_lag_times_days, 0
+            )
 
             these_lag_times_days = numpy.sort(these_lag_times_days)[::-1]
             model_lead_days_to_target_lags_days[d] = these_lag_times_days
 
-    model_lead_days_to_freq = option_dict[MODEL_LEAD_TO_FREQ_KEY]
-
-    try:
-        new_lead_times_days = list(set(
-            this_key[1] for this_key in model_lead_days_to_freq.keys()
-        ))
-        new_lead_times_days = numpy.array(new_lead_times_days, dtype=int)
-        model_lead_time_freqs = numpy.array(
-            [model_lead_days_to_freq[1, d] for d in model_lead_times_days],
-            dtype=float
-        )
-    except:
-        new_lead_times_days = numpy.array(
-            list(model_lead_days_to_freq.keys()),
-            dtype=int
-        )
-        model_lead_time_freqs = numpy.array(
-            [model_lead_days_to_freq[d] for d in model_lead_times_days],
-            dtype=float
-        )
-
-    assert numpy.array_equal(
-        numpy.sort(model_lead_times_days),
-        numpy.sort(new_lead_times_days)
+    option_dict[GFS_USE_QUANTILE_NORM_KEY] = gfs_use_quantile_norm
+    option_dict[GFS_PREDICTOR_FIELDS_KEY] = gfs_predictor_field_names
+    option_dict[GFS_PRESSURE_LEVELS_KEY] = gfs_pressure_levels_mb
+    option_dict[MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = (
+        model_lead_days_to_gfs_pred_leads_hours
     )
-
-    error_checking.assert_is_geq_numpy_array(model_lead_time_freqs, 0.)
-    error_checking.assert_is_leq_numpy_array(model_lead_time_freqs, 1.)
-    model_lead_time_freqs = (
-        model_lead_time_freqs / numpy.sum(model_lead_time_freqs)
+    option_dict[MODEL_LEAD_TO_TARGET_LAGS_KEY] = (
+        model_lead_days_to_target_lags_days
     )
-
     option_dict[MODEL_LEAD_TO_FREQ_KEY] = dict(zip(
         model_lead_times_days, model_lead_time_freqs
     ))
 
-    error_checking.assert_is_boolean(option_dict[COMPARE_TO_GFS_IN_LOSS_KEY])
+    # Check ERA5 predictors.
+    era5_constant_field_names = option_dict[ERA5_CONSTANT_PREDICTOR_FIELDS_KEY]
+    era5_constant_file_name = option_dict[ERA5_CONSTANT_FILE_KEY]
+    era5_norm_file_name = option_dict[ERA5_NORM_FILE_KEY]
+    era5_use_quantile_norm = option_dict[ERA5_USE_QUANTILE_NORM_KEY]
 
-    error_checking.assert_directory_exists(option_dict[GFS_DIRECTORY_KEY])
-    if option_dict[GFS_NORM_FILE_KEY] is None:
-        option_dict[GFS_USE_QUANTILE_NORM_KEY] = False
+    if era5_constant_field_names is None:
+        era5_constant_field_names = []
+
+    use_era5_const = (
+        len(era5_constant_field_names) > 0
+        and era5_constant_file_name is not None
+    )
+
+    error_checking.assert_is_string_list(era5_constant_field_names)
+    for this_field_name in era5_constant_field_names:
+        era5_constant_utils.check_field_name(this_field_name)
+
+    if use_era5_const:
+        error_checking.assert_file_exists(era5_constant_file_name)
+
+    if era5_norm_file_name is None:
+        era5_use_quantile_norm = False
     else:
-        error_checking.assert_file_exists(option_dict[GFS_NORM_FILE_KEY])
-        error_checking.assert_is_boolean(option_dict[GFS_USE_QUANTILE_NORM_KEY])
+        error_checking.assert_file_exists(era5_norm_file_name)
+        error_checking.assert_is_boolean(era5_use_quantile_norm)
 
-    if option_dict[ERA5_CONSTANT_PREDICTOR_FIELDS_KEY] is not None:
-        error_checking.assert_is_string_list(
-            option_dict[ERA5_CONSTANT_PREDICTOR_FIELDS_KEY]
-        )
-        for this_field_name in option_dict[ERA5_CONSTANT_PREDICTOR_FIELDS_KEY]:
-            era5_constant_utils.check_field_name(this_field_name)
+    option_dict[ERA5_CONSTANT_PREDICTOR_FIELDS_KEY] = era5_constant_field_names
+    option_dict[ERA5_CONSTANT_FILE_KEY] = era5_constant_file_name
+    option_dict[ERA5_NORM_FILE_KEY] = era5_norm_file_name
+    option_dict[ERA5_USE_QUANTILE_NORM_KEY] = era5_use_quantile_norm
 
-    if option_dict[ERA5_CONSTANT_FILE_KEY] is not None:
-        error_checking.assert_file_exists(option_dict[ERA5_CONSTANT_FILE_KEY])
-    if option_dict[ERA5_NORM_FILE_KEY] is None:
-        option_dict[ERA5_USE_QUANTILE_NORM_KEY] = False
-    else:
-        error_checking.assert_file_exists(option_dict[ERA5_NORM_FILE_KEY])
-        error_checking.assert_is_boolean(
-            option_dict[ERA5_USE_QUANTILE_NORM_KEY]
-        )
+    # Check target fields.
+    target_field_names = option_dict[TARGET_FIELDS_KEY]
+    target_dir_name = option_dict[TARGET_DIRECTORY_KEY]
+    target_norm_file_name = option_dict[TARGET_NORM_FILE_KEY]
+    targets_use_quantile_norm = option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
 
-    error_checking.assert_is_string_list(option_dict[TARGET_FIELDS_KEY])
-    for this_field_name in option_dict[TARGET_FIELDS_KEY]:
+    error_checking.assert_is_string_list(target_field_names)
+    for this_field_name in target_field_names:
         canadian_fwi_utils.check_field_name(this_field_name)
 
-    if option_dict[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] is not None:
-        assert option_dict[GFS_FORECAST_TARGET_DIR_KEY] is not None
+    error_checking.assert_directory_exists(target_dir_name)
 
-        model_lead_days_to_gfs_target_leads_days = option_dict[
-            MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
-        ]
-        new_lead_times_days = numpy.array(
-            list(model_lead_days_to_gfs_target_leads_days.keys()),
-            dtype=int
-        )
-        assert numpy.array_equal(
-            numpy.sort(model_lead_times_days),
-            numpy.sort(new_lead_times_days)
+    if target_norm_file_name is None:
+        targets_use_quantile_norm = False
+    else:
+        error_checking.assert_file_exists(target_norm_file_name)
+        error_checking.assert_is_boolean(targets_use_quantile_norm)
+
+    model_lead_days_to_gfs_target_leads_days = option_dict[
+        MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
+    ]
+    gfs_forecast_target_dir_name = option_dict[GFS_FORECAST_TARGET_DIR_KEY]
+
+    use_gfs_forecast_targets = (
+        model_lead_days_to_gfs_target_leads_days is not None
+        and gfs_forecast_target_dir_name is not None
+    )
+
+    if use_gfs_forecast_targets:
+        error_checking.assert_directory_exists(gfs_forecast_target_dir_name)
+        new_lead_times_days = numpy.sort(new_lead_times_days)
+        error_checking.assert_equals_numpy_array(
+            new_lead_times_days, model_lead_times_days
         )
 
         for d in model_lead_times_days:
@@ -835,62 +903,52 @@ def _check_generator_args(option_dict):
                 these_target_lead_times_days
             )
 
-    if option_dict[GFS_FORECAST_TARGET_DIR_KEY] is not None:
-        error_checking.assert_directory_exists(
-            option_dict[GFS_FORECAST_TARGET_DIR_KEY]
-        )
+    option_dict[TARGET_DIRECTORY_KEY] = target_dir_name
+    option_dict[TARGET_NORM_FILE_KEY] = target_norm_file_name
+    option_dict[TARGETS_USE_QUANTILE_NORM_KEY] = targets_use_quantile_norm
+    option_dict[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = (
+        model_lead_days_to_gfs_target_leads_days
+    )
 
-    error_checking.assert_directory_exists(option_dict[TARGET_DIRECTORY_KEY])
-    if option_dict[TARGET_NORM_FILE_KEY] is None:
-        option_dict[TARGETS_USE_QUANTILE_NORM_KEY] = False
-    else:
-        error_checking.assert_file_exists(
-            option_dict[TARGET_NORM_FILE_KEY]
-        )
-        error_checking.assert_is_boolean(
-            option_dict[TARGETS_USE_QUANTILE_NORM_KEY]
-        )
-
+    # Check other stuff.
     error_checking.assert_is_integer(option_dict[BATCH_SIZE_KEY])
     error_checking.assert_is_geq(option_dict[BATCH_SIZE_KEY], 1)
     # error_checking.assert_is_not_nan(option_dict[SENTINEL_VALUE_KEY])
     error_checking.assert_is_boolean(option_dict[DO_RESIDUAL_PREDICTION_KEY])
     error_checking.assert_is_boolean(option_dict[USE_LEAD_TIME_AS_PRED_KEY])
 
-    if option_dict[CHANGE_LEAD_EVERY_N_BATCHES_KEY] is not None:
-        error_checking.assert_is_integer(
-            option_dict[CHANGE_LEAD_EVERY_N_BATCHES_KEY]
-        )
-        error_checking.assert_is_greater(
-            option_dict[CHANGE_LEAD_EVERY_N_BATCHES_KEY], 0
-        )
+    change_lead_every_n_batches = option_dict[CHANGE_LEAD_EVERY_N_BATCHES_KEY]
+    if change_lead_every_n_batches is not None:
+        error_checking.assert_is_integer(change_lead_every_n_batches)
+        error_checking.assert_is_greater(change_lead_every_n_batches, 0)
 
     if option_dict[OUTER_PATCH_SIZE_DEG_KEY] is None:
         option_dict[OUTER_PATCH_OVERLAP_DEG_KEY] = None
         return option_dict
 
-    option_dict[OUTER_PATCH_SIZE_DEG_KEY] = number_rounding.round_to_nearest(
-        option_dict[OUTER_PATCH_SIZE_DEG_KEY], GRID_SPACING_DEG
+    outer_patch_size_deg = option_dict[OUTER_PATCH_SIZE_DEG_KEY]
+    outer_patch_overlap_deg = option_dict[OUTER_PATCH_OVERLAP_DEG_KEY]
+
+    outer_patch_size_deg = number_rounding.round_to_nearest(
+        outer_patch_size_deg, GRID_SPACING_DEG
     )
     error_checking.assert_is_greater(
-        option_dict[OUTER_PATCH_SIZE_DEG_KEY],
-        option_dict[OUTER_LATITUDE_BUFFER_KEY]
+        outer_patch_size_deg, 2 * outer_latitude_buffer_deg
     )
     error_checking.assert_is_greater(
-        option_dict[OUTER_PATCH_SIZE_DEG_KEY],
-        option_dict[OUTER_LONGITUDE_BUFFER_KEY]
+        outer_patch_size_deg, 2 * outer_longitude_buffer_deg
     )
 
-    option_dict[OUTER_PATCH_OVERLAP_DEG_KEY] = number_rounding.round_to_nearest(
-        option_dict[OUTER_PATCH_OVERLAP_DEG_KEY], GRID_SPACING_DEG
+    outer_patch_overlap_deg = number_rounding.round_to_nearest(
+        outer_patch_overlap_deg, GRID_SPACING_DEG
     )
-    error_checking.assert_is_greater(
-        option_dict[OUTER_PATCH_OVERLAP_DEG_KEY], 0.
-    )
+    error_checking.assert_is_greater(outer_patch_overlap_deg, 0.)
     error_checking.assert_is_less_than(
-        option_dict[OUTER_PATCH_OVERLAP_DEG_KEY],
-        option_dict[OUTER_PATCH_SIZE_DEG_KEY]
+        outer_patch_overlap_deg, 0.5 * outer_patch_size_deg
     )
+
+    option_dict[OUTER_PATCH_SIZE_DEG_KEY] = outer_patch_size_deg
+    option_dict[OUTER_PATCH_OVERLAP_DEG_KEY] = outer_patch_overlap_deg
 
     return option_dict
 
@@ -918,15 +976,32 @@ def _determine_num_times_for_interp(generator_option_dict):
     model_lead_days_to_gfs_target_leads_days = generator_option_dict[
         MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY
     ]
-    model_lead_times_days = numpy.array(
-        list(model_lead_days_to_gfs_pred_leads_hours.keys()),
-        dtype=int
-    )
 
-    num_gfs_hours_by_model_lead = numpy.array([
-        len(model_lead_days_to_gfs_pred_leads_hours[l])
-        for l in model_lead_times_days
-    ], dtype=int)
+    if model_lead_days_to_gfs_pred_leads_hours is not None:
+        model_lead_times_days = numpy.array(
+            list(model_lead_days_to_gfs_pred_leads_hours.keys()),
+            dtype=int
+        )
+    elif model_lead_days_to_target_lags_days is not None:
+        model_lead_times_days = numpy.array(
+            list(model_lead_days_to_target_lags_days.keys()),
+            dtype=int
+        )
+    elif model_lead_days_to_gfs_target_leads_days is not None:
+        model_lead_times_days = numpy.array(
+            list(model_lead_days_to_gfs_target_leads_days.keys()),
+            dtype=int
+        )
+
+    if model_lead_days_to_gfs_pred_leads_hours is None:
+        num_gfs_hours_by_model_lead = numpy.full(
+            len(model_lead_times_days), 0, dtype=int
+        )
+    else:
+        num_gfs_hours_by_model_lead = numpy.array([
+            len(model_lead_days_to_gfs_pred_leads_hours[l])
+            for l in model_lead_times_days
+        ], dtype=int)
 
     if len(numpy.unique(num_gfs_hours_by_model_lead)) == 1:
         num_gfs_hours_for_interp = None
@@ -2289,9 +2364,12 @@ def data_generator(option_dict):
                     model_lead_times_days, weights=model_lead_time_freqs, k=1
                 )[0]
 
-            gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
-                model_lead_time_days
-            ]
+            if model_lead_days_to_gfs_pred_leads_hours is None:
+                gfs_pred_lead_times_hours = numpy.array([], dtype=int)
+            else:
+                gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
+                    model_lead_time_days
+                ]
 
             if model_lead_days_to_target_lags_days is None:
                 target_lag_times_days = numpy.array([], dtype=int)
@@ -2314,22 +2392,26 @@ def data_generator(option_dict):
             else:
                 lead_time_predictors_days = None
 
-            (
-                this_gfs_predictor_matrix_3d, this_gfs_predictor_matrix_2d,
-                desired_gfs_row_indices, desired_gfs_column_indices
-            ) = _read_gfs_data_1example(
-                gfs_file_name=gfs_file_names[gfs_file_index],
-                desired_row_indices=desired_gfs_row_indices,
-                desired_column_indices=desired_gfs_column_indices,
-                latitude_limits_deg_n=outer_latitude_limits_deg_n,
-                longitude_limits_deg_e=outer_longitude_limits_deg_e,
-                lead_times_hours=gfs_pred_lead_times_hours,
-                field_names=gfs_predictor_field_names,
-                pressure_levels_mb=gfs_pressure_levels_mb,
-                norm_param_table_xarray=gfs_norm_param_table_xarray,
-                use_quantile_norm=gfs_use_quantile_norm,
-                num_lead_times_for_interp=num_gfs_hours_for_interp
-            )
+            if len(gfs_predictor_field_names) > 0:
+                (
+                    this_gfs_predictor_matrix_3d, this_gfs_predictor_matrix_2d,
+                    desired_gfs_row_indices, desired_gfs_column_indices
+                ) = _read_gfs_data_1example(
+                    gfs_file_name=gfs_file_names[gfs_file_index],
+                    desired_row_indices=desired_gfs_row_indices,
+                    desired_column_indices=desired_gfs_column_indices,
+                    latitude_limits_deg_n=outer_latitude_limits_deg_n,
+                    longitude_limits_deg_e=outer_longitude_limits_deg_e,
+                    lead_times_hours=gfs_pred_lead_times_hours,
+                    field_names=gfs_predictor_field_names,
+                    pressure_levels_mb=gfs_pressure_levels_mb,
+                    norm_param_table_xarray=gfs_norm_param_table_xarray,
+                    use_quantile_norm=gfs_use_quantile_norm,
+                    num_lead_times_for_interp=num_gfs_hours_for_interp
+                )
+            else:
+                this_gfs_predictor_matrix_3d = None
+                this_gfs_predictor_matrix_2d = None
 
             if this_gfs_predictor_matrix_3d is not None:
                 if gfs_predictor_matrix_3d is None:
@@ -2818,12 +2900,14 @@ def data_generator_fast_patches(option_dict):
                     current_index=gfs_file_index,
                     gfs_file_names=gfs_file_names
                 )
-                print('FOOOOO1')
                 continue
 
-            gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
-                model_lead_time_days
-            ]
+            if model_lead_days_to_gfs_pred_leads_hours is None:
+                gfs_pred_lead_times_hours = numpy.array([], dtype=int)
+            else:
+                gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
+                    model_lead_time_days
+                ]
 
             if model_lead_days_to_target_lags_days is None:
                 target_lag_times_days = numpy.array([], dtype=int)
@@ -2846,10 +2930,13 @@ def data_generator_fast_patches(option_dict):
             else:
                 lead_time_predictors_days = None
 
-            if (
-                    full_gfs_predictor_matrix_3d is None
-                    and full_gfs_predictor_matrix_2d is None
-            ):
+            need_basic_gfs = (
+                len(gfs_predictor_field_names) > 0
+                and full_gfs_predictor_matrix_3d is None
+                and full_gfs_predictor_matrix_2d is None
+            )
+
+            if need_basic_gfs:
                 (
                     full_gfs_predictor_matrix_3d, full_gfs_predictor_matrix_2d,
                     desired_gfs_row_indices, desired_gfs_column_indices
@@ -2956,7 +3043,6 @@ def data_generator_fast_patches(option_dict):
                             current_index=gfs_file_index,
                             gfs_file_names=gfs_file_names
                         )
-                        print('FOOOOO2')
                         continue
 
                 these_matrices = [this_lagged_matrix, this_lead_matrix]
@@ -3061,7 +3147,6 @@ def data_generator_fast_patches(option_dict):
                             current_index=gfs_file_index,
                             gfs_file_names=gfs_file_names
                         )
-                        print('FOOOOO3')
                         continue
 
                     new_target_matrix = new_target_matrix[..., 0, :]
@@ -3266,9 +3351,12 @@ def create_data(
         _determine_num_times_for_interp(option_dict)
     )
 
-    gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
-        model_lead_time_days
-    ]
+    if model_lead_days_to_gfs_pred_leads_hours is None:
+        gfs_pred_lead_times_hours = numpy.array([], dtype=int)
+    else:
+        gfs_pred_lead_times_hours = model_lead_days_to_gfs_pred_leads_hours[
+            model_lead_time_days
+        ]
 
     if model_lead_days_to_target_lags_days is None:
         target_lag_times_days = numpy.array([], dtype=int)
@@ -3363,24 +3451,47 @@ def create_data(
         raise_error_if_missing=True
     )
 
-    (
-        gfs_predictor_matrix_3d,
-        gfs_predictor_matrix_2d,
-        desired_gfs_row_indices,
-        desired_gfs_column_indices
-    ) = _read_gfs_data_1example(
-        gfs_file_name=gfs_file_name,
-        desired_row_indices=None,
-        desired_column_indices=None,
-        latitude_limits_deg_n=outer_latitude_limits_deg_n,
-        longitude_limits_deg_e=outer_longitude_limits_deg_e,
-        lead_times_hours=gfs_pred_lead_times_hours,
-        field_names=gfs_predictor_field_names,
-        pressure_levels_mb=gfs_pressure_levels_mb,
-        norm_param_table_xarray=gfs_norm_param_table_xarray,
-        use_quantile_norm=gfs_use_quantile_norm,
-        num_lead_times_for_interp=num_gfs_hours_for_interp
-    )
+    need_basic_gfs = len(gfs_predictor_field_names) > 0
+
+    if need_basic_gfs:
+        (
+            gfs_predictor_matrix_3d,
+            gfs_predictor_matrix_2d,
+            desired_gfs_row_indices,
+            desired_gfs_column_indices
+        ) = _read_gfs_data_1example(
+            gfs_file_name=gfs_file_name,
+            desired_row_indices=None,
+            desired_column_indices=None,
+            latitude_limits_deg_n=outer_latitude_limits_deg_n,
+            longitude_limits_deg_e=outer_longitude_limits_deg_e,
+            lead_times_hours=gfs_pred_lead_times_hours,
+            field_names=gfs_predictor_field_names,
+            pressure_levels_mb=gfs_pressure_levels_mb,
+            norm_param_table_xarray=gfs_norm_param_table_xarray,
+            use_quantile_norm=gfs_use_quantile_norm,
+            num_lead_times_for_interp=num_gfs_hours_for_interp
+        )
+    else:
+        gfs_predictor_matrix_3d = None
+        gfs_predictor_matrix_2d = None
+
+        gfs_table_xarray = gfs_io.read_file(gfs_file_name)
+
+        desired_gfs_row_indices = misc_utils.desired_latitudes_to_rows(
+            grid_latitudes_deg_n=
+            gfs_table_xarray.coords[gfs_utils.LATITUDE_DIM].values,
+            start_latitude_deg_n=outer_latitude_limits_deg_n[0],
+            end_latitude_deg_n=outer_latitude_limits_deg_n[1]
+        )
+        desired_gfs_column_indices = (
+            misc_utils.desired_longitudes_to_columns(
+                grid_longitudes_deg_e=
+                gfs_table_xarray.coords[gfs_utils.LONGITUDE_DIM].values,
+                start_longitude_deg_e=outer_longitude_limits_deg_e[0],
+                end_longitude_deg_e=outer_longitude_limits_deg_e[1]
+            )
+        )
 
     gfs_table_xarray = gfs_io.read_file(gfs_file_name)
     grid_latitudes_deg_n = gfs_table_xarray.coords[
@@ -3942,52 +4053,6 @@ def read_metafile(pickle_file_name):
         metadata_dict[CHIU_NET_ARCHITECTURE_KEY] = None
     if CHIU_NET_PP_ARCHITECTURE_KEY not in metadata_dict:
         metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] = None
-
-    tod = metadata_dict[TRAINING_OPTIONS_KEY]
-    vod = metadata_dict[VALIDATION_OPTIONS_KEY]
-
-    if MODEL_LEAD_TO_GFS_PRED_LEADS_KEY not in tod:
-        try:
-            model_lead_time_days = tod['target_lead_time_days']
-
-            this_dict = {
-                model_lead_time_days: tod['gfs_predictor_lead_times_hours']
-            }
-            tod[MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = this_dict
-            vod[MODEL_LEAD_TO_GFS_PRED_LEADS_KEY] = this_dict
-
-            this_dict = {
-                model_lead_time_days: tod['target_lag_times_days']
-            }
-            tod[MODEL_LEAD_TO_TARGET_LAGS_KEY] = this_dict
-            vod[MODEL_LEAD_TO_TARGET_LAGS_KEY] = this_dict
-
-            this_dict = {
-                model_lead_time_days: tod['gfs_forecast_target_lead_times_days']
-            }
-            tod[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = this_dict
-            vod[MODEL_LEAD_TO_GFS_TARGET_LEADS_KEY] = this_dict
-        except KeyError:
-            pass
-
-    if OUTER_PATCH_SIZE_DEG_KEY not in tod:
-        tod[OUTER_PATCH_SIZE_DEG_KEY] = None
-        tod[OUTER_PATCH_OVERLAP_DEG_KEY] = None
-
-        vod[OUTER_PATCH_SIZE_DEG_KEY] = None
-        vod[OUTER_PATCH_OVERLAP_DEG_KEY] = None
-
-    if (
-            metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] is not None
-            and 'use_convnext_blocks' not in
-            metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
-    ):
-        metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY][
-            'use_convnext_blocks'
-        ] = False
-
-    metadata_dict[TRAINING_OPTIONS_KEY] = tod
-    metadata_dict[VALIDATION_OPTIONS_KEY] = vod
 
     missing_keys = list(set(METADATA_KEYS) - set(metadata_dict.keys()))
     if len(missing_keys) == 0:

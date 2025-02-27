@@ -1439,7 +1439,17 @@ def create_model(option_dict, omit_model_summary=False):
             dims=(2, 3, 1, 4), name=this_name
         )(gfs_encoder_conv_layer_objects[i])
 
-        if gfs_fcst_use_3d_conv:
+        if num_gfs_lead_times > 1:
+            orig_dims = gfs_fcst_module_layer_objects[i].shape
+            orig_dims = numpy.array([__dimension_to_int(d) for d in orig_dims], dtype=int)
+            new_dims = orig_dims[1:-2] + (orig_dims[-1],)
+
+            this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
+            gfs_fcst_module_layer_objects[i] = keras.layers.Reshape(
+                target_shape=new_dims, name=this_name
+            )(gfs_fcst_module_layer_objects[i])
+
+        elif gfs_fcst_use_3d_conv:
             gfs_fcst_module_layer_objects[i] = _get_3d_conv_block(
                 input_layer_object=gfs_fcst_module_layer_objects[i],
                 do_residual=use_residual_blocks,
@@ -1526,7 +1536,17 @@ def create_model(option_dict, omit_model_summary=False):
             dims=(2, 3, 1, 4), name=this_name
         )(lagtgt_encoder_conv_layer_objects[i])
 
-        if lagtgt_fcst_use_3d_conv:
+        if num_target_lag_times > 1:
+            orig_dims = lagtgt_fcst_module_layer_objects[i].shape
+            orig_dims = numpy.array([__dimension_to_int(d) for d in orig_dims], dtype=int)
+            new_dims = orig_dims[1:-2] + (orig_dims[-1],)
+
+            this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
+            lagtgt_fcst_module_layer_objects[i] = keras.layers.Reshape(
+                target_shape=new_dims, name=this_name
+            )(lagtgt_fcst_module_layer_objects[i])
+
+        elif lagtgt_fcst_use_3d_conv:
             lagtgt_fcst_module_layer_objects[i] = _get_3d_conv_block(
                 input_layer_object=lagtgt_fcst_module_layer_objects[i],
                 do_residual=use_residual_blocks,
@@ -1710,7 +1730,7 @@ def create_model(option_dict, omit_model_summary=False):
             new_dims = (
                 input_dimensions_predn_baseline[0],
                 input_dimensions_predn_baseline[1],
-                num_free_target_fields,
+                input_dimensions_predn_baseline[2],
                 1
             )
 
