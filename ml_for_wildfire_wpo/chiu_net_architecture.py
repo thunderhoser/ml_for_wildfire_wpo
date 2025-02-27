@@ -285,7 +285,7 @@ def check_args(option_dict):
                 input_dimensions_era5_constants[2]
             ], dtype=int)
 
-        assert numpy.array_equal(input_dimensions_era5_constants, these_dim)
+            assert numpy.array_equal(input_dimensions_era5_constants, these_dim)
 
     if input_dimensions_lagged_target is not None:
         error_checking.assert_is_numpy_array(
@@ -306,7 +306,7 @@ def check_args(option_dict):
                 input_dimensions_lagged_target[3]
             ], dtype=int)
 
-        assert numpy.array_equal(input_dimensions_lagged_target, these_dim)
+            assert numpy.array_equal(input_dimensions_lagged_target, these_dim)
 
     gfs_fcst_num_conv_layers = option_dict[GFS_FC_MODULE_NUM_CONV_LAYERS_KEY]
     error_checking.assert_is_integer(gfs_fcst_num_conv_layers)
