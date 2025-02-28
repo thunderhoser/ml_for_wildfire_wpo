@@ -744,9 +744,7 @@ def _check_generator_args(option_dict):
             dtype=int
         )
         new_lead_times_days = numpy.sort(new_lead_times_days)
-        error_checking.assert_equals_numpy_array(
-            new_lead_times_days, model_lead_times_days
-        )
+        assert numpy.array_equal(new_lead_times_days, model_lead_times_days)
 
         for d in model_lead_times_days:
             these_pred_lead_times_hours = (
@@ -783,9 +781,7 @@ def _check_generator_args(option_dict):
             dtype=int
         )
         new_lead_times_days = numpy.sort(new_lead_times_days)
-        error_checking.assert_equals_numpy_array(
-            new_lead_times_days, model_lead_times_days
-        )
+        assert numpy.array_equal(new_lead_times_days, model_lead_times_days)
 
         for d in model_lead_times_days:
             these_lag_times_days = model_lead_days_to_target_lags_days[d]
@@ -877,9 +873,7 @@ def _check_generator_args(option_dict):
     if use_gfs_forecast_targets:
         error_checking.assert_directory_exists(gfs_forecast_target_dir_name)
         new_lead_times_days = numpy.sort(new_lead_times_days)
-        error_checking.assert_equals_numpy_array(
-            new_lead_times_days, model_lead_times_days
-        )
+        assert numpy.array_equal(new_lead_times_days, model_lead_times_days)
 
         for d in model_lead_times_days:
             these_target_lead_times_days = (
