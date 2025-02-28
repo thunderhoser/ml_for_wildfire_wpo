@@ -819,15 +819,18 @@ def _check_generator_args(option_dict):
     era5_norm_file_name = option_dict[ERA5_NORM_FILE_KEY]
     era5_use_quantile_norm = option_dict[ERA5_USE_QUANTILE_NORM_KEY]
 
+    # TODO(thunderhoser): Just making it an empty list would be easier, but then
+    # I would need to change other code in this module.
     use_era5_const = (
         era5_constant_field_names is not None
         and len(era5_constant_field_names) > 0
         and era5_constant_file_name is not None
     )
 
-    error_checking.assert_is_string_list(era5_constant_field_names)
-    for this_field_name in era5_constant_field_names:
-        era5_constant_utils.check_field_name(this_field_name)
+    if era5_constant_field_names is not None:
+        error_checking.assert_is_string_list(era5_constant_field_names)
+        for this_field_name in era5_constant_field_names:
+            era5_constant_utils.check_field_name(this_field_name)
 
     if use_era5_const:
         error_checking.assert_file_exists(era5_constant_file_name)
