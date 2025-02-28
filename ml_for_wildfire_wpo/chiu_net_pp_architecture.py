@@ -1745,7 +1745,7 @@ def create_model(option_dict, omit_model_summary=False):
             new_dims = (
                 input_dimensions_predn_baseline[0],
                 input_dimensions_predn_baseline[1],
-                input_dimensions_predn_baseline[2],
+                num_free_target_fields,
                 1
             )
 
