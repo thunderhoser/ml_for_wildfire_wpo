@@ -820,7 +820,8 @@ def _check_generator_args(option_dict):
     era5_use_quantile_norm = option_dict[ERA5_USE_QUANTILE_NORM_KEY]
 
     use_era5_const = (
-        len(era5_constant_field_names) > 0
+        era5_constant_field_names is not None
+        and len(era5_constant_field_names) > 0
         and era5_constant_file_name is not None
     )
 
