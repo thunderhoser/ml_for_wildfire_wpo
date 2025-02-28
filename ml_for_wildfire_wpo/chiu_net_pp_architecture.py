@@ -1454,7 +1454,7 @@ def create_model(option_dict, omit_model_summary=False):
         if num_gfs_lead_times > 1:
             orig_dims = gfs_fcst_module_layer_objects[i].shape
             orig_dims = numpy.array([__dimension_to_int(d) for d in orig_dims], dtype=int)
-            new_dims = orig_dims[1:-2] + (orig_dims[-1],)
+            new_dims = tuple(orig_dims[1:-2].tolist()) + (orig_dims[-1],)
 
             this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
             gfs_fcst_module_layer_objects[i] = keras.layers.Reshape(
@@ -1478,7 +1478,7 @@ def create_model(option_dict, omit_model_summary=False):
         else:
             orig_dims = gfs_fcst_module_layer_objects[i].shape
             orig_dims = numpy.array([__dimension_to_int(d) for d in orig_dims], dtype=int)
-            new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
+            new_dims = tuple(orig_dims[1:-2].tolist()) + (orig_dims[-2] * orig_dims[-1],)
 
             this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
             gfs_fcst_module_layer_objects[i] = keras.layers.Reshape(
@@ -1553,7 +1553,7 @@ def create_model(option_dict, omit_model_summary=False):
             print(orig_dims)
             orig_dims = numpy.array([__dimension_to_int(d) for d in orig_dims], dtype=int)
             print(orig_dims)
-            new_dims = orig_dims[1:-2] + (orig_dims[-1],)
+            new_dims = tuple(orig_dims[1:-2].tolist()) + (orig_dims[-1],)
             print(new_dims)
 
             this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
