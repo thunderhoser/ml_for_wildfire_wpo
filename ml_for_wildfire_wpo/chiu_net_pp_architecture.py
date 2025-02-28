@@ -434,16 +434,14 @@ def __dimension_to_int(dimension_object):
     """
 
     try:
-        return int(dimension_object.value)
-    except TypeError:
-        pass
+        dimension = dimension_object.value
+    except AttributeError:
+        dimension = dimension_object
 
     try:
-        return int(dimension_object)
+        return int(dimension)
     except TypeError:
-        pass
-
-    return LARGE_INTEGER
+        return LARGE_INTEGER
 
 
 def __get_2d_convnext_block(
