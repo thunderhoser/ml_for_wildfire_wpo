@@ -866,6 +866,11 @@ def _check_generator_args(option_dict):
 
     if use_gfs_forecast_targets:
         error_checking.assert_directory_exists(gfs_forecast_target_dir_name)
+
+        new_lead_times_days = numpy.array(
+            list(model_lead_days_to_gfs_target_leads_days.keys()),
+            dtype=int
+        )
         new_lead_times_days = numpy.sort(new_lead_times_days)
         assert numpy.array_equal(new_lead_times_days, model_lead_times_days)
 
