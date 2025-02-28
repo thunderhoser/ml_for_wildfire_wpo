@@ -2779,6 +2779,8 @@ def data_generator_fast_patches(option_dict):
     )
     random.shuffle(gfs_file_names)
 
+    print(era5_constant_predictor_field_names)
+    print('\n\n\n')
     if era5_constant_predictor_field_names is None:
         full_era5_constant_matrix = None
     else:
