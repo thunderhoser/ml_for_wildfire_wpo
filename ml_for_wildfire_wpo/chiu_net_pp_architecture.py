@@ -20,6 +20,8 @@ import error_checking
 import architecture_utils
 import chiu_net_architecture as chiu_net_arch
 
+LARGE_INTEGER = int(1e12)
+
 GFS_3D_DIMENSIONS_KEY = chiu_net_arch.GFS_3D_DIMENSIONS_KEY
 GFS_2D_DIMENSIONS_KEY = chiu_net_arch.GFS_2D_DIMENSIONS_KEY
 ERA5_CONST_DIMENSIONS_KEY = chiu_net_arch.ERA5_CONST_DIMENSIONS_KEY
@@ -432,9 +434,16 @@ def __dimension_to_int(dimension_object):
     """
 
     try:
-        return dimension_object.value
-    except:
-        return dimension_object
+        return int(dimension_object.value)
+    except TypeError:
+        pass
+
+    try:
+        return int(dimension_object)
+    except TypeError:
+        pass
+
+    return LARGE_INTEGER
 
 
 def __get_2d_convnext_block(
