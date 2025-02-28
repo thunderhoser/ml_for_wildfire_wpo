@@ -1543,6 +1543,7 @@ def create_model(option_dict, omit_model_summary=False):
 
         if num_target_lag_times > 1:
             orig_dims = lagtgt_fcst_module_layer_objects[i].shape
+            print(orig_dims)
             orig_dims = numpy.array([__dimension_to_int(d) for d in orig_dims], dtype=int)
             new_dims = orig_dims[1:-2] + (orig_dims[-1],)
 
