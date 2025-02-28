@@ -1451,7 +1451,7 @@ def create_model(option_dict, omit_model_summary=False):
             dims=(2, 3, 1, 4), name=this_name
         )(gfs_encoder_conv_layer_objects[i])
 
-        if num_gfs_lead_times > 1:
+        if num_gfs_lead_times == 1:
             orig_dims = gfs_fcst_module_layer_objects[i].shape
             orig_dims = numpy.array([__dimension_to_int(d) for d in orig_dims], dtype=int)
             new_dims = tuple(orig_dims[1:-2].tolist()) + (orig_dims[-1],)
@@ -1548,13 +1548,10 @@ def create_model(option_dict, omit_model_summary=False):
             dims=(2, 3, 1, 4), name=this_name
         )(lagtgt_encoder_conv_layer_objects[i])
 
-        if num_target_lag_times > 1:
+        if num_target_lag_times == 1:
             orig_dims = lagtgt_fcst_module_layer_objects[i].shape
-            print(orig_dims)
             orig_dims = numpy.array([__dimension_to_int(d) for d in orig_dims], dtype=int)
-            print(orig_dims)
             new_dims = tuple(orig_dims[1:-2].tolist()) + (orig_dims[-1],)
-            print(new_dims)
 
             this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
             lagtgt_fcst_module_layer_objects[i] = keras.layers.Reshape(
@@ -1577,7 +1574,7 @@ def create_model(option_dict, omit_model_summary=False):
             )
         else:
             orig_dims = lagtgt_fcst_module_layer_objects[i].shape
-            new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
+            new_dims = tuple(orig_dims[1:-2].tolist()) + (orig_dims[-2] * orig_dims[-1],)
 
             this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
             lagtgt_fcst_module_layer_objects[i] = keras.layers.Reshape(
