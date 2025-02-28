@@ -538,7 +538,7 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
         these_dim = (bs, psp, psp, this_num_times) + this_matrix.shape[3:]
         laglead_target_predictor_matrix = numpy.full(these_dim, numpy.nan)
 
-    if era5_constant_predictor_field_names is None:
+    if len(era5_constant_predictor_field_names) == 0:
         era5_constant_matrix = None
     else:
         this_matrix = _get_era5_constants(
@@ -737,9 +737,7 @@ def _check_generator_args(option_dict):
             dtype=int
         )
         new_lead_times_days = numpy.sort(new_lead_times_days)
-        error_checking.assert_equals_numpy_array(
-            new_lead_times_days, model_lead_times_days
-        )
+        assert numpy.array_equal(new_lead_times_days, model_lead_times_days)
 
         for d in model_lead_times_days:
             these_pred_lead_times_hours = (
@@ -776,9 +774,7 @@ def _check_generator_args(option_dict):
             dtype=int
         )
         new_lead_times_days = numpy.sort(new_lead_times_days)
-        error_checking.assert_equals_numpy_array(
-            new_lead_times_days, model_lead_times_days
-        )
+        assert numpy.array_equal(new_lead_times_days, model_lead_times_days)
 
         for d in model_lead_times_days:
             these_lag_times_days = model_lead_days_to_target_lags_days[d]
@@ -816,17 +812,11 @@ def _check_generator_args(option_dict):
     if era5_constant_field_names is None:
         era5_constant_field_names = []
 
-    use_era5_const = (
-        len(era5_constant_field_names) > 0
-        and era5_constant_file_name is not None
-    )
-
     error_checking.assert_is_string_list(era5_constant_field_names)
     for this_field_name in era5_constant_field_names:
         era5_constant_utils.check_field_name(this_field_name)
 
-    if use_era5_const:
-        error_checking.assert_file_exists(era5_constant_file_name)
+    error_checking.assert_file_exists(era5_constant_file_name)
 
     if era5_norm_file_name is None:
         era5_use_quantile_norm = False
@@ -869,10 +859,13 @@ def _check_generator_args(option_dict):
 
     if use_gfs_forecast_targets:
         error_checking.assert_directory_exists(gfs_forecast_target_dir_name)
-        new_lead_times_days = numpy.sort(new_lead_times_days)
-        error_checking.assert_equals_numpy_array(
-            new_lead_times_days, model_lead_times_days
+
+        new_lead_times_days = numpy.array(
+            list(model_lead_days_to_gfs_target_leads_days.keys()),
+            dtype=int
         )
+        new_lead_times_days = numpy.sort(new_lead_times_days)
+        assert numpy.array_equal(new_lead_times_days, model_lead_times_days)
 
         for d in model_lead_times_days:
             these_target_lead_times_days = (
@@ -2283,7 +2276,7 @@ def data_generator(option_dict):
     )
     random.shuffle(gfs_file_names)
 
-    if era5_constant_predictor_field_names is None:
+    if len(era5_constant_predictor_field_names) == 0:
         era5_constant_matrix = None
     else:
         era5_constant_matrix = _get_era5_constants(
@@ -2778,7 +2771,7 @@ def data_generator_fast_patches(option_dict):
     )
     random.shuffle(gfs_file_names)
 
-    if era5_constant_predictor_field_names is None:
+    if len(era5_constant_predictor_field_names) == 0:
         full_era5_constant_matrix = None
     else:
         full_era5_constant_matrix = _get_era5_constants(
@@ -3414,7 +3407,7 @@ def create_data(
         -1 * outer_longitude_buffer_deg, outer_longitude_buffer_deg
     ])
 
-    if era5_constant_predictor_field_names is None:
+    if len(era5_constant_predictor_field_names) == 0:
         era5_constant_matrix = None
     else:
         era5_constant_matrix = _get_era5_constants(
@@ -4076,7 +4069,7 @@ def read_model(hdf5_file_name):
 
     chiu_net_architecture_dict = metadata_dict[CHIU_NET_ARCHITECTURE_KEY]
     if chiu_net_architecture_dict is not None:
-        from ml_for_wildfire_wpo.machine_learning import chiu_net_architecture
+        import chiu_net_architecture
 
         arch_dict = chiu_net_architecture_dict
 
@@ -4096,7 +4089,7 @@ def read_model(hdf5_file_name):
 
     chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
     if chiu_net_pp_architecture_dict is not None:
-        from ml_for_wildfire_wpo.machine_learning import \
+        import \
             chiu_net_pp_architecture
 
         arch_dict = chiu_net_pp_architecture_dict
@@ -4153,7 +4146,7 @@ def read_model_for_shapley(pickle_file_name):
     chiu_net_pp_architecture_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
     assert chiu_net_pp_architecture_dict is not None
 
-    from ml_for_wildfire_wpo.machine_learning import \
+    import \
         chiu_net_pp_architecture
 
     arch_dict = chiu_net_pp_architecture_dict

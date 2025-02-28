@@ -6,6 +6,8 @@ from ml_for_wildfire_wpo.utils import misc_utils
 from ml_for_wildfire_wpo.machine_learning import neural_net
 from ml_for_wildfire_wpo.scripts import training_args
 
+NONE_STRINGS = ['', 'none', 'None']
+
 INPUT_ARG_PARSER = argparse.ArgumentParser()
 INPUT_ARG_PARSER = training_args.add_input_args(parser_object=INPUT_ARG_PARSER)
 
@@ -93,7 +95,7 @@ def _run(template_file_name, output_dir_name,
 
     if (
             len(gfs_predictor_field_names) == 1
-            and gfs_predictor_field_names[0] == ''
+            and gfs_predictor_field_names[0] in NONE_STRINGS
     ):
         gfs_predictor_field_names = None
 
@@ -105,23 +107,23 @@ def _run(template_file_name, output_dir_name,
 
     if len(gfs_pressure_levels_mb) == 1 and gfs_pressure_levels_mb[0] <= 0:
         gfs_pressure_levels_mb = None
-    if gfs_normalization_file_name == '':
+    if gfs_normalization_file_name in NONE_STRINGS:
         gfs_normalization_file_name = None
-    if target_normalization_file_name == '':
+    if target_normalization_file_name in NONE_STRINGS:
         target_normalization_file_name = None
-    if era5_normalization_file_name == '':
+    if era5_normalization_file_name in NONE_STRINGS:
         era5_normalization_file_name = None
-    if gfs_forecast_target_dir_name_for_training == '':
+    if gfs_forecast_target_dir_name_for_training in NONE_STRINGS:
         gfs_forecast_target_dir_name_for_training = None
-    if gfs_forecast_target_dir_name_for_validation == '':
+    if gfs_forecast_target_dir_name_for_validation in NONE_STRINGS:
         gfs_forecast_target_dir_name_for_validation = None
 
-    if era5_constant_file_name == '':
+    if era5_constant_file_name in NONE_STRINGS:
         era5_constant_file_name = None
         era5_constant_predictor_field_names = None
     elif (
             len(era5_constant_predictor_field_names) == 1 and
-            era5_constant_predictor_field_names[0] in ['', 'None']
+            era5_constant_predictor_field_names[0] in NONE_STRINGS
     ):
         era5_constant_predictor_field_names = None
 

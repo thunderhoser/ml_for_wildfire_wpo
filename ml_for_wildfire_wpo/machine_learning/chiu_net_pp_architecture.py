@@ -13,6 +13,8 @@ from gewittergefahr.deep_learning import architecture_utils
 from ml_for_wildfire_wpo.machine_learning import \
     chiu_net_architecture as chiu_net_arch
 
+LARGE_INTEGER = int(1e12)
+
 GFS_3D_DIMENSIONS_KEY = chiu_net_arch.GFS_3D_DIMENSIONS_KEY
 GFS_2D_DIMENSIONS_KEY = chiu_net_arch.GFS_2D_DIMENSIONS_KEY
 ERA5_CONST_DIMENSIONS_KEY = chiu_net_arch.ERA5_CONST_DIMENSIONS_KEY
@@ -425,9 +427,14 @@ def __dimension_to_int(dimension_object):
     """
 
     try:
-        return dimension_object.value
-    except:
-        return dimension_object
+        dimension = dimension_object.value
+    except AttributeError:
+        dimension = dimension_object
+
+    try:
+        return int(dimension)
+    except TypeError:
+        return LARGE_INTEGER
 
 
 def __get_2d_convnext_block(
@@ -1437,10 +1444,10 @@ def create_model(option_dict, omit_model_summary=False):
             dims=(2, 3, 1, 4), name=this_name
         )(gfs_encoder_conv_layer_objects[i])
 
-        if num_gfs_lead_times > 1:
+        if num_gfs_lead_times == 1:
             orig_dims = gfs_fcst_module_layer_objects[i].shape
             orig_dims = numpy.array([__dimension_to_int(d) for d in orig_dims], dtype=int)
-            new_dims = orig_dims[1:-2] + (orig_dims[-1],)
+            new_dims = tuple(orig_dims[1:-2].tolist()) + (orig_dims[-1],)
 
             this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
             gfs_fcst_module_layer_objects[i] = keras.layers.Reshape(
@@ -1464,7 +1471,7 @@ def create_model(option_dict, omit_model_summary=False):
         else:
             orig_dims = gfs_fcst_module_layer_objects[i].shape
             orig_dims = numpy.array([__dimension_to_int(d) for d in orig_dims], dtype=int)
-            new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
+            new_dims = tuple(orig_dims[1:-2].tolist()) + (orig_dims[-2] * orig_dims[-1],)
 
             this_name = 'gfs_fcst_level{0:d}_remove-time-dim'.format(i)
             gfs_fcst_module_layer_objects[i] = keras.layers.Reshape(
@@ -1534,10 +1541,10 @@ def create_model(option_dict, omit_model_summary=False):
             dims=(2, 3, 1, 4), name=this_name
         )(lagtgt_encoder_conv_layer_objects[i])
 
-        if num_target_lag_times > 1:
+        if num_target_lag_times == 1:
             orig_dims = lagtgt_fcst_module_layer_objects[i].shape
             orig_dims = numpy.array([__dimension_to_int(d) for d in orig_dims], dtype=int)
-            new_dims = orig_dims[1:-2] + (orig_dims[-1],)
+            new_dims = tuple(orig_dims[1:-2].tolist()) + (orig_dims[-1],)
 
             this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
             lagtgt_fcst_module_layer_objects[i] = keras.layers.Reshape(
@@ -1560,7 +1567,7 @@ def create_model(option_dict, omit_model_summary=False):
             )
         else:
             orig_dims = lagtgt_fcst_module_layer_objects[i].shape
-            new_dims = orig_dims[1:-2] + (orig_dims[-2] * orig_dims[-1],)
+            new_dims = tuple(orig_dims[1:-2].tolist()) + (orig_dims[-2] * orig_dims[-1],)
 
             this_name = 'lagtgt_fcst_level{0:d}_remove-time-dim'.format(i)
             lagtgt_fcst_module_layer_objects[i] = keras.layers.Reshape(
@@ -1731,7 +1738,7 @@ def create_model(option_dict, omit_model_summary=False):
             new_dims = (
                 input_dimensions_predn_baseline[0],
                 input_dimensions_predn_baseline[1],
-                input_dimensions_predn_baseline[2],
+                num_free_target_fields,
                 1
             )
 
