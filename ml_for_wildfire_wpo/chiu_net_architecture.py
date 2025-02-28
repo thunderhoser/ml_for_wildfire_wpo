@@ -226,6 +226,7 @@ def check_args(option_dict):
     option_dict = DEFAULT_ARCHITECTURE_OPTION_DICT.copy()
     option_dict.update(orig_option_dict)
 
+    # Check input dimensions.
     input_dimensions_gfs_3d = option_dict[GFS_3D_DIMENSIONS_KEY]
     input_dimensions_gfs_2d = option_dict[GFS_2D_DIMENSIONS_KEY]
     input_dimensions_era5_constants = option_dict[ERA5_CONST_DIMENSIONS_KEY]
@@ -265,7 +266,6 @@ def check_args(option_dict):
 
         num_grid_rows = input_dimensions_gfs_2d[0]
         num_grid_columns = input_dimensions_gfs_2d[1]
-        num_gfs_lead_times = input_dimensions_gfs_2d[2]
 
     if input_dimensions_era5_constants is not None:
         error_checking.assert_is_numpy_array(
@@ -308,6 +308,7 @@ def check_args(option_dict):
 
             assert numpy.array_equal(input_dimensions_lagged_target, these_dim)
 
+    # Check forecasting module for GFS data.
     gfs_fcst_num_conv_layers = option_dict[GFS_FC_MODULE_NUM_CONV_LAYERS_KEY]
     error_checking.assert_is_integer(gfs_fcst_num_conv_layers)
     error_checking.assert_is_greater(gfs_fcst_num_conv_layers, 0)
@@ -324,6 +325,7 @@ def check_args(option_dict):
 
     error_checking.assert_is_boolean(option_dict[GFS_FC_MODULE_USE_3D_CONV])
 
+    # Check forecasting module for lagged target fields.
     lagtgt_fcst_num_conv_layers = option_dict[
         LAGTGT_FC_MODULE_NUM_CONV_LAYERS_KEY
     ]
@@ -342,6 +344,7 @@ def check_args(option_dict):
 
     error_checking.assert_is_boolean(option_dict[LAGTGT_FC_MODULE_USE_3D_CONV])
 
+    # Check spatial encoder for GFS data.
     num_levels = option_dict[NUM_LEVELS_KEY]
     error_checking.assert_is_integer(num_levels)
     error_checking.assert_is_geq(num_levels, 2)
@@ -369,6 +372,7 @@ def check_args(option_dict):
         gfs_dropout_rate_by_level, 1., allow_nan=True
     )
 
+    # Check spatial encoder for lagged target fields.
     lagtgt_num_conv_by_level = option_dict[LAGTGT_ENCODER_NUM_CONV_LAYERS_KEY]
     error_checking.assert_is_numpy_array(
         lagtgt_num_conv_by_level, exact_dimensions=expected_dim
@@ -393,6 +397,7 @@ def check_args(option_dict):
         lagtgt_dropout_rate_by_level, 1., allow_nan=True
     )
 
+    # Check decoder.
     expected_dim = numpy.array([num_levels], dtype=int)
 
     decoder_num_conv_by_level = option_dict[DECODER_NUM_CONV_LAYERS_KEY]
@@ -432,6 +437,7 @@ def check_args(option_dict):
         option_dict[PENULTIMATE_DROPOUT_RATE_KEY], 1., allow_nan=True
     )
 
+    # Check other stuff.
     error_checking.assert_is_geq(option_dict[L1_WEIGHT_KEY], 0.)
     error_checking.assert_is_geq(option_dict[L2_WEIGHT_KEY], 0.)
     error_checking.assert_is_boolean(option_dict[USE_BATCH_NORM_KEY])
