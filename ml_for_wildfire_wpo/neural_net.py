@@ -2284,6 +2284,9 @@ def data_generator(option_dict):
     )
     random.shuffle(gfs_file_names)
 
+    if era5_constant_predictor_field_names[0] == '':
+        era5_constant_predictor_field_names = None
+
     if era5_constant_predictor_field_names is None:
         era5_constant_matrix = None
     else:
@@ -2779,8 +2782,9 @@ def data_generator_fast_patches(option_dict):
     )
     random.shuffle(gfs_file_names)
 
-    print(era5_constant_predictor_field_names)
-    print('\n\n\n')
+    if era5_constant_predictor_field_names[0] == '':
+        era5_constant_predictor_field_names = None
+
     if era5_constant_predictor_field_names is None:
         full_era5_constant_matrix = None
     else:
@@ -3416,6 +3420,9 @@ def create_data(
     outer_longitude_limits_deg_e = inner_longitude_limits_deg_e + numpy.array([
         -1 * outer_longitude_buffer_deg, outer_longitude_buffer_deg
     ])
+
+    if era5_constant_predictor_field_names[0] == '':
+        era5_constant_predictor_field_names = None
 
     if era5_constant_predictor_field_names is None:
         era5_constant_matrix = None
