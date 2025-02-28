@@ -545,6 +545,9 @@ def __init_matrices_1batch_patchwise(generator_option_dict, gfs_file_names):
         these_dim = (bs, psp, psp, this_num_times) + this_matrix.shape[3:]
         laglead_target_predictor_matrix = numpy.full(these_dim, numpy.nan)
 
+    if len(era5_constant_predictor_field_names) == 0:
+        era5_constant_predictor_field_names = None
+
     if era5_constant_predictor_field_names is None:
         era5_constant_matrix = None
     else:
@@ -815,9 +818,6 @@ def _check_generator_args(option_dict):
     era5_constant_file_name = option_dict[ERA5_CONSTANT_FILE_KEY]
     era5_norm_file_name = option_dict[ERA5_NORM_FILE_KEY]
     era5_use_quantile_norm = option_dict[ERA5_USE_QUANTILE_NORM_KEY]
-
-    if era5_constant_field_names is None:
-        era5_constant_field_names = []
 
     use_era5_const = (
         len(era5_constant_field_names) > 0
@@ -2284,7 +2284,7 @@ def data_generator(option_dict):
     )
     random.shuffle(gfs_file_names)
 
-    if era5_constant_predictor_field_names[0] == '':
+    if len(era5_constant_predictor_field_names) == 0:
         era5_constant_predictor_field_names = None
 
     if era5_constant_predictor_field_names is None:
@@ -2782,7 +2782,7 @@ def data_generator_fast_patches(option_dict):
     )
     random.shuffle(gfs_file_names)
 
-    if era5_constant_predictor_field_names[0] == '':
+    if len(era5_constant_predictor_field_names) == 0:
         era5_constant_predictor_field_names = None
 
     if era5_constant_predictor_field_names is None:
@@ -3421,7 +3421,7 @@ def create_data(
         -1 * outer_longitude_buffer_deg, outer_longitude_buffer_deg
     ])
 
-    if era5_constant_predictor_field_names[0] == '':
+    if len(era5_constant_predictor_field_names) == 0:
         era5_constant_predictor_field_names = None
 
     if era5_constant_predictor_field_names is None:
