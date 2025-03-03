@@ -4047,6 +4047,13 @@ def read_metafile(pickle_file_name):
     if CHIU_NET_PP_ARCHITECTURE_KEY not in metadata_dict:
         metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] = None
 
+    chiu_net_option_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
+    if 'dmc_dc_isi_indices_for_constraints' not in chiu_net_option_dict:
+        chiu_net_option_dict['dmc_dc_isi_indices_for_constraints'] = None
+    if 'num_free_target_fields' not in chiu_net_option_dict:
+        chiu_net_option_dict['num_free_target_fields'] = 4
+    metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] = chiu_net_option_dict
+
     missing_keys = list(set(METADATA_KEYS) - set(metadata_dict.keys()))
     if len(missing_keys) == 0:
         return metadata_dict
