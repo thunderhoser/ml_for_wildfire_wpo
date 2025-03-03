@@ -4103,15 +4103,30 @@ def read_model(hdf5_file_name):
         if chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY not in arch_dict:
             arch_dict[chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY] = False
 
+        # TODO(thunderhoser): HACK for back-compatibility.
+        loss_function_string = arch_dict[chiu_net_pp_architecture.LOSS_FUNCTION_KEY]
+        loss_function_string = loss_function_string.replace(
+            'dual_weighted_crpss_all_constraints', 'dual_weighted_crpss'
+        )
+        loss_function_string = loss_function_string.replace(
+            'dmc_index=1, dc_index=2, isi_index=3',
+            'dmc_dc_isi_indices_for_constraints=numpy.array([1, 2, 3], dtype=int)'
+        )
+        arch_dict[chiu_net_pp_architecture.LOSS_FUNCTION_KEY] = loss_function_string
+
         for this_key in [
                 chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
                 chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
         ]:
             arch_dict[this_key] = eval(arch_dict[this_key])
 
-        for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
-            for k in range(len(arch_dict[this_key])):
-                arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+        # TODO(thunderhoser): HACK for back-compatibility.
+        try:
+            for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
+                for k in range(len(arch_dict[this_key])):
+                    arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+        except:
+            arch_dict[chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY] = []
 
         model_object = chiu_net_pp_architecture.create_model(arch_dict)
         model_object.load_weights(hdf5_file_name)
