@@ -53,4 +53,5 @@ python3 -u "${CODE_DIR_NAME}/apply_neural_net.py" \
 --init_date_limit_strings "${START_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}" "${END_DATE_STRINGS[$SLURM_ARRAY_TASK_ID]}" \
 --model_lead_time_days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]} \
 --take_ensemble_mean=0 \
+--patch_overlap_size_deg=15 \
 --output_dir_name="${model_dir_name}/training_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}"
