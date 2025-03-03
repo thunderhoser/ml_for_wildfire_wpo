@@ -209,23 +209,16 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     dummy_validation_option_dict[neural_net.OUTER_PATCH_SIZE_DEG_KEY] = None
 
     for this_init_date_string in init_date_strings:
-        data_dict = neural_net.create_data(
-            option_dict=dummy_validation_option_dict,
-            init_date_string=this_init_date_string,
-            model_lead_time_days=model_lead_time_days
-        )
-        print(SEPARATOR_STRING)
-
-        # try:
-        #     data_dict = neural_net.create_data(
-        #         option_dict=dummy_validation_option_dict,
-        #         init_date_string=this_init_date_string,
-        #         model_lead_time_days=model_lead_time_days
-        #     )
-        #     print(SEPARATOR_STRING)
-        # except:
-        #     print(SEPARATOR_STRING)
-        #     continue
+        try:
+            data_dict = neural_net.create_data(
+                option_dict=dummy_validation_option_dict,
+                init_date_string=this_init_date_string,
+                model_lead_time_days=model_lead_time_days
+            )
+            print(SEPARATOR_STRING)
+        except:
+            print(SEPARATOR_STRING)
+            continue
 
         predictor_matrices = data_dict[neural_net.PREDICTOR_MATRICES_KEY]
         target_matrix_with_weights = data_dict[
