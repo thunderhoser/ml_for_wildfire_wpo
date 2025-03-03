@@ -1,0 +1,43 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_spread_vs_skill"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=04:00:00
+#SBATCH --array=0-13
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_spread_vs_skill_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment21_convnext"
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/training-strategy=40-10-diff_spectral-complexity=025_use-lead-time-as-predictor=1"
+echo $model_dir_name
+
+MODEL_LEAD_TIMES_DAYS=("01" "02" "03" "04" "05" "06" "07" "08" "09" "10" "11" "12" "13" "14")
+
+python3 -u "${CODE_DIR_NAME}/plot_spread_vs_skill.py" \
+--input_file_name="${model_dir_name}/validation_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/uncertainty_calibration/spread_vs_skill.nc" \
+--output_dir_name="${model_dir_name}/validation_lead-time-days=${MODEL_LEAD_TIMES_DAYS[$SLURM_ARRAY_TASK_ID]}/isotonic_regression/uncertainty_calibration/spread_vs_skill"
