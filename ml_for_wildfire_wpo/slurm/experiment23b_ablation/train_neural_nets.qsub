@@ -130,7 +130,7 @@ while true; do
     --target_dir_name_for_validation="${TARGET_DIR_NAME}" \
     --gfs_forecast_target_dir_name_for_validation="${GFS_FORECAST_TARGET_DIR_NAME}" \
     --gfs_init_date_limit_strings_for_validation "20210101" "20211210" \
-    --num_epochs=10000 \
+    --num_epochs=600 \
     --num_training_batches_per_epoch=704 \
     --num_validation_batches_per_epoch=264 \
     --plateau_patience_epochs=${num_rampup_epochs} \
