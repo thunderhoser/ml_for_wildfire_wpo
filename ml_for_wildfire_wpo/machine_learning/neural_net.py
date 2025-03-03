@@ -3280,22 +3280,13 @@ def create_data(
     option_dict[INIT_DATE_LIMITS_KEY] = [init_date_string] * 2
     option_dict[BATCH_SIZE_KEY] = 32
 
-    try:
-        all_model_leads_days = list(set(
-            this_key[1] for this_key in
-            option_dict[MODEL_LEAD_TO_FREQ_KEY].keys()
-        ))
-        all_model_leads_days = numpy.array(all_model_leads_days, dtype=int)
-    except:
-        all_model_leads_days = numpy.array(
-            list(option_dict[MODEL_LEAD_TO_FREQ_KEY].keys()),
-            dtype=int
-        )
-        all_model_leads_days = numpy.unique(all_model_leads_days)
-
-    dummy_frequencies = numpy.full(len(all_model_leads_days), 0.1)
+    # TODO(thunderhoser): This might cause error in `_check_generator_args`
+    # sometimes.
+    dummy_model_leads_days = numpy.linspace(1, 14, num=14, dtype=int)
+    dummy_frequencies = numpy.full(len(dummy_model_leads_days), 1.)
+    dummy_frequencies = dummy_frequencies / numpy.sum(dummy_frequencies)
     option_dict[MODEL_LEAD_TO_FREQ_KEY] = dict(
-        zip(all_model_leads_days, dummy_frequencies)
+        zip(dummy_model_leads_days, dummy_frequencies)
     )
 
     option_dict = _check_generator_args(option_dict)
@@ -4040,6 +4031,13 @@ def read_metafile(pickle_file_name):
     if CHIU_NET_PP_ARCHITECTURE_KEY not in metadata_dict:
         metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] = None
 
+    chiu_net_option_dict = metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY]
+    if 'dmc_dc_isi_indices_for_constraints' not in chiu_net_option_dict:
+        chiu_net_option_dict['dmc_dc_isi_indices_for_constraints'] = None
+    if 'num_free_target_fields' not in chiu_net_option_dict:
+        chiu_net_option_dict['num_free_target_fields'] = 4
+    metadata_dict[CHIU_NET_PP_ARCHITECTURE_KEY] = chiu_net_option_dict
+
     missing_keys = list(set(METADATA_KEYS) - set(metadata_dict.keys()))
     if len(missing_keys) == 0:
         return metadata_dict
@@ -4096,15 +4094,30 @@ def read_model(hdf5_file_name):
         if chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY not in arch_dict:
             arch_dict[chiu_net_pp_architecture.USE_LEAD_TIME_AS_PRED_KEY] = False
 
+        # TODO(thunderhoser): HACK for back-compatibility.
+        loss_function_string = arch_dict[chiu_net_pp_architecture.LOSS_FUNCTION_KEY]
+        loss_function_string = loss_function_string.replace(
+            'dual_weighted_crpss_all_constraints', 'dual_weighted_crpss'
+        )
+        loss_function_string = loss_function_string.replace(
+            'dmc_index=1, dc_index=2, isi_index=3',
+            'dmc_dc_isi_indices_for_constraints=numpy.array([1, 2, 3], dtype=int)'
+        )
+        arch_dict[chiu_net_pp_architecture.LOSS_FUNCTION_KEY] = loss_function_string
+
         for this_key in [
                 chiu_net_pp_architecture.LOSS_FUNCTION_KEY,
                 chiu_net_pp_architecture.OPTIMIZER_FUNCTION_KEY
         ]:
             arch_dict[this_key] = eval(arch_dict[this_key])
 
-        for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
-            for k in range(len(arch_dict[this_key])):
-                arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+        # TODO(thunderhoser): HACK for back-compatibility.
+        try:
+            for this_key in [chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY]:
+                for k in range(len(arch_dict[this_key])):
+                    arch_dict[this_key][k] = eval(arch_dict[this_key][k])
+        except:
+            arch_dict[chiu_net_pp_architecture.METRIC_FUNCTIONS_KEY] = []
 
         model_object = chiu_net_pp_architecture.create_model(arch_dict)
         model_object.load_weights(hdf5_file_name)
