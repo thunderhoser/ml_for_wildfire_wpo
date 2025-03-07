@@ -250,12 +250,12 @@ DEFAULT_OPTION_DICT = {
     # chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY: numpy.array(
     #     [160, 160, 2, -1, 5], dtype=int
     # ),
-    # chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
-    #     [160, 160, -1, 5], dtype=int
-    # ),
-    chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
-        [160, 160, 7], dtype=int
+    chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
+        [160, 160, 1, 5], dtype=int
     ),
+    # chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
+    #     [160, 160, 7], dtype=int
+    # ),
     # chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY: None,
     # chiu_net_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: numpy.array(
     #     [160, 160, 4], dtype=int
@@ -307,7 +307,7 @@ DEFAULT_OPTION_DICT = {
 
 SPECTRAL_COMPLEXITY = 25
 EXTRA_PREDICTOR_TYPE_STRINGS = [
-    'gfs_2d', 'gfs_3d', 'lagged_targets', 'residual_baseline'
+    'gfs_3d', 'lagged_targets', 'era5_constants', 'residual_baseline'
 ]
 
 
@@ -333,13 +333,10 @@ def _run():
             SPECTRAL_COMPLEXITY * these_multipliers
         ).astype(int)
 
-        if EXTRA_PREDICTOR_TYPE_STRINGS[i] in ['gfs_2d', 'gfs_3d']:
-            decoder_channel_counts = (
-                gfs_encoder_channel_counts +
-                lagtgt_encoder_channel_counts
-            )[:-1]
-        else:
-            decoder_channel_counts = lagtgt_encoder_channel_counts[:-1]
+        decoder_channel_counts = (
+            gfs_encoder_channel_counts +
+            lagtgt_encoder_channel_counts
+        )[:-1]
 
         option_dict = copy.deepcopy(DEFAULT_OPTION_DICT)
         option_dict.update({
@@ -353,20 +350,20 @@ def _run():
             chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY:
                 decoder_channel_counts,
             chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY: None,
-            chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: None,
             chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY:
                 numpy.array([160, 160, 1, 7], dtype=int),
             chiu_net_pp_arch.USE_LEAD_TIME_AS_PRED_KEY: True,
-            chiu_net_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: None
+            chiu_net_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY: None,
+            chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: None
         })
 
         if EXTRA_PREDICTOR_TYPE_STRINGS[i] == 'gfs_3d':
             option_dict[chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY] = numpy.array(
                 [160, 160, 1, 1, 5], dtype=int
             )
-        elif EXTRA_PREDICTOR_TYPE_STRINGS[i] == 'gfs_2d':
-            option_dict[chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY] = numpy.array(
-                [160, 160, 1, 5], dtype=int
+        elif EXTRA_PREDICTOR_TYPE_STRINGS[i] == 'era5_constants':
+            option_dict[chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY] = (
+                numpy.array([160, 160, 7], dtype=int)
             )
         elif EXTRA_PREDICTOR_TYPE_STRINGS[i] == 'residual_baseline':
             option_dict[chiu_net_pp_arch.PREDN_BASELINE_DIMENSIONS_KEY] = (
