@@ -3435,6 +3435,9 @@ def create_data(
         raise_error_if_missing=True
     )
 
+    desired_target_row_indices = numpy.array([], dtype=int)
+    desired_target_column_indices = numpy.array([], dtype=int)
+
     need_basic_gfs = len(gfs_predictor_field_names) > 0
 
     if need_basic_gfs:
@@ -3516,7 +3519,11 @@ def create_data(
         )
 
     if do_residual_prediction:
-        baseline_prediction_matrix, _, _ = _read_lagged_targets_1example(
+        (
+            baseline_prediction_matrix,
+            desired_target_row_indices,
+            desired_target_column_indices
+        ) = _read_lagged_targets_1example(
             gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_name),
             target_dir_name=target_dir_name,
             target_lag_times_days=numpy.array([0], dtype=int),
