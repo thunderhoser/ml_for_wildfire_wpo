@@ -4556,7 +4556,7 @@ def apply_model_patchwise(
     num_columns_in_full_grid = -1
 
     for this_matrix in full_predictor_matrices:
-        if len(this_matrix.shape) < 2:
+        if len(this_matrix.shape) < 3:
             continue
 
         num_rows_in_full_grid = this_matrix.shape[1]
