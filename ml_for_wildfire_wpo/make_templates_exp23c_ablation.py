@@ -250,9 +250,9 @@ DEFAULT_OPTION_DICT = {
     # chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY: numpy.array(
     #     [160, 160, 2, -1, 5], dtype=int
     # ),
-    chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
-        [160, 160, 1, 5], dtype=int
-    ),
+    # chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
+    #     [160, 160, 1, 5], dtype=int
+    # ),
     # chiu_net_pp_arch.ERA5_CONST_DIMENSIONS_KEY: numpy.array(
     #     [160, 160, 7], dtype=int
     # ),
@@ -349,6 +349,9 @@ def _run():
                 lagtgt_encoder_channel_counts,
             chiu_net_pp_arch.DECODER_NUM_CHANNELS_KEY:
                 decoder_channel_counts,
+            chiu_net_pp_arch.GFS_2D_DIMENSIONS_KEY: numpy.array(
+                [160, 160, 1, 5], dtype=int
+            ),
             chiu_net_pp_arch.GFS_3D_DIMENSIONS_KEY: None,
             chiu_net_pp_arch.LAGTGT_DIMENSIONS_KEY:
                 numpy.array([160, 160, 1, 7], dtype=int),
