@@ -1,0 +1,50 @@
+#!/bin/bash
+
+#SBATCH --job-name="plot_evaluation_ungridded"
+#SBATCH --partition="fge"
+#SBATCH --account="rda-ghpcs"
+#SBATCH --qos="gpuwf"
+#SBATCH --ntasks=1
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=1
+##SBATCH --nodes=1
+##SBATCH --ntasks=1
+##SBATCH --cpus-per-task=1
+##SBATCH --ntasks-per-node=1
+#SBATCH --time=04:00:00
+#SBATCH --array=0-12
+#SBATCH --exclude=h28n12
+##SBATCH --exclude=h31n03,h28n12
+##SBATCH --exclude=h29n01,h26n05,h28n06,h29n07,h30n03,h30n15
+#SBATCH --mail-type=BEGIN,END,FAIL
+#SBATCH --mail-user=ryan.lagerquist@noaa.gov
+#SBATCH --output=plot_evaluation_ungridded_%A_%a.out
+
+conda init
+conda activate base
+
+echo `which conda`
+echo `which python`
+echo `which python3`
+
+# PATH=/usr/local/cuda/bin:$PATH
+echo $PATH
+
+CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment23b_ablation"
+
+EXTRA_PREDICTOR_TYPE_STRINGS=("gfs_surface" "gfs_1000mb" "gfs_900mb" "gfs_800mb" "gfs_700mb" "gfs_600mb" "gfs_500mb" "gfs_400mb" "gfs_300mb" "gfs_200mb" "lagged_targets" "era5_constants" "residual_baseline")
+extra_predictor_type_string=${EXTRA_PREDICTOR_TYPE_STRINGS[$SLURM_ARRAY_TASK_ID]}
+
+model_dir_name="${TOP_MODEL_DIR_NAME}/extra_predictor_type=${extra_predictor_type_string}"
+echo $model_dir_name
+
+python3 -u "${CODE_DIR_NAME}/plot_ungridded_evaluation.py" \
+--input_eval_file_names "${model_dir_name}/validation_lead-time-days=${model_lead_time_days}/ungridded_evaluation.nc" \
+--line_styles "solid" \
+--line_colours "217_95_2" \
+--set_descriptions "model" \
+--plot_full_error_distributions=1 \
+--confidence_level=0.95 \
+--report_metrics_in_titles=1 \
+--output_dir_name="${model_dir_name}/validation_lead-time-days=${model_lead_time_days}/ungridded_evaluation"
