@@ -3428,6 +3428,9 @@ def create_data(
         raise_error_if_missing=True
     )
 
+    desired_target_row_indices = numpy.array([], dtype=int)
+    desired_target_column_indices = numpy.array([], dtype=int)
+
     need_basic_gfs = len(gfs_predictor_field_names) > 0
 
     if need_basic_gfs:
@@ -3509,7 +3512,11 @@ def create_data(
         )
 
     if do_residual_prediction:
-        baseline_prediction_matrix, _, _ = _read_lagged_targets_1example(
+        (
+            baseline_prediction_matrix,
+            desired_target_row_indices,
+            desired_target_column_indices
+        ) = _read_lagged_targets_1example(
             gfs_init_date_string=gfs_io.file_name_to_date(gfs_file_name),
             target_dir_name=target_dir_name,
             target_lag_times_days=numpy.array([0], dtype=int),
@@ -3543,6 +3550,8 @@ def create_data(
             norm_param_table_xarray=target_norm_param_table_xarray,
             use_quantile_norm=targets_use_quantile_norm
         )[0]
+
+        assert this_lead_matrix is not None
 
     these_matrices = [this_lagged_matrix, this_lead_matrix]
     these_matrices = [m for m in these_matrices if m is not None]
@@ -4542,7 +4551,7 @@ def apply_model_patchwise(
     num_columns_in_full_grid = -1
 
     for this_matrix in full_predictor_matrices:
-        if len(this_matrix.shape) < 2:
+        if len(this_matrix.shape) < 3:
             continue
 
         num_rows_in_full_grid = this_matrix.shape[1]
