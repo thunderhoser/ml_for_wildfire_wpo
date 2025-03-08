@@ -3558,6 +3558,8 @@ def create_data(
             use_quantile_norm=targets_use_quantile_norm
         )[0]
 
+        assert this_lead_matrix is not None
+
     these_matrices = [this_lagged_matrix, this_lead_matrix]
     these_matrices = [m for m in these_matrices if m is not None]
     if len(these_matrices) == 0:
