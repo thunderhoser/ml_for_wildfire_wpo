@@ -209,9 +209,6 @@ def _run(model_file_name, gfs_directory_name, target_dir_name,
     dummy_validation_option_dict[neural_net.OUTER_PATCH_SIZE_DEG_KEY] = None
 
     for this_init_date_string in init_date_strings:
-        print(dummy_validation_option_dict)
-        print('\n\n')
-
         try:
             data_dict = neural_net.create_data(
                 option_dict=dummy_validation_option_dict,
