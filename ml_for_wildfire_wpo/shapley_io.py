@@ -481,6 +481,11 @@ def write_file(
     )
     dataset_object.variables[LONGITUDE_KEY][:] = grid_longitudes_deg_e
 
+    if GFS_LEAD_TIME_DIM not in dataset_object.dimensions:
+        dataset_object.createDimension(
+            GFS_LEAD_TIME_DIM, len(gfs_pred_lead_times_hours)
+        )
+
     dataset_object.createVariable(
         GFS_LEAD_TIME_KEY, datatype=numpy.float64, dimensions=GFS_LEAD_TIME_DIM
     )
