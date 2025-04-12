@@ -1148,6 +1148,9 @@ def _run(shapley_dir_or_file_name, init_date_string, extreme_case_file_name,
     border_latitudes_deg_n, border_longitudes_deg_e = border_io.read_file()
 
     gfs_field_names = vod[neural_net.GFS_PREDICTOR_FIELDS_KEY]
+    if gfs_field_names is None:
+        gfs_field_names = []
+
     gfs_field_names_2d = [
         f for f in gfs_field_names
         if f in gfs_utils.ALL_2D_FIELD_NAMES
