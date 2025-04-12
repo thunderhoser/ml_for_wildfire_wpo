@@ -1052,6 +1052,11 @@ def _run(shapley_dir_or_file_name, init_date_string, extreme_case_file_name,
         ]
         del data_dict
 
+    thin_out_lead_times = thin_out_lead_times and (
+        neural_net.GFS_3D_LAYER_NAME in model_input_layer_names or
+        neural_net.GFS_2D_LAYER_NAME in model_input_layer_names
+    )
+
     if thin_out_lead_times:
         vod = validation_option_dict
         orig_gfs_lead_times_hours = vod[
