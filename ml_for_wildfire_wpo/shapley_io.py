@@ -141,26 +141,62 @@ def write_file(
     for this_layer_name in model_input_layer_names:
         assert this_layer_name in neural_net.VALID_INPUT_LAYER_NAMES
 
-    assert (
-        neural_net.GFS_3D_LAYER_NAME in model_input_layer_names or
-        neural_net.GFS_2D_LAYER_NAME in model_input_layer_names
-    )
     assert len(model_input_layer_names) == len(shapley_matrices)
 
-    if neural_net.GFS_3D_LAYER_NAME in model_input_layer_names:
+    num_gfs_lead_times = None
+    num_grid_rows = None
+    num_grid_columns = None
+
+    try:
         lyr_idx = model_input_layer_names.index(neural_net.GFS_3D_LAYER_NAME)
-    else:
+        num_grid_rows = shapley_matrices[lyr_idx].shape[0]
+        num_grid_columns = shapley_matrices[lyr_idx].shape[1]
+        num_gfs_lead_times = shapley_matrices[lyr_idx].shape[-2]
+    except:
+        pass
+
+    try:
         lyr_idx = model_input_layer_names.index(neural_net.GFS_2D_LAYER_NAME)
+        num_grid_rows = shapley_matrices[lyr_idx].shape[0]
+        num_grid_columns = shapley_matrices[lyr_idx].shape[1]
+        num_gfs_lead_times = shapley_matrices[lyr_idx].shape[-2]
+    except:
+        pass
 
-    num_grid_rows = shapley_matrices[lyr_idx].shape[0]
-    num_grid_columns = shapley_matrices[lyr_idx].shape[1]
-    num_gfs_lead_times = shapley_matrices[lyr_idx].shape[-2]
+    try:
+        lyr_idx = model_input_layer_names.index(
+            neural_net.LAGLEAD_TARGET_LAYER_NAME
+        )
+        num_grid_rows = shapley_matrices[lyr_idx].shape[0]
+        num_grid_columns = shapley_matrices[lyr_idx].shape[1]
+    except:
+        pass
 
-    error_checking.assert_is_numpy_array(
-        gfs_pred_lead_times_hours,
-        exact_dimensions=numpy.array([num_gfs_lead_times], dtype=int)
-    )
+    try:
+        lyr_idx = model_input_layer_names.index(neural_net.ERA5_LAYER_NAME)
+        num_grid_rows = shapley_matrices[lyr_idx].shape[0]
+        num_grid_columns = shapley_matrices[lyr_idx].shape[1]
+    except:
+        pass
+
+    try:
+        lyr_idx = model_input_layer_names.index(
+            neural_net.PREDN_BASELINE_LAYER_NAME
+        )
+        num_grid_rows = shapley_matrices[lyr_idx].shape[0]
+        num_grid_columns = shapley_matrices[lyr_idx].shape[1]
+    except:
+        pass
+
+    assert num_grid_rows is not None
+    assert num_grid_columns is not None
+
     error_checking.assert_is_geq_numpy_array(gfs_pred_lead_times_hours, 0.)
+    if num_gfs_lead_times is not None:
+        error_checking.assert_is_numpy_array(
+            gfs_pred_lead_times_hours,
+            exact_dimensions=numpy.array([num_gfs_lead_times], dtype=int)
+        )
 
     error_checking.assert_is_numpy_array(
         grid_latitudes_deg_n,
