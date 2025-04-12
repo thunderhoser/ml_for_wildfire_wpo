@@ -30,13 +30,13 @@ echo `which python3`
 echo $PATH
 
 CODE_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_standalone/ml_for_wildfire_wpo"
-TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment22_shapley/test"
+TOP_MODEL_DIR_NAME="/scratch1/RDARCH/rda-ghpcs/Ryan.Lagerquist/ml_for_wildfire_models/experiment23a_ablation"
 
 GFS_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed"
 TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/canadian_fwi"
 GFS_FORECAST_TARGET_DIR_NAME="/scratch2/BMC/gsd-hpcs/Ryan.Lagerquist/ml_for_wildfire_wpo_project/gfs_data/processed_fwi_forecasts"
 
-model_dir_name="${TOP_MODEL_DIR_NAME}/num-model-leads=01_use-lagged-targets=1_do-residual-prediction=0_random-seed=1"
+model_dir_name="${TOP_MODEL_DIR_NAME}/predictor_type=gfs_forecast_targets"
 echo $model_dir_name
 
 REGION_NAMES=("pacific_northwest" "pacific_central_west" "pacific_southwest" "mountain_northwest" "mountain_central_west" "mountain_southwest" "northern_plains" "central_plains" "southern_plains" "northeast" "central_east" "southeast" "hawaii" "small_alaska")
