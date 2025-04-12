@@ -1298,6 +1298,9 @@ def _run(shapley_dir_or_file_name, init_date_string, extreme_case_file_name,
             os.remove(this_panel_file_name)
 
     gfs_pressure_levels_mb = vod[neural_net.GFS_PRESSURE_LEVELS_KEY]
+    if gfs_pressure_levels_mb is None:
+        gfs_pressure_levels_mb = numpy.array([])
+
     gfs_field_names_3d = [
         f for f in gfs_field_names
         if f in gfs_utils.ALL_3D_FIELD_NAMES
